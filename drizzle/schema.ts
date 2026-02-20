@@ -70,6 +70,9 @@ export const leads = mysqlTable("leads", {
   analysisStatus: mysqlEnum("analysisStatus", ["pending", "analyzing", "completed", "failed"]).default("pending").notNull(),
   sourceJobId: int("sourceJobId"),   // رابط بمهمة البحث التي أنشأت هذا الـ Lead
   socialSince: varchar("socialSince", { length: 20 }),  // تاريخ الظهور على السوشيال ميديا (مثال: 2019، 2020-05)
+  hasWhatsapp: mysqlEnum("hasWhatsapp", ["unknown", "yes", "no"]).default("unknown").notNull(),
+  whatsappCheckedAt: timestamp("whatsappCheckedAt"),
+  lastWhatsappSentAt: timestamp("lastWhatsappSentAt"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -163,3 +166,18 @@ export const socialAnalyses = mysqlTable("social_analyses", {
 
 export type SocialAnalysis = typeof socialAnalyses.$inferSelect;
 export type InsertSocialAnalysis = typeof socialAnalyses.$inferInsert;
+
+// ===== WHATSAPP MESSAGES TABLE =====
+export const whatsappMessages = mysqlTable("whatsapp_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  message: text("message").notNull(),
+  messageType: mysqlEnum("messageType", ["individual", "bulk"]).default("individual").notNull(),
+  bulkJobId: varchar("bulkJobId", { length: 64 }),  // معرف دفعة الإرسال المجمع
+  status: mysqlEnum("status", ["sent", "pending", "failed"]).default("sent").notNull(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+});
+
+export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
+export type InsertWhatsappMessage = typeof whatsappMessages.$inferInsert;

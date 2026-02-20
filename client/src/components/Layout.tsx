@@ -14,6 +14,7 @@ import {
   X,
   Search,
   Bot,
+  MessageCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -26,6 +27,7 @@ const navItems = [
   { path: "/zones", label: "المناطق الجغرافية", icon: Map },
   { path: "/leads", label: "قائمة العملاء", icon: Users },
   { path: "/leads/add", label: "إضافة عميل", icon: Plus },
+  { path: "/bulk-whatsapp", label: "واتساب مجمع", icon: MessageCircle },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

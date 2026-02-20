@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
-  Edit2, Save, X, ExternalLink, RefreshCw
+  Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -58,6 +58,50 @@ export default function LeadDetail() {
   const [editForm, setEditForm] = useState<any>({});
   const [report, setReport] = useState<any>(null);
   const [analyzingPlatform, setAnalyzingPlatform] = useState<string | null>(null);
+  // WhatsApp state
+  const [waStatus, setWaStatus] = useState<"unknown" | "yes" | "no">("unknown");
+  const [waMessage, setWaMessage] = useState("");
+  const [waGenerating, setWaGenerating] = useState(false);
+  const [waTone, setWaTone] = useState<"formal" | "friendly" | "direct">("friendly");
+  const checkWhatsapp = trpc.whatsapp.check.useMutation();
+  const updateWaStatus = trpc.whatsapp.updateStatus.useMutation();
+  const generateWaMessage = trpc.whatsapp.generateMessage.useMutation();
+  const logWaMessage = trpc.whatsapp.logMessage.useMutation();
+
+  const handleCheckWhatsapp = async () => {
+    if (!lead.verifiedPhone) { toast.error("لا يوجد رقم هاتف لهذا العميل"); return; }
+    const result = await checkWhatsapp.mutateAsync({ leadId: id, phone: lead.verifiedPhone });
+    window.open(result.waUrl, "_blank");
+    toast.info("تم فتح واتساب - حدد الحالة بعد التحقق");
+  };
+
+  const handleGenerateWaMessage = async () => {
+    if (!lead.verifiedPhone) { toast.error("لا يوجد رقم هاتف"); return; }
+    setWaGenerating(true);
+    try {
+      const result = await generateWaMessage.mutateAsync({
+        leadId: id,
+        companyName: lead.companyName,
+        businessType: lead.businessType,
+        city: lead.city,
+        biggestGap: lead.biggestMarketingGap || undefined,
+        salesAngle: lead.suggestedSalesEntryAngle || undefined,
+        tone: waTone,
+      });
+      setWaMessage(result.message);
+      toast.success("تم توليد الرسالة بالذكاء الاصطناعي");
+    } catch { toast.error("فشل توليد الرسالة"); }
+    finally { setWaGenerating(false); }
+  };
+
+  const handleSendWhatsapp = async () => {
+    if (!lead.verifiedPhone || !waMessage) return;
+    const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`;
+    window.open(waUrl, "_blank");
+    await logWaMessage.mutateAsync({ leadId: id, phone, message: waMessage, messageType: "individual" });
+    toast.success("تم فتح واتساب مع الرسالة");
+  };
 
   if (isLoading) {
     return (
@@ -244,6 +288,75 @@ export default function LeadDetail() {
                 <span className="text-xs text-muted-foreground">ظهور على السوشيال منذ:</span>
                 <span className="text-sm font-semibold" style={{ color: "var(--brand-cyan)" }}>{(lead as any).socialSince}</span>
               </div>
+            )}
+          </div>
+
+          {/* WhatsApp Section */}
+          <div className="rounded-2xl p-4 border space-y-3" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.55 0.2 145 / 0.3)" }}>
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <MessageCircle className="w-4 h-4" style={{ color: "oklch(0.65 0.2 145)" }} />
+              واتساب
+            </h3>
+            {!lead.verifiedPhone ? (
+              <p className="text-xs text-muted-foreground">أضف رقم الهاتف أولاً لاستخدام واتساب</p>
+            ) : (
+              <>
+                {/* Status buttons */}
+                <div className="flex gap-1.5">
+                  <button onClick={handleCheckWhatsapp} disabled={checkWhatsapp.isPending}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+                    style={{ background: "oklch(0.55 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.3)" }}>
+                    {checkWhatsapp.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
+                    فحص واتساب
+                  </button>
+                </div>
+                {/* Manual status update */}
+                <div className="flex gap-1.5">
+                  {(["yes", "no", "unknown"] as const).map(s => (
+                    <button key={s} onClick={async () => { setWaStatus(s); await updateWaStatus.mutateAsync({ leadId: id, hasWhatsapp: s }); toast.success("تم تحديث الحالة"); }}
+                      className="flex-1 py-1 rounded-lg text-xs transition-all"
+                      style={waStatus === s ? { background: s === "yes" ? "oklch(0.55 0.2 145 / 0.3)" : s === "no" ? "oklch(0.58 0.22 25 / 0.3)" : "oklch(0.18 0.02 240)", color: s === "yes" ? "oklch(0.65 0.2 145)" : s === "no" ? "oklch(0.7 0.22 25)" : "oklch(0.6 0.01 240)", border: "1px solid currentColor" } : { background: "oklch(0.15 0.015 240)", color: "oklch(0.5 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
+                      {s === "yes" ? "✅ لديه" : s === "no" ? "❌ ليس لديه" : "❓ غير محدد"}
+                    </button>
+                  ))}
+                </div>
+                {/* Message generator */}
+                <div className="space-y-2">
+                  <div className="flex gap-1">
+                    {(["friendly", "formal", "direct"] as const).map(t => (
+                      <button key={t} onClick={() => setWaTone(t)}
+                        className="flex-1 py-1 rounded-lg text-xs transition-all"
+                        style={waTone === t ? { background: "oklch(0.65 0.18 200 / 0.2)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.4)" } : { background: "oklch(0.15 0.015 240)", color: "oklch(0.5 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
+                        {t === "friendly" ? "ودي" : t === "formal" ? "رسمي" : "مباشر"}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={handleGenerateWaMessage} disabled={waGenerating}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-all"
+                    style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+                    {waGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                    توليد رسالة بالذكاء الاصطناعي
+                  </button>
+                  {waMessage && (
+                    <>
+                      <textarea value={waMessage} onChange={e => setWaMessage(e.target.value)} rows={4}
+                        className="w-full px-3 py-2 rounded-xl text-xs border border-border bg-background text-foreground resize-none focus:outline-none focus:border-primary" />
+                      <div className="flex gap-1.5">
+                        <button onClick={() => { navigator.clipboard.writeText(waMessage); toast.success("تم النسخ"); }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs transition-all"
+                          style={{ background: "oklch(0.15 0.015 240)", color: "oklch(0.6 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
+                          <Copy className="w-3 h-3" /> نسخ
+                        </button>
+                        <button onClick={handleSendWhatsapp}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                          style={{ background: "oklch(0.55 0.2 145)", color: "white" }}>
+                          <Send className="w-3 h-3" /> إرسال
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
             )}
           </div>
 

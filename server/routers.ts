@@ -13,7 +13,8 @@ import {
   createSearchJob, getSearchJobById, getAllSearchJobs, updateSearchJob, deleteSearchJob, checkLeadDuplicate,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
-
+import { whatsappMessages } from "../drizzle/schema";
+import { nanoid } from "nanoid";
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
   list: protectedProcedure.query(async () => {
@@ -1192,6 +1193,164 @@ const aiSearchRouter = router({
     }),
 });
 
+// ===== WHATSAPP ROUTER =====
+const whatsappRouter = router({
+  // فحص وجود واتساب لرقم هاتف
+  check: protectedProcedure
+    .input(z.object({ leadId: z.number(), phone: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // نحدّث حالة الواتساب في قاعدة البيانات
+      // الفحص الفعلي يتم من المتصفح عبر wa.me - هنا نسجّل النتيجة
+      const { leads } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(leads)
+        .set({ whatsappCheckedAt: new Date() })
+        .where(eq(leads.id, input.leadId));
+      return { phone: input.phone, waUrl: `https://wa.me/${input.phone.replace(/[^0-9]/g, "")}` };
+    }),
+
+  // تحديث حالة واتساب بعد الفحص اليدوي
+  updateStatus: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      hasWhatsapp: z.enum(["yes", "no", "unknown"]),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { leads } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(leads)
+        .set({ hasWhatsapp: input.hasWhatsapp, whatsappCheckedAt: new Date() })
+        .where(eq(leads.id, input.leadId));
+      return { success: true };
+    }),
+
+  // توليد رسالة واتساب مخصصة بالذكاء الاصطناعي
+  generateMessage: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      companyName: z.string(),
+      businessType: z.string(),
+      city: z.string(),
+      biggestGap: z.string().optional(),
+      salesAngle: z.string().optional(),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+    }))
+    .mutation(async ({ input }) => {
+      const prompt = `أنت خبير تسويق رقمي سعودي. اكتب رسالة واتساب احترافية وقصيرة (لا تتجاوز 150 كلمة) لصاحب النشاط التالي:
+
+اسم النشاط: ${input.companyName}
+نوع النشاط: ${input.businessType}
+المدينة: ${input.city}
+${input.biggestGap ? `أبرز ثغرة تسويقية: ${input.biggestGap}` : ""}
+${input.salesAngle ? `زاوية البيع المقترحة: ${input.salesAngle}` : ""}
+
+الأسلوب المطلوب: ${input.tone === "formal" ? "رسمي محترم" : input.tone === "friendly" ? "ودي ومحفّز" : "مباشر وواضح"}
+
+الرسالة يجب أن:
+- تبدأ بالسلام والتعريف بنفسك كمزود خدمات تسويق رقمي
+- تذكر ثغرة محددة أو فرصة تحسين
+- تنتهي بدعوة واضحة للتواصل
+- تكون باللغة العربية الفصحى السهلة
+
+أعطني الرسالة فقط بدون أي مقدمات أو شرح.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "أنت خبير تسويق رقمي متخصص في السوق السعودي." },
+          { role: "user", content: prompt },
+        ],
+      });
+      const message = response.choices[0]?.message?.content;
+      if (!message) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل توليد الرسالة" });
+      return { message: typeof message === "string" ? message : JSON.stringify(message) };
+    }),
+
+  // تسجيل رسالة مُرسلة
+  logMessage: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      phone: z.string(),
+      message: z.string(),
+      messageType: z.enum(["individual", "bulk"]).default("individual"),
+      bulkJobId: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { leads } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.insert(whatsappMessages).values({
+        leadId: input.leadId,
+        phone: input.phone,
+        message: input.message,
+        messageType: input.messageType,
+        bulkJobId: input.bulkJobId,
+        status: "sent",
+      });
+      await db.update(leads)
+        .set({ lastWhatsappSentAt: new Date() })
+        .where(eq(leads.id, input.leadId));
+      return { success: true };
+    }),
+
+  // جلب سجل الرسائل لعميل معين
+  getMessages: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const { eq, desc } = await import("drizzle-orm");
+      return db.select().from(whatsappMessages)
+        .where(eq(whatsappMessages.leadId, input.leadId))
+        .orderBy(desc(whatsappMessages.sentAt))
+        .limit(20);
+    }),
+
+  // إرسال مجمع: توليد رسائل لقائمة عملاء
+  bulkGenerate: protectedProcedure
+    .input(z.object({
+      leadIds: z.array(z.number()),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      customTemplate: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const results: Array<{ leadId: number; companyName: string; phone: string; message: string; waUrl: string }> = [];
+      for (const leadId of input.leadIds) {
+        const lead = await getLeadById(leadId);
+        if (!lead || !lead.verifiedPhone) continue;
+        let message = input.customTemplate || "";
+        if (!message) {
+          const prompt = `اكتب رسالة واتساب قصيرة (80-100 كلمة) لـ ${lead.companyName} (${lead.businessType}) في ${lead.city}. ${lead.biggestMarketingGap ? `الثغرة: ${lead.biggestMarketingGap}` : ""}. الأسلوب: ${input.tone === "formal" ? "رسمي" : input.tone === "friendly" ? "ودي" : "مباشر"}. أعطني الرسالة فقط.`;
+          const resp = await invokeLLM({
+            messages: [{ role: "user", content: prompt }],
+          });
+          const content = resp.choices[0]?.message?.content;
+          message = typeof content === "string" ? content : "";
+        } else {
+          message = message
+            .replace("{{اسم_النشاط}}", lead.companyName)
+            .replace("{{نوع_النشاط}}", lead.businessType)
+            .replace("{{المدينة}}", lead.city);
+        }
+        const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+        results.push({
+          leadId,
+          companyName: lead.companyName,
+          phone,
+          message,
+          waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+        });
+        // تأخير بشري بين الطلبات
+        await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000));
+      }
+      return { results, bulkJobId: nanoid(10) };
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1209,5 +1368,6 @@ export const appRouter = router({
    search: searchRouter,
   searchJobs: searchJobsRouter,
   aiSearch: aiSearchRouter,
+  whatsapp: whatsappRouter,
 });
 export type AppRouter = typeof appRouter;

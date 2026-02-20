@@ -105,3 +105,17 @@
 - [x] تحديث صفحة AddLead بحقل socialSince
 - [x] تحديث صفحة LeadDetail لعرض socialSince
 - [x] تحديث صفحة Leads لعرض socialSince في الجدول
+
+## الدفعة السابعة - نظام واتساب المتكامل
+
+- [ ] إضافة حقل hasWhatsapp + whatsappCheckedAt في جدول leads
+- [ ] إضافة جدول whatsapp_messages لتتبع الرسائل المرسلة
+- [ ] migration لإضافة الحقول والجدول الجديد
+- [ ] tRPC router: checkWhatsapp (فحص وجود واتساب عبر wa.me)
+- [ ] tRPC router: generateWhatsappMessage (AI يولد رسالة مخصصة)
+- [ ] tRPC router: logWhatsappMessage (تسجيل الرسالة المرسلة)
+- [ ] tRPC router: bulkWhatsapp (إرسال مجمع لقائمة عملاء)
+- [ ] زر فحص واتساب في LeadDetail مع مؤشر ✅/❌
+- [ ] زر "إرسال واتساب" يفتح wa.me مع الرسالة المولّدة بالـ AI
+- [ ] صفحة الإرسال المجمع في Leads: اختيار عملاء + توليد رسائل + إرسال
+- [ ] عرض حالة واتساب في جدول Leads (أيقونة ملونة)

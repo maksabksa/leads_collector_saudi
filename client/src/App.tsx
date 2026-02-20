@@ -13,6 +13,7 @@ import Search from "./pages/Search";
 import Scout from "./pages/Scout";
 import SearchEngine from "./pages/SearchEngine";
 import Layout from "./components/Layout";
+import BulkWhatsapp from "./pages/BulkWhatsapp";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
         <Route path="/search" component={Search} />
         <Route path="/scout" component={Scout} />
         <Route path="/engine" component={SearchEngine} />
+        <Route path="/bulk-whatsapp" component={BulkWhatsapp} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
