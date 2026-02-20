@@ -10,6 +10,7 @@ import Leads from "./pages/Leads";
 import AddLead from "./pages/AddLead";
 import LeadDetail from "./pages/LeadDetail";
 import Search from "./pages/Search";
+import Scout from "./pages/Scout";
 import Layout from "./components/Layout";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/leads/add" component={AddLead} />
         <Route path="/leads/:id" component={LeadDetail} />
         <Route path="/search" component={Search} />
+        <Route path="/scout" component={Scout} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

@@ -38,15 +38,16 @@ export default function Leads() {
   };
 
   const handleExport = async () => {
-    const result = await exportCSV.mutateAsync({ city: filterCity || undefined, analysisStatus: filterStatus || undefined });
+    toast.info("جاري تجهيز البيانات مع التحليل...");
+    const result = await exportCSV.mutateAsync({ city: filterCity || undefined, analysisStatus: filterStatus || undefined, includeAnalysis: true });
     const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `leads_${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `leads_مع_تحليل_${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`تم تصدير ${result.count} سجل`);
+    toast.success(`✅ تم تصدير ${result.count} سجل بالتحليل الكامل في صف واحد`);
   };
 
   const cities = Array.from(new Set((leads ?? []).map(l => l.city))).filter(Boolean);

@@ -459,27 +459,68 @@ const exportRouter = router({
       zoneId: z.number().optional(),
       city: z.string().optional(),
       analysisStatus: z.string().optional(),
+      includeAnalysis: z.boolean().optional().default(true),
     }).optional())
     .mutation(async ({ input }) => {
       const allLeads = await getAllLeads(input ?? {});
+      const includeAnalysis = input?.includeAnalysis !== false;
+
+      // Fetch analysis data for all leads if requested
+      let analysisMap: Record<number, { website?: any; social?: any[] }> = {};
+      if (includeAnalysis) {
+        for (const lead of allLeads) {
+          const website = await getWebsiteAnalysisByLeadId(lead.id);
+          const social = await getSocialAnalysesByLeadId(lead.id);
+          analysisMap[lead.id] = { website, social };
+        }
+      }
+
       const headers = [
+        // Basic info
         "الاسم", "نوع النشاط", "المدينة", "الحي", "المنطقة",
-        "الهاتف", "الموقع", "انستغرام", "تويتر", "سناب شات",
+        "الهاتف", "الموقع", "إنستغرام", "تويتر", "سناب شات", "تيك توك", "فيسبوك",
         "عدد التقييمات", "درجة الجودة", "درجة الأولوية",
         "أكبر ثغرة تسويقية", "فرصة الإيراد", "زاوية الدخول",
+        // Website analysis
+        "تحليل الموقع - الدرجة الكلية", "سرعة التحميل", "تجربة الجوال", "سيو",
+        "جودة المحتوى", "التصميم", "وضوح العروض",
+        "الثغرات التقنية", "ثغرات المحتوى", "ملخص تحليل الموقع",
+        // Social analysis
+        "تحليل سوشيال - أفضل منصة", "درجة التفاعل", "جودة المحتوى السوشيال",
+        "ثغرات السوشيال", "ملخص تحليل السوشيال",
         "تاريخ الإضافة"
       ];
-      const rows = allLeads.map(lead => [
-        lead.companyName, lead.businessType, lead.city, lead.district || "",
-        lead.zoneName || "", lead.verifiedPhone || "", lead.website || "",
-        lead.instagramUrl || "", lead.twitterUrl || "", lead.snapchatUrl || "",
-        lead.reviewCount || 0, lead.brandingQualityScore || "",
-        lead.leadPriorityScore || "", lead.biggestMarketingGap || "",
-        lead.revenueOpportunity || "", lead.suggestedSalesEntryAngle || "",
-        new Date(lead.createdAt).toLocaleDateString("ar-SA"),
-      ]);
+
+      const rows = allLeads.map(lead => {
+        const analysis = analysisMap[lead.id];
+        const wa = analysis?.website;
+        const bestSocial = analysis?.social?.sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0))[0];
+        return [
+          // Basic
+          lead.companyName, lead.businessType, lead.city, lead.district || "",
+          lead.zoneName || "", lead.verifiedPhone || "", lead.website || "",
+          lead.instagramUrl || "", lead.twitterUrl || "", lead.snapchatUrl || "",
+          lead.tiktokUrl || "", lead.facebookUrl || "",
+          lead.reviewCount || 0, lead.brandingQualityScore || "",
+          lead.leadPriorityScore || "", lead.biggestMarketingGap || "",
+          lead.revenueOpportunity || "", lead.suggestedSalesEntryAngle || "",
+          // Website analysis
+          wa?.overallScore || "", wa?.loadSpeedScore || "", wa?.mobileExperienceScore || "",
+          wa?.seoScore || "", wa?.contentQualityScore || "", wa?.designScore || "", wa?.offerClarityScore || "",
+          Array.isArray(wa?.technicalGaps) ? wa.technicalGaps.join(" | ") : "",
+          Array.isArray(wa?.contentGaps) ? wa.contentGaps.join(" | ") : "",
+          wa?.summary || "",
+          // Social analysis
+          bestSocial?.platform || "", bestSocial?.engagementScore || "",
+          bestSocial?.contentQualityScore || "",
+          Array.isArray(bestSocial?.gaps) ? bestSocial.gaps.join(" | ") : "",
+          bestSocial?.summary || "",
+          new Date(lead.createdAt).toLocaleDateString("ar-SA"),
+        ];
+      });
+
       const csvContent = [headers, ...rows]
-        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .map(row => row.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
         .join("\n");
       return { csv: "\uFEFF" + csvContent, count: allLeads.length };
     }),
