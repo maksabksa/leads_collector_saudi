@@ -918,6 +918,128 @@ async function runSearchJobInBackground(jobId: number): Promise<void> {
 }
 
 // ===== MAIN ROUTER =====
+// ====== AI Search Assistant Router ======
+const aiSearchRouter = router({
+  // يولد استراتيجية بحث ذكية مخصصة لكل منصة ونشاط
+  generateStrategy: protectedProcedure
+    .input(z.object({
+      platform: z.string(),
+      businessType: z.string(),
+      city: z.string(),
+      country: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const platformNames: Record<string, string> = {
+        snapchat: "سناب شات",
+        instagram: "إنستغرام",
+        tiktok: "تيك توك",
+        facebook: "فيسبوك",
+        maroof: "منصة معروف السعودية",
+      };
+      const platformAr = platformNames[input.platform] || input.platform;
+
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `أنت خبير استراتيجي في التسويق الرقمي والبحث عن الأنشطة التجارية في السوق السعودي والخليجي. مهمتك توليد استراتيجيات بحث دقيقة ومخصصة لكل منصة.`,
+          },
+          {
+            role: "user",
+            content: `أريد البحث عن نشاط تجاري من نوع "${input.businessType}" في مدينة "${input.city}" عبر منصة "${platformAr}".
+
+أعطني:
+1. أفضل 8-10 كلمات بحث وهاشتاقات مناسبة لهذه المنصة
+2. استراتيجية البحث المثلى (كيف تبحث خطوة بخطوة)
+3. علامات تدل على أن الحساب نشاط تجاري حقيقي وليس شخصي
+4. البيانات التي يجب استخراجها من كل حساب
+5. زاوية التواصل المقترحة مع هذا النوع من الأنشطة
+
+أجب بصيغة JSON منظمة.`,
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "search_strategy",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                keywords: { type: "array", items: { type: "string" }, description: "كلمات البحث والهاشتاقات" },
+                strategy: { type: "string", description: "استراتيجية البحث خطوة بخطوة" },
+                qualitySignals: { type: "array", items: { type: "string" }, description: "علامات الحساب التجاري الحقيقي" },
+                dataToExtract: { type: "array", items: { type: "string" }, description: "البيانات المطلوب استخراجها" },
+                contactAngle: { type: "string", description: "زاوية التواصل المقترحة" },
+                platformTips: { type: "string", description: "نصائح خاصة بهذه المنصة" },
+              },
+              required: ["keywords", "strategy", "qualitySignals", "dataToExtract", "contactAngle", "platformTips"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("لم يتم توليد الاستراتيجية");
+      return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+    }),
+
+  // يقيّم جودة العميل المدخل يدوياً
+  evaluateLead: protectedProcedure
+    .input(z.object({
+      companyName: z.string(),
+      platform: z.string(),
+      businessType: z.string(),
+      profileUrl: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `أنت محلل تسويقي متخصص في تقييم جودة العملاء المحتملين في السوق السعودي.`,
+          },
+          {
+            role: "user",
+            content: `قيّم هذا العميل المحتمل:
+- الاسم: ${input.companyName}
+- المنصة: ${input.platform}
+- نوع النشاط: ${input.businessType}
+- رابط الحساب: ${input.profileUrl || "غير متاح"}
+- ملاحظات: ${input.notes || "لا يوجد"}
+
+أعطني تقييماً سريعاً يشمل: درجة الجودة (1-10)، مستوى الاهتمام المتوقع، أفضل وقت للتواصل، وأبرز نقطة ضعف تسويقية يمكن استغلالها.`,
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "lead_evaluation",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                qualityScore: { type: "number", description: "درجة الجودة من 1 إلى 10" },
+                interestLevel: { type: "string", description: "مستوى الاهتمام المتوقع: منخفض/متوسط/عالي" },
+                bestContactTime: { type: "string", description: "أفضل وقت للتواصل" },
+                mainWeakness: { type: "string", description: "أبرز نقطة ضعف تسويقية" },
+                recommendation: { type: "string", description: "توصية سريعة للتواصل" },
+              },
+              required: ["qualityScore", "interestLevel", "bestContactTime", "mainWeakness", "recommendation"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("لم يتم التقييم");
+      return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -934,5 +1056,6 @@ export const appRouter = router({
   export: exportRouter,
    search: searchRouter,
   searchJobs: searchJobsRouter,
+  aiSearch: aiSearchRouter,
 });
 export type AppRouter = typeof appRouter;

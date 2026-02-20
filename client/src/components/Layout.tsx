@@ -97,8 +97,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Zap className="w-5 h-5" style={{ color: "var(--brand-cyan)" }} />
             </div>
             <div>
-              <p className="font-bold text-sm text-foreground leading-tight">Leads Collector</p>
-              <p className="text-xs text-muted-foreground">السوق السعودي</p>
+              <p className="font-bold text-sm text-foreground leading-tight">بحثي</p>
+              <p className="text-xs text-muted-foreground">مجمع البيانات</p>
             </div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-muted-foreground hover:text-foreground">
@@ -166,7 +166,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Globe className="w-4 h-4" />
-            <span>السعودية - لحوم وملاحم وأغنام</span>
+            <span>مجمع بيانات الأعمال</span>
           </div>
           <div className="mr-auto flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />

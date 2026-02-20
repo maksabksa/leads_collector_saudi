@@ -69,7 +69,8 @@ export default function Dashboard() {
           {
             label: "إجمالي Leads",
             value: statsLoading ? "..." : totalLeads,
-            sub: `الهدف: 400`,
+            sub: `بدون حد`,
+            sub2: `جمع لا محدود`,
             icon: Users,
             color: "var(--brand-cyan)",
             bg: "oklch(0.65 0.18 200 / 0.1)",
@@ -117,27 +118,27 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="font-semibold text-foreground">تقدم جمع البيانات</p>
-            <p className="text-xs text-muted-foreground mt-0.5">الهدف: 400 Lead في السعودية كاملة</p>
+            <p className="text-xs text-muted-foreground mt-0.5">جمع بيانات بلا حد من جميع المنصات</p>
           </div>
           <span className="text-2xl font-bold" style={{ color: "var(--brand-cyan)" }}>
-            {totalLeads > 0 ? Math.round((totalLeads / 400) * 100) : 0}%
+            {totalLeads.toLocaleString('ar-SA')}
           </span>
         </div>
         <div className="h-3 rounded-full overflow-hidden" style={{ background: "oklch(0.18 0.02 240)" }}>
           <div
             className="h-full rounded-full transition-all duration-1000"
             style={{
-              width: `${Math.min(100, (totalLeads / 400) * 100)}%`,
+              width: totalLeads > 0 ? `${Math.min(100, (totalLeads / 1000) * 100)}%` : '0%',
               background: "linear-gradient(90deg, oklch(0.55 0.15 200), oklch(0.72 0.18 200))",
             }}
           />
         </div>
         <div className="flex justify-between mt-2 text-xs text-muted-foreground">
           <span>0</span>
-          <span>100</span>
-          <span>200</span>
-          <span>300</span>
-          <span>400</span>
+          <span>250</span>
+          <span>500</span>
+          <span>750</span>
+          <span>∞</span>
         </div>
       </div>
 

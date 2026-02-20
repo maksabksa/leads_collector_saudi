@@ -167,12 +167,34 @@ function ManualExtractForm({ platform, query, city, onClose }: {
     facebookUrl: "",
     notes: "",
   });
+  const [strategy, setStrategy] = useState<any>(null);
+  const [evaluation, setEvaluation] = useState<any>(null);
+  const [showStrategy, setShowStrategy] = useState(false);
+
   const createLead = trpc.leads.create.useMutation({
     onSuccess: () => {
       toast.success("✅ تم حفظ العميل بنجاح!");
       setForm(f => ({ ...f, companyName: "", verifiedPhone: "", website: "", notes: "" }));
+      setEvaluation(null);
     },
     onError: (e) => toast.error(`خطأ: ${e.message}`),
+  });
+
+  const generateStrategy = trpc.aiSearch.generateStrategy.useMutation({
+    onSuccess: (data) => {
+      setStrategy(data);
+      setShowStrategy(true);
+      toast.success("✨ تم توليد استراتيجية البحث!");
+    },
+    onError: (e) => toast.error(`خطأ AI: ${e.message}`),
+  });
+
+  const evaluateLead = trpc.aiSearch.evaluateLead.useMutation({
+    onSuccess: (data) => {
+      setEvaluation(data);
+      toast.success("✨ تم تقييم العميل!");
+    },
+    onError: (e) => toast.error(`خطأ AI: ${e.message}`),
   });
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -193,70 +215,190 @@ function ManualExtractForm({ platform, query, city, onClose }: {
     });
   };
 
+  const platformColor = platform.id === "instagram" ? "bg-pink-700 hover:bg-pink-600" :
+    platform.id === "snapchat" ? "bg-yellow-700 hover:bg-yellow-600" :
+    platform.id === "tiktok" ? "bg-cyan-700 hover:bg-cyan-600" :
+    platform.id === "facebook" ? "bg-blue-700 hover:bg-blue-600" :
+    platform.id === "maroof" ? "bg-emerald-700 hover:bg-emerald-600" :
+    "bg-zinc-700 hover:bg-zinc-600";
+
   return (
-    <Card className={`border ${platform.borderColor} ${platform.bgColor}`}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-white text-sm flex items-center gap-2">
-          <span className={platform.color}>{platform.icon}</span>
-          نموذج الاستخراج اليدوي — {platform.nameAr}
-          <button onClick={onClose} className="mr-auto text-zinc-500 hover:text-white">
-            <XCircle className="w-4 h-4" />
-          </button>
-        </CardTitle>
-        <p className="text-zinc-500 text-xs">
-          ابحث في {platform.nameAr} ثم انسخ البيانات هنا — الحفظ فوري بضغطة واحدة
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-zinc-400 text-xs mb-1 block">اسم النشاط *</label>
-            <Input value={form.companyName} onChange={e => set("companyName", e.target.value)}
-              placeholder="اسم الحساب أو النشاط"
-              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
+    <div className="space-y-3">
+      {/* AI Strategy Panel */}
+      <Card className="border border-violet-700 bg-violet-900/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-white text-sm flex items-center gap-2">
+            <Bot className="w-4 h-4 text-violet-400" />
+            مساعد الذكاء الاصطناعي — {platform.nameAr}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button
+            onClick={() => generateStrategy.mutate({ platform: platform.id, businessType: query, city, country: "السعودية" })}
+            disabled={generateStrategy.isPending}
+            variant="outline"
+            className="w-full gap-2 border-violet-600 text-violet-300 hover:bg-violet-800/40 text-sm"
+          >
+            {generateStrategy.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {generateStrategy.isPending ? "جاري توليد استراتيجية البحث..." : "✨ ولّد استراتيجية بحث بالذكاء الاصطناعي"}
+          </Button>
+
+          {strategy && showStrategy && (
+            <div className="space-y-2 text-xs">
+              {/* Keywords */}
+              <div className="bg-zinc-800/60 rounded-lg p-3">
+                <p className="text-violet-400 font-medium mb-2">🔍 كلمات البحث والهاشتاقات:</p>
+                <div className="flex flex-wrap gap-1">
+                  {strategy.keywords?.map((kw: string, i: number) => (
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-violet-800/50 text-violet-200 border border-violet-700">
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {/* Strategy */}
+              <div className="bg-zinc-800/60 rounded-lg p-3">
+                <p className="text-violet-400 font-medium mb-1">📋 استراتيجية البحث:</p>
+                <p className="text-zinc-300 leading-relaxed whitespace-pre-line">{strategy.strategy}</p>
+              </div>
+              {/* Quality Signals */}
+              <div className="bg-zinc-800/60 rounded-lg p-3">
+                <p className="text-violet-400 font-medium mb-1">✅ علامات الحساب التجاري الحقيقي:</p>
+                <ul className="space-y-0.5">
+                  {strategy.qualitySignals?.map((s: string, i: number) => (
+                    <li key={i} className="text-zinc-300 flex items-start gap-1"><span className="text-green-400 mt-0.5">•</span>{s}</li>
+                  ))}
+                </ul>
+              </div>
+              {/* Contact Angle */}
+              <div className="bg-zinc-800/60 rounded-lg p-3">
+                <p className="text-violet-400 font-medium mb-1">🎯 زاوية التواصل:</p>
+                <p className="text-zinc-300">{strategy.contactAngle}</p>
+              </div>
+              {/* Platform Tips */}
+              <div className="bg-zinc-800/60 rounded-lg p-3">
+                <p className="text-violet-400 font-medium mb-1">💡 نصائح {platform.nameAr}:</p>
+                <p className="text-zinc-300">{strategy.platformTips}</p>
+              </div>
+              <button onClick={() => setShowStrategy(false)} className="text-zinc-500 text-xs hover:text-zinc-300">↑ إخفاء الاستراتيجية</button>
+            </div>
+          )}
+          {strategy && !showStrategy && (
+            <button onClick={() => setShowStrategy(true)} className="text-violet-400 text-xs hover:text-violet-300">↓ عرض الاستراتيجية</button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Manual Form */}
+      <Card className={`border ${platform.borderColor} ${platform.bgColor}`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-white text-sm flex items-center gap-2">
+            <span className={platform.color}>{platform.icon}</span>
+            نموذج استخراج البيانات — {platform.nameAr}
+            <button onClick={onClose} className="mr-auto text-zinc-500 hover:text-white">
+              <XCircle className="w-4 h-4" />
+            </button>
+          </CardTitle>
+          <p className="text-zinc-500 text-xs">
+            ابحث في {platform.nameAr} ثم انسخ البيانات هنا — الذكاء الاصطناعي يقيّم العميل قبل الحفظ
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-zinc-400 text-xs mb-1 block">اسم النشاط *</label>
+              <Input value={form.companyName} onChange={e => set("companyName", e.target.value)}
+                placeholder="اسم الحساب أو النشاط"
+                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-zinc-400 text-xs mb-1 block">رقم الهاتف</label>
+              <Input value={form.verifiedPhone} onChange={e => set("verifiedPhone", e.target.value)}
+                placeholder="+966..."
+                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-zinc-400 text-xs mb-1 block">رابط الموقع</label>
+              <Input value={form.website} onChange={e => set("website", e.target.value)}
+                placeholder="https://..."
+                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-zinc-400 text-xs mb-1 block">رابط الحساب على {platform.nameAr}</label>
+              <Input
+                value={platform.id === "instagram" ? form.instagramUrl : platform.id === "snapchat" ? form.snapchatUrl : platform.id === "tiktok" ? form.tiktokUrl : form.facebookUrl}
+                onChange={e => set(
+                  platform.id === "instagram" ? "instagramUrl" : platform.id === "snapchat" ? "snapchatUrl" : platform.id === "tiktok" ? "tiktokUrl" : "facebookUrl",
+                  e.target.value
+                )}
+                placeholder={`رابط حساب ${platform.nameAr}`}
+                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
+            </div>
           </div>
           <div>
-            <label className="text-zinc-400 text-xs mb-1 block">رقم الهاتف</label>
-            <Input value={form.verifiedPhone} onChange={e => set("verifiedPhone", e.target.value)}
-              placeholder="+966..."
+            <label className="text-zinc-400 text-xs mb-1 block">ملاحظات</label>
+            <Input value={form.notes} onChange={e => set("notes", e.target.value)}
+              placeholder="أي ملاحظات إضافية..."
               className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-zinc-400 text-xs mb-1 block">رابط الموقع</label>
-            <Input value={form.website} onChange={e => set("website", e.target.value)}
-              placeholder="https://..."
-              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
-          </div>
-          <div>
-            <label className="text-zinc-400 text-xs mb-1 block">رابط الحساب على {platform.nameAr}</label>
-            <Input
-              value={platform.id === "instagram" ? form.instagramUrl : platform.id === "snapchat" ? form.snapchatUrl : platform.id === "tiktok" ? form.tiktokUrl : form.facebookUrl}
-              onChange={e => set(
-                platform.id === "instagram" ? "instagramUrl" : platform.id === "snapchat" ? "snapchatUrl" : platform.id === "tiktok" ? "tiktokUrl" : "facebookUrl",
-                e.target.value
-              )}
-              placeholder={`رابط حساب ${platform.nameAr}`}
-              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
-          </div>
-        </div>
-        <div>
-          <label className="text-zinc-400 text-xs mb-1 block">ملاحظات</label>
-          <Input value={form.notes} onChange={e => set("notes", e.target.value)}
-            placeholder="أي ملاحظات إضافية..."
-            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-8 text-sm" />
-        </div>
-        <Button
-          onClick={handleSave}
-          disabled={createLead.isPending}
-          className={`w-full gap-2 text-white ${platform.id === "instagram" ? "bg-pink-700 hover:bg-pink-600" : platform.id === "snapchat" ? "bg-yellow-700 hover:bg-yellow-600" : platform.id === "tiktok" ? "bg-cyan-700 hover:bg-cyan-600" : platform.id === "facebook" ? "bg-blue-700 hover:bg-blue-600" : "bg-emerald-700 hover:bg-emerald-600"}`}
-        >
-          {createLead.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          حفظ العميل
-        </Button>
-      </CardContent>
-    </Card>
+
+          {/* AI Evaluate Button */}
+          {form.companyName && (
+            <Button
+              onClick={() => evaluateLead.mutate({
+                companyName: form.companyName,
+                platform: platform.id,
+                businessType: form.businessType,
+                profileUrl: platform.id === "instagram" ? form.instagramUrl : platform.id === "snapchat" ? form.snapchatUrl : platform.id === "tiktok" ? form.tiktokUrl : form.facebookUrl,
+                notes: form.notes,
+              })}
+              disabled={evaluateLead.isPending}
+              variant="outline"
+              className="w-full gap-2 border-amber-600 text-amber-300 hover:bg-amber-900/30 text-sm"
+            >
+              {evaluateLead.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+              {evaluateLead.isPending ? "جاري تقييم العميل..." : "🤖 قيّم هذا العميل بالذكاء الاصطناعي"}
+            </Button>
+          )}
+
+          {/* AI Evaluation Result */}
+          {evaluation && (
+            <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-3 space-y-2 text-xs">
+              <p className="text-amber-400 font-medium">🤖 تقييم الذكاء الاصطناعي:</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-zinc-800/60 rounded p-2">
+                  <p className="text-zinc-500">درجة الجودة</p>
+                  <p className="text-amber-300 font-bold text-lg">{evaluation.qualityScore}/10</p>
+                </div>
+                <div className="bg-zinc-800/60 rounded p-2">
+                  <p className="text-zinc-500">مستوى الاهتمام</p>
+                  <p className="text-amber-300 font-medium">{evaluation.interestLevel}</p>
+                </div>
+              </div>
+              <div className="bg-zinc-800/60 rounded p-2">
+                <p className="text-zinc-500 mb-0.5">نقطة الضعف التسويقية:</p>
+                <p className="text-red-300">{evaluation.mainWeakness}</p>
+              </div>
+              <div className="bg-zinc-800/60 rounded p-2">
+                <p className="text-zinc-500 mb-0.5">توصية التواصل:</p>
+                <p className="text-green-300">{evaluation.recommendation}</p>
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={handleSave}
+            disabled={createLead.isPending}
+            className={`w-full gap-2 text-white ${platformColor}`}
+          >
+            {createLead.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            حفظ العميل
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
