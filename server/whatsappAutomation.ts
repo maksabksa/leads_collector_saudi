@@ -11,6 +11,8 @@ import fs from "fs";
 const CHROMIUM_PATH = "/usr/bin/chromium-browser";
 const USER_DATA_DIR = path.join(process.cwd(), ".whatsapp-session");
 const WA_URL = "https://web.whatsapp.com";
+const USER_AGENT =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
 // حالة الجلسة
 export type WaStatus =
@@ -25,6 +27,7 @@ let page: Page | null = null;
 let currentStatus: WaStatus = "disconnected";
 let qrDataUrl: string | null = null;
 let lastError: string | null = null;
+let pollingActive = false;
 
 // نتيجة إرسال رسالة
 export type SendResult = {
@@ -52,26 +55,55 @@ async function launchBrowser(): Promise<Browser> {
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--disable-web-security",
-      "--disable-features=IsolateOrigins,site-per-process",
-      "--window-size=1280,800",
+      "--window-size=1280,900",
     ],
   });
 }
 
-// الحصول على الصفحة الحالية أو إنشاء جديدة
-async function getPage(): Promise<Page> {
-  if (!browser || !browser.connected) {
-    browser = await launchBrowser();
+// إعداد الصفحة مع User Agent صحيح
+async function setupPage(p: Page) {
+  await p.setViewport({ width: 1280, height: 900 });
+  await p.setUserAgent(USER_AGENT);
+  // تجاوز فحص WebDriver
+  await p.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+  });
+}
+
+// فحص تسجيل الدخول
+async function checkIfLoggedIn(p: Page): Promise<boolean> {
+  try {
+    return await p.evaluate(() => {
+      return !!(
+        document.querySelector("#side") ||
+        document.querySelector('[data-testid="chat-list"]') ||
+        document.querySelector('[aria-label="Chat list"]')
+      );
+    });
+  } catch {
+    return false;
   }
-  const pages = await browser.pages();
-  if (pages.length > 0) {
-    page = pages[0];
-  } else {
-    page = await browser.newPage();
+}
+
+// التقاط QR كـ screenshot للصفحة الكاملة
+async function captureQRScreenshot(p: Page): Promise<string | null> {
+  try {
+    const hasQR = await p.evaluate(() => {
+      return !!(
+        document.querySelector("[data-ref]") ||
+        document.querySelector("canvas")
+      );
+    });
+    if (!hasQR) return null;
+
+    const screenshot = await p.screenshot({
+      encoding: "base64",
+      type: "png",
+    });
+    return `data:image/png;base64,${screenshot}`;
+  } catch {
+    return null;
   }
-  await page.setViewport({ width: 1280, height: 800 });
-  return page;
 }
 
 // بدء جلسة واتساب ويب
@@ -83,45 +115,63 @@ export async function startWhatsAppSession(): Promise<{
     currentStatus = "qr_pending";
     qrDataUrl = null;
     lastError = null;
+    pollingActive = false;
 
-    const p = await getPage();
-    await p.goto(WA_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+    // أغلق المتصفح القديم إن وجد
+    if (browser) {
+      try {
+        await browser.close();
+      } catch { /* تجاهل */ }
+      browser = null;
+      page = null;
+    }
 
-    // انتظر قليلاً للتحميل
-    await new Promise((r) => setTimeout(r, 3000));
+    browser = await launchBrowser();
+    const pages = await browser.pages();
+    page = pages.length > 0 ? pages[0] : await browser.newPage();
+    await setupPage(page);
 
-    // تحقق إذا كان مسجلاً دخوله بالفعل
-    const isLoggedIn = await checkIfLoggedIn(p);
-    if (isLoggedIn) {
+    await page.goto(WA_URL, { waitUntil: "networkidle0", timeout: 60000 });
+
+    // انتظر حتى 12 ثانية لتحميل الصفحة كاملاً
+    let loggedIn = false;
+    let qrFound = false;
+
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+
+      loggedIn = await checkIfLoggedIn(page);
+      if (loggedIn) break;
+
+      qrFound = await page.evaluate(() => {
+        return !!(
+          document.querySelector("[data-ref]") ||
+          document.querySelector("canvas")
+        );
+      });
+      if (qrFound) break;
+    }
+
+    if (loggedIn) {
       currentStatus = "connected";
       return { status: "connected" };
     }
 
-    // انتظر QR code
-    try {
-      await p.waitForSelector('[data-ref]', { timeout: 15000 });
-      // التقط QR كـ screenshot
-      const qrEl = await p.$('[data-ref]');
-      if (qrEl) {
-        // خذ screenshot للصفحة كاملة
-        const screenshot = await p.screenshot({ encoding: "base64", type: "png" });
-        qrDataUrl = `data:image/png;base64,${screenshot}`;
+    if (qrFound) {
+      const qr = await captureQRScreenshot(page);
+      if (qr) {
+        qrDataUrl = qr;
         currentStatus = "qr_pending";
-
         // ابدأ polling للتحقق من تسجيل الدخول
-        pollForLogin(p);
+        startLoginPolling(page);
         return { status: "qr_pending", qr: qrDataUrl };
-      }
-    } catch {
-      // ربما مسجل دخوله بالفعل
-      const loggedIn = await checkIfLoggedIn(p);
-      if (loggedIn) {
-        currentStatus = "connected";
-        return { status: "connected" };
       }
     }
 
-    return { status: currentStatus, qr: qrDataUrl || undefined };
+    // إذا لم يظهر QR ولم يكن مسجلاً، أعد المحاولة مرة أخرى
+    currentStatus = "error";
+    lastError = "لم يتم تحميل واتساب ويب بشكل صحيح";
+    return { status: "error" };
   } catch (err: any) {
     currentStatus = "error";
     lastError = err.message;
@@ -129,43 +179,38 @@ export async function startWhatsAppSession(): Promise<{
   }
 }
 
-// فحص تسجيل الدخول
-async function checkIfLoggedIn(p: Page): Promise<boolean> {
-  try {
-    // واتساب ويب يظهر side panel عند تسجيل الدخول
-    const result = await p.evaluate(() => {
-      return !!(
-        document.querySelector('[data-testid="chat-list"]') ||
-        document.querySelector('#side') ||
-        document.querySelector('[data-testid="default-user"]') ||
-        document.querySelector('[aria-label="Chat list"]')
-      );
-    });
-    return result;
-  } catch {
-    return false;
-  }
-}
+// Polling للتحقق من تسجيل الدخول وتحديث QR
+function startLoginPolling(p: Page) {
+  if (pollingActive) return;
+  pollingActive = true;
 
-// Polling للتحقق من تسجيل الدخول بعد مسح QR
-async function pollForLogin(p: Page) {
-  const maxAttempts = 60; // 60 ثانية
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
-    try {
-      const loggedIn = await checkIfLoggedIn(p);
-      if (loggedIn) {
-        currentStatus = "connected";
-        qrDataUrl = null;
-        return;
+  const poll = async () => {
+    const maxAttempts = 90; // 3 دقائق
+    for (let i = 0; i < maxAttempts; i++) {
+      if (!pollingActive) break;
+      await new Promise((r) => setTimeout(r, 2000));
+
+      try {
+        const loggedIn = await checkIfLoggedIn(p);
+        if (loggedIn) {
+          currentStatus = "connected";
+          qrDataUrl = null;
+          pollingActive = false;
+          return;
+        }
+
+        // تحديث QR screenshot
+        const newQR = await captureQRScreenshot(p);
+        if (newQR) qrDataUrl = newQR;
+      } catch {
+        pollingActive = false;
+        break;
       }
-      // تحديث QR screenshot
-      const screenshot = await p.screenshot({ encoding: "base64", type: "png" });
-      qrDataUrl = `data:image/png;base64,${screenshot}`;
-    } catch {
-      break;
     }
-  }
+    pollingActive = false;
+  };
+
+  poll().catch(() => { pollingActive = false; });
 }
 
 // جلب حالة الجلسة الحالية
@@ -175,7 +220,6 @@ export async function getSessionStatus(): Promise<{
   error?: string;
 }> {
   if (currentStatus === "connected" && page) {
-    // تحقق أن الاتصال لا يزال قائماً
     try {
       const stillConnected = await checkIfLoggedIn(page);
       if (!stillConnected) {
@@ -203,12 +247,11 @@ export async function sendWhatsAppMessage(
 
   try {
     currentStatus = "sending";
-    // تنظيف رقم الهاتف
     const cleanPhone = phone.replace(/[^0-9]/g, "");
     const waUrl = `${WA_URL}/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
 
-    await page.goto(waUrl, { waitUntil: "domcontentloaded", timeout: 20000 });
-    await new Promise((r) => setTimeout(r, 3000));
+    await page.goto(waUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise((r) => setTimeout(r, 4000));
 
     // انتظر حقل الإدخال
     const inputSelectors = [
@@ -228,45 +271,35 @@ export async function sendWhatsAppMessage(
     }
 
     if (!inputEl) {
-      // جرب نهج مختلف: ابحث عن أي contenteditable في footer
-      inputEl = await page.evaluate(() => {
+      // بحث بديل
+      inputEl = await page.evaluateHandle(() => {
         const els = Array.from(document.querySelectorAll('[contenteditable="true"]'));
         for (const el of els) {
-          const rect = el.getBoundingClientRect();
-          if (rect.bottom > window.innerHeight * 0.7) return el as any;
+          const rect = (el as HTMLElement).getBoundingClientRect();
+          if (rect.bottom > window.innerHeight * 0.7) return el;
         }
         return null;
       }) as any;
     }
 
-    if (!inputEl) {
+    if (!inputEl || !(await inputEl.asElement())) {
       currentStatus = "connected";
       return { success: false, phone, error: "لم يتم العثور على حقل الرسالة" };
     }
 
-    // انقر على حقل الإدخال
-    await inputEl.click();
+    const el = inputEl.asElement()!;
+    await el.click();
     await new Promise((r) => setTimeout(r, 500));
 
-    // امسح المحتوى الحالي وأدخل الرسالة
+    // مسح المحتوى وكتابة الرسالة
     await page.keyboard.down("Control");
     await page.keyboard.press("a");
     await page.keyboard.up("Control");
     await new Promise((r) => setTimeout(r, 200));
-
-    // اكتب الرسالة
-    await page.keyboard.type(message, { delay: 30 });
+    await page.keyboard.type(message, { delay: 20 });
     await new Promise((r) => setTimeout(r, 1000));
-
-    // اضغط Enter للإرسال
     await page.keyboard.press("Enter");
     await new Promise((r) => setTimeout(r, 2000));
-
-    // تحقق من نجاح الإرسال (ابحث عن علامة الإرسال ✓)
-    const sent = await page.evaluate(() => {
-      const ticks = document.querySelectorAll('[data-testid="msg-dblcheck"], [data-testid="msg-check"]');
-      return ticks.length > 0;
-    });
 
     currentStatus = "connected";
     return { success: true, phone };
@@ -276,7 +309,7 @@ export async function sendWhatsAppMessage(
   }
 }
 
-// إرسال رسائل مجمعة مع تأخير بشري
+// إرسال رسائل مجمعة
 export async function sendBulkMessages(
   messages: Array<{ phone: string; message: string; leadId: number; companyName: string }>,
   onProgress?: (index: number, result: SendResult) => void
@@ -284,12 +317,11 @@ export async function sendBulkMessages(
   const results: SendResult[] = [];
 
   for (let i = 0; i < messages.length; i++) {
-    const { phone, message, companyName } = messages[i];
+    const { phone, message } = messages[i];
     const result = await sendWhatsAppMessage(phone, message);
     results.push(result);
     if (onProgress) onProgress(i, result);
 
-    // تأخير بشري بين الرسائل (3-6 ثواني)
     if (i < messages.length - 1) {
       const delay = 3000 + Math.random() * 3000;
       await new Promise((r) => setTimeout(r, delay));
@@ -301,6 +333,7 @@ export async function sendBulkMessages(
 
 // قطع الاتصال
 export async function disconnectWhatsApp(): Promise<void> {
+  pollingActive = false;
   try {
     if (browser) {
       await browser.close();
