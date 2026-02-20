@@ -12,12 +12,14 @@ import {
   ChevronRight,
   Menu,
   X,
+  Search,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navItems = [
   { path: "/", label: "لوحة التحكم", icon: BarChart3 },
+  { path: "/search", label: "البحث عن عملاء", icon: Search },
   { path: "/zones", label: "المناطق الجغرافية", icon: Map },
   { path: "/leads", label: "قائمة العملاء", icon: Users },
   { path: "/leads/add", label: "إضافة عميل", icon: Plus },

@@ -9,6 +9,7 @@ import Zones from "./pages/Zones";
 import Leads from "./pages/Leads";
 import AddLead from "./pages/AddLead";
 import LeadDetail from "./pages/LeadDetail";
+import Search from "./pages/Search";
 import Layout from "./components/Layout";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
         <Route path="/leads" component={Leads} />
         <Route path="/leads/add" component={AddLead} />
         <Route path="/leads/:id" component={LeadDetail} />
+        <Route path="/search" component={Search} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

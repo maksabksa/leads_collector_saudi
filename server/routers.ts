@@ -9,7 +9,7 @@ import {
   getAllLeads, getLeadById, createLead, updateLead, deleteLead, getLeadsStats,
   getWebsiteAnalysisByLeadId, createWebsiteAnalysis,
   getSocialAnalysesByLeadId, createSocialAnalysis,
-  getTopGaps,
+  getTopGaps, getDb,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 
@@ -485,6 +485,111 @@ const exportRouter = router({
     }),
 });
 
+// ===== SEARCH ROUTER (Google Places) =====
+const searchRouter = router({
+  // Text search: returns list of places matching query + city
+  searchPlaces: protectedProcedure
+    .input(z.object({
+      query: z.string().min(1),
+      city: z.string().min(1),
+      pagetoken: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { makeRequest } = await import("./_core/map");
+      const searchQuery = `${input.query} في ${input.city} السعودية`;
+      const params: Record<string, unknown> = {
+        query: searchQuery,
+        language: "ar",
+        region: "SA",
+      };
+      if (input.pagetoken) params.pagetoken = input.pagetoken;
+      const data = await makeRequest<{
+        results: Array<{
+          place_id: string;
+          name: string;
+          formatted_address: string;
+          geometry: { location: { lat: number; lng: number } };
+          rating?: number;
+          user_ratings_total?: number;
+          business_status?: string;
+          types?: string[];
+        }>;
+        status: string;
+        next_page_token?: string;
+        error_message?: string;
+      }>("/maps/api/place/textsearch/json", params);
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Google Places Error: ${data.status} - ${data.error_message || ""}`,
+        });
+      }
+      return {
+        results: data.results || [],
+        nextPageToken: data.next_page_token || null,
+        total: data.results?.length || 0,
+      };
+    }),
+
+  // Get full details for a specific place (phone, website, etc.)
+  getPlaceDetails: protectedProcedure
+    .input(z.object({ placeId: z.string() }))
+    .query(async ({ input }) => {
+      const { makeRequest } = await import("./_core/map");
+      const data = await makeRequest<{
+        result: {
+          place_id: string;
+          name: string;
+          formatted_address: string;
+          formatted_phone_number?: string;
+          international_phone_number?: string;
+          website?: string;
+          rating?: number;
+          user_ratings_total?: number;
+          geometry: { location: { lat: number; lng: number } };
+          types?: string[];
+          opening_hours?: { open_now: boolean; weekday_text: string[] };
+          reviews?: Array<{ author_name: string; rating: number; text: string }>;
+          url?: string;
+        };
+        status: string;
+        error_message?: string;
+      }>("/maps/api/place/details/json", {
+        place_id: input.placeId,
+        fields: "place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types,opening_hours,url",
+        language: "ar",
+      });
+      if (data.status !== "OK") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Place not found: ${data.status}`,
+        });
+      }
+      return data.result;
+    }),
+
+  // Check if a place already exists as a lead (by name + phone)
+  checkDuplicate: protectedProcedure
+    .input(z.object({ companyName: z.string(), phone: z.string().optional() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { isDuplicate: false, existingId: null };
+      const { leads } = await import("../drizzle/schema");
+      const { or, eq, like } = await import("drizzle-orm");
+      const conditions = [like(leads.companyName, `%${input.companyName}%`)];
+      if (input.phone) conditions.push(eq(leads.verifiedPhone, input.phone));
+      const existing = await db.select({ id: leads.id, companyName: leads.companyName })
+        .from(leads)
+        .where(or(...conditions))
+        .limit(1);
+      return {
+        isDuplicate: existing.length > 0,
+        existingId: existing[0]?.id || null,
+        existingName: existing[0]?.companyName || null,
+      };
+    }),
+});
+
 // ===== MAIN ROUTER =====
 export const appRouter = router({
   system: systemRouter,
@@ -500,6 +605,7 @@ export const appRouter = router({
   leads: leadsRouter,
   analysis: analysisRouter,
   export: exportRouter,
+  search: searchRouter,
 });
 
 export type AppRouter = typeof appRouter;
