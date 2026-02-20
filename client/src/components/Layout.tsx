@@ -28,6 +28,7 @@ const navItems = [
   { path: "/leads", label: "قائمة العملاء", icon: Users },
   { path: "/leads/add", label: "إضافة عميل", icon: Plus },
   { path: "/bulk-whatsapp", label: "واتساب مجمع", icon: MessageCircle },
+  { path: "/whatsapp-auto", label: "إرسال تلقائي", icon: MessageCircle },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

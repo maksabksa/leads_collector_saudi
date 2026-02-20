@@ -1514,6 +1514,89 @@ ${input.salesAngle ? `زاوية البيع المقترحة: ${input.salesAngle
     }),
 });
 
+// ===== WHATSAPP AUTOMATION ROUTER =====
+const whatsappAutomationRouter = router({
+  // جلب حالة الجلسة
+  status: protectedProcedure.query(async () => {
+    const { getSessionStatus } = await import("./whatsappAutomation");
+    return getSessionStatus();
+  }),
+
+  // بدء جلسة واتساب (يفتح المتصفح ويعرض QR)
+  startSession: protectedProcedure.mutation(async () => {
+    const { startWhatsAppSession } = await import("./whatsappAutomation");
+    return startWhatsAppSession();
+  }),
+
+  // قطع الاتصال
+  disconnect: protectedProcedure.mutation(async () => {
+    const { disconnectWhatsApp } = await import("./whatsappAutomation");
+    await disconnectWhatsApp();
+    return { success: true };
+  }),
+
+  // إرسال رسالة لرقم واحد
+  sendOne: protectedProcedure
+    .input(z.object({
+      phone: z.string(),
+      message: z.string(),
+      leadId: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { sendWhatsAppMessage } = await import("./whatsappAutomation");
+      const result = await sendWhatsAppMessage(input.phone, input.message);
+      // تسجيل في قاعدة البيانات إذا نجح
+      if (result.success && input.leadId) {
+        const db = await getDb();
+        if (db) {
+          const { whatsappMessages } = await import("../drizzle/schema");
+          await db.insert(whatsappMessages).values({
+            leadId: input.leadId,
+            phone: input.phone,
+            message: input.message,
+            messageType: "individual",
+            status: "sent",
+          });
+        }
+      }
+      return result;
+    }),
+
+  // إرسال مجمع تلقائي
+  sendBulk: protectedProcedure
+    .input(z.object({
+      messages: z.array(z.object({
+        phone: z.string(),
+        message: z.string(),
+        leadId: z.number(),
+        companyName: z.string(),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const { sendBulkMessages } = await import("./whatsappAutomation");
+      const results = await sendBulkMessages(input.messages);
+      // تسجيل النتائج في قاعدة البيانات
+      const db = await getDb();
+      if (db) {
+        const { whatsappMessages } = await import("../drizzle/schema");
+        const bulkJobId = nanoid(10);
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i];
+          const m = input.messages[i];
+          await db.insert(whatsappMessages).values({
+            leadId: m.leadId,
+            phone: m.phone,
+            message: m.message,
+            messageType: "bulk",
+            bulkJobId,
+            status: r.success ? "sent" : "failed",
+          });
+        }
+      }
+      return { results };
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1532,5 +1615,6 @@ export const appRouter = router({
   searchJobs: searchJobsRouter,
   aiSearch: aiSearchRouter,
   whatsapp: whatsappRouter,
+  wauto: whatsappAutomationRouter,
 });
 export type AppRouter = typeof appRouter;
