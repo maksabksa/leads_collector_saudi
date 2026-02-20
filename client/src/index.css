@@ -43,6 +43,14 @@
 }
 
 :root {
+  --brand-cyan: oklch(0.72 0.18 200);
+  --brand-cyan-dim: oklch(0.55 0.15 200);
+  --brand-gold: oklch(0.78 0.16 75);
+  --brand-green: oklch(0.65 0.18 145);
+  --brand-red: oklch(0.58 0.22 25);
+  --brand-purple: oklch(0.62 0.18 285);
+  --glow-cyan: 0 0 20px oklch(0.72 0.18 200 / 0.3);
+  --glow-gold: 0 0 20px oklch(0.78 0.16 75 / 0.3);
   --primary: var(--color-blue-700);
   --primary-foreground: var(--color-blue-50);
   --sidebar-primary: var(--color-blue-600);
@@ -119,7 +127,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
   }
+  html {
+    direction: rtl;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--background); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [type="button"]:not(:disabled),
@@ -169,9 +185,25 @@
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
   }
+
+  .glass-card {
+    background: oklch(0.13 0.015 240 / 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(0.25 0.02 240 / 0.6);
+  }
+
+  .score-high { background: oklch(0.65 0.18 145 / 0.2); color: oklch(0.75 0.18 145); border: 1px solid oklch(0.65 0.18 145 / 0.4); border-radius: 9999px; }
+  .score-medium { background: oklch(0.78 0.16 75 / 0.2); color: oklch(0.85 0.16 75); border: 1px solid oklch(0.78 0.16 75 / 0.4); border-radius: 9999px; }
+  .score-low { background: oklch(0.58 0.22 25 / 0.2); color: oklch(0.7 0.22 25); border: 1px solid oklch(0.58 0.22 25 / 0.4); border-radius: 9999px; }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 10px oklch(0.72 0.18 200 / 0.2); }
+    50% { box-shadow: 0 0 25px oklch(0.72 0.18 200 / 0.5); }
+  }
+  .analyzing-pulse { animation: pulse-glow 2s ease-in-out infinite; }
 }
