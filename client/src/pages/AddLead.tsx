@@ -36,6 +36,7 @@ export default function AddLead() {
     tiktokUrl: "",
     facebookUrl: "",
     reviewCount: 0,
+    socialSince: "",
     notes: "",
   });
 
@@ -59,7 +60,7 @@ export default function AddLead() {
       ...form,
       zoneName: selectedZone?.name || form.zoneName || undefined,
     });
-    toast.success("تم إضافة العميل بنجاح");
+    toast.success("تم إضافة العميل — جاري التحليل التلقائي في الخلفية...");
     utils.leads.list.invalidate();
     utils.leads.stats.invalidate();
     navigate(`/leads/${result.id}`);
@@ -190,6 +191,21 @@ export default function AddLead() {
               </div>
             ))}
           </div>
+          {/* تاريخ الظهور على السوشيال */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5" />
+              تاريخ الظهور على السوشيال ميديا (اختياري)
+            </label>
+            <input
+              value={form.socialSince}
+              onChange={e => set("socialSince", e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary"
+              placeholder="مثال: 2019 أو 2020-05"
+              dir="ltr"
+            />
+            <p className="text-xs text-muted-foreground mt-1">السنة أو الشهر-السنة التي بدأ فيها النشاط على السوشيال</p>
+          </div>
         </div>
 
         {/* Notes */}
@@ -209,7 +225,7 @@ export default function AddLead() {
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
             style={{ background: "linear-gradient(135deg, oklch(0.65 0.18 200), oklch(0.55 0.15 200))" }}>
             <Save className="w-4 h-4" />
-            {createLead.isPending ? "جاري الحفظ..." : "حفظ وانتقل للتحليل"}
+            {createLead.isPending ? "جاري الحفظ..." : "حفظ + تحليل تلقائي"}
           </button>
           <button type="button" onClick={() => navigate("/leads")}
             className="px-6 py-3 rounded-xl text-sm text-muted-foreground border border-border hover:bg-white/5 transition-all">

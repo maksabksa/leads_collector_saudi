@@ -136,6 +136,7 @@ const leadsRouter = router({
       companyName: z.string().min(1),
       businessType: z.string().min(1),
       city: z.string().min(1),
+      country: z.string().optional(),
       district: z.string().optional(),
       zoneId: z.number().optional(),
       zoneName: z.string().optional(),
@@ -148,10 +149,161 @@ const leadsRouter = router({
       tiktokUrl: z.string().optional(),
       facebookUrl: z.string().optional(),
       reviewCount: z.number().optional(),
+      socialSince: z.string().optional(),
       notes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const id = await createLead(input);
+
+      // تشغيل التحليل التلقائي في الخلفية بعد الحفظ مباشرة
+      setImmediate(async () => {
+        try {
+          const socialPlatforms: Array<{ field: keyof typeof input; platform: "instagram" | "twitter" | "snapchat" | "tiktok" | "facebook" }> = [
+            { field: "instagramUrl", platform: "instagram" },
+            { field: "snapchatUrl", platform: "snapchat" },
+            { field: "tiktokUrl", platform: "tiktok" },
+            { field: "facebookUrl", platform: "facebook" },
+            { field: "twitterUrl", platform: "twitter" },
+          ];
+
+          const hasSocial = socialPlatforms.some(p => input[p.field]);
+          const hasWebsite = !!input.website;
+
+          if (!hasWebsite && !hasSocial) {
+            // لا يوجد بيانات للتحليل — نشغّل تحليل ذكاء اصطناعي عام بناءً على الاسم والنشاط
+            await updateLead(id, { analysisStatus: "analyzing" });
+            const prompt = `أنت خبير تحليل تسويق رقمي في السوق السعودي.
+قيّم الحضور الرقمي لهذا النشاط بناءً على معرفتك بالسوق:
+- اسم النشاط: ${input.companyName}
+- نوع النشاط: ${input.businessType}
+- المدينة: ${input.city}
+- لا يوجد موقع إلكتروني أو حسابات سوشيال مسجلة
+
+أجب بـ JSON فقط:
+{
+  "biggestMarketingGap": "أكبر ثغرة تسويقية متوقعة",
+  "revenueOpportunity": "فرصة الإيراد المتاحة",
+  "suggestedSalesEntryAngle": "زاوية الدخول البيعية المقترحة",
+  "leadPriorityScore": 6
+}`;
+            const resp = await invokeLLM({
+              messages: [
+                { role: "system", content: "أنت محلل تسويقي. أجب بـ JSON فقط." },
+                { role: "user", content: prompt },
+              ],
+              response_format: { type: "json_object" } as any,
+            });
+            const raw = resp.choices[0]?.message?.content;
+            const txt = typeof raw === "string" ? raw : "{}";
+            let r: any = {};
+            try { r = JSON.parse(txt); } catch { r = {}; }
+            await updateLead(id, {
+              analysisStatus: "completed",
+              biggestMarketingGap: r.biggestMarketingGap,
+              revenueOpportunity: r.revenueOpportunity,
+              suggestedSalesEntryAngle: r.suggestedSalesEntryAngle,
+              leadPriorityScore: r.leadPriorityScore,
+            });
+            return;
+          }
+
+          await updateLead(id, { analysisStatus: "analyzing" });
+
+          // تحليل الموقع إن وجد
+          if (hasWebsite) {
+            const websitePrompt = `أنت خبير تحليل تسويق رقمي متخصص في السوق السعودي.
+قم بتحليل الموقع الإلكتروني: ${input.website}
+اسم النشاط: ${input.companyName} | نوع: ${input.businessType} | مدينة: ${input.city}
+
+أجب بـ JSON فقط:
+{
+  "hasWebsite": true, "loadSpeedScore": 7, "mobileExperienceScore": 6, "seoScore": 5,
+  "contentQualityScore": 6, "designScore": 7, "offerClarityScore": 5,
+  "hasSeasonalPage": false, "hasOnlineBooking": false, "hasPaymentOptions": false, "hasDeliveryInfo": false,
+  "technicalGaps": [], "contentGaps": [], "overallScore": 6,
+  "summary": "ملخص", "recommendations": [],
+  "biggestMarketingGap": "الثغرة", "revenueOpportunity": "الفرصة", "suggestedSalesEntryAngle": "زاوية الدخول"
+}`;
+            const wr = await invokeLLM({
+              messages: [
+                { role: "system", content: "أجب بـ JSON فقط." },
+                { role: "user", content: websitePrompt },
+              ],
+              response_format: { type: "json_object" } as any,
+            });
+            const wRaw = wr.choices[0]?.message?.content;
+            const wTxt = typeof wRaw === "string" ? wRaw : "{}";
+            let wa: any = {};
+            try { wa = JSON.parse(wTxt); } catch { wa = {}; }
+            await createWebsiteAnalysis({
+              leadId: id, url: input.website!,
+              hasWebsite: wa.hasWebsite ?? true,
+              loadSpeedScore: wa.loadSpeedScore, mobileExperienceScore: wa.mobileExperienceScore,
+              seoScore: wa.seoScore, contentQualityScore: wa.contentQualityScore,
+              designScore: wa.designScore, offerClarityScore: wa.offerClarityScore,
+              hasSeasonalPage: wa.hasSeasonalPage ?? false, hasOnlineBooking: wa.hasOnlineBooking ?? false,
+              hasPaymentOptions: wa.hasPaymentOptions ?? false, hasDeliveryInfo: wa.hasDeliveryInfo ?? false,
+              technicalGaps: wa.technicalGaps ?? [], contentGaps: wa.contentGaps ?? [],
+              overallScore: wa.overallScore, summary: wa.summary,
+              recommendations: wa.recommendations ?? [], rawAnalysis: wTxt,
+            });
+            await updateLead(id, {
+              biggestMarketingGap: wa.biggestMarketingGap,
+              revenueOpportunity: wa.revenueOpportunity,
+              suggestedSalesEntryAngle: wa.suggestedSalesEntryAngle,
+              brandingQualityScore: wa.designScore,
+              leadPriorityScore: wa.overallScore,
+            });
+          }
+
+          // تحليل حسابات السوشيال إن وجدت
+          for (const { field, platform } of socialPlatforms) {
+            const url = input[field] as string | undefined;
+            if (!url) continue;
+            const platformNames: Record<string, string> = {
+              instagram: "إنستغرام", twitter: "تويتر/X",
+              snapchat: "سناب شات", tiktok: "تيك توك", facebook: "فيسبوك",
+            };
+            const socialPrompt = `حلّل حساب ${platformNames[platform]}: ${url}
+نشاط: ${input.companyName} (${input.businessType}) في ${input.city}
+أجب بـ JSON فقط:
+{
+  "hasAccount": true, "postingFrequencyScore": 6, "engagementScore": 5, "contentQualityScore": 6,
+  "hasSeasonalContent": false, "hasPricingContent": false, "hasCallToAction": false,
+  "contentStrategyScore": 5, "digitalPresenceScore": 6,
+  "gaps": [], "overallScore": 5.5, "summary": "ملخص", "recommendations": []
+}`;
+            const sr = await invokeLLM({
+              messages: [
+                { role: "system", content: "أجب بـ JSON فقط." },
+                { role: "user", content: socialPrompt },
+              ],
+              response_format: { type: "json_object" } as any,
+            });
+            const sRaw = sr.choices[0]?.message?.content;
+            const sTxt = typeof sRaw === "string" ? sRaw : "{}";
+            let sa: any = {};
+            try { sa = JSON.parse(sTxt); } catch { sa = {}; }
+            await createSocialAnalysis({
+              leadId: id, platform, profileUrl: url,
+              hasAccount: sa.hasAccount ?? true,
+              postingFrequencyScore: sa.postingFrequencyScore, engagementScore: sa.engagementScore,
+              contentQualityScore: sa.contentQualityScore,
+              hasSeasonalContent: sa.hasSeasonalContent ?? false, hasPricingContent: sa.hasPricingContent ?? false,
+              hasCallToAction: sa.hasCallToAction ?? false,
+              contentStrategyScore: sa.contentStrategyScore, digitalPresenceScore: sa.digitalPresenceScore,
+              gaps: sa.gaps ?? [], overallScore: sa.overallScore,
+              summary: sa.summary, recommendations: sa.recommendations ?? [], rawAnalysis: sTxt,
+            });
+          }
+
+          await updateLead(id, { analysisStatus: "completed" });
+        } catch (err) {
+          console.error("[Auto-Analysis] فشل التحليل التلقائي:", err);
+          await updateLead(id, { analysisStatus: "failed" });
+        }
+      });
+
       return { id };
     }),
 

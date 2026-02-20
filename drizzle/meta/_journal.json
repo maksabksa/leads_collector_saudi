@@ -22,6 +22,13 @@
       "when": 1771616979206,
       "tag": "0002_dry_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1771621909325,
+      "tag": "0003_fine_domino",
+      "breakpoints": true
     }
   ]
 }

@@ -238,6 +238,13 @@ export default function LeadDetail() {
                 <span className="text-sm text-foreground">{lead.reviewCount} تقييم</span>
               </div>
             )}
+            {(lead as any).socialSince && (
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">ظهور على السوشيال منذ:</span>
+                <span className="text-sm font-semibold" style={{ color: "var(--brand-cyan)" }}>{(lead as any).socialSince}</span>
+              </div>
+            )}
           </div>
 
           {/* Digital presence */}
