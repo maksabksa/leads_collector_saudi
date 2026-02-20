@@ -4,10 +4,6 @@
  * يولّد QR كـ Data URL ويرسل الرسائل مباشرة
  */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { Client, LocalAuth } = require("whatsapp-web.js");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const QRCode = require("qrcode");
 import path from "path";
 
 const SESSION_DIR = path.join(process.cwd(), ".wwebjs_auth");
@@ -18,7 +14,6 @@ export type WaStatus =
   | "qr_pending"
   | "initializing"
   | "connected"
-  | "sending"
   | "error";
 
 export type SendResult = {
@@ -35,7 +30,8 @@ let lastError: string | null = null;
 let isInitializing = false;
 
 // إنشاء client جديد
-function createClient() {
+async function createClient() {
+  const { Client, LocalAuth } = await import("whatsapp-web.js");
   return new Client({
     authStrategy: new LocalAuth({
       dataPath: SESSION_DIR,
@@ -55,17 +51,25 @@ function createClient() {
   });
 }
 
+// توليد QR كـ Data URL
+async function generateQrDataUrl(qr: string): Promise<string> {
+  const QRCode = await import("qrcode");
+  return QRCode.default.toDataURL(qr, {
+    width: 300,
+    margin: 2,
+    color: { dark: "#000000", light: "#ffffff" },
+  });
+}
+
 // بدء جلسة واتساب
 export async function startWhatsAppSession(): Promise<{
   status: WaStatus;
   qr?: string;
 }> {
-  // إذا كان يعمل بالفعل
   if (isInitializing) {
     return { status: currentStatus, qr: qrDataUrl || undefined };
   }
 
-  // إذا كان متصلاً بالفعل
   if (currentStatus === "connected" && client) {
     return { status: "connected" };
   }
@@ -76,22 +80,16 @@ export async function startWhatsAppSession(): Promise<{
     qrDataUrl = null;
     lastError = null;
 
-    // أغلق client القديم
     if (client) {
       try { await client.destroy(); } catch { /* تجاهل */ }
       client = null;
     }
 
-    client = createClient();
+    client = await createClient();
 
-    // حدث QR — يُطلق عند ظهور رمز QR جديد
     client.on("qr", async (qr: string) => {
       try {
-        qrDataUrl = await QRCode.toDataURL(qr, {
-          width: 300,
-          margin: 2,
-          color: { dark: "#000000", light: "#ffffff" },
-        });
+        qrDataUrl = await generateQrDataUrl(qr);
         currentStatus = "qr_pending";
         isInitializing = false;
       } catch (e) {
@@ -99,35 +97,30 @@ export async function startWhatsAppSession(): Promise<{
       }
     });
 
-    // حدث الاتصال الناجح
     client.on("ready", () => {
       currentStatus = "connected";
       qrDataUrl = null;
       isInitializing = false;
     });
 
-    // حدث المصادقة
     client.on("authenticated", () => {
       currentStatus = "connected";
       qrDataUrl = null;
       isInitializing = false;
     });
 
-    // حدث فشل المصادقة
     client.on("auth_failure", (msg: string) => {
       currentStatus = "error";
       lastError = "فشل المصادقة: " + msg;
       isInitializing = false;
     });
 
-    // حدث قطع الاتصال
     client.on("disconnected", () => {
       currentStatus = "disconnected";
       qrDataUrl = null;
       isInitializing = false;
     });
 
-    // ابدأ التهيئة (لا تنتظرها — تعمل في الخلفية)
     client.initialize().catch((err: Error) => {
       if (!err.message.includes("Target closed")) {
         currentStatus = "error";
@@ -140,21 +133,15 @@ export async function startWhatsAppSession(): Promise<{
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       const s = currentStatus as string;
-      if (s === "qr_pending" || s === "connected") {
-        break;
-      }
-      if (s === "error") {
-        return { status: "error" as WaStatus };
-      }
+      if (s === "qr_pending" || s === "connected") break;
+      if (s === "error") return { status: "error" as WaStatus };
     }
 
-    return {
-      status: currentStatus,
-      qr: qrDataUrl || undefined,
-    };
-  } catch (err: any) {
+    return { status: currentStatus, qr: qrDataUrl || undefined };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     currentStatus = "error";
-    lastError = err.message;
+    lastError = message;
     isInitializing = false;
     return { status: "error" };
   }
@@ -183,7 +170,6 @@ export async function sendWhatsAppMessage(
   }
 
   try {
-    // تنسيق الرقم الدولي
     const cleanPhone = phone.replace(/[^0-9]/g, "");
     const intlPhone = cleanPhone.startsWith("0")
       ? "966" + cleanPhone.slice(1)
@@ -194,8 +180,9 @@ export async function sendWhatsAppMessage(
 
     await client.sendMessage(chatId, message);
     return { success: true, phone };
-  } catch (err: any) {
-    return { success: false, phone, error: err.message };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, phone, error: message };
   }
 }
 
