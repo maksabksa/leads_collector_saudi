@@ -10,6 +10,7 @@ import {
   getWebsiteAnalysisByLeadId, createWebsiteAnalysis,
   getSocialAnalysesByLeadId, createSocialAnalysis,
   getTopGaps, getDb,
+  createSearchJob, getSearchJobById, getAllSearchJobs, updateSearchJob, deleteSearchJob, checkLeadDuplicate,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 
@@ -631,6 +632,291 @@ const searchRouter = router({
     }),
 });
 
+// ===== SEARCH JOBS ROUTER =====
+// خريطة المهام الجارية في الذاكرة (jobId -> AbortController)
+const runningJobs = new Map<number, { abort: boolean }>();
+
+const searchJobsRouter = router({
+  list: protectedProcedure.query(async () => {
+    return getAllSearchJobs();
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const job = await getSearchJobById(input.id);
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      return job;
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      jobName: z.string().min(1),
+      country: z.string().min(1),
+      city: z.string().min(1),
+      businessType: z.string().min(1),
+      targetCount: z.number().min(1).max(500).default(50),
+    }))
+    .mutation(async ({ input }) => {
+      // توليد كلمات بحث متعددة بناءً على نوع النشاط
+      const keywords = generateSearchKeywords(input.businessType, input.city, input.country);
+      const id = await createSearchJob({
+        jobName: input.jobName,
+        country: input.country,
+        city: input.city,
+        businessType: input.businessType,
+        searchKeywords: keywords,
+        targetCount: input.targetCount,
+        status: "pending",
+        totalSearched: 0,
+        totalFound: 0,
+        totalDuplicates: 0,
+        totalAdded: 0,
+        currentPage: 0,
+        log: [],
+      });
+      return { id, keywords };
+    }),
+
+  start: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const job = await getSearchJobById(input.id);
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      if (job.status === "running") return { message: "المهمة تعمل بالفعل" };
+      
+      // تشغيل المهمة في الخلفية بدون انتظار
+      runSearchJobInBackground(input.id).catch(console.error);
+      return { message: "تم بدء المهمة" };
+    }),
+
+  pause: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const ctrl = runningJobs.get(input.id);
+      if (ctrl) ctrl.abort = true;
+      await updateSearchJob(input.id, { status: "paused" });
+      return { message: "تم إيقاف المهمة مؤقتاً" };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const ctrl = runningJobs.get(input.id);
+      if (ctrl) ctrl.abort = true;
+      runningJobs.delete(input.id);
+      await deleteSearchJob(input.id);
+      return { success: true };
+    }),
+});
+
+// ===== دالة توليد كلمات البحث الذكية =====
+function generateSearchKeywords(businessType: string, city: string, country: string): string[] {
+  const base = businessType.trim();
+  const keywords: string[] = [
+    base,
+    `${base} ${city}`,
+    `محل ${base}`,
+    `مؤسسة ${base}`,
+    `شركة ${base}`,
+  ];
+  // إضافة مرادفات شائعة
+  const synonyms: Record<string, string[]> = {
+    "ملحمة": ["جزارة", "لحوم", "محل لحوم", "لحم طازج"],
+    "أغنام": ["خراف", "ماعز", "مزرعة أغنام", "بيع أغنام"],
+    "مطعم": ["مطعم شعبي", "مطعم مشاوي", "مطعم سمك", "كافتيريا"],
+    "صيدلية": ["دواء", "صيدلانية", "مستلزمات طبية"],
+    "بقالة": ["سوبرماركت", "تموينات", "هايبر"],
+    "مقهى": ["كافيه", "قهوة", "كوفي"],
+    "صالون": ["حلاق", "حلاقة", "تجميل"],
+  };
+  for (const [key, syns] of Object.entries(synonyms)) {
+    if (base.includes(key)) {
+      keywords.push(...syns.map(s => `${s} ${city}`));
+      break;
+    }
+  }
+  return Array.from(new Set(keywords)).slice(0, 8); // حد أقصى 8 كلمات بحث
+}
+
+// ===== محرك البحث الخلفي الذكي =====
+async function runSearchJobInBackground(jobId: number): Promise<void> {
+  const ctrl = { abort: false };
+  runningJobs.set(jobId, ctrl);
+
+  const addLog = async (message: string, type: "info" | "success" | "warning" | "error" = "info") => {
+    const job = await getSearchJobById(jobId);
+    if (!job) return;
+    const currentLog = (job.log as any[]) || [];
+    const newEntry = { time: new Date().toISOString(), message, type };
+    const updatedLog = [...currentLog.slice(-49), newEntry]; // احتفظ بآخر 50 رسالة
+    await updateSearchJob(jobId, { log: updatedLog as any });
+  };
+
+  try {
+    await updateSearchJob(jobId, { status: "running", startedAt: new Date() });
+    await addLog("🚀 بدأ محرك البحث الذكي", "info");
+
+    const job = await getSearchJobById(jobId);
+    if (!job) return;
+
+    const keywords = (job.searchKeywords as string[]) || [job.businessType];
+    let totalAdded = 0;
+    let totalDuplicates = 0;
+    let totalSearched = 0;
+
+    for (const keyword of keywords) {
+      if (ctrl.abort) break;
+      if (totalAdded >= job.targetCount) break;
+
+      await addLog(`🔍 البحث عن: "${keyword}" في ${job.city}`, "info");
+      await updateSearchJob(jobId, { currentKeyword: keyword });
+
+      let nextPageToken: string | undefined = undefined;
+      let pageNum = 0;
+
+      do {
+        if (ctrl.abort) break;
+        if (totalAdded >= job.targetCount) break;
+
+        // تأخير بشري عشوائي بين الطلبات (2-5 ثوانٍ)
+        const delay = 2000 + Math.random() * 3000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        try {
+          const { makeRequest } = await import("./_core/map");
+          
+          const searchQuery = `${keyword} في ${job.city}`;
+          const params: Record<string, string> = {
+            query: searchQuery,
+            language: "ar",
+            region: "SA",
+          };
+          if (nextPageToken) params.pagetoken = nextPageToken;
+
+          const data = await makeRequest<{
+            results: Array<{
+              place_id: string;
+              name: string;
+              formatted_address: string;
+              rating?: number;
+              user_ratings_total?: number;
+              types?: string[];
+              geometry?: { location: { lat: number; lng: number } };
+            }>;
+            next_page_token?: string;
+            status: string;
+          }>("/maps/api/place/textsearch/json", params);
+
+          if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+            await addLog(`⚠️ خطأ في البحث: ${data.status}`, "warning");
+            break;
+          }
+
+          const results = data.results || [];
+          totalSearched += results.length;
+          await updateSearchJob(jobId, { totalSearched });
+          await addLog(`📋 وجد ${results.length} نتيجة في الصفحة ${pageNum + 1}`, "info");
+
+          for (const place of results) {
+            if (ctrl.abort) break;
+            if (totalAdded >= job.targetCount) break;
+
+            // تأخير إضافي بين جلب التفاصيل (1-2 ثانية)
+            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+
+            try {
+              // جلب تفاصيل المكان (الهاتف والموقع)
+              const details = await makeRequest<{
+                result: {
+                  name: string;
+                  formatted_phone_number?: string;
+                  international_phone_number?: string;
+                  website?: string;
+                  formatted_address?: string;
+                  url?: string;
+                };
+                status: string;
+              }>("/maps/api/place/details/json", {
+                place_id: place.place_id,
+                fields: "name,formatted_phone_number,international_phone_number,website,formatted_address,url",
+                language: "ar",
+              });
+
+              if (details.status !== "OK") continue;
+
+              const d = details.result;
+              const phone = d.formatted_phone_number || d.international_phone_number || "";
+
+              // فحص التكرار
+              const isDuplicate = phone ? await checkLeadDuplicate(phone, d.name) : false;
+              if (isDuplicate) {
+                totalDuplicates++;
+                await updateSearchJob(jobId, { totalDuplicates });
+                await addLog(`⚡ مكرر: ${d.name}`, "warning");
+                continue;
+              }
+
+              // إضافة Lead جديد
+              await createLead({
+                companyName: d.name || place.name,
+                businessType: job.businessType,
+                country: job.country,
+                city: job.city,
+                verifiedPhone: phone || undefined,
+                website: d.website || undefined,
+                googleMapsUrl: d.url || undefined,
+                district: d.formatted_address || place.formatted_address || undefined,
+                reviewCount: place.user_ratings_total || 0,
+                analysisStatus: "pending",
+                sourceJobId: jobId,
+              });
+
+              totalAdded++;
+              await updateSearchJob(jobId, { totalAdded, totalFound: totalAdded + totalDuplicates });
+              await addLog(`✅ أُضيف: ${d.name || place.name}${phone ? ` (${phone})` : " (بدون هاتف)"}`, "success");
+
+            } catch (detailErr) {
+              await addLog(`❌ فشل جلب تفاصيل: ${place.name}`, "error");
+            }
+          }
+
+          nextPageToken = data.next_page_token;
+          pageNum++;
+
+          // Google Places يتطلب انتظار 2 ثانية قبل استخدام next_page_token
+          if (nextPageToken) await new Promise(resolve => setTimeout(resolve, 2500));
+
+        } catch (searchErr) {
+          await addLog(`❌ خطأ في البحث: ${String(searchErr)}`, "error");
+          break;
+        }
+
+      } while (nextPageToken && !ctrl.abort && totalAdded < job.targetCount);
+    }
+
+    const finalStatus = ctrl.abort ? "paused" : "completed";
+    await updateSearchJob(jobId, {
+      status: finalStatus,
+      completedAt: new Date(),
+      totalAdded,
+      totalDuplicates,
+      totalSearched,
+    });
+    await addLog(
+      finalStatus === "completed"
+        ? `🎉 اكتملت المهمة! تم إضافة ${totalAdded} عميل جديد`
+        : `⏸️ تم إيقاف المهمة. أُضيف ${totalAdded} عميل`,
+      finalStatus === "completed" ? "success" : "warning"
+    );
+
+  } catch (err) {
+    await updateSearchJob(jobId, { status: "failed", errorMessage: String(err) });
+  } finally {
+    runningJobs.delete(jobId);
+  }
+}
+
 // ===== MAIN ROUTER =====
 export const appRouter = router({
   system: systemRouter,
@@ -646,7 +932,7 @@ export const appRouter = router({
   leads: leadsRouter,
   analysis: analysisRouter,
   export: exportRouter,
-  search: searchRouter,
+   search: searchRouter,
+  searchJobs: searchJobsRouter,
 });
-
 export type AppRouter = typeof appRouter;

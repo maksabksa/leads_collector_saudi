@@ -1,4 +1,4 @@
-import { eq, desc, asc, and, like, sql, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, or, like, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -6,6 +6,7 @@ import {
   zones, InsertZone, Zone,
   websiteAnalyses, InsertWebsiteAnalysis,
   socialAnalyses, InsertSocialAnalysis,
+  searchJobs, InsertSearchJob, SearchJob,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -211,4 +212,48 @@ export async function getTopGaps() {
     }
   }
   return Object.entries(gapCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([gap, count]) => ({ gap, count }));
+}
+
+// ===== SEARCH JOBS HELPERS =====
+
+export async function createSearchJob(data: InsertSearchJob): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(searchJobs).values(data);
+  return (result[0] as any).insertId;
+}
+
+export async function getSearchJobById(id: number): Promise<SearchJob | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(searchJobs).where(eq(searchJobs.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getAllSearchJobs(): Promise<SearchJob[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(searchJobs).orderBy(desc(searchJobs.createdAt));
+}
+
+export async function updateSearchJob(id: number, data: Partial<InsertSearchJob>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(searchJobs).set(data).where(eq(searchJobs.id, id));
+}
+
+export async function deleteSearchJob(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(searchJobs).where(eq(searchJobs.id, id));
+}
+
+export async function checkLeadDuplicate(phone: string, companyName: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const conditions = [];
+  if (phone) conditions.push(eq(leads.verifiedPhone, phone));
+  if (conditions.length === 0) return false;
+  const result = await db.select({ id: leads.id }).from(leads).where(or(...conditions)).limit(1);
+  return result.length > 0;
 }

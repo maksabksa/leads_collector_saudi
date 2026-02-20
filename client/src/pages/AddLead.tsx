@@ -3,16 +3,11 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag } from "lucide-react";
 import { toast } from "sonner";
+import { COUNTRIES_DATA } from "../../../shared/countries";
 
 const businessTypes = [
   "ملحمة", "أغنام", "ماعز", "لحوم", "ذبح وتجهيز", "توصيل لحوم",
-  "مزرعة أغنام", "سوق ماشية", "أضاحي", "مشاوي ولحوم", "أخرى"
-];
-
-const saudiCities = [
-  "الرياض", "جدة", "مكة المكرمة", "المدينة المنورة", "الدمام", "الخبر", "الأحساء",
-  "بريدة", "عنيزة", "حائل", "تبوك", "أبها", "خميس مشيط", "نجران", "جازان",
-  "الطائف", "ينبع", "الجبيل", "القطيف", "سكاكا", "عرعر", "الباحة"
+  "مزرعة أغنام", "سوق ماشية", "أضاحي", "مشاوي ولحوم", "مطعم", "صيدلية", "بقالة", "مقهى", "صالون", "أخرى"
 ];
 
 export default function AddLead() {
@@ -21,9 +16,13 @@ export default function AddLead() {
   const createLead = trpc.leads.create.useMutation();
   const utils = trpc.useUtils();
 
+  const [selectedCountry, setSelectedCountry] = useState("السعودية");
+  const availableCities = COUNTRIES_DATA.find(c => c.name === selectedCountry)?.cities ?? [];
+
   const [form, setForm] = useState({
     companyName: "",
     businessType: "ملحمة",
+    country: "السعودية",
     city: "الرياض",
     district: "",
     zoneId: undefined as number | undefined,
@@ -107,10 +106,22 @@ export default function AddLead() {
               </select>
             </div>
             <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">الدولة</label>
+              <select value={selectedCountry} onChange={e => {
+                setSelectedCountry(e.target.value);
+                set("country", e.target.value);
+                const firstCity = COUNTRIES_DATA.find(c => c.name === e.target.value)?.cities[0] ?? "";
+                set("city", firstCity);
+              }}
+                className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary">
+                {COUNTRIES_DATA.map(c => <option key={c.code} value={c.name}>{c.flag} {c.name}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="text-xs text-muted-foreground mb-1.5 block">المدينة *</label>
               <select value={form.city} onChange={e => set("city", e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary">
-                {saudiCities.map(c => <option key={c} value={c}>{c}</option>)}
+                {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>

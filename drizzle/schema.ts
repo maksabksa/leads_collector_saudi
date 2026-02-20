@@ -30,7 +30,7 @@ export const zones = mysqlTable("zones", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   nameEn: varchar("nameEn", { length: 100 }),
-  region: varchar("region", { length: 100 }).notNull(), // e.g. الرياض, جدة, مكة...
+  region: varchar("region", { length: 100 }).notNull(),
   status: mysqlEnum("status", ["not_started", "in_progress", "completed"]).default("not_started").notNull(),
   leadsCount: int("leadsCount").default(0).notNull(),
   targetLeads: int("targetLeads").default(20).notNull(),
@@ -46,7 +46,8 @@ export type InsertZone = typeof zones.$inferInsert;
 export const leads = mysqlTable("leads", {
   id: int("id").autoincrement().primaryKey(),
   companyName: varchar("companyName", { length: 200 }).notNull(),
-  businessType: varchar("businessType", { length: 100 }).notNull(), // ملحمة, أغنام, لحوم...
+  businessType: varchar("businessType", { length: 100 }).notNull(),
+  country: varchar("country", { length: 100 }).default("السعودية").notNull(),
   city: varchar("city", { length: 100 }).notNull(),
   district: varchar("district", { length: 100 }),
   zoneId: int("zoneId"),
@@ -67,6 +68,7 @@ export const leads = mysqlTable("leads", {
   revenueOpportunity: text("revenueOpportunity"),
   suggestedSalesEntryAngle: text("suggestedSalesEntryAngle"),
   analysisStatus: mysqlEnum("analysisStatus", ["pending", "analyzing", "completed", "failed"]).default("pending").notNull(),
+  sourceJobId: int("sourceJobId"),   // رابط بمهمة البحث التي أنشأت هذا الـ Lead
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -75,25 +77,57 @@ export const leads = mysqlTable("leads", {
 export type Lead = typeof leads.$inferSelect;
 export type InsertLead = typeof leads.$inferInsert;
 
+// ===== SEARCH JOBS TABLE (محرك البحث الخلفي) =====
+export const searchJobs = mysqlTable("search_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  // إعدادات المهمة
+  jobName: varchar("jobName", { length: 200 }).notNull(),
+  country: varchar("country", { length: 100 }).notNull(),
+  city: varchar("city", { length: 100 }).notNull(),
+  businessType: varchar("businessType", { length: 200 }).notNull(),
+  searchKeywords: json("searchKeywords").$type<string[]>(),  // كلمات البحث المتعددة
+  targetCount: int("targetCount").default(50).notNull(),
+  // حالة المهمة
+  status: mysqlEnum("status", ["pending", "running", "paused", "completed", "failed"]).default("pending").notNull(),
+  // تقدم المهمة
+  totalSearched: int("totalSearched").default(0).notNull(),
+  totalFound: int("totalFound").default(0).notNull(),
+  totalDuplicates: int("totalDuplicates").default(0).notNull(),
+  totalAdded: int("totalAdded").default(0).notNull(),
+  currentKeyword: varchar("currentKeyword", { length: 200 }),
+  currentPage: int("currentPage").default(0).notNull(),
+  nextPageToken: text("nextPageToken"),
+  // سجل العمليات
+  log: json("log").$type<Array<{ time: string; message: string; type: "info" | "success" | "warning" | "error" }>>(),
+  errorMessage: text("errorMessage"),
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SearchJob = typeof searchJobs.$inferSelect;
+export type InsertSearchJob = typeof searchJobs.$inferInsert;
+
 // ===== WEBSITE ANALYSIS TABLE =====
 export const websiteAnalyses = mysqlTable("website_analyses", {
   id: int("id").autoincrement().primaryKey(),
   leadId: int("leadId").notNull(),
   url: varchar("url", { length: 500 }).notNull(),
   hasWebsite: boolean("hasWebsite").default(false),
-  loadSpeedScore: float("loadSpeedScore"),       // 1-10
-  mobileExperienceScore: float("mobileExperienceScore"), // 1-10
-  seoScore: float("seoScore"),                   // 1-10
-  contentQualityScore: float("contentQualityScore"), // 1-10
-  designScore: float("designScore"),             // 1-10
-  offerClarityScore: float("offerClarityScore"), // 1-10
+  loadSpeedScore: float("loadSpeedScore"),
+  mobileExperienceScore: float("mobileExperienceScore"),
+  seoScore: float("seoScore"),
+  contentQualityScore: float("contentQualityScore"),
+  designScore: float("designScore"),
+  offerClarityScore: float("offerClarityScore"),
   hasSeasonalPage: boolean("hasSeasonalPage").default(false),
   hasOnlineBooking: boolean("hasOnlineBooking").default(false),
   hasPaymentOptions: boolean("hasPaymentOptions").default(false),
   hasDeliveryInfo: boolean("hasDeliveryInfo").default(false),
   technicalGaps: json("technicalGaps").$type<string[]>(),
   contentGaps: json("contentGaps").$type<string[]>(),
-  overallScore: float("overallScore"),           // 1-10
+  overallScore: float("overallScore"),
   summary: text("summary"),
   recommendations: json("recommendations").$type<string[]>(),
   rawAnalysis: text("rawAnalysis"),
@@ -110,16 +144,16 @@ export const socialAnalyses = mysqlTable("social_analyses", {
   platform: mysqlEnum("platform", ["instagram", "twitter", "snapchat", "tiktok", "facebook"]).notNull(),
   profileUrl: varchar("profileUrl", { length: 500 }),
   hasAccount: boolean("hasAccount").default(false),
-  postingFrequencyScore: float("postingFrequencyScore"), // 1-10
-  engagementScore: float("engagementScore"),     // 1-10
-  contentQualityScore: float("contentQualityScore"), // 1-10
+  postingFrequencyScore: float("postingFrequencyScore"),
+  engagementScore: float("engagementScore"),
+  contentQualityScore: float("contentQualityScore"),
   hasSeasonalContent: boolean("hasSeasonalContent").default(false),
   hasPricingContent: boolean("hasPricingContent").default(false),
   hasCallToAction: boolean("hasCallToAction").default(false),
-  contentStrategyScore: float("contentStrategyScore"), // 1-10
-  digitalPresenceScore: float("digitalPresenceScore"), // 1-10
+  contentStrategyScore: float("contentStrategyScore"),
+  digitalPresenceScore: float("digitalPresenceScore"),
   gaps: json("gaps").$type<string[]>(),
-  overallScore: float("overallScore"),           // 1-10
+  overallScore: float("overallScore"),
   summary: text("summary"),
   recommendations: json("recommendations").$type<string[]>(),
   rawAnalysis: text("rawAnalysis"),

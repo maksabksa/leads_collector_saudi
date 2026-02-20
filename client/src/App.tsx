@@ -11,6 +11,7 @@ import AddLead from "./pages/AddLead";
 import LeadDetail from "./pages/LeadDetail";
 import Search from "./pages/Search";
 import Scout from "./pages/Scout";
+import SearchEngine from "./pages/SearchEngine";
 import Layout from "./components/Layout";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/leads/:id" component={LeadDetail} />
         <Route path="/search" component={Search} />
         <Route path="/scout" component={Scout} />
+        <Route path="/engine" component={SearchEngine} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

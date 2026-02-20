@@ -13,13 +13,15 @@ import {
   Menu,
   X,
   Search,
+  Bot,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navItems = [
   { path: "/", label: "لوحة التحكم", icon: BarChart3 },
-  { path: "/search", label: "البحث عن عملاء", icon: Search },
+  { path: "/engine", label: "محرك البحث الذكي", icon: Bot },
+  { path: "/search", label: "بحث يدوي", icon: Search },
   { path: "/scout", label: "استخراج يدوي", icon: Globe },
   { path: "/zones", label: "المناطق الجغرافية", icon: Map },
   { path: "/leads", label: "قائمة العملاء", icon: Users },

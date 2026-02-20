@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone, MapPin, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { COUNTRIES_DATA } from "../../../shared/countries";
 
 const statusColors: Record<string, { color: string; bg: string; label: string }> = {
   pending: { color: "oklch(0.55 0.01 240)", bg: "oklch(0.18 0.02 240)", label: "معلق" },
@@ -13,10 +14,15 @@ const statusColors: Record<string, { color: string; bg: string; label: string }>
 
 export default function Leads() {
   const [search, setSearch] = useState("");
+  const [filterCountry, setFilterCountry] = useState("");
   const [filterCity, setFilterCity] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterZone, setFilterZone] = useState<number | undefined>();
   const [showFilters, setShowFilters] = useState(false);
+
+  const availableFilterCities = filterCountry
+    ? (COUNTRIES_DATA.find(c => c.name === filterCountry)?.cities ?? [])
+    : [];
 
   const { data: leads, isLoading, refetch } = trpc.leads.list.useQuery({
     search: search || undefined,
@@ -103,13 +109,21 @@ export default function Leads() {
           </button>
         </div>
         {showFilters && (
-          <div className="grid grid-cols-3 gap-3 p-4 rounded-xl border border-border" style={{ background: "oklch(0.12 0.015 240)" }}>
+          <div className="grid grid-cols-4 gap-3 p-4 rounded-xl border border-border" style={{ background: "oklch(0.12 0.015 240)" }}>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">الدولة</label>
+              <select value={filterCountry} onChange={e => { setFilterCountry(e.target.value); setFilterCity(""); }}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
+                <option value="">كل الدول</option>
+                {COUNTRIES_DATA.map(c => <option key={c.code} value={c.name}>{c.flag} {c.name}</option>)}
+              </select>
+            </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">المدينة</label>
               <select value={filterCity} onChange={e => setFilterCity(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
-                <option value="">الكل</option>
-                {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">كل المدن</option>
+                {availableFilterCities.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
