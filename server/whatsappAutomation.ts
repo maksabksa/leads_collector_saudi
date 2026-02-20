@@ -31,7 +31,8 @@ let isInitializing = false;
 
 // إنشاء client جديد
 async function createClient() {
-  const { Client, LocalAuth } = await import("whatsapp-web.js");
+  const wweb = await import("whatsapp-web.js");
+  const { Client, LocalAuth } = (wweb.default || wweb) as typeof wweb.default;
   return new Client({
     authStrategy: new LocalAuth({
       dataPath: SESSION_DIR,
