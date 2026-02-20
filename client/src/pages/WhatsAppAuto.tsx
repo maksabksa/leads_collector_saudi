@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-type WaStatus = "disconnected" | "qr_pending" | "connected" | "sending" | "error";
+type WaStatus = "disconnected" | "qr_pending" | "initializing" | "connected" | "sending" | "error";
 type MsgState = { phone: string; message: string; leadId: number; companyName: string; status: "pending" | "sending" | "sent" | "failed"; error?: string };
 
 // ==================== STATUS BADGE ====================
@@ -14,11 +14,12 @@ function StatusBadge({ status }: { status: WaStatus }) {
   const map: Record<WaStatus, { label: string; color: string; icon: React.ReactNode }> = {
     disconnected: { label: "غير متصل", color: "oklch(0.5 0.01 240)", icon: <WifiOff className="w-3.5 h-3.5" /> },
     qr_pending: { label: "في انتظار مسح QR", color: "oklch(0.78 0.16 75)", icon: <Smartphone className="w-3.5 h-3.5" /> },
+    initializing: { label: "جاري التهيئة...", color: "oklch(0.75 0.18 200)", icon: <Loader2 className="w-3.5 h-3.5 animate-spin" /> },
     connected: { label: "متصل", color: "oklch(0.65 0.2 145)", icon: <Wifi className="w-3.5 h-3.5" /> },
     sending: { label: "جاري الإرسال...", color: "oklch(0.75 0.18 200)", icon: <Loader2 className="w-3.5 h-3.5 animate-spin" /> },
     error: { label: "خطأ", color: "oklch(0.7 0.22 25)", icon: <AlertCircle className="w-3.5 h-3.5" /> },
   };
-  const s = map[status];
+  const s = map[status as WaStatus] ?? { label: status, color: "oklch(0.5 0.01 240)", icon: <WifiOff className="w-3.5 h-3.5" /> };
   return (
     <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
       style={{ background: `${s.color}20`, color: s.color, border: `1px solid ${s.color}40` }}>
