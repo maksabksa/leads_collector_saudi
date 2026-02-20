@@ -301,16 +301,7 @@ export default function LeadDetail() {
               <p className="text-xs text-muted-foreground">أضف رقم الهاتف أولاً لاستخدام واتساب</p>
             ) : (
               <>
-                {/* Status buttons */}
-                <div className="flex gap-1.5">
-                  <button onClick={handleCheckWhatsapp} disabled={checkWhatsapp.isPending}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-medium transition-all"
-                    style={{ background: "oklch(0.55 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.3)" }}>
-                    {checkWhatsapp.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
-                    فحص واتساب
-                  </button>
-                </div>
-                {/* Manual status update */}
+                {/* WA status */}
                 <div className="flex gap-1.5">
                   {(["yes", "no", "unknown"] as const).map(s => (
                     <button key={s} onClick={async () => { setWaStatus(s); await updateWaStatus.mutateAsync({ leadId: id, hasWhatsapp: s }); toast.success("تم تحديث الحالة"); }}
@@ -320,26 +311,33 @@ export default function LeadDetail() {
                     </button>
                   ))}
                 </div>
+                {/* Open WA direct */}
+                <button onClick={handleCheckWhatsapp} disabled={checkWhatsapp.isPending}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+                  style={{ background: "oklch(0.55 0.2 145 / 0.12)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.25)" }}>
+                  {checkWhatsapp.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
+                  فتح واتساب مباشرة
+                </button>
                 {/* Message generator */}
                 <div className="space-y-2">
                   <div className="flex gap-1">
                     {(["friendly", "formal", "direct"] as const).map(t => (
                       <button key={t} onClick={() => setWaTone(t)}
                         className="flex-1 py-1 rounded-lg text-xs transition-all"
-                        style={waTone === t ? { background: "oklch(0.65 0.18 200 / 0.2)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.4)" } : { background: "oklch(0.15 0.015 240)", color: "oklch(0.5 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
+                        style={waTone === t ? { background: "oklch(0.65 0.18 200 / 0.2)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.4)" } : { background: "oklch(0.15 0.015 240)", color: "oklch(0.5 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
                         {t === "friendly" ? "ودي" : t === "formal" ? "رسمي" : "مباشر"}
                       </button>
                     ))}
                   </div>
                   <button onClick={handleGenerateWaMessage} disabled={waGenerating}
                     className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-all"
-                    style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+                    style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
                     {waGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
                     توليد رسالة بالذكاء الاصطناعي
                   </button>
                   {waMessage && (
                     <>
-                      <textarea value={waMessage} onChange={e => setWaMessage(e.target.value)} rows={4}
+                      <textarea value={waMessage} onChange={e => setWaMessage(e.target.value)} rows={5}
                         className="w-full px-3 py-2 rounded-xl text-xs border border-border bg-background text-foreground resize-none focus:outline-none focus:border-primary" />
                       <div className="flex gap-1.5">
                         <button onClick={() => { navigator.clipboard.writeText(waMessage); toast.success("تم النسخ"); }}
@@ -350,7 +348,7 @@ export default function LeadDetail() {
                         <button onClick={handleSendWhatsapp}
                           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
                           style={{ background: "oklch(0.55 0.2 145)", color: "white" }}>
-                          <Send className="w-3 h-3" /> إرسال
+                          <Send className="w-3 h-3" /> إرسال عبر واتساب
                         </button>
                       </div>
                     </>

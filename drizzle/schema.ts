@@ -181,3 +181,18 @@ export const whatsappMessages = mysqlTable("whatsapp_messages", {
 
 export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 export type InsertWhatsappMessage = typeof whatsappMessages.$inferInsert;
+
+// ===== WHATSAPP TEMPLATES TABLE =====
+export const whatsappTemplates = mysqlTable("whatsapp_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  content: text("content").notNull(),
+  tone: mysqlEnum("tone", ["formal", "friendly", "direct"]).default("friendly").notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  usageCount: int("usageCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type WhatsappTemplate = typeof whatsappTemplates.$inferSelect;
+export type InsertWhatsappTemplate = typeof whatsappTemplates.$inferInsert;

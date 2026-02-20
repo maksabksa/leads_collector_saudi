@@ -1195,6 +1195,169 @@ const aiSearchRouter = router({
 
 // ===== WHATSAPP ROUTER =====
 const whatsappRouter = router({
+  // ===== TEMPLATES =====
+  // جلب كل القوالب
+  listTemplates: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const { whatsappTemplates } = await import("../drizzle/schema");
+    const { desc } = await import("drizzle-orm");
+    return db.select().from(whatsappTemplates).orderBy(desc(whatsappTemplates.isDefault), desc(whatsappTemplates.usageCount));
+  }),
+
+  // إنشاء قالب جديد
+  createTemplate: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      content: z.string().min(1),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      isDefault: z.boolean().default(false),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const [result] = await db.insert(whatsappTemplates).values(input);
+      return { id: (result as any).insertId };
+    }),
+
+  // تحديث قالب
+  updateTemplate: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      content: z.string().optional(),
+      tone: z.enum(["formal", "friendly", "direct"]).optional(),
+      isDefault: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const { id, ...data } = input;
+      await db.update(whatsappTemplates).set({ ...data, updatedAt: new Date() }).where(eq(whatsappTemplates.id, id));
+      return { success: true };
+    }),
+
+  // حذف قالب
+  deleteTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.delete(whatsappTemplates).where(eq(whatsappTemplates.id, input.id));
+      return { success: true };
+    }),
+
+  // توليد قالب بالذكاء الاصطناعي
+  generateTemplate: protectedProcedure
+    .input(z.object({
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      businessType: z.string().optional(),
+      serviceType: z.string().optional(),
+      senderName: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const prompt = `أنت خبير تسويق رقمي سعودي. اكتب قالب رسالة واتساب احترافي لبيع خدمات التسويق الرقمي.
+
+الأسلوب: ${input.tone === "formal" ? "رسمي محترم" : input.tone === "friendly" ? "ودي ومحفّز" : "مباشر وواضح"}
+${input.businessType ? `نوع النشاط المستهدف: ${input.businessType}` : ""}
+${input.serviceType ? `الخدمة المقدمة: ${input.serviceType}` : ""}
+
+استخدم هذه المتغيرات في القالب:
+- {{اسم_النشاط}} = اسم الشركة/النشاط
+- {{نوع_النشاط}} = نوع العمل
+- {{المدينة}} = المدينة
+- {{اسمي}} = اسم المرسل
+- {{شركتي}} = اسم شركة المرسل
+- {{الثغرة}} = الثغرة التسويقية المكتشفة
+
+القالب يجب أن:
+- يكون بين 80-150 كلمة
+- يبدأ بتحية مناسبة
+- يذكر قيمة محددة أو فرصة
+- ينتهي بدعوة للتواصل
+- يكون باللغة العربية
+
+أعطني القالب فقط بدون أي شرح.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "أنت خبير تسويق رقمي متخصص في كتابة رسائل مبيعات فعّالة." },
+          { role: "user", content: prompt },
+        ],
+      });
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل توليد القالب" });
+      return { content: typeof content === "string" ? content : JSON.stringify(content) };
+    }),
+
+  // تطبيق قالب على عميل (استبدال المتغيرات)
+  applyTemplate: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      leadId: z.number(),
+      senderName: z.string().optional(),
+      senderCompany: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [template] = await db.select().from(whatsappTemplates).where(eq(whatsappTemplates.id, input.templateId));
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "القالب غير موجود" });
+      const lead = await getLeadById(input.leadId);
+      if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
+      let message = template.content
+        .replace(/\{\{اسم_النشاط\}\}/g, lead.companyName)
+        .replace(/\{\{نوع_النشاط\}\}/g, lead.businessType)
+        .replace(/\{\{المدينة\}\}/g, lead.city)
+        .replace(/\{\{اسمي\}\}/g, input.senderName || "")
+        .replace(/\{\{شركتي\}\}/g, input.senderCompany || "")
+        .replace(/\{\{الثغرة\}\}/g, lead.biggestMarketingGap || "");
+      // زيادة عداد الاستخدام
+      await db.update(whatsappTemplates).set({ usageCount: template.usageCount + 1 }).where(eq(whatsappTemplates.id, input.templateId));
+      const phone = (lead.verifiedPhone || "").replace(/[^0-9]/g, "");
+      return { message, phone, waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}` };
+    }),
+
+  // تطبيق قالب على قائمة عملاء (مجمع)
+  bulkApplyTemplate: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      leadIds: z.array(z.number()),
+      senderName: z.string().optional(),
+      senderCompany: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [template] = await db.select().from(whatsappTemplates).where(eq(whatsappTemplates.id, input.templateId));
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      const results: Array<{ leadId: number; companyName: string; phone: string; message: string; waUrl: string }> = [];
+      for (const leadId of input.leadIds) {
+        const lead = await getLeadById(leadId);
+        if (!lead || !lead.verifiedPhone) continue;
+        const message = template.content
+          .replace(/\{\{اسم_النشاط\}\}/g, lead.companyName)
+          .replace(/\{\{نوع_النشاط\}\}/g, lead.businessType)
+          .replace(/\{\{المدينة\}\}/g, lead.city)
+          .replace(/\{\{اسمي\}\}/g, input.senderName || "")
+          .replace(/\{\{شركتي\}\}/g, input.senderCompany || "")
+          .replace(/\{\{الثغرة\}\}/g, lead.biggestMarketingGap || "");
+        const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+        results.push({ leadId, companyName: lead.companyName, phone, message, waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}` });
+      }
+      await db.update(whatsappTemplates).set({ usageCount: template.usageCount + results.length }).where(eq(whatsappTemplates.id, input.templateId));
+      return { results };
+    }),
+
   // فحص وجود واتساب لرقم هاتف
   check: protectedProcedure
     .input(z.object({ leadId: z.number(), phone: z.string() }))
