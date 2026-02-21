@@ -643,6 +643,55 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       return { success: true, chatId: chat.id };
     }),
 
+  // اقتراح رد AI ذكي بناءً على سياق المحادثة
+  suggestAiReply: protectedProcedure
+    .input(z.object({
+      chatId: z.number(),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      count: z.number().default(3),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { suggestions: [], intentAnalysis: null };
+      const messages = await db
+        .select()
+        .from(whatsappChatMessages)
+        .where(eq(whatsappChatMessages.chatId, input.chatId))
+        .orderBy(desc(whatsappChatMessages.sentAt))
+        .limit(10);
+      const chat = await db.select().from(whatsappChats).where(eq(whatsappChats.id, input.chatId)).limit(1);
+      const chatInfo = chat[0];
+      const toneMap = { formal: "رسمي ومحترف", friendly: "ودي ومريح", direct: "مباشر ومختصر" };
+      const conversationHistory = messages
+        .reverse()
+        .map(m => `${m.direction === "outgoing" ? "نحن" : "العميل"}: ${m.message || "[ملف]"}`)
+        .join("\n");
+      const systemPrompt = [
+        "أنت مساعد مبيعات ذكي متخصص في السوق السعودي.",
+        "العميل: " + (chatInfo?.contactName || "غير محدد") + " | الرقم: " + (chatInfo?.phone || ""),
+        "أسلوب الرد: " + toneMap[input.tone],
+        "مهمتك: اقتراح " + input.count + " ردود مختلفة بالعربية وتحليل نية العميل.",
+        'أعط الرد JSON بهذا الشكل فقط: {"suggestions":["رد 1","رد 2","رد 3"],"intentAnalysis":{"intent":"price_inquiry","urgency":"medium","sentiment":"positive","suggestedAction":"وصف الخطوة","interestScore":75}}',
+      ].join("\n");
+      try {
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `سجل المحادثة:\n${conversationHistory}\n\nاقترح ردودًا مناسبة بالعربية.` },
+          ],
+          response_format: { type: "json_object" },
+        });
+        const content = response.choices[0]?.message?.content || "{}";
+        const parsed = JSON.parse(content as string);
+        return {
+          suggestions: (parsed.suggestions as string[]) || [],
+          intentAnalysis: parsed.intentAnalysis || null,
+        };
+      } catch {
+        return { suggestions: [], intentAnalysis: null };
+      }
+    }),
+
   // جلب إجمالي الرسائل غير المقروءة عبر جميع المحادثات
   getTotalUnread: protectedProcedure
     .query(async () => {

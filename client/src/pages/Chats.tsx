@@ -24,6 +24,17 @@ import {
   Paperclip,
   FileText,
   Download,
+  Smile,
+  Mic,
+  MicOff,
+  Sparkles,
+  Zap,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  ThumbsUp,
+  AlertCircle,
+  TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +44,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
+import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 
 // ===== ألوان ثابتة لكل حساب واتساب =====
 const ACCOUNT_COLORS = [
@@ -270,6 +282,19 @@ export default function Chats() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // AI Panel
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiIntent, setAiIntent] = useState<{ intent: string; urgency: string; sentiment: string; suggestedAction: string; interestScore: number } | null>(null);
+  const [aiTone, setAiTone] = useState<"formal" | "friendly" | "direct">("friendly");
+  // إيموجي
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // تسجيل صوتي
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ===== Queries مع polling تلقائي =====
   const { data: chats = [] } = trpc.waSettings.listChats.useQuery(
@@ -305,6 +330,45 @@ export default function Chats() {
     onSuccess: () => { setSelectedChatId(null); toast.success("تم حذف المحادثة"); },
   });
   const markAsRead = trpc.waSettings.markChatAsRead.useMutation();
+  const suggestAiReply = trpc.waSettings.suggestAiReply.useMutation({
+    onSuccess: (data) => {
+      setAiSuggestions(data.suggestions);
+      if (data.intentAnalysis) setAiIntent(data.intentAnalysis as typeof aiIntent);
+      setShowAiPanel(true);
+    },
+    onError: () => toast.error("تعذر جلب اقتراحات AI"),
+  });
+
+  // ===== دوال التسجيل الصوتي =====
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(",")[1];
+          setPendingMedia({ base64, mimetype: "audio/webm", filename: "رسالة-صوتية.webm", previewUrl: URL.createObjectURL(blob) });
+        };
+        reader.readAsDataURL(blob);
+        stream.getTracks().forEach(t => t.stop());
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+        setIsRecording(false);
+        setRecordingTime(0);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } catch {
+      toast.error("تعذر الوصول للمايكروفون");
+    }
+  };
+  const stopRecording = () => { mediaRecorderRef.current?.stop(); };
 
   // ===== المحادثة المختارة =====
   const selectedChat = (chats as Chat[]).find((c) => c.id === selectedChatId) ?? null;
@@ -678,7 +742,7 @@ export default function Chats() {
 
               {/* منطقة الإدخال */}
               <div
-                className="px-4 py-3 border-t border-border/50 flex-shrink-0"
+                className="px-4 py-3 border-t border-border/50 flex-shrink-0 relative"
                 style={{ background: "oklch(0.12 0.015 240)" }}
               >
                 {/* شارة الإرسال */}
@@ -717,6 +781,97 @@ export default function Chats() {
                     </Button>
                   </div>
                 )}
+                {/* لوحة AI */}
+                {showAiPanel && (
+                  <div
+                    className="mb-2 rounded-xl border p-3"
+                    style={{ background: "oklch(0.14 0.025 260)", borderColor: "oklch(0.3 0.08 260 / 0.5)" }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" style={{ color: "oklch(0.75 0.2 260)" }} />
+                        <span className="text-xs font-semibold" style={{ color: "oklch(0.75 0.2 260)" }}>اقتراحات AI</span>
+                        {aiIntent && (
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.2 0.05 260)", color: "oklch(0.7 0.15 260)" }}>
+                            {aiIntent.interestScore}% اهتمام
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={aiTone}
+                          onChange={(e) => setAiTone(e.target.value as "formal" | "friendly" | "direct")}
+                          className="text-xs rounded-lg px-2 py-1 border"
+                          style={{ background: "oklch(0.18 0.02 240)", borderColor: "oklch(0.3 0.02 240)", color: "var(--foreground)" }}
+                        >
+                          <option value="friendly">ودي</option>
+                          <option value="formal">رسمي</option>
+                          <option value="direct">مباشر</option>
+                        </select>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowAiPanel(false)}>
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    {aiIntent && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {aiIntent.intent === "price_inquiry" ? "سؤال سعر" : aiIntent.intent === "purchase_intent" ? "نية شراء" : aiIntent.intent === "complaint" ? "شكوى" : aiIntent.intent === "follow_up" ? "متابعة" : "استفسار"}
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${aiIntent.urgency === "high" ? "bg-red-500/20 text-red-400" : aiIntent.urgency === "medium" ? "bg-yellow-500/20 text-yellow-400" : "bg-green-500/20 text-green-400"}`}>
+                          {aiIntent.urgency === "high" ? "عاجل" : aiIntent.urgency === "medium" ? "متوسط" : "منخفض"}
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${aiIntent.sentiment === "positive" ? "bg-green-500/20 text-green-400" : aiIntent.sentiment === "negative" ? "bg-red-500/20 text-red-400" : "bg-muted text-muted-foreground"}`}>
+                          {aiIntent.sentiment === "positive" ? "إيجابي" : aiIntent.sentiment === "negative" ? "سلبي" : "محايد"}
+                        </span>
+                        {aiIntent.suggestedAction && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">→ {aiIntent.suggestedAction}</span>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      {aiSuggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          className="text-right text-sm px-3 py-2 rounded-lg border transition-all hover:opacity-90"
+                          style={{ background: "oklch(0.18 0.03 260)", borderColor: "oklch(0.35 0.1 260 / 0.4)", color: "var(--foreground)" }}
+                          onClick={() => { setNewMessage(s); setShowAiPanel(false); textareaRef.current?.focus(); }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-xs opacity-50 flex-shrink-0 mt-0.5">{i + 1}.</span>
+                            <span>{s}</span>
+                            <Copy className="w-3 h-3 opacity-40 flex-shrink-0 mt-0.5 mr-auto" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-2 text-xs h-7"
+                      onClick={() => selectedChatId && suggestAiReply.mutate({ chatId: selectedChatId, tone: aiTone })}
+                      disabled={suggestAiReply.isPending}
+                    >
+                      {suggestAiReply.isPending ? <RefreshCw className="w-3 h-3 animate-spin ml-1" /> : <RefreshCw className="w-3 h-3 ml-1" />}
+                      تحديث الاقتراحات
+                    </Button>
+                  </div>
+                )}
+                {/* إيموجي picker */}
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full mb-2 left-0 z-50">
+                    <EmojiPicker
+                      theme={Theme.DARK}
+                      onEmojiClick={(data: EmojiClickData) => {
+                        setNewMessage(prev => prev + data.emoji);
+                        setShowEmojiPicker(false);
+                        textareaRef.current?.focus();
+                      }}
+                      height={350}
+                      width={300}
+                    />
+                  </div>
+                )}
                 <div className="flex items-end gap-2">
                   {/* زر رفع ملف */}
                   <input
@@ -736,16 +891,56 @@ export default function Chats() {
                   >
                     <Paperclip className="w-5 h-5" />
                   </Button>
+                  {/* زر الإيموجي */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-11 w-11 p-0 flex-shrink-0"
+                    onClick={() => setShowEmojiPicker(p => !p)}
+                    title="إيموجي"
+                    style={{ color: showEmojiPicker ? getAccountColor(selectedChat.accountId).text : undefined }}
+                  >
+                    <Smile className="w-5 h-5" />
+                  </Button>
+                  {/* زر AI */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-11 w-11 p-0 flex-shrink-0"
+                    onClick={() => selectedChatId && suggestAiReply.mutate({ chatId: selectedChatId, tone: aiTone })}
+                    disabled={suggestAiReply.isPending}
+                    title="اقتراح AI"
+                    style={{ color: showAiPanel ? "oklch(0.75 0.2 260)" : undefined }}
+                  >
+                    {suggestAiReply.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                  </Button>
                   <Textarea
                     ref={textareaRef}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={pendingMedia ? "تعليق على الملف (اختياري)..." : "اكتب رسالتك... (Enter للإرسال، Shift+Enter لسطر جديد)"}
+                    placeholder={isRecording ? "جاري التسجيل..." : pendingMedia ? "تعليق على الملف (اختياري)..." : "اكتب رسالتك... (Enter للإرسال، Shift+Enter لسطر جديد)"}
                     className="flex-1 min-h-[44px] max-h-32 resize-none text-sm py-2.5"
                     rows={1}
-                    style={{ background: "oklch(0.16 0.015 240)", borderColor: "oklch(0.25 0.02 240)" }}
+                    disabled={isRecording}
+                    style={{ background: "oklch(0.16 0.015 240)", borderColor: isRecording ? "oklch(0.6 0.2 0)" : "oklch(0.25 0.02 240)" }}
                   />
+                  {/* زر التسجيل الصوتي */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-11 w-11 p-0 flex-shrink-0"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    title={isRecording ? "إيقاف التسجيل" : "تسجيل صوتي"}
+                    style={{ color: isRecording ? "oklch(0.65 0.25 0)" : undefined }}
+                  >
+                    {isRecording ? (
+                      <div className="flex flex-col items-center">
+                        <MicOff className="w-4 h-4" />
+                        <span className="text-[9px]">{recordingTime}s</span>
+                      </div>
+                    ) : <Mic className="w-5 h-5" />}
+                  </Button>
                   <Button
                     onClick={handleSend}
                     disabled={(!newMessage.trim() && !pendingMedia) || sendMessage.isPending}
