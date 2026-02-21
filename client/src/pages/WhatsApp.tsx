@@ -10,10 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   MessageCircle, Wifi, WifiOff, QrCode, Send, Users, FileText,
   Plus, Trash2, Edit, Loader2, Sparkles, CheckCircle, RefreshCw,
-  Play, Square, Copy, ChevronDown, ChevronUp
+  Play, Square, Copy, ChevronDown, ChevronUp, Settings, Bell, Bot, Tag
 } from "lucide-react";
 
 // ===== مكون حالة الاتصال =====
@@ -44,13 +46,31 @@ export default function WhatsApp() {
   const [showNewTemplate, setShowNewTemplate] = useState(false);
   const [generatingFor, setGeneratingFor] = useState<string>("");
   const [sendProgress, setSendProgress] = useState<{ sent: number; total: number; current: string } | null>(null);
-  const [expandedMsg, setExpandedMsg] = useState<number | null>(null);
+   const [expandedMsg, setExpandedMsg] = useState<number | null>(null);
   const sendingRef = useRef(false);
-
+  // إعدادات
+  const [messageDelay, setMessageDelay] = useState(10);
+  const [notificationThreshold, setNotificationThreshold] = useState(50);
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
+  const [newRule, setNewRule] = useState({ keywords: "", template: "", useAI: false, aiContext: "" });
+  const [showNewRule, setShowNewRule] = useState(false);
+  const [editingRule, setEditingRule] = useState<any | null>(null);
   // ===== Queries =====
   const { data: statusData, refetch: refetchStatus } = trpc.wauto.status.useQuery(undefined, { refetchInterval: 3000 });
   const { data: leads } = trpc.leads.list.useQuery({});
   const { data: templates, refetch: refetchTemplates } = trpc.whatsapp.listTemplates.useQuery();
+  const { data: waSettings, refetch: refetchSettings } = trpc.waSettings.getSettings.useQuery({ accountId: "default" });
+  const { data: autoReplyRules, refetch: refetchRules } = trpc.waSettings.listAutoReplyRules.useQuery({ accountId: "default" });
+  const utils = trpc.useUtils();
+
+  // تحميل الإعدادات من قاعدة البيانات
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  if (waSettings && !settingsLoaded) {
+    setMessageDelay(Math.round(waSettings.messageDelay / 1000));
+    setNotificationThreshold(waSettings.notificationThreshold);
+    setAutoReplyEnabled(waSettings.autoReplyEnabled);
+    setSettingsLoaded(true);
+  }
 
   // ===== Mutations =====
   const startSession = trpc.wauto.startSession.useMutation({
@@ -82,6 +102,26 @@ export default function WhatsApp() {
       else setNewTemplate(t => ({ ...t, content: data.content }));
       toast.success("تم توليد المحتوى بالذكاء الاصطناعي");
     },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+
+  const updateSettings = trpc.waSettings.updateSettings.useMutation({
+    onSuccess: () => { toast.success("تم حفظ الإعدادات"); refetchSettings(); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+
+  const addAutoReplyRule = trpc.waSettings.addAutoReplyRule.useMutation({
+    onSuccess: () => { toast.success("تم إضافة قاعدة الرد"); refetchRules(); setShowNewRule(false); setNewRule({ keywords: "", template: "", useAI: false, aiContext: "" }); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+
+  const updateAutoReplyRule = trpc.waSettings.updateAutoReplyRule.useMutation({
+    onSuccess: () => { toast.success("تم تحديث القاعدة"); refetchRules(); setEditingRule(null); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+
+  const deleteAutoReplyRule = trpc.waSettings.deleteAutoReplyRule.useMutation({
+    onSuccess: () => { toast.success("تم حذف القاعدة"); refetchRules(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
 
@@ -117,6 +157,8 @@ export default function WhatsApp() {
     );
   };
 
+  const incrementCount = trpc.waSettings.incrementMessageCount.useMutation();
+
   // إرسال تلقائي
   const handleSendAll = async () => {
     if (!isConnected) { toast.error("يجب الاتصال بواتساب أولاً"); return; }
@@ -133,12 +175,17 @@ export default function WhatsApp() {
       } catch (e: any) {
         toast.error(`فشل إرسال ${msg.name}`, { description: e.message });
       }
-      // تأخير بشري عشوائي 3-7 ثواني
-      await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));
+      // تأخير بشري بناءً على الإعداد
+      const delayMs = messageDelay * 1000;
+      await new Promise(r => setTimeout(r, delayMs + Math.random() * 2000));
     }
     setSendProgress(null);
     sendingRef.current = false;
     toast.success(`تم إرسال ${sent} من ${preparedMessages.length} رسالة`);
+    // تحديث عداد الرسائل وإرسال تنبيه إذا لزم
+    if (sent > 0) {
+      incrementCount.mutate({ accountId: "default", count: sent });
+    }
   };
 
   const stopSending = () => { sendingRef.current = false; setSendProgress(null); };
@@ -173,7 +220,7 @@ export default function WhatsApp() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 w-full max-w-md">
+          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
             <TabsTrigger value="connect" className="flex items-center gap-2">
               <Wifi className="w-4 h-4" />
               الربط
@@ -185,6 +232,10 @@ export default function WhatsApp() {
             <TabsTrigger value="send" className="flex items-center gap-2">
               <Send className="w-4 h-4" />
               الإرسال
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              الإعدادات
             </TabsTrigger>
           </TabsList>
 
@@ -518,6 +569,226 @@ export default function WhatsApp() {
                   </Card>
                 )}
               </div>
+            </div>
+          </TabsContent>
+          {/* ===== تبويب الإعدادات ===== */}
+          <TabsContent value="settings" className="mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* إعدادات الإرسال */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-primary" />
+                    إعدادات الإرسال
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* التأخير بين الرسائل */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-base font-medium">التأخير بين الرسائل</Label>
+                      <span className="text-primary font-bold text-lg">{messageDelay} ثانية</span>
+                    </div>
+                    <Slider
+                      value={[messageDelay]}
+                      onValueChange={([v]) => setMessageDelay(v)}
+                      min={3}
+                      max={60}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>3 ثواني (أسرع)</span>
+                      <span>60 ثانية (أآمن)</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">يضاف تأخير عشوائي 0-2 ثانية لتبدو طبيعية</p>
+                  </div>
+
+                  {/* عتبة التنبيه */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-base font-medium">تنبيه بعد كل</Label>
+                      <span className="text-primary font-bold text-lg">{notificationThreshold} رسالة</span>
+                    </div>
+                    <Slider
+                      value={[notificationThreshold]}
+                      onValueChange={([v]) => setNotificationThreshold(v)}
+                      min={10}
+                      max={500}
+                      step={10}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>10 رسائل</span>
+                      <span>500 رسالة</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">ستصلك إشعار بعد كل {notificationThreshold} رسالة مرسلة</p>
+                  </div>
+
+                  {/* الرد التلقائي */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
+                    <div>
+                      <p className="font-medium text-sm">الرد التلقائي</p>
+                      <p className="text-xs text-muted-foreground">رد تلقائي على الرسائل الواردة</p>
+                    </div>
+                    <Switch
+                      checked={autoReplyEnabled}
+                      onCheckedChange={setAutoReplyEnabled}
+                    />
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    onClick={() => updateSettings.mutate({
+                      accountId: "default",
+                      messageDelay: messageDelay * 1000,
+                      notificationThreshold,
+                      autoReplyEnabled,
+                    })}
+                    disabled={updateSettings.isPending}
+                  >
+                    {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+                    حفظ الإعدادات
+                  </Button>
+
+                  {/* إحصائيات */}
+                  {waSettings && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                      <div className="text-center p-3 bg-muted/20 rounded-lg">
+                        <p className="text-2xl font-bold text-primary">{waSettings.totalMessagesSent}</p>
+                        <p className="text-xs text-muted-foreground">إجمالي الرسائل</p>
+                      </div>
+                      <div className="text-center p-3 bg-muted/20 rounded-lg">
+                        <p className="text-2xl font-bold text-green-400">{waSettings.messagesSentToday}</p>
+                        <p className="text-xs text-muted-foreground">رسائل اليوم</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* قواعد الرد التلقائي */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Bot className="w-5 h-5 text-primary" />
+                      قواعد الرد التلقائي
+                    </CardTitle>
+                    <Button size="sm" onClick={() => setShowNewRule(true)}>
+                      <Plus className="w-4 h-4 ml-1" />
+                      قاعدة جديدة
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* نموذج قاعدة جديدة */}
+                  {showNewRule && (
+                    <Card className="border-primary/30 bg-primary/5">
+                      <CardContent className="pt-4 space-y-3">
+                        <div>
+                          <Label>كلمات التفعيل (مفصولة بفاصلة)</Label>
+                          <Input
+                            value={newRule.keywords}
+                            onChange={e => setNewRule(r => ({ ...r, keywords: e.target.value }))}
+                            placeholder="سعر, كم, خدمة, price"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label>قالب الرد</Label>
+                          <Textarea
+                            value={newRule.template}
+                            onChange={e => setNewRule(r => ({ ...r, template: e.target.value }))}
+                            placeholder="شكراً على تواصلك! يسعدنا الرد على استفسارك..."
+                            className="mt-1 h-20"
+                          />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={newRule.useAI}
+                            onCheckedChange={v => setNewRule(r => ({ ...r, useAI: v }))}
+                          />
+                          <Label>استخدام الذكاء الاصطناعي لتخصيص الرد</Label>
+                        </div>
+                        {newRule.useAI && (
+                          <div>
+                            <Label>سياق الذكاء الاصطناعي</Label>
+                            <Textarea
+                              value={newRule.aiContext}
+                              onChange={e => setNewRule(r => ({ ...r, aiContext: e.target.value }))}
+                              placeholder="أنت مساعد تجاري سعودي متخصص في اللحوم..."
+                              className="mt-1 h-16"
+                            />
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => addAutoReplyRule.mutate({
+                              accountId: "default",
+                              triggerKeywords: newRule.keywords.split(",").map(k => k.trim()).filter(Boolean),
+                              replyTemplate: newRule.template,
+                              useAI: newRule.useAI,
+                              aiContext: newRule.aiContext || undefined,
+                            })}
+                            disabled={addAutoReplyRule.isPending || !newRule.keywords || !newRule.template}
+                          >
+                            {addAutoReplyRule.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : null}
+                            حفظ
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setShowNewRule(false)}>إلغاء</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* قائمة القواعد */}
+                  {autoReplyRules?.length === 0 && !showNewRule && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Bot className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm">لا توجد قواعد بعد</p>
+                    </div>
+                  )}
+                  {autoReplyRules?.map((rule: any) => (
+                    <Card key={rule.id} className={`border ${rule.isActive ? "border-green-500/20 bg-green-500/5" : "border-border opacity-60"}`}>
+                      <CardContent className="pt-3 pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {(rule.triggerKeywords as string[]).map((kw: string) => (
+                                <span key={kw} className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                  <Tag className="w-2.5 h-2.5" />
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{rule.replyTemplate}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {rule.useAI && <span className="text-xs text-purple-400 flex items-center gap-1"><Sparkles className="w-3 h-3" />ذكاء اصطناعي</span>}
+                              <span className="text-xs text-muted-foreground">تفعيل: {rule.matchCount}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Switch
+                              checked={rule.isActive}
+                              onCheckedChange={v => updateAutoReplyRule.mutate({ id: rule.id, isActive: v })}
+                            />
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => deleteAutoReplyRule.mutate({ id: rule.id })}
+                              className="text-destructive hover:text-destructive h-7 w-7 p-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>

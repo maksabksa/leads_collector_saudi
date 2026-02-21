@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Zap,
   Globe,
+  Shield,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -23,6 +24,10 @@ const navItems = [
   { path: "/leads", label: "قائمة العملاء", icon: Users },
   { path: "/leads/add", label: "إضافة عميل", icon: Plus },
   { path: "/whatsapp", label: "واتساب", icon: MessageCircle },
+];
+
+const adminNavItems = [
+  { path: "/users", label: "إدارة المستخدمين", icon: Shield },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -128,6 +133,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {/* قسم الأدمن */}
+          {user?.role === "admin" && (
+            <>
+              <div className="px-3 pt-3 pb-1">
+                <p className="text-xs text-muted-foreground/60 font-medium uppercase tracking-wider">إدارة</p>
+              </div>
+              {adminNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
+                return (
+                  <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)}>
+                    <div
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                        isActive
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                      }`}
+                      style={isActive ? {
+                        background: "oklch(0.65 0.18 200 / 0.12)",
+                        border: "1px solid oklch(0.65 0.18 200 / 0.2)",
+                        color: "var(--brand-cyan)",
+                      } : {}}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {item.label}
+                    </div>
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* User section */}

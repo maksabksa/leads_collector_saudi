@@ -18,6 +18,8 @@ import WhatsAppAuto from "./pages/WhatsAppAuto";
 import InstagramSearch from "./pages/InstagramSearch";
 import WhatsApp from "./pages/WhatsApp";
 import SearchHub from "./pages/SearchHub";
+import UsersManagement from "./pages/UsersManagement";
+import JoinPage from "./pages/JoinPage";
 
 function Router() {
   return (
@@ -36,6 +38,8 @@ function Router() {
         <Route path="/instagram" component={InstagramSearch} />
         <Route path="/whatsapp" component={WhatsApp} />
         <Route path="/search-hub" component={SearchHub} />
+        <Route path="/users" component={UsersManagement} />
+        <Route path="/join" component={JoinPage} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

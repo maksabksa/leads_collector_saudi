@@ -206,7 +206,7 @@ export async function sendBulkMessages(
     if (onProgress) onProgress(i, result);
 
     if (i < messages.length - 1) {
-      const delay = 3000 + Math.random() * 3000;
+      const delay = 10000 + Math.random() * 2000; // 10-12 ثانية بين كل رسالة
       await new Promise((r) => setTimeout(r, delay));
     }
   }

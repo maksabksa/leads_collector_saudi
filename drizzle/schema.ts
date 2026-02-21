@@ -232,3 +232,94 @@ export const instagramAccounts = mysqlTable("instagram_accounts", {
 });
 export type InstagramAccount = typeof instagramAccounts.$inferSelect;
 export type InsertInstagramAccount = typeof instagramAccounts.$inferInsert;
+
+// ===== USER INVITATIONS TABLE =====
+export const userInvitations = mysqlTable("user_invitations", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull(),
+  invitedBy: int("invitedBy").notNull(), // userId of the admin who invited
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  permissions: json("permissions").$type<string[]>(), // ['leads.view', 'leads.add', 'whatsapp.send', 'search.use']
+  status: mysqlEnum("status", ["pending", "accepted", "expired", "revoked"]).default("pending").notNull(),
+  acceptedBy: int("acceptedBy"), // userId who accepted
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type UserInvitation = typeof userInvitations.$inferSelect;
+export type InsertUserInvitation = typeof userInvitations.$inferInsert;
+
+// ===== USER PERMISSIONS TABLE =====
+export const userPermissions = mysqlTable("user_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  permissions: json("permissions").$type<string[]>().notNull(), // ['leads.view', 'leads.add', 'whatsapp.send', 'search.use', 'analytics.view']
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type UserPermission = typeof userPermissions.$inferSelect;
+export type InsertUserPermission = typeof userPermissions.$inferInsert;
+
+// ===== WHATSAPP SETTINGS TABLE =====
+export const whatsappSettings = mysqlTable("whatsapp_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: varchar("accountId", { length: 64 }).notNull().unique(), // 'default' or custom account name
+  accountLabel: varchar("accountLabel", { length: 100 }).notNull(),
+  messageDelay: int("messageDelay").default(10000).notNull(), // ms between messages
+  notificationThreshold: int("notificationThreshold").default(50).notNull(), // notify after X messages
+  messagesSentToday: int("messagesSentToday").default(0).notNull(),
+  totalMessagesSent: int("totalMessagesSent").default(0).notNull(),
+  autoReplyEnabled: boolean("autoReplyEnabled").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type WhatsappSettings = typeof whatsappSettings.$inferSelect;
+export type InsertWhatsappSettings = typeof whatsappSettings.$inferInsert;
+
+// ===== WHATSAPP AUTO REPLY RULES TABLE =====
+export const autoReplyRules = mysqlTable("auto_reply_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: varchar("accountId", { length: 64 }).notNull().default("default"),
+  triggerKeywords: json("triggerKeywords").$type<string[]>().notNull(), // keywords that trigger this rule
+  replyTemplate: text("replyTemplate").notNull(), // template for the reply
+  useAI: boolean("useAI").default(false).notNull(), // use AI to generate contextual reply
+  aiContext: text("aiContext"), // context/instructions for AI reply generation
+  isActive: boolean("isActive").default(true).notNull(),
+  matchCount: int("matchCount").default(0).notNull(), // how many times this rule was triggered
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AutoReplyRule = typeof autoReplyRules.$inferSelect;
+export type InsertAutoReplyRule = typeof autoReplyRules.$inferInsert;
+
+// ===== WHATSAPP CHATS TABLE =====
+export const whatsappChats = mysqlTable("whatsapp_chats", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: varchar("accountId", { length: 64 }).notNull().default("default"),
+  phone: varchar("phone", { length: 30 }).notNull(),
+  contactName: varchar("contactName", { length: 200 }),
+  leadId: int("leadId"), // linked lead if any
+  lastMessage: text("lastMessage"),
+  lastMessageAt: timestamp("lastMessageAt"),
+  unreadCount: int("unreadCount").default(0).notNull(),
+  isArchived: boolean("isArchived").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type WhatsappChat = typeof whatsappChats.$inferSelect;
+export type InsertWhatsappChat = typeof whatsappChats.$inferInsert;
+
+// ===== WHATSAPP CHAT MESSAGES TABLE =====
+export const whatsappChatMessages = mysqlTable("whatsapp_chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  chatId: int("chatId").notNull(),
+  accountId: varchar("accountId", { length: 64 }).notNull().default("default"),
+  direction: mysqlEnum("direction", ["outgoing", "incoming"]).notNull(),
+  message: text("message").notNull(),
+  isAutoReply: boolean("isAutoReply").default(false).notNull(),
+  status: mysqlEnum("status", ["sent", "delivered", "read", "failed"]).default("sent").notNull(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+});
+export type WhatsappChatMessage = typeof whatsappChatMessages.$inferSelect;
+export type InsertWhatsappChatMessage = typeof whatsappChatMessages.$inferInsert;

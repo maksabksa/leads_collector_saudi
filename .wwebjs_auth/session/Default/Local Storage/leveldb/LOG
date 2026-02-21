@@ -1,2 +1,3 @@
-2026/02/20-18:43:45.968 8ce1 Creating DB /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb since it was missing.
-2026/02/20-18:43:45.977 8ce1 Reusing MANIFEST /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
+2026/02/20-19:56:01.747 af7b Reusing MANIFEST /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
+2026/02/20-19:56:01.754 af7b Recovering log #3
+2026/02/20-19:56:01.756 af7b Reusing old log /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb/000003.log 

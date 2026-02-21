@@ -766,6 +766,89 @@ const searchRouter = router({
       return data.result;
     }),
 
+  // استخراج بيانات الأنشطة التجارية من رابط مخصص
+  scrapeUrl: protectedProcedure
+    .input(z.object({
+      url: z.string().url(),
+    }))
+    .mutation(async ({ input }) => {
+      const { invokeLLM } = await import("./_core/llm");
+      // جلب محتوى الصفحة
+      let pageContent = "";
+      try {
+        const res = await fetch(input.url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ar,en;q=0.9",
+          },
+          signal: AbortSignal.timeout(15000),
+        });
+        const html = await res.text();
+        // استخراج النص من HTML
+        pageContent = html
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 8000);
+      } catch (err: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `فشل جلب الصفحة: ${err.message}` });
+      }
+      // استخدام الذكاء الاصطناعي لاستخراج بيانات الأنشطة التجارية
+      const aiRes = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `أنت محلل بيانات متخصص في استخراج بيانات الأنشطة التجارية السعودية. استخرج كل نشاط تجاري من النص وأرجع JSON array. كل عنصر يحتوي: name (اسم النشاط), businessType (نوع النشاط), city (المدينة), phone (رقم الهاتف), website (الموقع), instagram (حساب انستغرام), description (وصف مختصر). إذا لم تجد بيانات كافية أرجع [].`
+          },
+          {
+            role: "user",
+            content: `استخرج الأنشطة التجارية من هذا النص:\n\n${pageContent}`
+          }
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "businesses",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                results: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      businessType: { type: "string" },
+                      city: { type: "string" },
+                      phone: { type: "string" },
+                      website: { type: "string" },
+                      instagram: { type: "string" },
+                      description: { type: "string" },
+                    },
+                    required: ["name", "businessType", "city", "phone", "website", "instagram", "description"],
+                    additionalProperties: false,
+                  }
+                }
+              },
+              required: ["results"],
+              additionalProperties: false,
+            }
+          }
+        }
+      });
+      let results: any[] = [];
+      try {
+        const parsed = JSON.parse(aiRes.choices[0].message.content as string);
+        results = parsed.results || [];
+      } catch {
+        results = [];
+      }
+      return { results, url: input.url, count: results.length };
+    }),
   // Check if a place already exists as a lead (by name + phone)
   checkDuplicate: protectedProcedure
     .input(z.object({ companyName: z.string(), phone: z.string().optional() }))
@@ -1779,6 +1862,9 @@ const instagramRouter = router({
     }),
 });
 
+import { invitationsRouter } from "./routers/invitations";
+import { whatsappSettingsRouter } from "./routers/whatsappSettings";
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1793,11 +1879,13 @@ export const appRouter = router({
   leads: leadsRouter,
   analysis: analysisRouter,
   export: exportRouter,
-   search: searchRouter,
+  search: searchRouter,
   searchJobs: searchJobsRouter,
   aiSearch: aiSearchRouter,
   whatsapp: whatsappRouter,
   wauto: whatsappAutomationRouter,
   instagram: instagramRouter,
+  invitations: invitationsRouter,
+  waSettings: whatsappSettingsRouter,
 });
 export type AppRouter = typeof appRouter;
