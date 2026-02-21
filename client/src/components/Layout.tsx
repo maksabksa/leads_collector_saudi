@@ -3,34 +3,26 @@ import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import {
   BarChart3,
-  Globe,
   LogOut,
-  Map,
   Plus,
   Users,
-  Zap,
   ChevronRight,
   Menu,
   X,
   Search,
-  Bot,
   MessageCircle,
-  Instagram,
+  Zap,
+  Globe,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navItems = [
   { path: "/", label: "لوحة التحكم", icon: BarChart3 },
-  { path: "/engine", label: "محرك البحث الذكي", icon: Bot },
-  { path: "/search", label: "بحث يدوي", icon: Search },
-  { path: "/scout", label: "استخراج يدوي", icon: Globe },
-  { path: "/zones", label: "المناطق الجغرافية", icon: Map },
+  { path: "/search-hub", label: "مركز البحث", icon: Search },
   { path: "/leads", label: "قائمة العملاء", icon: Users },
   { path: "/leads/add", label: "إضافة عميل", icon: Plus },
-  { path: "/bulk-whatsapp", label: "واتساب مجمع", icon: MessageCircle },
-  { path: "/whatsapp-auto", label: "إرسال تلقائي", icon: MessageCircle },
-  { path: "/instagram", label: "بحث إنستغرام", icon: Instagram },
+  { path: "/whatsapp", label: "واتساب", icon: MessageCircle },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
