@@ -446,3 +446,18 @@ export const leadSegments = mysqlTable("lead_segments", {
 });
 export type LeadSegment = typeof leadSegments.$inferSelect;
 export type InsertLeadSegment = typeof leadSegments.$inferInsert;
+
+// ===== DATA SETTINGS TABLE =====
+// Customizable dropdown options for business types, cities, and other fields
+export const dataSettings = mysqlTable("data_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  category: varchar("category", { length: 50 }).notNull(), // "businessType" | "city" | "district" | "source" | "tag"
+  value: varchar("value", { length: 200 }).notNull(),
+  label: varchar("label", { length: 200 }).notNull(),
+  parentValue: varchar("parentValue", { length: 200 }), // for hierarchical data (e.g., city → district)
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DataSetting = typeof dataSettings.$inferSelect;
+export type InsertDataSetting = typeof dataSettings.$inferInsert;

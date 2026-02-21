@@ -25,7 +25,7 @@ import AISettings from "./pages/AISettings";
 import WhatsAppAccounts from "./pages/WhatsAppAccounts";
 import InterestKeywords from "./pages/InterestKeywords";
 import Segments from "./pages/Segments";
-
+import DataSettings from "./pages/DataSettings";
 function Router() {
   return (
     <Layout>
@@ -50,6 +50,7 @@ function Router() {
         <Route path="/whatsapp-accounts" component={WhatsAppAccounts} />
         <Route path="/interest-keywords" component={InterestKeywords} />
           <Route path="/segments" component={Segments} />
+          <Route path="/data-settings" component={DataSettings} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

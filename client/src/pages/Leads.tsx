@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Link } from "wouter";
-import { Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone, MapPin, ChevronDown, Layers, CheckSquare, Square } from "lucide-react";
+import { Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone, MapPin, ChevronDown, Layers, CheckSquare, Square, MessageCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 import {
@@ -24,6 +24,7 @@ export default function Leads() {
   const [filterZone, setFilterZone] = useState<number | undefined>();
   const [showFilters, setShowFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [filterWhatsapp, setFilterWhatsapp] = useState<"" | "yes" | "no" | "unknown">("");
   const [showSegmentDialog, setShowSegmentDialog] = useState(false);
   const [targetSegmentId, setTargetSegmentId] = useState<string>("");
 
@@ -36,11 +37,20 @@ export default function Leads() {
     city: filterCity || undefined,
     analysisStatus: filterStatus || undefined,
     zoneId: filterZone,
+    hasWhatsapp: filterWhatsapp || undefined,
   });
   const { data: zones } = trpc.zones.list.useQuery();
   const { data: segmentsList } = trpc.segments.list.useQuery();
   const deleteLead = trpc.leads.delete.useMutation();
   const exportCSV = trpc.export.exportCSV.useMutation();
+  const bulkAnalyze = trpc.analysis.bulkAnalyze.useMutation({
+    onSuccess: (data) => {
+      toast.success(`تم إرسال ${data.queued} عميل للتحليل في الخلفية`);
+      setSelectedIds(new Set());
+      setTimeout(() => utils.leads.list.invalidate(), 2000);
+    },
+    onError: (e) => toast.error("فشل التحليل: " + e.message),
+  });
   const addToSegment = trpc.segments.addLeads.useMutation({
     onSuccess: (data) => {
       toast.success(`تمت إضافة ${data.added} عميل للشريحة`);
@@ -108,14 +118,25 @@ export default function Leads() {
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
-            <button
-              onClick={() => setShowSegmentDialog(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
-              style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
-            >
-              <Layers className="w-4 h-4" />
-              إضافة {selectedIds.size} للشريحة
-            </button>
+            <>
+              <button
+                onClick={() => bulkAnalyze.mutate({ leadIds: Array.from(selectedIds) })}
+                disabled={bulkAnalyze.isPending}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                style={{ background: "oklch(0.85 0.16 75 / 0.15)", color: "oklch(0.85 0.16 75)", border: "1px solid oklch(0.85 0.16 75 / 0.3)" }}
+              >
+                <Zap className="w-4 h-4" />
+                {bulkAnalyze.isPending ? "جاري التحليل..." : `تحليل ${selectedIds.size} عميل`}
+              </button>
+              <button
+                onClick={() => setShowSegmentDialog(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
+              >
+                <Layers className="w-4 h-4" />
+                إضافة {selectedIds.size} للشريحة
+              </button>
+            </>
           )}
           <button
             onClick={handleExport}
@@ -193,6 +214,16 @@ export default function Leads() {
                 className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
                 <option value="">الكل</option>
                 {zones?.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">واتساب</label>
+              <select value={filterWhatsapp} onChange={e => setFilterWhatsapp(e.target.value as "" | "yes" | "no" | "unknown")}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
+                <option value="">الكل</option>
+                <option value="yes">✅ واتساب فعّال</option>
+                <option value="no">❌ ليس لديه واتساب</option>
+                <option value="unknown">❓ غير محدد</option>
               </select>
             </div>
           </div>
@@ -294,9 +325,17 @@ export default function Leads() {
                   {/* Contact */}
                   <div className="col-span-2">
                     {lead.verifiedPhone ? (
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs text-foreground font-mono">{lead.verifiedPhone}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-xs text-foreground font-mono">{lead.verifiedPhone}</span>
+                        </div>
+                        {lead.hasWhatsapp === "yes" && (
+                          <div className="flex items-center gap-1">
+                            <MessageCircle className="w-3 h-3" style={{ color: "oklch(0.75 0.18 145)" }} />
+                            <span className="text-xs font-medium" style={{ color: "oklch(0.75 0.18 145)" }}>واتساب فعّال</span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">لا يوجد</span>

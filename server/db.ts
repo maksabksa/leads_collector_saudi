@@ -106,6 +106,8 @@ export async function getAllLeads(filters?: {
   businessType?: string;
   analysisStatus?: string;
   search?: string;
+  hasWhatsapp?: "yes" | "no" | "unknown";
+  hasPhone?: boolean;
 }): Promise<Lead[]> {
   const db = await getDb();
   if (!db) return [];
@@ -115,6 +117,8 @@ export async function getAllLeads(filters?: {
   if (filters?.businessType) conditions.push(like(leads.businessType, `%${filters.businessType}%`));
   if (filters?.analysisStatus) conditions.push(eq(leads.analysisStatus, filters.analysisStatus as any));
   if (filters?.search) conditions.push(like(leads.companyName, `%${filters.search}%`));
+  if (filters?.hasWhatsapp) conditions.push(eq(leads.hasWhatsapp, filters.hasWhatsapp));
+  if (filters?.hasPhone === true) conditions.push(sql`${leads.verifiedPhone} IS NOT NULL AND ${leads.verifiedPhone} != ''`);
   const query = conditions.length > 0
     ? db.select().from(leads).where(and(...conditions)).orderBy(desc(leads.createdAt))
     : db.select().from(leads).orderBy(desc(leads.createdAt));

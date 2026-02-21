@@ -16,7 +16,8 @@ import {
   markInstagramAccountAsLead,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { whatsappMessages } from "../drizzle/schema";
+import { whatsappMessages, dataSettings } from "../drizzle/schema";
+import { eq, and, asc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -122,6 +123,8 @@ const leadsRouter = router({
       businessType: z.string().optional(),
       analysisStatus: z.string().optional(),
       search: z.string().optional(),
+      hasWhatsapp: z.enum(["yes", "no", "unknown"]).optional(),
+      hasPhone: z.boolean().optional(),
     }).optional())
     .query(async ({ input }) => {
       return getAllLeads(input ?? {});
@@ -607,9 +610,69 @@ const analysisRouter = router({
 
       return report;
     }),
+  // ===== تحليل جماعي بضغطة واحدة =====
+  bulkAnalyze: protectedProcedure
+    .input(z.object({
+      leadIds: z.array(z.number()).min(1).max(50),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not ready" });
+      let queued = 0;
+      let skipped = 0;
+      for (const leadId of input.leadIds) {
+        const lead = await getLeadById(leadId);
+        if (!lead) { skipped++; continue; }
+        // تحديث حالة التحليل إلى "جاري التحليل"
+        await updateLead(leadId, { analysisStatus: "analyzing" });
+        // تشغيل التحليل في الخلفية (non-blocking)
+        (async () => {
+          try {
+            // تحليل الموقع إذا وجد
+            if (lead.website) {
+              const { invokeLLM } = await import("./_core/llm");
+              const websitePrompt = `أنت خبير تحليل مواقع ويب للسوق السعودي. حلل الموقع التالي:
+الشركة: ${lead.companyName}\nنوع النشاط: ${lead.businessType}\nالموقع: ${lead.website}\nالمدينة: ${lead.city}\n\nقدم تحليلاً شاملاً يتضمن:\n1. الدرجة الكلية (0-10)\n2. سرعة التحميل (0-10)\n3. تجربة الجوال (0-10)\n4. SEO (0-10)\n5. جودة المحتوى (0-10)\n6. التصميم (0-10)\n7. أكبر ثغرة تسويقية\n8. فرصة الإيراد\n9. ملخص التحليل`;
+              const resp = await invokeLLM({
+                messages: [
+                  { role: "system", content: "أنت خبير تحليل مواقع ويب وتسويق رقمي في السوق السعودي. أجب بـ JSON فقط." },
+                  { role: "user", content: websitePrompt },
+                ],
+                response_format: { type: "json_schema", json_schema: { name: "website_analysis", strict: true, schema: { type: "object", properties: { overallScore: { type: "number" }, loadSpeed: { type: "number" }, mobileExperience: { type: "number" }, seoScore: { type: "number" }, contentQuality: { type: "number" }, designScore: { type: "number" }, biggestGap: { type: "string" }, revenueOpportunity: { type: "string" }, summary: { type: "string" } }, required: ["overallScore", "loadSpeed", "mobileExperience", "seoScore", "contentQuality", "designScore", "biggestGap", "revenueOpportunity", "summary"], additionalProperties: false } } },
+              });
+              const raw = resp.choices[0]?.message?.content;
+              const analysis = typeof raw === "string" ? JSON.parse(raw) : {};
+              const { createWebsiteAnalysis } = await import("./db");
+              await createWebsiteAnalysis({
+                leadId,
+                url: lead.website!,
+                overallScore: analysis.overallScore,
+                loadSpeedScore: analysis.loadSpeed,
+                mobileExperienceScore: analysis.mobileExperience,
+                seoScore: analysis.seoScore,
+                contentQualityScore: analysis.contentQuality,
+                designScore: analysis.designScore,
+                summary: analysis.summary,
+                rawAnalysis: JSON.stringify({ biggestGap: analysis.biggestGap, revenueOpportunity: analysis.revenueOpportunity }),
+              });
+              await updateLead(leadId, {
+                biggestMarketingGap: analysis.biggestGap,
+                suggestedSalesEntryAngle: analysis.revenueOpportunity,
+                analysisStatus: "completed",
+              });
+            } else {
+              await updateLead(leadId, { analysisStatus: "completed" });
+            }
+          } catch {
+            await updateLead(leadId, { analysisStatus: "failed" });
+          }
+        })();
+        queued++;
+      }
+      return { queued, skipped };
+    }),
 });
-
-// ===== EXPORT ROUTER =====
+// ===== EXPORT ROUTER ======
 const exportRouter = router({
   exportCSV: protectedProcedure
     .input(z.object({
@@ -1871,6 +1934,79 @@ const instagramRouter = router({
 });
 
 import { invitationsRouter } from "./routers/invitations";
+
+// ===== DATA SETTINGS ROUTER =====
+const dataSettingsRouter = router({
+  // جلب خيارات فئة معينة
+  getByCategory: protectedProcedure
+    .input(z.object({ category: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      return db!.select().from(dataSettings)
+        .where(and(eq(dataSettings.category, input.category), eq(dataSettings.isActive, true)))
+        .orderBy(asc(dataSettings.sortOrder), asc(dataSettings.label));
+    }),
+  // جلب كل الفئات
+  getAll: protectedProcedure.query(async () => {
+    const db = await getDb();
+    return db!.select().from(dataSettings)
+      .where(eq(dataSettings.isActive, true))
+      .orderBy(asc(dataSettings.category), asc(dataSettings.sortOrder));
+  }),
+  // إضافة خيار جديد
+  create: protectedProcedure
+    .input(z.object({
+      category: z.enum(["businessType", "city", "district", "source", "tag"]),
+      value: z.string().min(1).max(200),
+      label: z.string().min(1).max(200),
+      parentValue: z.string().optional(),
+      sortOrder: z.number().default(0),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await db!.insert(dataSettings).values({
+        category: input.category,
+        value: input.value,
+        label: input.label,
+        parentValue: input.parentValue,
+        sortOrder: input.sortOrder,
+        isActive: true,
+      });
+      return { success: true };
+    }),
+  // تعديل خيار
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      label: z.string().min(1).max(200).optional(),
+      sortOrder: z.number().optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      const { id, ...rest } = input;
+      await db!.update(dataSettings).set(rest).where(eq(dataSettings.id, id));
+      return { success: true };
+    }),
+  // حذف خيار
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await db!.delete(dataSettings).where(eq(dataSettings.id, input.id));
+      return { success: true };
+    }),
+  // تحديث ترتيب الخيارات
+  reorder: protectedProcedure
+    .input(z.array(z.object({ id: z.number(), sortOrder: z.number() })))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await Promise.all(input.map(item =>
+        db!.update(dataSettings).set({ sortOrder: item.sortOrder }).where(eq(dataSettings.id, item.id))
+      ));
+      return { success: true };
+    }),
+});
 import { whatsappSettingsRouter } from "./routers/whatsappSettings";
 import { aiSettingsRouter } from "./routers/aiSettings";
 import { whatsappAccountsRouter } from "./routers/whatsappAccounts";
@@ -1903,5 +2039,6 @@ export const appRouter = router({
   waAccounts: whatsappAccountsRouter,
   interestKw: interestKeywordsRouter,
   segments: segmentsRouter,
+  dataSettings: dataSettingsRouter,
 });
 export type AppRouter = typeof appRouter;

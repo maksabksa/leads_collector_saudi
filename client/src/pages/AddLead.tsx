@@ -5,7 +5,7 @@ import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, 
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 
-const businessTypes = [
+const FALLBACK_BUSINESS_TYPES = [
   "ملحمة", "أغنام", "ماعز", "لحوم", "ذبح وتجهيز", "توصيل لحوم",
   "مزرعة أغنام", "سوق ماشية", "أضاحي", "مشاوي ولحوم", "مطعم", "صيدلية", "بقالة", "مقهى", "صالون", "أخرى"
 ];
@@ -13,6 +13,8 @@ const businessTypes = [
 export default function AddLead() {
   const [, navigate] = useLocation();
   const { data: zones } = trpc.zones.list.useQuery();
+  const { data: businessTypesData } = trpc.dataSettings.getByCategory.useQuery({ category: "businessType" });
+  const businessTypes = businessTypesData?.length ? businessTypesData.map(b => b.label) : FALLBACK_BUSINESS_TYPES;
   const createLead = trpc.leads.create.useMutation();
   const utils = trpc.useUtils();
 
