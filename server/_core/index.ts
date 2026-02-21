@@ -27,6 +27,40 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+// استعادة جلسات واتساب تلقائياً من قاعدة البيانات
+async function restoreWhatsAppSessions() {
+  try {
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (!db) return;
+    const { whatsappAccounts } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const { startWhatsAppSession } = await import("../whatsappAutomation");
+
+    const accounts = await db
+      .select()
+      .from(whatsappAccounts)
+      .where(eq(whatsappAccounts.isActive, true));
+
+    if (accounts.length === 0) return;
+
+    console.log(`[WhatsApp] استعادة ${accounts.length} حساب(ات) واتساب...`);
+
+    // بدء الجلسات بالتوازي
+    for (const account of accounts) {
+      startWhatsAppSession(account.accountId)
+        .then((result) => {
+          console.log(`[WhatsApp] ${account.label} (${account.accountId}): ${result.status}`);
+        })
+        .catch((err: Error) => {
+          console.error(`[WhatsApp] فشل استعادة ${account.accountId}:`, err.message);
+        });
+    }
+  } catch (err) {
+    console.error("[WhatsApp] خطأ في استعادة الجلسات:", err);
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -59,6 +93,8 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    // استعادة جلسات واتساب بعد 5 ثوانٍ من بدء الخادم
+    setTimeout(restoreWhatsAppSessions, 5000);
   });
 }
 
