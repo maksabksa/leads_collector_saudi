@@ -194,8 +194,8 @@ export default function Chats() {
   const { data: stats } = trpc.waSettings.getChatStats.useQuery({ accountId: "default" });
 
   const { data: messages = [], refetch: refetchMessages } = trpc.waSettings.getChatMessages.useQuery(
-    { chatId: selectedChatId! },
-    { enabled: !!selectedChatId, refetchInterval: 5000 }
+    { chatId: selectedChatId ?? 0 },
+    { enabled: selectedChatId !== null && selectedChatId > 0, refetchInterval: selectedChatId !== null && selectedChatId > 0 ? 5000 : false }
   );
 
   // ===== Mutations =====

@@ -302,8 +302,10 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
 
   // رسائل محادثة معينة
   getChatMessages: protectedProcedure
-    .input(z.object({ chatId: z.number() }))
+    .input(z.object({ chatId: z.number().int().min(0) }))
     .query(async ({ input }) => {
+      // إذا كان chatId = 0 فهذا يعني لم يتم اختيار محادثة بعد
+      if (!input.chatId || input.chatId <= 0) return [];
       const db = await getDb();
       if (!db) return [];
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,10 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
   MessageCircle, Wifi, WifiOff, QrCode, Send, Users, FileText,
-  Plus, Trash2, Edit, Loader2, Sparkles, CheckCircle, RefreshCw,
+  Plus, Trash2, Loader2, Sparkles, CheckCircle, RefreshCw,
   Play, Square, Copy, ChevronDown, ChevronUp, Settings, Bell, Bot, Tag,
-  Smartphone, Pencil, Zap, UserCheck, Layers, AlertTriangle, ExternalLink
+  Smartphone, Pencil, Zap, UserCheck, Layers, AlertTriangle, ExternalLink,
+  PhoneCall, Info
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -25,27 +26,261 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger
+} from "@/components/ui/tooltip";
 
-// ===== مكون حالة الاتصال =====
-const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  disconnected: { label: "غير متصل", color: "text-red-400 bg-red-500/10 border-red-500/30", icon: <WifiOff className="w-4 h-4" /> },
-  initializing: { label: "جاري التهيئة...", color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30", icon: <Loader2 className="w-4 h-4 animate-spin" /> },
-  qr_pending: { label: "في انتظار المسح", color: "text-blue-400 bg-blue-500/10 border-blue-500/30", icon: <QrCode className="w-4 h-4" /> },
-  connected: { label: "متصل", color: "text-green-400 bg-green-500/10 border-green-500/30", icon: <Wifi className="w-4 h-4" /> },
+// ===== ثوابت =====
+const MAX_ACCOUNTS = 10;
+
+// ===== إعدادات حالة الاتصال =====
+const statusConfig: Record<string, { label: string; color: string; dotColor: string; icon: React.ReactNode }> = {
+  disconnected: {
+    label: "غير متصل",
+    color: "text-red-400 bg-red-500/10 border-red-500/30",
+    dotColor: "bg-red-500",
+    icon: <WifiOff className="w-3.5 h-3.5" />,
+  },
+  initializing: {
+    label: "جاري التهيئة...",
+    color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
+    dotColor: "bg-yellow-400 animate-pulse",
+    icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />,
+  },
+  qr_pending: {
+    label: "في انتظار المسح",
+    color: "text-blue-400 bg-blue-500/10 border-blue-500/30",
+    dotColor: "bg-blue-400 animate-pulse",
+    icon: <QrCode className="w-3.5 h-3.5" />,
+  },
+  connected: {
+    label: "متصل",
+    color: "text-green-400 bg-green-500/10 border-green-500/30",
+    dotColor: "bg-green-500",
+    icon: <Wifi className="w-3.5 h-3.5" />,
+  },
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg = statusConfig[status] ?? { label: status, color: "text-gray-400 bg-gray-500/10 border-gray-500/30", icon: null };
+function StatusPill({ status }: { status: string }) {
+  const cfg = statusConfig[status] ?? {
+    label: status,
+    color: "text-gray-400 bg-gray-500/10 border-gray-500/30",
+    dotColor: "bg-gray-400",
+    icon: null,
+  };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-medium ${cfg.color}`}>
-      {cfg.icon}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${cfg.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dotColor}`} />
       {cfg.label}
     </span>
   );
 }
 
+const ROLE_LABELS: Record<string, { label: string; color: string; icon: React.ElementType; desc: string }> = {
+  bulk_sender: {
+    label: "إرسال جماعي",
+    color: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    icon: Zap,
+    desc: "مخصص لإرسال الرسائل الجماعية للعملاء",
+  },
+  human_handoff: {
+    label: "تحويل للموظف",
+    color: "bg-green-500/20 text-green-400 border-green-500/30",
+    icon: UserCheck,
+    desc: "مخصص لاستقبال العملاء المهتمين وإتمام البيع",
+  },
+  both: {
+    label: "إرسال + تحويل",
+    color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    icon: Layers,
+    desc: "يقوم بالإرسال الجماعي وتحويل العملاء المهتمين",
+  },
+};
+
+// ===== بطاقة حساب واتساب =====
+function AccountCard({
+  account,
+  sessionStatus,
+  sessionQr,
+  onConnect,
+  onDisconnect,
+  onEdit,
+  onDelete,
+  onToggleActive,
+  isConnecting,
+  isDisconnecting,
+}: {
+  account: any;
+  sessionStatus: string;
+  sessionQr?: string;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleActive: (v: boolean) => void;
+  isConnecting: boolean;
+  isDisconnecting: boolean;
+}) {
+  const roleInfo = ROLE_LABELS[account.role] ?? ROLE_LABELS.bulk_sender;
+  const RoleIcon = roleInfo.icon;
+  const isConnected = sessionStatus === "connected";
+  const isQrPending = sessionStatus === "qr_pending";
+  const isInitializing = sessionStatus === "initializing";
+  const isActive = account.isActive;
+
+  return (
+    <Card className={`transition-all duration-200 ${isActive ? "border-border" : "border-border/30 opacity-50"} ${isConnected ? "ring-1 ring-green-500/20" : ""}`}>
+      <CardContent className="p-4 space-y-3">
+
+        {/* رأس البطاقة */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* أيقونة الحالة */}
+            <div className={`relative w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+              isConnected ? "bg-green-500/15 border border-green-500/30" : "bg-muted border border-border"
+            }`}>
+              <Smartphone className={`w-5 h-5 ${isConnected ? "text-green-400" : "text-muted-foreground"}`} />
+              {/* نقطة الحالة */}
+              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background ${
+                isConnected ? "bg-green-500" :
+                isInitializing || isQrPending ? "bg-yellow-400 animate-pulse" :
+                "bg-red-500"
+              }`} />
+            </div>
+
+            <div className="min-w-0">
+              <p className="font-semibold text-sm truncate">{account.label}</p>
+              <p className="text-xs text-muted-foreground font-mono" dir="ltr">{account.phoneNumber}</p>
+            </div>
+          </div>
+
+          {/* تفعيل/إيقاف */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Switch
+                  checked={account.isActive}
+                  onCheckedChange={onToggleActive}
+                  className="flex-shrink-0"
+                />
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>{account.isActive ? "تعطيل الحساب" : "تفعيل الحساب"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        {/* الدور والموظف */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={`${roleInfo.color} border text-xs flex items-center gap-1`}>
+            <RoleIcon className="w-3 h-3" />
+            {roleInfo.label}
+          </Badge>
+          {account.assignedEmployee && (
+            <Badge variant="outline" className="text-xs">
+              <UserCheck className="w-3 h-3 ml-1" />
+              {account.assignedEmployee}
+            </Badge>
+          )}
+        </div>
+
+        {/* حالة الاتصال */}
+        <div className="space-y-2">
+          <StatusPill status={sessionStatus} />
+
+          {/* QR Code */}
+          {isQrPending && sessionQr && (
+            <div className="bg-muted/30 rounded-xl p-3 text-center space-y-2 border border-border">
+              <p className="text-xs text-muted-foreground">افتح واتساب → الأجهزة المرتبطة → ربط جهاز</p>
+              <div className="bg-white p-2 rounded-lg inline-block">
+                <img src={sessionQr} alt="QR Code" className="w-36 h-36" />
+              </div>
+            </div>
+          )}
+
+          {/* جاري التهيئة */}
+          {isInitializing && (
+            <div className="flex items-center gap-2 py-2 px-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+              <Loader2 className="w-4 h-4 text-yellow-400 animate-spin" />
+              <span className="text-xs text-yellow-400">جاري تهيئة الاتصال... (20-30 ثانية)</span>
+            </div>
+          )}
+
+          {/* متصل */}
+          {isConnected && (
+            <div className="flex items-center gap-2 py-2 px-3 bg-green-500/10 rounded-lg border border-green-500/20">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              <span className="text-xs text-green-400">متصل بنجاح — الجلسة محفوظة</span>
+            </div>
+          )}
+        </div>
+
+        {/* أزرار التحكم */}
+        <div className="flex gap-2 pt-1">
+          {/* زر الربط */}
+          {!isConnected && !isInitializing && !isQrPending && (
+            <Button
+              size="sm"
+              className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700"
+              onClick={onConnect}
+              disabled={isConnecting || !isActive}
+            >
+              {isConnecting ? (
+                <Loader2 className="w-3 h-3 animate-spin ml-1" />
+              ) : (
+                <Play className="w-3 h-3 ml-1" />
+              )}
+              ربط الحساب
+            </Button>
+          )}
+
+          {/* زر قطع الاتصال */}
+          {(isConnected || isQrPending || isInitializing) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-8 text-xs text-red-400 border-red-500/30 hover:bg-red-500/10"
+              onClick={onDisconnect}
+              disabled={isDisconnecting}
+            >
+              {isDisconnecting ? (
+                <Loader2 className="w-3 h-3 animate-spin ml-1" />
+              ) : (
+                <Square className="w-3 h-3 ml-1" />
+              )}
+              قطع الاتصال
+            </Button>
+          )}
+
+          {/* تعديل */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-8 p-0"
+            onClick={onEdit}
+          >
+            <Pencil className="w-3 h-3" />
+          </Button>
+
+          {/* حذف */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={onDelete}
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ===== الصفحة الرئيسية =====
 export default function WhatsApp() {
-  const [activeTab, setActiveTab] = useState("connect");
+  const [activeTab, setActiveTab] = useState("accounts");
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [preparedMessages, setPreparedMessages] = useState<{ leadId: number; name: string; phone: string; message: string }[]>([]);
@@ -54,8 +289,9 @@ export default function WhatsApp() {
   const [showNewTemplate, setShowNewTemplate] = useState(false);
   const [generatingFor, setGeneratingFor] = useState<string>("");
   const [sendProgress, setSendProgress] = useState<{ sent: number; total: number; current: string } | null>(null);
-   const [expandedMsg, setExpandedMsg] = useState<number | null>(null);
+  const [expandedMsg, setExpandedMsg] = useState<number | null>(null);
   const sendingRef = useRef(false);
+
   // إعدادات
   const [messageDelay, setMessageDelay] = useState(10);
   const [notificationThreshold, setNotificationThreshold] = useState(50);
@@ -63,21 +299,31 @@ export default function WhatsApp() {
   const [newRule, setNewRule] = useState({ keywords: "", template: "", useAI: false, aiContext: "" });
   const [showNewRule, setShowNewRule] = useState(false);
   const [editingRule, setEditingRule] = useState<any | null>(null);
-  // ===== حسابات واتساب المتعددة =====
+
+  // حسابات واتساب
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any | null>(null);
   const [deleteAccountTarget, setDeleteAccountTarget] = useState<{ id: number; label: string } | null>(null);
-  const [accountForm, setAccountForm] = useState({ label: "", phoneNumber: "", role: "bulk_sender" as "bulk_sender" | "human_handoff" | "both", assignedEmployee: "", notes: "", sortOrder: 0 });
+  const [accountForm, setAccountForm] = useState({
+    label: "",
+    phoneNumber: "",
+    role: "bulk_sender" as "bulk_sender" | "human_handoff" | "both",
+    assignedEmployee: "",
+    notes: "",
+    sortOrder: 0,
+  });
+
   // ===== Queries =====
-  const { data: statusData, refetch: refetchStatus } = trpc.wauto.status.useQuery(undefined, { refetchInterval: 3000 });
-  const { data: allSessionsData, refetch: refetchAllSessions } = trpc.wauto.allStatus.useQuery(undefined, { refetchInterval: 5000 });
+  const { data: allSessionsData, refetch: refetchAllSessions } = trpc.wauto.allStatus.useQuery(
+    undefined,
+    { refetchInterval: 4000 }
+  );
   const { data: accounts = [], refetch: refetchAccounts } = trpc.waAccounts.listAccounts.useQuery();
   const { data: pendingAlerts = [], refetch: refetchAlerts } = trpc.waAccounts.listAlerts.useQuery({ status: "pending" });
   const { data: leads } = trpc.leads.list.useQuery({});
   const { data: templates, refetch: refetchTemplates } = trpc.whatsapp.listTemplates.useQuery();
   const { data: waSettings, refetch: refetchSettings } = trpc.waSettings.getSettings.useQuery({ accountId: "default" });
   const { data: autoReplyRules, refetch: refetchRules } = trpc.waSettings.listAutoReplyRules.useQuery({ accountId: "default" });
-  const utils = trpc.useUtils();
 
   // تحميل الإعدادات من قاعدة البيانات
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -89,29 +335,30 @@ export default function WhatsApp() {
   }
 
   // ===== Mutations =====
-  const startSession = trpc.wauto.startSession.useMutation({
-    onSuccess: () => { toast.success("جاري تهيئة واتساب..."); refetchStatus(); },
-    onError: (e) => toast.error("خطأ", { description: e.message }),
-  });
-  const disconnect = trpc.wauto.disconnect.useMutation({
-    onSuccess: () => { toast.success("تم قطع الاتصال"); refetchStatus(); },
-    onError: (e) => toast.error("خطأ", { description: e.message }),
-  });
   const sendOne = trpc.wauto.sendOne.useMutation();
   const bulkApplyTemplate = trpc.whatsapp.bulkApplyTemplate.useMutation();
   const bulkGenerate = trpc.whatsapp.bulkGenerate.useMutation();
+
   const createTemplate = trpc.whatsapp.createTemplate.useMutation({
-    onSuccess: () => { toast.success("تم إنشاء القالب"); refetchTemplates(); setShowNewTemplate(false); setNewTemplate({ name: "", content: "", category: "" }); },
+    onSuccess: () => {
+      toast.success("تم إنشاء القالب");
+      refetchTemplates();
+      setShowNewTemplate(false);
+      setNewTemplate({ name: "", content: "", category: "" });
+    },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+
   const updateTemplate = trpc.whatsapp.updateTemplate.useMutation({
     onSuccess: () => { toast.success("تم تحديث القالب"); refetchTemplates(); setEditingTemplate(null); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+
   const deleteTemplate = trpc.whatsapp.deleteTemplate.useMutation({
     onSuccess: () => { toast.success("تم حذف القالب"); refetchTemplates(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+
   const generateTemplate = trpc.whatsapp.generateTemplate.useMutation({
     onSuccess: (data) => {
       if (editingTemplate) setEditingTemplate((t: any) => ({ ...t, content: data.content }));
@@ -127,7 +374,12 @@ export default function WhatsApp() {
   });
 
   const addAutoReplyRule = trpc.waSettings.addAutoReplyRule.useMutation({
-    onSuccess: () => { toast.success("تم إضافة قاعدة الرد"); refetchRules(); setShowNewRule(false); setNewRule({ keywords: "", template: "", useAI: false, aiContext: "" }); },
+    onSuccess: () => {
+      toast.success("تم إضافة قاعدة الرد");
+      refetchRules();
+      setShowNewRule(false);
+      setNewRule({ keywords: "", template: "", useAI: false, aiContext: "" });
+    },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
 
@@ -140,61 +392,81 @@ export default function WhatsApp() {
     onSuccess: () => { toast.success("تم حذف القاعدة"); refetchRules(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
-  // ===== mutations الحسابات =====
+
+  // mutations الحسابات
   const addAccount = trpc.waAccounts.addAccount.useMutation({
-    onSuccess: () => { toast.success("تم إضافة الحساب"); refetchAccounts(); setShowAddAccount(false); setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 }); },
+    onSuccess: () => {
+      toast.success("تم إضافة الحساب");
+      refetchAccounts();
+      setShowAddAccount(false);
+      setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 });
+    },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+
   const updateAccount = trpc.waAccounts.updateAccount.useMutation({
     onSuccess: () => { toast.success("تم تحديث الحساب"); refetchAccounts(); setEditingAccount(null); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+
   const deleteAccount = trpc.waAccounts.deleteAccount.useMutation({
     onSuccess: () => { toast.success("تم حذف الحساب"); refetchAccounts(); setDeleteAccountTarget(null); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+
   const toggleAccountActive = trpc.waAccounts.updateAccount.useMutation({
     onSuccess: () => refetchAccounts(),
     onError: (e: any) => toast.error("خطأ", { description: e.message }),
   });
+
   const transferToHuman = trpc.waAccounts.transferToHuman.useMutation({
     onSuccess: () => { toast.success("تم التحويل بنجاح"); refetchAlerts(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+
+  // جلسات الحسابات
   const startAccountSession = trpc.wauto.startSession.useMutation({
-    onSuccess: (_, vars) => { toast.success("جاري تهيئة الحساب..."); refetchAllSessions(); },
-    onError: (e) => toast.error("خطأ", { description: e.message }),
+    onSuccess: () => { toast.success("جاري تهيئة الحساب..."); refetchAllSessions(); },
+    onError: (e) => toast.error("خطأ في بدء الجلسة", { description: e.message }),
   });
+
   const disconnectAccount = trpc.wauto.disconnect.useMutation({
     onSuccess: () => { toast.success("تم قطع الاتصال"); refetchAllSessions(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
-  const ROLE_LABELS: Record<string, { label: string; color: string; icon: React.ElementType; desc: string }> = {
-    bulk_sender: { label: "إرسال جماعي", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: Zap, desc: "مخصص لإرسال الرسائل الجماعية للعملاء" },
-    human_handoff: { label: "تحويل للموظف", color: "bg-green-500/20 text-green-400 border-green-500/30", icon: UserCheck, desc: "مخصص لاستقبال العملاء المهتمين وإتمام البيع" },
-    both: { label: "إرسال + تحويل", color: "bg-purple-500/20 text-purple-400 border-purple-500/30", icon: Layers, desc: "يقوم بالإرسال الجماعي وتحويل العملاء المهتمين" },
-  };
-  const handoffAccounts = (accounts as any[]).filter((a) => a.role === "human_handoff" || a.role === "both");
+
+  const incrementCount = trpc.waSettings.incrementMessageCount.useMutation();
+
+  // ===== حساب الحالات =====
+  const sessions = (allSessionsData as any[] | undefined) ?? [];
+  const connectedCount = sessions.filter((s: any) => s.status === "connected").length;
+  const accountsList = accounts as any[];
+  const handoffAccounts = accountsList.filter((a) => a.role === "human_handoff" || a.role === "both");
+
+  // أول حساب متصل (للإرسال)
+  const firstConnectedAccount = accountsList.find((a) => {
+    const s = sessions.find((s: any) => s.accountId === a.accountId);
+    return s?.status === "connected";
+  });
+  const isAnyConnected = !!firstConnectedAccount;
+
+  // ===== معالجات =====
   const handleAccountSave = () => {
-    const payload = { ...accountForm, assignedEmployee: accountForm.assignedEmployee || undefined, notes: accountForm.notes || undefined };
+    const payload = {
+      ...accountForm,
+      assignedEmployee: accountForm.assignedEmployee || undefined,
+      notes: accountForm.notes || undefined,
+    };
     if (editingAccount) updateAccount.mutate({ id: editingAccount.id, ...payload });
     else addAccount.mutate(payload);
   };
 
-  const status = statusData?.status ?? "disconnected";
-  const qrCode = statusData?.qr;
-  const isConnected = status === "connected";
-  const isQrReady = status === "qr_pending";
-
-  // تحضير الرسائل
   const handlePrepare = () => {
     if (!selectedTemplateId || selectedLeads.length === 0) {
       toast.error("اختر قالباً وعملاء أولاً");
       return;
     }
-    const template = templates?.find(t => t.id === selectedTemplateId);
-    if (!template) return;
-        bulkApplyTemplate.mutate(
+    bulkApplyTemplate.mutate(
       { templateId: selectedTemplateId, leadIds: selectedLeads },
       {
         onSuccess: (data) => {
@@ -213,11 +485,8 @@ export default function WhatsApp() {
     );
   };
 
-  const incrementCount = trpc.waSettings.incrementMessageCount.useMutation();
-
-  // إرسال تلقائي
   const handleSendAll = async () => {
-    if (!isConnected) { toast.error("يجب الاتصال بواتساب أولاً"); return; }
+    if (!isAnyConnected) { toast.error("يجب ربط حساب واتساب أولاً"); return; }
     if (preparedMessages.length === 0) { toast.error("لا توجد رسائل محضّرة"); return; }
     sendingRef.current = true;
     setSendProgress({ sent: 0, total: preparedMessages.length, current: "" });
@@ -226,22 +495,22 @@ export default function WhatsApp() {
       if (!sendingRef.current) break;
       setSendProgress({ sent, total: preparedMessages.length, current: msg.name });
       try {
-        await sendOne.mutateAsync({ phone: msg.phone, message: msg.message });
+        await sendOne.mutateAsync({
+          phone: msg.phone,
+          message: msg.message,
+          accountId: firstConnectedAccount?.accountId ?? "default",
+        });
         sent++;
       } catch (e: any) {
         toast.error(`فشل إرسال ${msg.name}`, { description: e.message });
       }
-      // تأخير بشري بناءً على الإعداد
       const delayMs = messageDelay * 1000;
       await new Promise(r => setTimeout(r, delayMs + Math.random() * 2000));
     }
     setSendProgress(null);
     sendingRef.current = false;
     toast.success(`تم إرسال ${sent} من ${preparedMessages.length} رسالة`);
-    // تحديث عداد الرسائل وإرسال تنبيه إذا لزم
-    if (sent > 0) {
-      incrementCount.mutate({ accountId: "default", count: sent });
-    }
+    if (sent > 0) incrementCount.mutate({ accountId: "default", count: sent });
   };
 
   const stopSending = () => { sendingRef.current = false; setSendProgress(null); };
@@ -250,43 +519,56 @@ export default function WhatsApp() {
     setSelectedLeads(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const selectAll = () => {
-    const withPhone = (Array.isArray(leads) ? leads : []).filter((l: any) => l.verifiedPhone);
-    setSelectedLeads(withPhone.map((l: any) => l.id));
-  };
-
   const leadsWithPhone = (Array.isArray(leads) ? leads : []).filter((l: any) => l.verifiedPhone);
 
   return (
     <div className="min-h-screen bg-background p-6" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-6">
 
-        {/* Header */}
+        {/* ===== Header ===== */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/20">
               <MessageCircle className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">واتساب</h1>
-              <p className="text-muted-foreground text-sm">ربط الحساب، القوالب، والإرسال التلقائي</p>
+              <h1 className="text-2xl font-bold">واتساب</h1>
+              <p className="text-sm text-muted-foreground">إدارة الحسابات، القوالب، والإرسال التلقائي</p>
             </div>
           </div>
-          <StatusBadge status={status} />
+
+          {/* ملخص الاتصال */}
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${
+              connectedCount > 0
+                ? "text-green-400 bg-green-500/10 border-green-500/30"
+                : "text-muted-foreground bg-muted/30 border-border"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${connectedCount > 0 ? "bg-green-500" : "bg-muted-foreground"}`} />
+              {connectedCount > 0 ? `${connectedCount} متصل` : "لا يوجد اتصال"}
+              {accountsList.length > 0 && (
+                <span className="text-muted-foreground">/ {accountsList.length}</span>
+              )}
+            </div>
+            {(pendingAlerts as any[]).length > 0 && (
+              <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <AlertTriangle className="w-3 h-3 ml-1" />
+                {(pendingAlerts as any[]).length} تنبيه
+              </Badge>
+            )}
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="accounts" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Smartphone className="w-4 h-4" />
               الحسابات
               {(pendingAlerts as any[]).length > 0 && (
-                <span className="bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{(pendingAlerts as any[]).length}</span>
+                <span className="bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  {(pendingAlerts as any[]).length}
+                </span>
               )}
-            </TabsTrigger>
-            <TabsTrigger value="connect" className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <Wifi className="w-4 h-4" />
-              الربط
             </TabsTrigger>
             <TabsTrigger value="templates" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <FileText className="w-4 h-4" />
@@ -302,115 +584,185 @@ export default function WhatsApp() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ===== تبويب الحسابات ===== */}
+          {/* ===== تبويب الحسابات (مع الربط المدمج) ===== */}
           <TabsContent value="accounts" className="mt-6 space-y-6">
+
             {/* رأس التبويب */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold">حسابات واتساب</h2>
-                <p className="text-sm text-muted-foreground">أضف حسابات متعددة وحدد دور كل حساب — إرسال جماعي أو تحويل للموظف</p>
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  حسابات واتساب
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>يمكنك ربط حتى {MAX_ACCOUNTS} أجهزة واتساب مختلفة</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {accountsList.length} / {MAX_ACCOUNTS} حساب — اضغط "ربط الحساب" في أي بطاقة لبدء الاتصال
+                </p>
               </div>
-              <Button onClick={() => { setEditingAccount(null); setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 }); setShowAddAccount(true); }}>
-                <Plus className="w-4 h-4 ml-2" />إضافة حساب
+              <Button
+                onClick={() => {
+                  if (accountsList.length >= MAX_ACCOUNTS) {
+                    toast.error(`الحد الأقصى ${MAX_ACCOUNTS} حسابات`);
+                    return;
+                  }
+                  setEditingAccount(null);
+                  setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 });
+                  setShowAddAccount(true);
+                }}
+                disabled={accountsList.length >= MAX_ACCOUNTS}
+              >
+                <Plus className="w-4 h-4 ml-2" />
+                إضافة حساب
+                {accountsList.length >= MAX_ACCOUNTS && (
+                  <span className="mr-1 text-xs opacity-70">(الحد الأقصى)</span>
+                )}
               </Button>
             </div>
 
-            {/* بطاقات الحسابات مع حالة الاتصال */}
-            {(accounts as any[]).length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="py-12 text-center">
-                  <Smartphone className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-                  <p className="text-muted-foreground">لم تضف أي حساب بعد</p>
-                  <p className="text-sm text-muted-foreground/60 mt-1">اضغط "إضافة حساب" للبدء</p>
+            {/* شريط التقدم */}
+            {accountsList.length > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                    <span>الحسابات المستخدمة</span>
+                    <span className="font-medium text-foreground">{accountsList.length} / {MAX_ACCOUNTS}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div
+                      className="bg-primary h-1.5 rounded-full transition-all"
+                      style={{ width: `${(accountsList.length / MAX_ACCOUNTS) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => refetchAllSessions()}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 ml-1" />
+                  تحديث
+                </Button>
+              </div>
+            )}
+
+            {/* بطاقات الحسابات */}
+            {accountsList.length === 0 ? (
+              <Card className="border-dashed border-2">
+                <CardContent className="py-16 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                    <Smartphone className="w-8 h-8 text-muted-foreground/40" />
+                  </div>
+                  <p className="font-medium text-muted-foreground">لم تضف أي حساب بعد</p>
+                  <p className="text-sm text-muted-foreground/60 mt-1 mb-4">
+                    أضف حساباً واضغط "ربط الحساب" لبدء الاتصال بواتساب
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setEditingAccount(null);
+                      setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 });
+                      setShowAddAccount(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 ml-2" />
+                    إضافة أول حساب
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {(accounts as any[]).map((account: any) => {
-                  const roleInfo = ROLE_LABELS[account.role] || ROLE_LABELS.bulk_sender;
-                  const RoleIcon = roleInfo.icon;
-                  const sessionInfo = (allSessionsData as any[] | undefined)?.find((s: any) => s.accountId === account.accountId);
+                {accountsList.map((account: any) => {
+                  const sessionInfo = sessions.find((s: any) => s.accountId === account.accountId);
                   const sessionStatus = sessionInfo?.status ?? "disconnected";
                   const sessionQr = sessionInfo?.qr;
-                  const isAccConnected = sessionStatus === "connected";
-                  const isAccQrPending = sessionStatus === "qr_pending";
-                  const isAccInitializing = sessionStatus === "initializing";
+
                   return (
-                    <Card key={account.id} className={`transition-all ${ account.isActive ? "border-border" : "border-border/40 opacity-60" }`}>
-                      <CardContent className="p-5 space-y-4">
-                        {/* رأس البطاقة */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${ isAccConnected ? "bg-green-500/20" : "bg-muted" }`}>
-                              <Smartphone className={`w-5 h-5 ${ isAccConnected ? "text-green-400" : "text-muted-foreground" }`} />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold truncate">{account.label}</p>
-                              <p className="text-xs text-muted-foreground font-mono" dir="ltr">{account.phoneNumber}</p>
-                            </div>
-                          </div>
-                          <Switch checked={account.isActive} onCheckedChange={(v) => toggleAccountActive.mutate({ id: account.id, isActive: v })} />
-                        </div>
-                        {/* الدور */}
-                        <div className="flex items-center gap-2">
-                          <Badge className={`${roleInfo.color} border text-xs flex items-center gap-1`}>
-                            <RoleIcon className="w-3 h-3" />{roleInfo.label}
-                          </Badge>
-                          {account.assignedEmployee && (
-                            <Badge variant="outline" className="text-xs">
-                              <UserCheck className="w-3 h-3 ml-1" />{account.assignedEmployee}
-                            </Badge>
-                          )}
-                        </div>
-                        {/* حالة الاتصال */}
-                        <div className="space-y-2">
-                          <StatusBadge status={sessionStatus} />
-                          {isAccInitializing && (
-                            <div className="text-center py-2">
-                              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                              <p className="text-xs text-muted-foreground mt-1">جاري التهيئة...</p>
-                            </div>
-                          )}
-                          {isAccQrPending && sessionQr && (
-                            <div className="text-center space-y-2">
-                              <p className="text-xs text-muted-foreground">امسح الرمز بواتساب</p>
-                              <div className="bg-white p-2 rounded-lg inline-block">
-                                <img src={sessionQr} alt="QR" className="w-32 h-32" />
-                              </div>
-                            </div>
-                          )}
-                          {isAccConnected && (
-                            <div className="flex items-center gap-2 py-1 px-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                              <CheckCircle className="w-4 h-4 text-green-500" />
-                              <span className="text-xs text-green-400">متصل بنجاح</span>
-                            </div>
-                          )}
-                        </div>
-                        {/* أزرار */}
-                        <div className="flex gap-2">
-                          {!isAccConnected && !isAccInitializing && !isAccQrPending && (
-                            <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => startAccountSession.mutate({ accountId: account.accountId })} disabled={startAccountSession.isPending}>
-                              <Play className="w-3 h-3 ml-1" />ربط
-                            </Button>
-                          )}
-                          {(isAccConnected || isAccQrPending || isAccInitializing) && (
-                            <Button size="sm" variant="outline" className="flex-1 h-8 text-xs text-red-400 border-red-500/30" onClick={() => disconnectAccount.mutate({ accountId: account.accountId })} disabled={disconnectAccount.isPending}>
-                              <Square className="w-3 h-3 ml-1" />قطع
-                            </Button>
-                          )}
-                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setEditingAccount(account); setAccountForm({ label: account.label, phoneNumber: account.phoneNumber, role: account.role, assignedEmployee: account.assignedEmployee || "", notes: account.notes || "", sortOrder: account.sortOrder }); setShowAddAccount(true); }}>
-                            <Pencil className="w-3 h-3" />
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => setDeleteAccountTarget({ id: account.id, label: account.label })}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <AccountCard
+                      key={account.id}
+                      account={account}
+                      sessionStatus={sessionStatus}
+                      sessionQr={sessionQr}
+                      onConnect={() => startAccountSession.mutate({ accountId: account.accountId })}
+                      onDisconnect={() => disconnectAccount.mutate({ accountId: account.accountId })}
+                      onEdit={() => {
+                        setEditingAccount(account);
+                        setAccountForm({
+                          label: account.label,
+                          phoneNumber: account.phoneNumber,
+                          role: account.role,
+                          assignedEmployee: account.assignedEmployee || "",
+                          notes: account.notes || "",
+                          sortOrder: account.sortOrder,
+                        });
+                        setShowAddAccount(true);
+                      }}
+                      onDelete={() => setDeleteAccountTarget({ id: account.id, label: account.label })}
+                      onToggleActive={(v) => toggleAccountActive.mutate({ id: account.id, isActive: v })}
+                      isConnecting={startAccountSession.isPending}
+                      isDisconnecting={disconnectAccount.isPending}
+                    />
                   );
                 })}
+
+                {/* بطاقة إضافة حساب جديد (placeholder) */}
+                {accountsList.length < MAX_ACCOUNTS && (
+                  <button
+                    onClick={() => {
+                      setEditingAccount(null);
+                      setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 });
+                      setShowAddAccount(true);
+                    }}
+                    className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-3 text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all min-h-[200px]"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center">
+                      <Plus className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium">إضافة حساب جديد</p>
+                      <p className="text-xs opacity-60 mt-0.5">
+                        {MAX_ACCOUNTS - accountsList.length} متبقي
+                      </p>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
+
+            {/* تعليمات الربط */}
+            <Card className="bg-muted/10 border-border/50">
+              <CardContent className="p-4">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Info className="w-4 h-4 text-primary" />
+                  كيفية ربط حساب واتساب
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { n: 1, t: "أضف الحساب", d: "اضغط 'إضافة حساب' وأدخل البيانات" },
+                    { n: 2, t: "اضغط 'ربط الحساب'", d: "سيبدأ النظام تهيئة الاتصال" },
+                    { n: 3, t: "امسح رمز QR", d: "واتساب ← الأجهزة المرتبطة ← ربط جهاز" },
+                    { n: 4, t: "الجلسة محفوظة", d: "لن تحتاج لمسح QR مجدداً" },
+                  ].map(item => (
+                    <div key={item.n} className="flex gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center shrink-0 font-bold mt-0.5">
+                        {item.n}
+                      </span>
+                      <div>
+                        <p className="text-xs font-medium">{item.t}</p>
+                        <p className="text-xs text-muted-foreground">{item.d}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* إشعارات الاهتمام */}
             {(pendingAlerts as any[]).length > 0 && (
@@ -433,13 +785,22 @@ export default function WhatsApp() {
                           </Badge>
                         </div>
                         {alert.triggerMessage && (
-                          <p className="text-xs bg-muted/40 rounded p-2 text-muted-foreground line-clamp-2">{alert.triggerMessage}</p>
+                          <p className="text-xs bg-muted/40 rounded p-2 text-muted-foreground line-clamp-2">
+                            {alert.triggerMessage}
+                          </p>
                         )}
                         {handoffAccounts.length > 0 && (
                           <div className="flex gap-2">
                             {handoffAccounts.map((acc: any) => (
-                              <Button key={acc.accountId} size="sm" className="flex-1 h-8 text-xs" onClick={() => transferToHuman.mutate({ alertId: alert.id, handoffAccountId: acc.accountId })} disabled={transferToHuman.isPending}>
-                                <ExternalLink className="w-3 h-3 ml-1" />{acc.assignedEmployee || acc.label}
+                              <Button
+                                key={acc.accountId}
+                                size="sm"
+                                className="flex-1 h-8 text-xs"
+                                onClick={() => transferToHuman.mutate({ alertId: alert.id, handoffAccountId: acc.accountId })}
+                                disabled={transferToHuman.isPending}
+                              >
+                                <ExternalLink className="w-3 h-3 ml-1" />
+                                {acc.assignedEmployee || acc.label}
                               </Button>
                             ))}
                           </div>
@@ -452,103 +813,17 @@ export default function WhatsApp() {
             )}
           </TabsContent>
 
-          {/* ===== تبويب الربط ===== */}
-          <TabsContent value="connect" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-              {/* بطاقة الاتصال */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <QrCode className="w-5 h-5 text-primary" />
-                    ربط الحساب
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {!isConnected && status !== "initializing" && status !== "qr_pending" && (
-                    <Button onClick={() => startSession.mutate()} disabled={startSession.isPending} className="w-full" size="lg">
-                      {startSession.isPending ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Play className="w-5 h-5 mr-2" />}
-                      بدء الاتصال
-                    </Button>
-                  )}
-
-                  {(status === "initializing") && (
-                    <div className="text-center py-8 space-y-3">
-                      <Loader2 className="w-10 h-10 animate-spin mx-auto text-primary" />
-                      <p className="text-muted-foreground text-sm">جاري تهيئة واتساب... انتظر 20-30 ثانية</p>
-                    </div>
-                  )}
-
-                  {isQrReady && qrCode && (
-                    <div className="text-center space-y-3">
-                      <p className="text-sm text-muted-foreground">امسح الرمز بهاتفك من واتساب ← الأجهزة المرتبطة ← ربط جهاز</p>
-                      <div className="bg-white p-3 rounded-xl inline-block">
-                        <img src={qrCode} alt="QR Code" className="w-48 h-48" />
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => refetchStatus()}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        تحديث الرمز
-                      </Button>
-                    </div>
-                  )}
-
-                  {isConnected && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-center gap-3 py-4 bg-green-500/10 rounded-xl border border-green-500/20">
-                        <CheckCircle className="w-8 h-8 text-green-500" />
-                        <div>
-                          <p className="font-semibold text-green-400">متصل بنجاح</p>
-                          <p className="text-xs text-muted-foreground">الجلسة محفوظة تلقائياً</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" onClick={() => disconnect.mutate()} disabled={disconnect.isPending} className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10">
-                        <Square className="w-4 h-4 mr-2" />
-                        قطع الاتصال
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* تعليمات */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">كيفية الربط</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ol className="space-y-3 text-sm">
-                    {[
-                      { n: 1, t: "اضغط \"بدء الاتصال\"", d: "سيفتح النظام واتساب ويب في الخلفية" },
-                      { n: 2, t: "امسح رمز QR", d: "افتح واتساب على هاتفك ← الأجهزة المرتبطة ← ربط جهاز" },
-                      { n: 3, t: "انتظر التأكيد", d: "ستتحول الحالة إلى \"متصل\" تلقائياً" },
-                      { n: 4, t: "الجلسة محفوظة", d: "لن تحتاج لمسح QR مرة أخرى إلا إذا قطعت الاتصال" },
-                    ].map(item => (
-                      <li key={item.n} className="flex gap-3">
-                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center shrink-0 font-bold">{item.n}</span>
-                        <div>
-                          <p className="font-medium text-foreground">{item.t}</p>
-                          <p className="text-muted-foreground text-xs">{item.d}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
           {/* ===== تبويب القوالب ===== */}
           <TabsContent value="templates" className="mt-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">قوالب الرسائل</h2>
                 <Button onClick={() => setShowNewTemplate(true)} size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="w-4 h-4 ml-2" />
                   قالب جديد
                 </Button>
               </div>
 
-              {/* قالب جديد */}
               {showNewTemplate && (
                 <Card className="border-primary/30 bg-primary/5">
                   <CardContent className="pt-4 space-y-3">
@@ -588,7 +863,6 @@ export default function WhatsApp() {
                 </Card>
               )}
 
-              {/* قائمة القوالب */}
               {!templates || templates.length === 0 ? (
                 <Card className="text-center py-10">
                   <p className="text-muted-foreground">لا توجد قوالب بعد</p>
@@ -626,27 +900,28 @@ export default function WhatsApp() {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-start gap-3">
-                            <Checkbox
-                              checked={selectedTemplateId === t.id}
-                              onCheckedChange={() => setSelectedTemplateId(selectedTemplateId === t.id ? null : t.id)}
-                              className="mt-1"
-                            />
+                          <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold text-foreground">{t.name}</span>
+                                <p className="font-medium text-sm">{t.name}</p>
                                 {t.category && <Badge variant="outline" className="text-xs">{t.category}</Badge>}
                               </div>
-                              <p className="text-sm text-muted-foreground line-clamp-2">{t.content}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-2">{t.content}</p>
                             </div>
                             <div className="flex gap-1 shrink-0">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { navigator.clipboard.writeText(t.content); toast.success("تم النسخ"); }}>
-                                <Copy className="w-3 h-3" />
+                              <Button
+                                variant={selectedTemplateId === t.id ? "default" : "outline"}
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => { setSelectedTemplateId(t.id); setActiveTab("send"); }}
+                              >
+                                {selectedTemplateId === t.id ? <CheckCircle className="w-3 h-3 ml-1" /> : null}
+                                {selectedTemplateId === t.id ? "محدد" : "اختيار"}
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingTemplate(t)}>
-                                <Edit className="w-3 h-3" />
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditingTemplate(t)}>
+                                <Pencil className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => deleteTemplate.mutate({ id: t.id })}>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteTemplate.mutate({ id: t.id })}>
                                 <Trash2 className="w-3 h-3" />
                               </Button>
                             </div>
@@ -662,15 +937,24 @@ export default function WhatsApp() {
 
           {/* ===== تبويب الإرسال ===== */}
           <TabsContent value="send" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* تنبيه إذا لم يكن هناك اتصال */}
+            {!isAnyConnected && (
+              <div className="mb-4 flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-sm text-amber-400">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>يجب ربط حساب واتساب أولاً من تبويب "الحسابات" قبل الإرسال</span>
+                <Button variant="outline" size="sm" className="mr-auto h-7 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10" onClick={() => setActiveTab("accounts")}>
+                  اذهب للحسابات
+                </Button>
+              </div>
+            )}
 
-              {/* اختيار العملاء */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1 space-y-4">
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center justify-between">
                       <span className="flex items-center gap-2"><Users className="w-4 h-4" />العملاء ({selectedLeads.length} محدد)</span>
-                      <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectAll}>تحديد الكل</Button>
+                      <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setSelectedLeads(leadsWithPhone.map((l: any) => l.id))}>تحديد الكل</Button>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 max-h-64 overflow-y-auto">
@@ -688,12 +972,10 @@ export default function WhatsApp() {
                   </CardContent>
                 </Card>
 
-                {/* اختيار القالب */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      القالب المحدد
+                      <FileText className="w-4 h-4" />القالب المحدد
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -710,6 +992,14 @@ export default function WhatsApp() {
                   </CardContent>
                 </Card>
 
+                {/* حساب الإرسال */}
+                {isAnyConnected && (
+                  <div className="flex items-center gap-2 p-2.5 bg-green-500/10 border border-green-500/20 rounded-lg text-xs text-green-400">
+                    <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>سيتم الإرسال عبر: <strong>{firstConnectedAccount?.label}</strong></span>
+                  </div>
+                )}
+
                 <Button
                   className="w-full"
                   onClick={handlePrepare}
@@ -720,7 +1010,6 @@ export default function WhatsApp() {
                 </Button>
               </div>
 
-              {/* الرسائل المحضّرة */}
               <div className="lg:col-span-2 space-y-4">
                 {sendProgress && (
                   <Card className="border-primary/30 bg-primary/5">
@@ -745,11 +1034,11 @@ export default function WhatsApp() {
                       <p className="text-sm text-muted-foreground">{preparedMessages.length} رسالة محضّرة</p>
                       <Button
                         onClick={handleSendAll}
-                        disabled={!!sendProgress || !isConnected}
+                        disabled={!!sendProgress || !isAnyConnected}
                         className="bg-green-600 hover:bg-green-700"
                       >
                         <Send className="w-4 h-4 mr-2" />
-                        {isConnected ? "إرسال الكل تلقائياً" : "يجب الاتصال أولاً"}
+                        {isAnyConnected ? "إرسال الكل تلقائياً" : "يجب ربط حساب أولاً"}
                       </Button>
                     </div>
                     <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -784,11 +1073,10 @@ export default function WhatsApp() {
               </div>
             </div>
           </TabsContent>
+
           {/* ===== تبويب الإعدادات ===== */}
           <TabsContent value="settings" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-              {/* إعدادات الإرسال */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -797,20 +1085,12 @@ export default function WhatsApp() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* التأخير بين الرسائل */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <Label className="text-base font-medium">التأخير بين الرسائل</Label>
                       <span className="text-primary font-bold text-lg">{messageDelay} ثانية</span>
                     </div>
-                    <Slider
-                      value={[messageDelay]}
-                      onValueChange={([v]) => setMessageDelay(v)}
-                      min={3}
-                      max={60}
-                      step={1}
-                      className="w-full"
-                    />
+                    <Slider value={[messageDelay]} onValueChange={([v]) => setMessageDelay(v)} min={3} max={60} step={1} className="w-full" />
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">
                       <span>3 ثواني (أسرع)</span>
                       <span>60 ثانية (أآمن)</span>
@@ -818,54 +1098,35 @@ export default function WhatsApp() {
                     <p className="text-xs text-muted-foreground mt-2">يضاف تأخير عشوائي 0-2 ثانية لتبدو طبيعية</p>
                   </div>
 
-                  {/* عتبة التنبيه */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <Label className="text-base font-medium">تنبيه بعد كل</Label>
                       <span className="text-primary font-bold text-lg">{notificationThreshold} رسالة</span>
                     </div>
-                    <Slider
-                      value={[notificationThreshold]}
-                      onValueChange={([v]) => setNotificationThreshold(v)}
-                      min={10}
-                      max={500}
-                      step={10}
-                      className="w-full"
-                    />
+                    <Slider value={[notificationThreshold]} onValueChange={([v]) => setNotificationThreshold(v)} min={10} max={500} step={10} className="w-full" />
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">
                       <span>10 رسائل</span>
                       <span>500 رسالة</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">ستصلك إشعار بعد كل {notificationThreshold} رسالة مرسلة</p>
                   </div>
 
-                  {/* الرد التلقائي */}
                   <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
                     <div>
                       <p className="font-medium text-sm">الرد التلقائي</p>
                       <p className="text-xs text-muted-foreground">رد تلقائي على الرسائل الواردة</p>
                     </div>
-                    <Switch
-                      checked={autoReplyEnabled}
-                      onCheckedChange={setAutoReplyEnabled}
-                    />
+                    <Switch checked={autoReplyEnabled} onCheckedChange={setAutoReplyEnabled} />
                   </div>
 
                   <Button
                     className="w-full"
-                    onClick={() => updateSettings.mutate({
-                      accountId: "default",
-                      messageDelay: messageDelay * 1000,
-                      notificationThreshold,
-                      autoReplyEnabled,
-                    })}
+                    onClick={() => updateSettings.mutate({ accountId: "default", messageDelay: messageDelay * 1000, notificationThreshold, autoReplyEnabled })}
                     disabled={updateSettings.isPending}
                   >
                     {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
                     حفظ الإعدادات
                   </Button>
 
-                  {/* إحصائيات */}
                   {waSettings && (
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
                       <div className="text-center p-3 bg-muted/20 rounded-lg">
@@ -881,7 +1142,6 @@ export default function WhatsApp() {
                 </CardContent>
               </Card>
 
-              {/* قواعد الرد التلقائي */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -896,58 +1156,29 @@ export default function WhatsApp() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* نموذج قاعدة جديدة */}
                   {showNewRule && (
                     <Card className="border-primary/30 bg-primary/5">
                       <CardContent className="pt-4 space-y-3">
                         <div>
                           <Label>كلمات التفعيل (مفصولة بفاصلة)</Label>
-                          <Input
-                            value={newRule.keywords}
-                            onChange={e => setNewRule(r => ({ ...r, keywords: e.target.value }))}
-                            placeholder="سعر, كم, خدمة, price"
-                            className="mt-1"
-                          />
+                          <Input value={newRule.keywords} onChange={e => setNewRule(r => ({ ...r, keywords: e.target.value }))} placeholder="سعر, كم, خدمة, price" className="mt-1" />
                         </div>
                         <div>
                           <Label>قالب الرد</Label>
-                          <Textarea
-                            value={newRule.template}
-                            onChange={e => setNewRule(r => ({ ...r, template: e.target.value }))}
-                            placeholder="شكراً على تواصلك! يسعدنا الرد على استفسارك..."
-                            className="mt-1 h-20"
-                          />
+                          <Textarea value={newRule.template} onChange={e => setNewRule(r => ({ ...r, template: e.target.value }))} placeholder="شكراً على تواصلك! يسعدنا الرد على استفسارك..." className="mt-1 h-20" />
                         </div>
                         <div className="flex items-center gap-3">
-                          <Switch
-                            checked={newRule.useAI}
-                            onCheckedChange={v => setNewRule(r => ({ ...r, useAI: v }))}
-                          />
+                          <Switch checked={newRule.useAI} onCheckedChange={v => setNewRule(r => ({ ...r, useAI: v }))} />
                           <Label>استخدام الذكاء الاصطناعي لتخصيص الرد</Label>
                         </div>
                         {newRule.useAI && (
                           <div>
                             <Label>سياق الذكاء الاصطناعي</Label>
-                            <Textarea
-                              value={newRule.aiContext}
-                              onChange={e => setNewRule(r => ({ ...r, aiContext: e.target.value }))}
-                              placeholder="أنت مساعد تجاري سعودي متخصص في اللحوم..."
-                              className="mt-1 h-16"
-                            />
+                            <Textarea value={newRule.aiContext} onChange={e => setNewRule(r => ({ ...r, aiContext: e.target.value }))} placeholder="أنت مساعد تجاري سعودي متخصص في اللحوم..." className="mt-1 h-16" />
                           </div>
                         )}
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => addAutoReplyRule.mutate({
-                              accountId: "default",
-                              triggerKeywords: newRule.keywords.split(",").map(k => k.trim()).filter(Boolean),
-                              replyTemplate: newRule.template,
-                              useAI: newRule.useAI,
-                              aiContext: newRule.aiContext || undefined,
-                            })}
-                            disabled={addAutoReplyRule.isPending || !newRule.keywords || !newRule.template}
-                          >
+                          <Button size="sm" onClick={() => addAutoReplyRule.mutate({ accountId: "default", triggerKeywords: newRule.keywords.split(",").map(k => k.trim()).filter(Boolean), replyTemplate: newRule.template, useAI: newRule.useAI, aiContext: newRule.aiContext || undefined })} disabled={addAutoReplyRule.isPending || !newRule.keywords || !newRule.template}>
                             {addAutoReplyRule.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : null}
                             حفظ
                           </Button>
@@ -957,13 +1188,13 @@ export default function WhatsApp() {
                     </Card>
                   )}
 
-                  {/* قائمة القواعد */}
                   {autoReplyRules?.length === 0 && !showNewRule && (
                     <div className="text-center py-8 text-muted-foreground">
                       <Bot className="w-10 h-10 mx-auto mb-2 opacity-20" />
                       <p className="text-sm">لا توجد قواعد بعد</p>
                     </div>
                   )}
+
                   {autoReplyRules?.map((rule: any) => (
                     <Card key={rule.id} className={`border ${rule.isActive ? "border-green-500/20 bg-green-500/5" : "border-border opacity-60"}`}>
                       <CardContent className="pt-3 pb-3">
@@ -972,8 +1203,7 @@ export default function WhatsApp() {
                             <div className="flex flex-wrap gap-1 mb-2">
                               {(rule.triggerKeywords as string[]).map((kw: string) => (
                                 <span key={kw} className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                  <Tag className="w-2.5 h-2.5" />
-                                  {kw}
+                                  <Tag className="w-2.5 h-2.5" />{kw}
                                 </span>
                               ))}
                             </div>
@@ -984,15 +1214,8 @@ export default function WhatsApp() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Switch
-                              checked={rule.isActive}
-                              onCheckedChange={v => updateAutoReplyRule.mutate({ id: rule.id, isActive: v })}
-                            />
-                            <Button
-                              variant="ghost" size="sm"
-                              onClick={() => deleteAutoReplyRule.mutate({ id: rule.id })}
-                              className="text-destructive hover:text-destructive h-7 w-7 p-0"
-                            >
+                            <Switch checked={rule.isActive} onCheckedChange={v => updateAutoReplyRule.mutate({ id: rule.id, isActive: v })} />
+                            <Button variant="ghost" size="sm" onClick={() => deleteAutoReplyRule.mutate({ id: rule.id })} className="text-destructive hover:text-destructive h-7 w-7 p-0">
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </div>
@@ -1059,12 +1282,17 @@ export default function WhatsApp() {
           <AlertDialogHeader>
             <AlertDialogTitle>تأكيد حذف الحساب</AlertDialogTitle>
             <AlertDialogDescription>
-              هل أنت متأكد من حذف حساب "{deleteAccountTarget?.label}"? لا يمكن التراجع عن هذا الإجراء.
+              هل أنت متأكد من حذف حساب "{deleteAccountTarget?.label}"؟ لا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => deleteAccountTarget && deleteAccount.mutate({ id: deleteAccountTarget.id })}>حذف</AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => deleteAccountTarget && deleteAccount.mutate({ id: deleteAccountTarget.id })}
+            >
+              حذف
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
