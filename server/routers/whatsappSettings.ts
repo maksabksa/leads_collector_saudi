@@ -11,6 +11,7 @@ import {
   autoReplyRules,
   whatsappChats,
   whatsappChatMessages,
+  whatsappAccounts,
 } from "../../drizzle/schema";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -276,11 +277,11 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
 
   // ===== المحادثات =====
 
-  // قائمة المحادثات
+  // قائمة المحادثات (كل الحسابات أو حساب محدد)
   listChats: protectedProcedure
     .input(
       z.object({
-        accountId: z.string().default("default"),
+        accountId: z.string().default("all"),
         includeArchived: z.boolean().default(false),
       })
     )
@@ -288,33 +289,63 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       const db = await getDb();
       if (!db) return [];
 
-      const conditions = [eq(whatsappChats.accountId, input.accountId)];
+      // جلب حسابات واتساب لإضافة معلوماتها
+      const accounts = await db.select().from(whatsappAccounts);
+      const accountMap = new Map(accounts.map(a => [a.accountId, a]));
+
+      // بناء الشروط
+      const conditions: Parameters<typeof and>[0][] = [];
+      if (input.accountId !== "all") {
+        conditions.push(eq(whatsappChats.accountId, input.accountId));
+      }
       if (!input.includeArchived) {
         conditions.push(eq(whatsappChats.isArchived, false));
       }
 
-      return db
+      const chats = await db
         .select()
         .from(whatsappChats)
-        .where(and(...conditions))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(whatsappChats.lastMessageAt));
+
+      // إضافة معلومات الحساب لكل محادثة
+      return chats.map(chat => {
+        const account = accountMap.get(chat.accountId);
+        return {
+          ...chat,
+          senderAccountLabel: account?.label ?? chat.accountId,
+          senderPhoneNumber: account?.phoneNumber ?? chat.accountId,
+        };
+      });
     }),
 
-  // رسائل محادثة معينة
+  // رسائل محادثة معينة مع معلومات الحساب المرسل
   getChatMessages: protectedProcedure
     .input(z.object({ chatId: z.number().int().min(0) }))
     .query(async ({ input }) => {
-      // إذا كان chatId = 0 فهذا يعني لم يتم اختيار محادثة بعد
       if (!input.chatId || input.chatId <= 0) return [];
       const db = await getDb();
       if (!db) return [];
 
-      return db
+      const msgs = await db
         .select()
         .from(whatsappChatMessages)
         .where(eq(whatsappChatMessages.chatId, input.chatId))
         .orderBy(desc(whatsappChatMessages.sentAt))
-        .limit(100);
+        .limit(200);
+
+      // جلب حسابات واتساب لإضافة label
+      const accounts = await db.select().from(whatsappAccounts);
+      const accountMap = new Map(accounts.map(a => [a.accountId, a]));
+
+      return msgs.map(msg => {
+        const account = accountMap.get(msg.accountId);
+        return {
+          ...msg,
+          senderAccountLabel: account?.label ?? msg.accountId,
+          senderPhoneNumber: account?.phoneNumber ?? msg.accountId,
+        };
+      });
     }),
 
   // أرشفة محادثة
@@ -451,36 +482,38 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         .limit(20);
     }),
 
-  // إحصائيات المحادثات
+  // إحصائيات المحادثات (كل الحسابات)
   getChatStats: protectedProcedure
-    .input(z.object({ accountId: z.string().default("default") }))
+    .input(z.object({ accountId: z.string().default("all") }))
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return { total: 0, unread: 0, archived: 0 };
 
+      const baseCondition = input.accountId !== "all"
+        ? eq(whatsappChats.accountId, input.accountId)
+        : undefined;
+
       const [totalRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(whatsappChats)
-        .where(eq(whatsappChats.accountId, input.accountId));
+        .where(baseCondition);
 
       const [unreadRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(whatsappChats)
         .where(
-          and(
-            eq(whatsappChats.accountId, input.accountId),
-            sql`${whatsappChats.unreadCount} > 0`
-          )
+          baseCondition
+            ? and(baseCondition, sql`${whatsappChats.unreadCount} > 0`)
+            : sql`${whatsappChats.unreadCount} > 0`
         );
 
       const [archivedRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(whatsappChats)
         .where(
-          and(
-            eq(whatsappChats.accountId, input.accountId),
-            eq(whatsappChats.isArchived, true)
-          )
+          baseCondition
+            ? and(baseCondition, eq(whatsappChats.isArchived, true))
+            : eq(whatsappChats.isArchived, true)
         );
 
       return {
