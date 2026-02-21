@@ -287,6 +287,12 @@ export async function sendWhatsAppMedia(
   try {
     const wweb = await import("whatsapp-web.js");
     const { MessageMedia } = (wweb.default || wweb) as typeof wweb.default;
+    const media = new MessageMedia(mimetype, mediaBase64, filename);
+    // إذا كان الرقم بصيغة LID أرسله مباشرة
+    if (phone.includes("@lid") || phone.includes("@c.us") || phone.includes("@s.whatsapp.net")) {
+      await session.client.sendMessage(phone, media, { caption });
+      return { success: true, phone };
+    }
     const cleanPhone = phone.replace(/[^0-9]/g, "");
     let intlPhone: string;
     if (cleanPhone.startsWith("00")) {
@@ -298,7 +304,6 @@ export async function sendWhatsAppMedia(
     } else {
       intlPhone = cleanPhone;
     }
-    // استخدام getNumberId للحصول على chatId الصحيح
     let chatId: string;
     try {
       const numberId = await session.client.getNumberId(intlPhone);
@@ -310,7 +315,6 @@ export async function sendWhatsAppMedia(
     } catch {
       chatId = intlPhone + "@c.us";
     }
-    const media = new MessageMedia(mimetype, mediaBase64, filename);
     await session.client.sendMessage(chatId, media, { caption });
     return { success: true, phone };
   } catch (err: unknown) {
@@ -362,21 +366,26 @@ export async function sendWhatsAppMessage(
   }
 
   try {
+    // إذا كان الرقم بصيغة LID (مثل 237164554141949@lid) أرسله مباشرة
+    if (phone.includes("@lid") || phone.includes("@c.us") || phone.includes("@s.whatsapp.net")) {
+      await session.client.sendMessage(phone, message);
+      return { success: true, phone };
+    }
     const cleanPhone = phone.replace(/[^0-9]/g, "");
     // تنسيق الرقم بشكل صحيح:
     // - إذا بدأ بـ 00 أزل الأصفار (00966... تصبح 966...)
-    // - إذا بدأ ب**صفر واحد** فقط (سعودي محلي) أضف 966
-    // - إذا كان أقل من 7 أرقام فهو رقم محلي سعودي أضف 966
-    // - في جميع الحالات الأخرى احتفظ بالرقم كما هو (يحتوي على كود دولي)
+    // - إذا بدأ بصفر واحد فقط (محلي) أضف 966
+    // - إذا كان أقل من 10 أرقام فهو رقم سعودي محلي أضف 966
+    // - في جميع الحالات الأخرى احتفظ بالرقم كما هو
     let intlPhone: string;
     if (cleanPhone.startsWith("00")) {
-      intlPhone = cleanPhone.slice(2); // أزل 00 واحتفظ بالباقي
+      intlPhone = cleanPhone.slice(2);
     } else if (cleanPhone.startsWith("0") && cleanPhone.length <= 10) {
-      intlPhone = "966" + cleanPhone.slice(1); // سعودي محلي
+      intlPhone = "966" + cleanPhone.slice(1);
     } else if (cleanPhone.length <= 9) {
-      intlPhone = "966" + cleanPhone; // رقم سعودي قصير بدون صفر
+      intlPhone = "966" + cleanPhone;
     } else {
-      intlPhone = cleanPhone; // احتفظ بالرقم كما هو (يحتوي على كود دولي مثل 20 مصر أو 966 سعودي)
+      intlPhone = cleanPhone;
     }
     // استخدام getNumberId للحصول على chatId الصحيح وتجنب خطأ "No LID for user"
     let chatId: string;
