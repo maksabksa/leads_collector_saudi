@@ -2059,6 +2059,7 @@ const dataSettingsRouter = router({
     }),
 });
 import { whatsappSettingsRouter } from "./routers/whatsappSettings";
+import { socialSearchRouter } from "./routers/socialSearch";
 import { aiSettingsRouter } from "./routers/aiSettings";
 import { whatsappAccountsRouter } from "./routers/whatsappAccounts";
 import { segmentsRouter } from "./routers/segments";
@@ -2091,5 +2092,6 @@ export const appRouter = router({
   interestKw: interestKeywordsRouter,
   segments: segmentsRouter,
   dataSettings: dataSettingsRouter,
+  socialSearch: socialSearchRouter,
 });
 export type AppRouter = typeof appRouter;
