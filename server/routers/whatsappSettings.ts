@@ -5,7 +5,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, like, sql } from "drizzle-orm";
 import {
   whatsappSettings,
   autoReplyRules,
@@ -328,6 +328,164 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         .where(eq(whatsappChats.id, input.chatId));
 
       return { success: true };
+    }),
+
+  // ===== إدارة المحادثات المتقدمة =====
+
+  // إرسال رسالة من الشات مباشرة
+  sendChatMessage: protectedProcedure
+    .input(
+      z.object({
+        chatId: z.number().optional(),
+        accountId: z.string().default("default"),
+        phone: z.string(),
+        contactName: z.string().optional(),
+        message: z.string().min(1),
+        leadId: z.number().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // البحث عن محادثة موجودة أو إنشاء جديدة
+      let chatId = input.chatId;
+      if (!chatId) {
+        let [chat] = await db
+          .select()
+          .from(whatsappChats)
+          .where(
+            and(
+              eq(whatsappChats.accountId, input.accountId),
+              eq(whatsappChats.phone, input.phone)
+            )
+          )
+          .limit(1);
+
+        if (!chat) {
+          const [result] = await db.insert(whatsappChats).values({
+            accountId: input.accountId,
+            phone: input.phone,
+            contactName: input.contactName,
+            leadId: input.leadId,
+            lastMessage: input.message,
+            lastMessageAt: new Date(),
+            unreadCount: 0,
+          });
+          chatId = (result as { insertId: number }).insertId;
+        } else {
+          chatId = chat.id;
+        }
+      }
+
+      // تحديث آخر رسالة في المحادثة
+      await db
+        .update(whatsappChats)
+        .set({ lastMessage: input.message, lastMessageAt: new Date() })
+        .where(eq(whatsappChats.id, chatId));
+
+      // تسجيل الرسالة
+      await db.insert(whatsappChatMessages).values({
+        chatId,
+        accountId: input.accountId,
+        direction: "outgoing",
+        message: input.message,
+        status: "sent",
+      });
+
+      return { success: true, chatId };
+    }),
+
+  // تعليم المحادثة كمقروءة
+  markChatAsRead: protectedProcedure
+    .input(z.object({ chatId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db
+        .update(whatsappChats)
+        .set({ unreadCount: 0 })
+        .where(eq(whatsappChats.id, input.chatId));
+
+      return { success: true };
+    }),
+
+  // حذف محادثة
+  deleteChat: protectedProcedure
+    .input(z.object({ chatId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db.delete(whatsappChatMessages).where(eq(whatsappChatMessages.chatId, input.chatId));
+      await db.delete(whatsappChats).where(eq(whatsappChats.id, input.chatId));
+
+      return { success: true };
+    }),
+
+  // البحث في المحادثات
+  searchChats: protectedProcedure
+    .input(
+      z.object({
+        accountId: z.string().default("default"),
+        query: z.string().min(1),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+
+      return db
+        .select()
+        .from(whatsappChats)
+        .where(
+          and(
+            eq(whatsappChats.accountId, input.accountId),
+            like(whatsappChats.contactName, `%${input.query}%`)
+          )
+        )
+        .orderBy(desc(whatsappChats.lastMessageAt))
+        .limit(20);
+    }),
+
+  // إحصائيات المحادثات
+  getChatStats: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { total: 0, unread: 0, archived: 0 };
+
+      const [totalRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(whatsappChats)
+        .where(eq(whatsappChats.accountId, input.accountId));
+
+      const [unreadRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(whatsappChats)
+        .where(
+          and(
+            eq(whatsappChats.accountId, input.accountId),
+            sql`${whatsappChats.unreadCount} > 0`
+          )
+        );
+
+      const [archivedRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(whatsappChats)
+        .where(
+          and(
+            eq(whatsappChats.accountId, input.accountId),
+            eq(whatsappChats.isArchived, true)
+          )
+        );
+
+      return {
+        total: Number(totalRow?.count ?? 0),
+        unread: Number(unreadRow?.count ?? 0),
+        archived: Number(archivedRow?.count ?? 0),
+      };
     }),
 
   // تسجيل رسالة واردة في المحادثة

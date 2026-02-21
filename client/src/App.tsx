@@ -20,6 +20,7 @@ import WhatsApp from "./pages/WhatsApp";
 import SearchHub from "./pages/SearchHub";
 import UsersManagement from "./pages/UsersManagement";
 import JoinPage from "./pages/JoinPage";
+import Chats from "./pages/Chats";
 
 function Router() {
   return (
@@ -40,6 +41,7 @@ function Router() {
         <Route path="/search-hub" component={SearchHub} />
         <Route path="/users" component={UsersManagement} />
         <Route path="/join" component={JoinPage} />
+        <Route path="/chats" component={Chats} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

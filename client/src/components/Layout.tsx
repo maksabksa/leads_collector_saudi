@@ -11,9 +11,10 @@ import {
   X,
   Search,
   MessageCircle,
+  MessagesSquare,
+  Shield,
   Zap,
   Globe,
-  Shield,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -24,6 +25,7 @@ const navItems = [
   { path: "/leads", label: "قائمة العملاء", icon: Users },
   { path: "/leads/add", label: "إضافة عميل", icon: Plus },
   { path: "/whatsapp", label: "واتساب", icon: MessageCircle },
+  { path: "/chats", label: "المحادثات", icon: MessagesSquare },
 ];
 
 const adminNavItems = [
