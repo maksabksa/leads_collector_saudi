@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -13,6 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,533 +30,752 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Tag,
   Plus,
+  Pencil,
   Trash2,
-  Brain,
+  ToggleLeft,
+  ToggleRight,
+  Download,
+  Upload,
+  RefreshCw,
   Zap,
-  TestTube,
+  FlaskConical,
+  BookOpen,
+  BarChart3,
+  Search,
   CheckCircle2,
   XCircle,
-  Loader2,
-  BookOpen,
-  TrendingUp,
-  RefreshCw,
-  AlertTriangle,
-  Sparkles,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
-const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
-  price: { label: "السعر والتكلفة", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
-  buy: { label: "الشراء والطلب", color: "bg-green-500/20 text-green-400 border-green-500/30" },
-  interest: { label: "الاهتمام والموافقة", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  contact: { label: "التواصل والمواعيد", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-  general: { label: "عام", color: "bg-gray-500/20 text-gray-400 border-gray-500/30" },
+const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
+  price:    { label: "السعر والتكلفة",      color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+  buy:      { label: "الشراء والطلب",       color: "bg-green-500/20 text-green-400 border-green-500/30" },
+  interest: { label: "الاهتمام والموافقة",  color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  contact:  { label: "التواصل والمواعيد",   color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
+  general:  { label: "عام",                 color: "bg-gray-500/20 text-gray-400 border-gray-500/30" },
 };
 
-export default function InterestKeywords() {
-  const [activeTab, setActiveTab] = useState<"keywords" | "training" | "test">("keywords");
-  const [newKeyword, setNewKeyword] = useState("");
-  const [newCategory, setNewCategory] = useState<"price" | "buy" | "interest" | "contact" | "general">("general");
-  const [newWeight, setNewWeight] = useState(20);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; keyword: string; isDefault: boolean } | null>(null);
+type Keyword = {
+  id: number;
+  keyword: string;
+  category: string;
+  weight: number;
+  isActive: boolean | null;
+  isDefault: boolean | null;
+};
 
-  // Training
-  const [trainingMsg, setTrainingMsg] = useState("");
-  const [trainingLabel, setTrainingLabel] = useState<"interested" | "not_interested">("interested");
-  const [trainingNotes, setTrainingNotes] = useState("");
+type TrainingExample = {
+  id: number;
+  message: string;
+  label: string;
+  notes?: string | null;
+  createdAt?: Date | null;
+};
 
-  // Test
-  const [testMessage, setTestMessage] = useState("");
-  const [testResult, setTestResult] = useState<{
-    finalScore: number;
-    isInterested: boolean;
-    keywordsScore: number;
-    aiScore: number | null;
-    foundKeywords: { keyword: string; weight: number; category: string }[];
-    aiReason: string | null;
-  } | null>(null);
-
-  // ===== Queries =====
-  const { data: keywords = [], refetch: refetchKeywords } = trpc.interestKw.list.useQuery();
-  const { data: stats } = trpc.interestKw.stats.useQuery();
-  const { data: examples = [], refetch: refetchExamples } = trpc.interestKw.listTrainingExamples.useQuery();
-
-  // ===== Mutations =====
-  const addKeyword = trpc.interestKw.add.useMutation({
-    onSuccess: () => {
-      toast.success("تمت إضافة الكلمة");
-      setNewKeyword("");
-      refetchKeywords();
-    },
-    onError: (e) => toast.error("فشل الإضافة", { description: e.message }),
-  });
-
-  const updateKeyword = trpc.interestKw.update.useMutation({
-    onSuccess: () => refetchKeywords(),
-    onError: (e) => toast.error("فشل التحديث", { description: e.message }),
-  });
-
-  const deleteKeyword = trpc.interestKw.delete.useMutation({
-    onSuccess: () => {
-      toast.success("تم حذف الكلمة");
-      setDeleteTarget(null);
-      refetchKeywords();
-    },
-    onError: (e) => toast.error("فشل الحذف", { description: e.message }),
-  });
-
-  const addExample = trpc.interestKw.addTrainingExample.useMutation({
-    onSuccess: () => {
-      toast.success("تمت إضافة المثال التدريبي");
-      setTrainingMsg("");
-      setTrainingNotes("");
-      refetchExamples();
-    },
-    onError: (e) => toast.error("فشل الإضافة", { description: e.message }),
-  });
-
-  const deleteExample = trpc.interestKw.deleteTrainingExample.useMutation({
-    onSuccess: () => refetchExamples(),
-  });
-
-  const testMsg = trpc.interestKw.testMessage.useMutation({
-    onSuccess: (data) => setTestResult(data),
-    onError: (e) => toast.error("فشل الاختبار", { description: e.message }),
-  });
-
-  // تجميع الكلمات حسب الفئة
-  const grouped = (keywords as any[]).reduce((acc: Record<string, any[]>, kw: any) => {
-    if (!acc[kw.category]) acc[kw.category] = [];
-    acc[kw.category].push(kw);
-    return acc;
-  }, {});
+// ─── مكوّن بطاقة كلمة مفتاحية ───────────────────────────────────────────────
+function KeywordCard({
+  kw,
+  onEdit,
+  onDelete,
+  onToggle,
+}: {
+  kw: Keyword;
+  onEdit: (kw: Keyword) => void;
+  onDelete: (kw: Keyword) => void;
+  onToggle: (id: number, active: boolean) => void;
+}) {
+  const cat = CATEGORY_LABELS[kw.category] ?? CATEGORY_LABELS.general;
+  const weightColor =
+    kw.weight >= 70 ? "text-red-400" : kw.weight >= 40 ? "text-amber-400" : "text-green-400";
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6" dir="rtl">
-      {/* رأس الصفحة */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Brain className="w-7 h-7 text-primary" />
-          كشف الاهتمام بالذكاء الاصطناعي
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          أضف كلمات مفتاحية وأمثلة تدريبية لتحسين دقة كشف العملاء المهتمين
-        </p>
+    <div
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+        kw.isActive
+          ? "border-border bg-card"
+          : "border-border/40 bg-card/40 opacity-60"
+      }`}
+    >
+      {/* زر تفعيل/إيقاف */}
+      <button
+        onClick={() => onToggle(kw.id, !kw.isActive)}
+        className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+        title={kw.isActive ? "إيقاف" : "تفعيل"}
+      >
+        {kw.isActive ? (
+          <ToggleRight className="w-5 h-5 text-green-400" />
+        ) : (
+          <ToggleLeft className="w-5 h-5" />
+        )}
+      </button>
+
+      {/* الكلمة */}
+      <span className={`flex-1 font-medium text-sm ${kw.isActive ? "text-foreground" : "text-muted-foreground"}`}>
+        {kw.keyword}
+      </span>
+
+      {/* التصنيف */}
+      <span className={`text-xs px-2 py-0.5 rounded-full border ${cat.color} hidden sm:inline-flex`}>
+        {cat.label}
+      </span>
+
+      {/* الوزن */}
+      <div className="flex items-center gap-1 min-w-[60px]">
+        <span className={`text-sm font-bold ${weightColor}`}>{kw.weight}</span>
+        <span className="text-xs text-muted-foreground">/ 100</span>
       </div>
 
-      {/* إحصائيات */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-primary">{stats?.active ?? 0}</p>
-          <p className="text-xs text-muted-foreground">كلمة نشطة</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold">{stats?.total ?? 0}</p>
-          <p className="text-xs text-muted-foreground">إجمالي الكلمات</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-green-400">{stats?.interestedExamples ?? 0}</p>
-          <p className="text-xs text-muted-foreground">أمثلة مهتمة</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-red-400">{stats?.notInterestedExamples ?? 0}</p>
-          <p className="text-xs text-muted-foreground">أمثلة غير مهتمة</p>
-        </div>
-      </div>
-
-      {/* تبويبات */}
-      <div className="flex gap-1 bg-muted/30 p-1 rounded-lg w-fit">
-        {[
-          { id: "keywords", label: "الكلمات المفتاحية", icon: Tag },
-          { id: "training", label: "التدريب", icon: BookOpen },
-          { id: "test", label: "اختبار الكشف", icon: TestTube },
-        ].map(({ id, label, icon: Icon }) => (
+      {/* أزرار الإجراءات */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          onClick={() => onEdit(kw)}
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
+          title="تعديل"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        {!kw.isDefault && (
           <button
-            key={id}
-            onClick={() => setActiveTab(id as typeof activeTab)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-              activeTab === id
-                ? "bg-background shadow text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => onDelete(kw)}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all"
+            title="حذف"
           >
-            <Icon className="w-4 h-4" />
-            {label}
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── الصفحة الرئيسية ──────────────────────────────────────────────────────────
+export default function InterestKeywords() {
+  const utils = trpc.useUtils();
+
+  // ── Queries ──
+  const { data: keywords = [], isLoading } = trpc.interestKw.list.useQuery();
+  const { data: stats } = trpc.interestKw.stats.useQuery();
+  const { data: trainingExamples = [] } = trpc.interestKw.listTrainingExamples.useQuery();
+
+  // ── Mutations ──
+  const addMut       = trpc.interestKw.add.useMutation({ onSuccess: () => { utils.interestKw.list.invalidate(); utils.interestKw.stats.invalidate(); toast.success("تمت الإضافة"); } });
+  const updateMut    = trpc.interestKw.updateFull.useMutation({ onSuccess: () => { utils.interestKw.list.invalidate(); toast.success("تم التحديث"); } });
+  const deleteMut    = trpc.interestKw.delete.useMutation({ onSuccess: () => { utils.interestKw.list.invalidate(); utils.interestKw.stats.invalidate(); toast.success("تم الحذف"); } });
+  const bulkToggle   = trpc.interestKw.bulkToggle.useMutation({ onSuccess: () => { utils.interestKw.list.invalidate(); utils.interestKw.stats.invalidate(); } });
+  const resetDef     = trpc.interestKw.resetDefaults.useMutation({ onSuccess: () => { utils.interestKw.list.invalidate(); toast.success("تم إعادة تفعيل الكلمات الافتراضية"); } });
+  const importMut    = trpc.interestKw.importKeywords.useMutation({ onSuccess: (d) => { utils.interestKw.list.invalidate(); utils.interestKw.stats.invalidate(); toast.success(`تم استيراد ${d.added} كلمة`); } });
+  const addExample   = trpc.interestKw.addTrainingExample.useMutation({ onSuccess: () => { utils.interestKw.listTrainingExamples.invalidate(); utils.interestKw.stats.invalidate(); toast.success("تمت إضافة المثال"); } });
+  const delExample   = trpc.interestKw.deleteTrainingExample.useMutation({ onSuccess: () => { utils.interestKw.listTrainingExamples.invalidate(); utils.interestKw.stats.invalidate(); } });
+  const testMsg      = trpc.interestKw.testMessage.useMutation();
+
+  // ── State: إضافة كلمة ──
+  const [newKeyword, setNewKeyword]   = useState("");
+  const [newCategory, setNewCategory] = useState<string>("general");
+  const [newWeight, setNewWeight]     = useState(20);
+
+  // ── State: تعديل كلمة ──
+  const [editDialog, setEditDialog]   = useState(false);
+  const [editKw, setEditKw]           = useState<Keyword | null>(null);
+  const [editText, setEditText]       = useState("");
+  const [editCat, setEditCat]         = useState("general");
+  const [editWeight, setEditWeight]   = useState(20);
+
+  // ── State: حذف كلمة ──
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [deleteKw, setDeleteKw]         = useState<Keyword | null>(null);
+
+  // ── State: فلتر التصنيف ──
+  const [filterCat, setFilterCat] = useState<string>("all");
+
+  // ── State: اختبار الرسالة ──
+  const [testInput, setTestInput]   = useState("");
+  const [testResult, setTestResult] = useState<ReturnType<typeof testMsg.mutateAsync> extends Promise<infer T> ? T : never | null>(null as never);
+
+  // ── State: مثال تدريبي ──
+  const [exampleMsg, setExampleMsg]     = useState("");
+  const [exampleLabel, setExampleLabel] = useState<"interested" | "not_interested">("interested");
+  const [exampleNotes, setExampleNotes] = useState("");
+
+  // ── State: استيراد ──
+  const [importText, setImportText]   = useState("");
+  const [importDialog, setImportDialog] = useState(false);
+  const [importOverwrite, setImportOverwrite] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // ── فلترة الكلمات ──
+  const filteredKeywords = filterCat === "all"
+    ? keywords
+    : keywords.filter((k) => k.category === filterCat);
+
+  // ── تصدير JSON ──
+  const handleExport = () => {
+    const data = keywords.map((k) => ({ keyword: k.keyword, category: k.category, weight: k.weight, isActive: k.isActive }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = "interest-keywords.json"; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("تم تصدير الكلمات");
+  };
+
+  // ── استيراد JSON ──
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setImportText(ev.target?.result as string);
+      setImportDialog(true);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleImportConfirm = () => {
+    try {
+      const parsed = JSON.parse(importText);
+      if (!Array.isArray(parsed)) throw new Error("يجب أن يكون الملف مصفوفة JSON");
+      importMut.mutate({ keywords: parsed, overwrite: importOverwrite });
+      setImportDialog(false);
+    } catch {
+      toast.error("ملف JSON غير صالح");
+    }
+  };
+
+  // ── فتح نافذة التعديل ──
+  const openEdit = (kw: Keyword) => {
+    setEditKw(kw);
+    setEditText(kw.keyword);
+    setEditCat(kw.category);
+    setEditWeight(kw.weight);
+    setEditDialog(true);
+  };
+
+  // ── حفظ التعديل ──
+  const handleSaveEdit = () => {
+    if (!editKw) return;
+    updateMut.mutate({ id: editKw.id, keyword: editText, category: editCat as "price" | "buy" | "interest" | "contact" | "general", weight: editWeight });
+    setEditDialog(false);
+  };
+
+  // ── اختبار رسالة ──
+  const handleTest = async () => {
+    if (!testInput.trim()) return;
+    const result = await testMsg.mutateAsync({ message: testInput });
+    setTestResult(result as never);
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* ── رأس الصفحة ── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Zap className="w-6 h-6 text-amber-400" />
+            كشف الاهتمام
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            إدارة الكلمات المفتاحية التي يستخدمها الذكاء الاصطناعي لتحديد اهتمام العملاء
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
+            <Download className="w-3.5 h-3.5" /> تصدير JSON
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} className="gap-1.5">
+            <Upload className="w-3.5 h-3.5" /> استيراد JSON
+          </Button>
+          <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
+          <Button variant="outline" size="sm" onClick={() => resetDef.mutate()} className="gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" /> إعادة الافتراضيات
+          </Button>
+        </div>
+      </div>
+
+      {/* ── بطاقات الإحصائيات ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "إجمالي الكلمات",   value: stats?.total ?? 0,            icon: BarChart3,    color: "text-cyan-400" },
+          { label: "نشطة",              value: stats?.active ?? 0,           icon: CheckCircle2, color: "text-green-400" },
+          { label: "موقوفة",            value: (stats?.total ?? 0) - (stats?.active ?? 0), icon: XCircle, color: "text-red-400" },
+          { label: "أمثلة التدريب",     value: stats?.trainingExamples ?? 0, icon: BookOpen,     color: "text-purple-400" },
+        ].map((s) => (
+          <Card key={s.label} className="border-border">
+            <CardContent className="p-4 flex items-center gap-3">
+              <s.icon className={`w-5 h-5 ${s.color} flex-shrink-0`} />
+              <div>
+                <p className="text-xl font-bold text-foreground">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* ===== تبويب الكلمات ===== */}
-      {activeTab === "keywords" && (
-        <div className="space-y-5">
-          {/* إضافة كلمة */}
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-primary" />
-              إضافة كلمة مفتاحية جديدة
-            </h3>
-            <div className="flex gap-3 flex-wrap">
-              <Input
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                placeholder="الكلمة المفتاحية..."
-                className="flex-1 min-w-40"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newKeyword.trim()) {
-                    addKeyword.mutate({ keyword: newKeyword, category: newCategory, weight: newWeight });
-                  }
+      {/* ── تبويبات ── */}
+      <Tabs defaultValue="keywords">
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="keywords" className="gap-1.5"><Zap className="w-3.5 h-3.5" /> الكلمات المفتاحية</TabsTrigger>
+          <TabsTrigger value="test"     className="gap-1.5"><FlaskConical className="w-3.5 h-3.5" /> اختبار الكشف</TabsTrigger>
+          <TabsTrigger value="training" className="gap-1.5"><BookOpen className="w-3.5 h-3.5" /> تدريب AI</TabsTrigger>
+        </TabsList>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            تبويب: الكلمات المفتاحية
+        ═══════════════════════════════════════════════════════════════════ */}
+        <TabsContent value="keywords" className="space-y-4 mt-4">
+          {/* نموذج إضافة كلمة جديدة */}
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Plus className="w-4 h-4 text-cyan-400" />
+                إضافة كلمة مفتاحية جديدة
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  placeholder="اكتب الكلمة أو العبارة..."
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && newKeyword.trim() && addMut.mutate({ keyword: newKeyword, category: newCategory as "price" | "buy" | "interest" | "contact" | "general", weight: newWeight })}
+                />
+                <Select value={newCategory} onValueChange={setNewCategory}>
+                  <SelectTrigger className="w-full sm:w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CATEGORY_LABELS).map(([v, { label }]) => (
+                      <SelectItem key={v} value={v}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* شريط الوزن */}
+                <div className="flex items-center gap-2 min-w-[140px]">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">وزن:</span>
+                  <input
+                    type="range" min={5} max={100} step={5}
+                    value={newWeight}
+                    onChange={(e) => setNewWeight(Number(e.target.value))}
+                    className="flex-1 accent-cyan-500"
+                  />
+                  <span className="text-sm font-bold text-cyan-400 w-8 text-center">{newWeight}</span>
+                </div>
+                <Button
+                  onClick={() => {
+                    if (!newKeyword.trim()) return;
+                    addMut.mutate({ keyword: newKeyword, category: newCategory as "price" | "buy" | "interest" | "contact" | "general", weight: newWeight });
+                    setNewKeyword("");
+                    setNewWeight(20);
+                  }}
+                  disabled={!newKeyword.trim() || addMut.isPending}
+                  className="gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-white"
+                >
+                  <Plus className="w-4 h-4" /> إضافة
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* أدوات التحكم الجماعي + فلتر التصنيف */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-muted-foreground">فلتر:</span>
+              {["all", ...Object.keys(CATEGORY_LABELS)].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setFilterCat(cat)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                    filterCat === cat
+                      ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-400"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-border/80"
+                  }`}
+                >
+                  {cat === "all" ? "الكل" : CATEGORY_LABELS[cat].label}
+                  {cat !== "all" && (
+                    <span className="mr-1 opacity-60">
+                      ({keywords.filter((k) => k.category === cat).length})
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => bulkToggle.mutate({ isActive: true })} className="gap-1 text-green-400 border-green-500/30 hover:bg-green-500/10">
+                <ToggleRight className="w-3.5 h-3.5" /> تفعيل الكل
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => bulkToggle.mutate({ isActive: false })} className="gap-1 text-red-400 border-red-500/30 hover:bg-red-500/10">
+                <ToggleLeft className="w-3.5 h-3.5" /> إيقاف الكل
+              </Button>
+            </div>
+          </div>
+
+          {/* قائمة الكلمات */}
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">جاري التحميل...</div>
+          ) : filteredKeywords.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">لا توجد كلمات في هذا التصنيف</div>
+          ) : (
+            <div className="space-y-2">
+              {/* رأس الجدول */}
+              <div className="flex items-center gap-3 px-4 py-2 text-xs text-muted-foreground/60 uppercase tracking-wider">
+                <span className="w-5" />
+                <span className="flex-1">الكلمة</span>
+                <span className="hidden sm:inline w-36">التصنيف</span>
+                <span className="w-20 text-center">الوزن</span>
+                <span className="w-16" />
+              </div>
+              {filteredKeywords.map((kw) => (
+                <KeywordCard
+                  key={kw.id}
+                  kw={kw as Keyword}
+                  onEdit={openEdit}
+                  onDelete={(k) => { setDeleteKw(k); setDeleteDialog(true); }}
+                  onToggle={(id, active) => updateMut.mutate({ id, isActive: active })}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            تبويب: اختبار الكشف
+        ═══════════════════════════════════════════════════════════════════ */}
+        <TabsContent value="test" className="space-y-4 mt-4">
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FlaskConical className="w-4 h-4 text-blue-400" />
+                اختبار رسالة عميل
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>أدخل رسالة العميل للاختبار</Label>
+                <Textarea
+                  placeholder="مثال: أنا مهتم بالمنتج، كم السعر؟"
+                  value={testInput}
+                  onChange={(e) => setTestInput(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+              <Button
+                onClick={handleTest}
+                disabled={!testInput.trim() || testMsg.isPending}
+                className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Search className="w-4 h-4" />
+                {testMsg.isPending ? "جاري التحليل..." : "تحليل الرسالة"}
+              </Button>
+
+              {/* نتيجة الاختبار */}
+              {testResult && (
+                <div className="space-y-4 pt-2">
+                  {/* درجة الاهتمام */}
+                  <div className={`p-4 rounded-xl border-2 ${
+                    (testResult as { isInterested: boolean }).isInterested
+                      ? "border-green-500/40 bg-green-500/10"
+                      : "border-red-500/40 bg-red-500/10"
+                  }`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      {(testResult as { isInterested: boolean }).isInterested ? (
+                        <CheckCircle2 className="w-6 h-6 text-green-400" />
+                      ) : (
+                        <XCircle className="w-6 h-6 text-red-400" />
+                      )}
+                      <div>
+                        <p className={`font-bold text-lg ${(testResult as { isInterested: boolean }).isInterested ? "text-green-400" : "text-red-400"}`}>
+                          {(testResult as { isInterested: boolean }).isInterested ? "العميل مهتم" : "العميل غير مهتم"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          الدرجة النهائية: {(testResult as { finalScore: number }).finalScore} / 100
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* شريط الدرجة */}
+                    <div className="w-full bg-white/10 rounded-full h-2 mb-3">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          (testResult as { finalScore: number }).finalScore >= 70 ? "bg-green-500" :
+                          (testResult as { finalScore: number }).finalScore >= 35 ? "bg-amber-500" : "bg-red-500"
+                        }`}
+                        style={{ width: `${(testResult as { finalScore: number }).finalScore}%` }}
+                      />
+                    </div>
+
+                    {/* تفاصيل الدرجات */}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="bg-white/5 rounded-lg p-3">
+                        <p className="text-muted-foreground text-xs mb-1">درجة الكلمات المفتاحية</p>
+                        <p className="font-bold text-amber-400">{(testResult as { keywordsScore: number }).keywordsScore} / 100</p>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-3">
+                        <p className="text-muted-foreground text-xs mb-1">درجة الذكاء الاصطناعي</p>
+                        <p className="font-bold text-blue-400">
+                          {(testResult as { aiScore: number | null }).aiScore !== null ? `${(testResult as { aiScore: number }).aiScore} / 100` : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* الكلمات المكتشفة */}
+                  {(testResult as { foundKeywords: { keyword: string; weight: number; category: string }[] }).foundKeywords.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-2">الكلمات المكتشفة:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(testResult as { foundKeywords: { keyword: string; weight: number; category: string }[] }).foundKeywords.map((k, i) => (
+                          <span key={i} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            {k.keyword} <span className="opacity-60">(+{k.weight})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* تحليل AI */}
+                  {(testResult as { aiReason: string | null }).aiReason && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                      <p className="text-xs text-blue-400 font-medium mb-1 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> تحليل الذكاء الاصطناعي
+                      </p>
+                      <p className="text-sm text-foreground">{(testResult as { aiReason: string }).aiReason}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            تبويب: تدريب AI
+        ═══════════════════════════════════════════════════════════════════ */}
+        <TabsContent value="training" className="space-y-4 mt-4">
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-purple-400" />
+                إضافة مثال تدريبي
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label>رسالة العميل</Label>
+                <Textarea
+                  placeholder="أدخل رسالة عميل حقيقية..."
+                  value={exampleMsg}
+                  onChange={(e) => setExampleMsg(e.target.value)}
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>التصنيف</Label>
+                  <Select value={exampleLabel} onValueChange={(v) => setExampleLabel(v as "interested" | "not_interested")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="interested">مهتم بالشراء</SelectItem>
+                      <SelectItem value="not_interested">غير مهتم</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>ملاحظات (اختياري)</Label>
+                  <Input
+                    placeholder="سبب التصنيف..."
+                    value={exampleNotes}
+                    onChange={(e) => setExampleNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  if (!exampleMsg.trim()) return;
+                  addExample.mutate({ message: exampleMsg, label: exampleLabel, notes: exampleNotes || undefined });
+                  setExampleMsg(""); setExampleNotes("");
                 }}
-              />
-              <Select value={newCategory} onValueChange={(v) => setNewCategory(v as typeof newCategory)}>
-                <SelectTrigger className="w-48">
+                disabled={!exampleMsg.trim() || addExample.isPending}
+                className="w-full gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <Plus className="w-4 h-4" /> إضافة مثال
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* قائمة الأمثلة */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">
+                أمثلة التدريب ({trainingExamples.length})
+              </p>
+              <div className="flex gap-2 text-xs text-muted-foreground">
+                <span className="text-green-400">{stats?.interestedExamples ?? 0} مهتم</span>
+                <span>·</span>
+                <span className="text-red-400">{stats?.notInterestedExamples ?? 0} غير مهتم</span>
+              </div>
+            </div>
+            {trainingExamples.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                لا توجد أمثلة تدريبية بعد. أضف أمثلة لتحسين دقة الذكاء الاصطناعي.
+              </div>
+            ) : (
+              (trainingExamples as TrainingExample[]).map((ex) => (
+                <div key={ex.id} className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card">
+                  <div className={`mt-0.5 flex-shrink-0 w-2 h-2 rounded-full ${ex.label === "interested" ? "bg-green-400" : "bg-red-400"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground">{ex.message}</p>
+                    {ex.notes && <p className="text-xs text-muted-foreground mt-0.5">{ex.notes}</p>}
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                    ex.label === "interested"
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : "bg-red-500/20 text-red-400 border-red-500/30"
+                  }`}>
+                    {ex.label === "interested" ? "مهتم" : "غير مهتم"}
+                  </span>
+                  <button
+                    onClick={() => delExample.mutate({ id: ex.id })}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* ── نافذة تعديل كلمة ── */}
+      <Dialog open={editDialog} onOpenChange={setEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>تعديل الكلمة المفتاحية</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>الكلمة أو العبارة</Label>
+              <Input value={editText} onChange={(e) => setEditText(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>التصنيف</Label>
+              <Select value={editCat} onValueChange={setEditCat}>
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  {Object.entries(CATEGORY_LABELS).map(([v, { label }]) => (
+                    <SelectItem key={v} value={v}>{label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground whitespace-nowrap">الوزن:</span>
-                <Input
-                  type="number"
-                  value={newWeight}
-                  onChange={(e) => setNewWeight(parseInt(e.target.value) || 20)}
-                  min={5}
-                  max={100}
-                  className="w-20"
-                />
-              </div>
-              <Button
-                onClick={() => addKeyword.mutate({ keyword: newKeyword, category: newCategory, weight: newWeight })}
-                disabled={!newKeyword.trim() || addKeyword.isPending}
-              >
-                {addKeyword.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Plus className="w-4 h-4 ml-1" />}
-                إضافة
-              </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              الوزن يحدد مساهمة الكلمة في درجة الاهتمام (5-100). الكلمات ذات الوزن الأعلى تزيد الدرجة أكثر.
-            </p>
-          </div>
-
-          {/* الكلمات مجمعة حسب الفئة */}
-          {Object.entries(CATEGORY_CONFIG).map(([category, catInfo]) => {
-            const catKeywords = grouped[category] || [];
-            if (catKeywords.length === 0) return null;
-            return (
-              <div key={category} className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <Badge className={`${catInfo.color} border text-xs`}>{catInfo.label}</Badge>
-                  <span className="text-xs text-muted-foreground">({catKeywords.length} كلمة)</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {catKeywords.map((kw: any) => (
-                    <div
-                      key={kw.id}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-all ${
-                        kw.isActive
-                          ? "bg-primary/10 border-primary/30 text-foreground"
-                          : "bg-muted/30 border-border text-muted-foreground line-through"
-                      }`}
-                    >
-                      <Tag className="w-3 h-3 text-primary" />
-                      <span>{kw.keyword}</span>
-                      <span className="text-xs text-muted-foreground">({kw.weight})</span>
-                      <div className="flex items-center gap-1 mr-1">
-                        <Switch
-                          checked={kw.isActive}
-                          onCheckedChange={(v) => updateKeyword.mutate({ id: kw.id, isActive: v })}
-                          className="scale-75"
-                        />
-                        {!kw.isDefault && (
-                          <button
-                            onClick={() => setDeleteTarget({ id: kw.id, keyword: kw.keyword, isDefault: kw.isDefault })}
-                            className="text-destructive/60 hover:text-destructive transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
-                        {kw.isDefault && (
-                          <span className="text-xs text-muted-foreground/50">افتراضي</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>الوزن (تأثير الكلمة على درجة الاهتمام)</Label>
+                <span className="text-lg font-bold text-cyan-400">{editWeight}</span>
               </div>
-            );
-          })}
-
-          {(keywords as any[]).length === 0 && (
-            <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
-              <Tag className="w-10 h-10 mx-auto mb-3 opacity-20" />
-              <p>لا توجد كلمات مفتاحية بعد</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== تبويب التدريب ===== */}
-      {activeTab === "training" && (
-        <div className="space-y-5">
-          {/* إضافة مثال */}
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-primary" />
-              إضافة مثال تدريبي
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              أضف أمثلة من رسائل حقيقية لتحسين دقة الذكاء الاصطناعي في كشف الاهتمام.
-            </p>
-            <div className="space-y-3">
-              <Textarea
-                value={trainingMsg}
-                onChange={(e) => setTrainingMsg(e.target.value)}
-                placeholder="أدخل رسالة العميل هنا..."
-                rows={3}
-                className="resize-none"
+              <input
+                type="range" min={5} max={100} step={5}
+                value={editWeight}
+                onChange={(e) => setEditWeight(Number(e.target.value))}
+                className="w-full accent-cyan-500"
               />
-              <div className="flex gap-3 flex-wrap">
-                <div className="flex gap-2">
-                  <Button
-                    variant={trainingLabel === "interested" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTrainingLabel("interested")}
-                    className={trainingLabel === "interested" ? "bg-green-600 hover:bg-green-700" : ""}
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>ضعيف (5)</span>
+                <span>متوسط (50)</span>
+                <span>قوي (100)</span>
+              </div>
+              <div className="flex gap-2 mt-1">
+                {[10, 20, 30, 50, 70, 100].map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => setEditWeight(w)}
+                    className={`flex-1 text-xs py-1 rounded-lg border transition-all ${
+                      editWeight === w
+                        ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-400"
+                        : "border-border text-muted-foreground hover:border-border/80"
+                    }`}
                   >
-                    <CheckCircle2 className="w-4 h-4 ml-1" />
-                    مهتم بالشراء
-                  </Button>
-                  <Button
-                    variant={trainingLabel === "not_interested" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTrainingLabel("not_interested")}
-                    className={trainingLabel === "not_interested" ? "bg-red-600 hover:bg-red-700" : ""}
-                  >
-                    <XCircle className="w-4 h-4 ml-1" />
-                    غير مهتم
-                  </Button>
-                </div>
-                <Input
-                  value={trainingNotes}
-                  onChange={(e) => setTrainingNotes(e.target.value)}
-                  placeholder="ملاحظة اختيارية..."
-                  className="flex-1 min-w-40"
-                />
-                <Button
-                  onClick={() => addExample.mutate({ message: trainingMsg, label: trainingLabel, notes: trainingNotes || undefined })}
-                  disabled={!trainingMsg.trim() || addExample.isPending}
-                >
-                  {addExample.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-                  حفظ المثال
-                </Button>
+                    {w}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialog(false)}>إلغاء</Button>
+            <Button onClick={handleSaveEdit} disabled={!editText.trim() || updateMut.isPending} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+              حفظ التغييرات
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-          {/* قائمة الأمثلة */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm text-muted-foreground">
-                الأمثلة التدريبية ({(examples as any[]).length})
-              </h3>
-              <Button variant="ghost" size="sm" onClick={() => refetchExamples()}>
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-            </div>
-            {(examples as any[]).map((ex: any) => (
-              <div
-                key={ex.id}
-                className={`flex items-start gap-3 p-4 rounded-xl border ${
-                  ex.label === "interested"
-                    ? "bg-green-500/5 border-green-500/20"
-                    : "bg-red-500/5 border-red-500/20"
-                }`}
-              >
-                <div className="flex-shrink-0 mt-0.5">
-                  {ex.label === "interested" ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">"{ex.message}"</p>
-                  {ex.notes && <p className="text-xs text-muted-foreground mt-1">{ex.notes}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(ex.createdAt).toLocaleDateString("ar-SA")}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive/60 hover:text-destructive h-7 w-7 p-0 flex-shrink-0"
-                  onClick={() => deleteExample.mutate({ id: ex.id })}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            ))}
-            {(examples as any[]).length === 0 && (
-              <div className="text-center py-10 text-muted-foreground border border-dashed border-border rounded-xl">
-                <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                <p className="text-sm">لا توجد أمثلة تدريبية بعد</p>
-                <p className="text-xs mt-1">أضف أمثلة لتحسين دقة الذكاء الاصطناعي</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ===== تبويب الاختبار ===== */}
-      {activeTab === "test" && (
-        <div className="space-y-5">
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <TestTube className="w-4 h-4 text-primary" />
-              اختبار كشف الاهتمام
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              أدخل رسالة عميل لمعرفة درجة اهتمامه وكيف يحللها النظام.
-            </p>
-            <div className="space-y-3">
-              <Textarea
-                value={testMessage}
-                onChange={(e) => setTestMessage(e.target.value)}
-                placeholder="مثال: كم سعر الكيلو؟ أبي أطلب..."
-                rows={3}
-                className="resize-none"
-              />
-              <Button
-                onClick={() => testMsg.mutate({ message: testMessage })}
-                disabled={!testMessage.trim() || testMsg.isPending}
-                className="w-full"
-              >
-                {testMsg.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                ) : (
-                  <Sparkles className="w-4 h-4 ml-2" />
-                )}
-                تحليل الرسالة
-              </Button>
-            </div>
-          </div>
-
-          {/* نتيجة الاختبار */}
-          {testResult && (
-            <div
-              className={`rounded-xl border p-5 space-y-4 ${
-                testResult.isInterested
-                  ? "bg-green-500/10 border-green-500/30"
-                  : "bg-red-500/10 border-red-500/30"
-              }`}
-            >
-              {/* الحكم النهائي */}
-              <div className="flex items-center gap-3">
-                {testResult.isInterested ? (
-                  <CheckCircle2 className="w-8 h-8 text-green-400" />
-                ) : (
-                  <XCircle className="w-8 h-8 text-red-400" />
-                )}
-                <div>
-                  <p className="text-lg font-bold">
-                    {testResult.isInterested ? "العميل مهتم بالشراء" : "العميل غير مهتم"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    درجة الاهتمام الإجمالية: {testResult.finalScore}%
-                  </p>
-                </div>
-              </div>
-
-              {/* تفاصيل الدرجات */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-background/50 rounded-lg p-3 text-center">
-                  <p className="text-xl font-bold">{testResult.keywordsScore}%</p>
-                  <p className="text-xs text-muted-foreground">درجة الكلمات المفتاحية</p>
-                </div>
-                <div className="bg-background/50 rounded-lg p-3 text-center">
-                  <p className="text-xl font-bold flex items-center justify-center gap-1">
-                    <Sparkles className="w-4 h-4 text-purple-400" />
-                    {testResult.aiScore !== null ? `${testResult.aiScore}%` : "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">درجة الذكاء الاصطناعي</p>
-                </div>
-              </div>
-
-              {/* الكلمات المكتشفة */}
-              {testResult.foundKeywords.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">الكلمات المكتشفة:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {testResult.foundKeywords.map((kw) => (
-                      <Badge key={kw.keyword} className={`${CATEGORY_CONFIG[kw.category]?.color || ""} border text-xs`}>
-                        {kw.keyword} (+{kw.weight})
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* تحليل AI */}
-              {testResult.aiReason && (
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs font-medium flex items-center gap-1 mb-1">
-                    <Sparkles className="w-3 h-3 text-purple-400" />
-                    تحليل الذكاء الاصطناعي:
-                  </p>
-                  <p className="text-sm text-muted-foreground">{testResult.aiReason}</p>
-                </div>
-              )}
-
-              {/* إضافة كمثال تدريبي */}
-              <div className="flex gap-2 pt-2 border-t border-border/30">
-                <p className="text-xs text-muted-foreground flex-1">هل التحليل صحيح؟ أضفه كمثال تدريبي:</p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs border-green-500/30 text-green-400"
-                  onClick={() => addExample.mutate({ message: testMessage, label: "interested" })}
-                >
-                  مهتم ✓
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs border-red-500/30 text-red-400"
-                  onClick={() => addExample.mutate({ message: testMessage, label: "not_interested" })}
-                >
-                  غير مهتم ✗
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Dialog تأكيد الحذف */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent dir="rtl">
+      {/* ── نافذة تأكيد الحذف ── */}
+      <AlertDialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>حذف الكلمة المفتاحية</AlertDialogTitle>
             <AlertDialogDescription>
-              هل تريد حذف كلمة "{deleteTarget?.keyword}"؟ لا يمكن التراجع.
+              هل تريد حذف الكلمة <strong className="text-foreground">"{deleteKw?.keyword}"</strong>؟ لا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteKeyword.mutate({ id: deleteTarget.id })}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => { if (deleteKw) { deleteMut.mutate({ id: deleteKw.id }); setDeleteDialog(false); } }}
             >
               حذف
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── نافذة استيراد JSON ── */}
+      <Dialog open={importDialog} onOpenChange={setImportDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>استيراد كلمات مفتاحية</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              سيتم استيراد {(() => { try { return JSON.parse(importText).length; } catch { return "؟"; } })()} كلمة من الملف.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="overwrite"
+                checked={importOverwrite}
+                onChange={(e) => setImportOverwrite(e.target.checked)}
+                className="accent-cyan-500"
+              />
+              <label htmlFor="overwrite" className="text-sm text-foreground">
+                استبدال الكلمات المخصصة الموجودة (الاحتفاظ بالافتراضية)
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialog(false)}>إلغاء</Button>
+            <Button onClick={handleImportConfirm} disabled={importMut.isPending} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+              استيراد
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

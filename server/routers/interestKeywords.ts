@@ -84,6 +84,105 @@ export const interestKeywordsRouter = router({
       return { success: true };
     }),
 
+  // ===== تعديل كلمة كاملة (النص + الوزن + التصنيف) =====
+  updateFull: protectedProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        keyword: z.string().min(1).max(100).optional(),
+        weight: z.number().min(5).max(100).optional(),
+        category: z.enum(["price", "buy", "interest", "contact", "general"]).optional(),
+        isActive: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...rest } = input;
+      const updateData: Record<string, unknown> = {};
+      if (rest.keyword !== undefined) updateData.keyword = rest.keyword.trim();
+      if (rest.weight !== undefined) updateData.weight = rest.weight;
+      if (rest.category !== undefined) updateData.category = rest.category;
+      if (rest.isActive !== undefined) updateData.isActive = rest.isActive;
+      await db.update(interestKeywords).set(updateData).where(eq(interestKeywords.id, id));
+      return { success: true };
+    }),
+
+  // ===== تفعيل/إيقاف جميع الكلمات =====
+  bulkToggle: protectedProcedure
+    .input(z.object({ isActive: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(interestKeywords).set({ isActive: input.isActive });
+      return { success: true };
+    }),
+
+  // ===== تصدير الكلمات كـ JSON =====
+  exportKeywords: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db
+      .select()
+      .from(interestKeywords)
+      .orderBy(interestKeywords.category, interestKeywords.keyword);
+    return rows.map((r) => ({
+      keyword: r.keyword,
+      category: r.category,
+      weight: r.weight,
+      isActive: r.isActive,
+    }));
+  }),
+
+  // ===== استيراد كلمات من JSON =====
+  importKeywords: protectedProcedure
+    .input(
+      z.object({
+        keywords: z.array(
+          z.object({
+            keyword: z.string().min(1).max(100),
+            category: z.enum(["price", "buy", "interest", "contact", "general"]).default("general"),
+            weight: z.number().min(5).max(100).default(20),
+          })
+        ),
+        overwrite: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.overwrite) {
+        await db.delete(interestKeywords).where(eq(interestKeywords.isDefault, false));
+      }
+      let added = 0;
+      for (const kw of input.keywords) {
+        try {
+          await db.insert(interestKeywords).values({
+            keyword: kw.keyword.trim(),
+            category: kw.category,
+            weight: kw.weight,
+            isActive: true,
+            isDefault: false,
+          });
+          added++;
+        } catch {
+          // تجاهل التكرار
+        }
+      }
+      return { success: true, added };
+    }),
+
+  // ===== إعادة تفعيل الكلمات الافتراضية =====
+  resetDefaults: protectedProcedure.mutation(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db
+      .update(interestKeywords)
+      .set({ isActive: true })
+      .where(eq(interestKeywords.isDefault, true));
+    return { success: true };
+  }),
+
   // ===== اختبار رسالة =====
   testMessage: protectedProcedure
     .input(z.object({ message: z.string().min(1) }))
