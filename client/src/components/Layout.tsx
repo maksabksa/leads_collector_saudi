@@ -22,17 +22,18 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navItems = [
-  { path: "/", label: "لوحة التحكم", icon: BarChart3 },
-  { path: "/search-hub", label: "مركز البحث", icon: Search },
-  { path: "/leads", label: "قائمة العملاء", icon: Users },
-  { path: "/leads/add", label: "إضافة عميل", icon: Plus },
-  { path: "/whatsapp", label: "واتساب", icon: MessageCircle },
-  { path: "/chats", label: "المحادثات", icon: MessagesSquare },
+  { path: "/", label: "لوحة التحكم", icon: BarChart3, permission: null },
+  { path: "/search-hub", label: "مركز البحث", icon: Search, permission: "search.use" },
+  { path: "/leads", label: "قائمة العملاء", icon: Users, permission: "leads.view" },
+  { path: "/leads/add", label: "إضافة عميل", icon: Plus, permission: "leads.add" },
+  { path: "/whatsapp", label: "واتساب", icon: MessageCircle, permission: "whatsapp.send" },
+  { path: "/chats", label: "المحادثات", icon: MessagesSquare, permission: "whatsapp.send" },
 ];
 
 const adminNavItems = [
   { path: "/users", label: "إدارة المستخدمين", icon: Shield },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
+  { path: "/interest-keywords", label: "كشف الاهتمام", icon: Zap },
   { path: "/ai-settings", label: "إعدادات AI", icon: Brain },
 ];
 
@@ -41,6 +42,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const logout = trpc.auth.logout.useMutation();
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // جلب صلاحيات المستخدم
+  const { data: myPerms } = trpc.invitations.myPermissions.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const userPermissionsList = myPerms?.permissions ?? [];
+  const isAdmin = user?.role === "admin";
+  // فلترة navItems حسب الصلاحيات
+  const visibleNavItems = navItems.filter((item) => {
+    if (isAdmin) return true;
+    if (!item.permission) return true;
+    return userPermissionsList.includes(item.permission);
+  });
 
   if (loading) {
     return (
@@ -116,7 +129,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
             return (

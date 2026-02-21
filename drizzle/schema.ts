@@ -383,3 +383,29 @@ export const interestAlerts = mysqlTable("interest_alerts", {
 });
 export type InterestAlert = typeof interestAlerts.$inferSelect;
 export type InsertInterestAlert = typeof interestAlerts.$inferInsert;
+
+// ===== INTEREST KEYWORDS TABLE =====
+// Custom keywords to detect customer interest (managed by admin)
+export const interestKeywords = mysqlTable("interest_keywords", {
+  id: int("id").autoincrement().primaryKey(),
+  keyword: varchar("keyword", { length: 100 }).notNull().unique(),
+  category: varchar("category", { length: 50 }).default("general").notNull(), // general, price, buy, contact
+  weight: int("weight").default(20).notNull(), // contribution to interest score (0-100)
+  isActive: boolean("isActive").default(true).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(), // system default, cannot delete
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InterestKeyword = typeof interestKeywords.$inferSelect;
+export type InsertInterestKeyword = typeof interestKeywords.$inferInsert;
+
+// ===== AI TRAINING EXAMPLES TABLE =====
+// Examples of interested/not-interested messages to improve AI detection
+export const aiTrainingExamples = mysqlTable("ai_training_examples", {
+  id: int("id").autoincrement().primaryKey(),
+  message: text("message").notNull(),
+  label: mysqlEnum("label", ["interested", "not_interested"]).notNull(),
+  notes: varchar("notes", { length: 200 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AiTrainingExample = typeof aiTrainingExamples.$inferSelect;
+export type InsertAiTrainingExample = typeof aiTrainingExamples.$inferInsert;

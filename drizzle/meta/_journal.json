@@ -71,6 +71,13 @@
       "when": 1771667521832,
       "tag": "0009_lyrical_thunderbolt_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1771670042516,
+      "tag": "0010_adorable_santa_claus",
+      "breakpoints": true
     }
   ]
 }
