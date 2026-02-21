@@ -231,11 +231,21 @@ export async function sendWhatsAppMessage(
 
   try {
     const cleanPhone = phone.replace(/[^0-9]/g, "");
-    const intlPhone = cleanPhone.startsWith("0")
-      ? "966" + cleanPhone.slice(1)
-      : cleanPhone.startsWith("966")
-        ? cleanPhone
-        : "966" + cleanPhone;
+    // تنسيق الرقم بشكل صحيح:
+    // - إذا بدأ بـ 00 أزل الأصفار (00966... تصبح 966...)
+    // - إذا بدأ ب**صفر واحد** فقط (سعودي محلي) أضف 966
+    // - إذا كان أقل من 7 أرقام فهو رقم محلي سعودي أضف 966
+    // - في جميع الحالات الأخرى احتفظ بالرقم كما هو (يحتوي على كود دولي)
+    let intlPhone: string;
+    if (cleanPhone.startsWith("00")) {
+      intlPhone = cleanPhone.slice(2); // أزل 00 واحتفظ بالباقي
+    } else if (cleanPhone.startsWith("0") && cleanPhone.length <= 10) {
+      intlPhone = "966" + cleanPhone.slice(1); // سعودي محلي
+    } else if (cleanPhone.length <= 9) {
+      intlPhone = "966" + cleanPhone; // رقم سعودي قصير بدون صفر
+    } else {
+      intlPhone = cleanPhone; // احتفظ بالرقم كما هو (يحتوي على كود دولي مثل 20 مصر أو 966 سعودي)
+    }
     const chatId = intlPhone + "@c.us";
 
     await session.client.sendMessage(chatId, message);
