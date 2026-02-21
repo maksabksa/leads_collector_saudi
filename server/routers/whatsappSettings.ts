@@ -381,6 +381,16 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+      // ===== الإرسال الفعلي عبر واتساب =====
+      const { sendWhatsAppMessage } = await import("../whatsappAutomation");
+      const sendResult = await sendWhatsAppMessage(input.phone, input.message, input.accountId);
+      if (!sendResult.success) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: sendResult.error ?? `فشل الإرسال عبر واتساب (${input.accountId}) - تأكد من ربط الحساب`,
+        });
+      }
+
       // البحث عن محادثة موجودة أو إنشاء جديدة
       let chatId = input.chatId;
       if (!chatId) {

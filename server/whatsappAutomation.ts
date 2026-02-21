@@ -211,10 +211,22 @@ export async function sendWhatsAppMessage(
   message: string,
   accountId = DEFAULT_ACCOUNT
 ): Promise<SendResult> {
-  const session = getSession(accountId);
+  let resolvedAccountId = accountId;
+  let session = getSession(accountId);
 
+  // إذا كان الحساب المطلوب غير متصل، ابحث عن أول حساب متصل
   if (session.status !== "connected" || !session.client) {
-    return { success: false, phone, error: `واتساب (${accountId}) غير متصل، يرجى ربط الحساب أولاً` };
+    let foundConnected = false;
+    sessions.forEach((s, id) => {
+      if (!foundConnected && s.status === "connected" && s.client) {
+        resolvedAccountId = id;
+        session = s;
+        foundConnected = true;
+      }
+    });
+    if (!foundConnected) {
+      return { success: false, phone, error: `لا يوجد حساب واتساب متصل. يرجى ربط حساب من صفحة واتساب أولاً` };
+    }
   }
 
   try {
