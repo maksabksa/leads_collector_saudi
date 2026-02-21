@@ -1,3 +1,6 @@
-2026/02/21-05:04:00.714 f8fd Reusing MANIFEST /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
-2026/02/21-05:04:00.722 f8fd Recovering log #3
-2026/02/21-05:04:00.727 f8fd Reusing old log /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb/000003.log 
+2026/02/21-06:49:59.546 116c3 Reusing MANIFEST /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
+2026/02/21-06:49:59.557 116c3 Recovering log #3
+2026/02/21-06:49:59.564 116c3 Reusing old log /home/ubuntu/leads_collector_saudi/.wwebjs_auth/session/Default/Local Storage/leveldb/000003.log 
+2026/02/21-06:51:00.753 116c3 Level-0 table #5: started
+2026/02/21-06:51:00.755 116c3 Level-0 table #5: 17858 bytes OK
+2026/02/21-06:51:00.756 116c3 Delete type=0 #3

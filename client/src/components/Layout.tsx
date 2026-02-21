@@ -32,7 +32,6 @@ const navItems = [
 
 const adminNavItems = [
   { path: "/users", label: "إدارة المستخدمين", icon: Shield },
-  { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
   { path: "/interest-keywords", label: "كشف الاهتمام", icon: Zap },
   { path: "/ai-settings", label: "إعدادات AI", icon: Brain },
 ];

@@ -1602,36 +1602,44 @@ ${input.salesAngle ? `زاوية البيع المقترحة: ${input.salesAngle
 
 // ===== WHATSAPP AUTOMATION ROUTER =====
 const whatsappAutomationRouter = router({
-  // جلب حالة الجلسة
-  status: protectedProcedure.query(async () => {
-    const { getSessionStatus } = await import("./whatsappAutomation");
-    return getSessionStatus();
+  // جلب حالة جلسة حساب معين
+  status: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .query(async ({ input }) => {
+      const { getSessionStatus } = await import("./whatsappAutomation");
+      return getSessionStatus(input?.accountId ?? "default");
+    }),
+  // جلب حالة جميع الحسابات
+  allStatus: protectedProcedure.query(async () => {
+    const { getAllSessionsStatus } = await import("./whatsappAutomation");
+    return getAllSessionsStatus();
   }),
-
-  // بدء جلسة واتساب (يفتح المتصفح ويعرض QR)
-  startSession: protectedProcedure.mutation(async () => {
-    const { startWhatsAppSession } = await import("./whatsappAutomation");
-    return startWhatsAppSession();
-  }),
-
-  // قطع الاتصال
-  disconnect: protectedProcedure.mutation(async () => {
-    const { disconnectWhatsApp } = await import("./whatsappAutomation");
-    await disconnectWhatsApp();
-    return { success: true };
-  }),
-
+  // بدء جلسة واتساب لحساب معين
+  startSession: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .mutation(async ({ input }) => {
+      const { startWhatsAppSession } = await import("./whatsappAutomation");
+      return startWhatsAppSession(input?.accountId ?? "default");
+    }),
+  // قطع الاتصال لحساب معين
+  disconnect: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .mutation(async ({ input }) => {
+      const { disconnectWhatsApp } = await import("./whatsappAutomation");
+      await disconnectWhatsApp(input?.accountId ?? "default");
+      return { success: true };
+    }),
   // إرسال رسالة لرقم واحد
   sendOne: protectedProcedure
     .input(z.object({
       phone: z.string(),
       message: z.string(),
       leadId: z.number().optional(),
+      accountId: z.string().default("default"),
     }))
     .mutation(async ({ input }) => {
       const { sendWhatsAppMessage } = await import("./whatsappAutomation");
-      const result = await sendWhatsAppMessage(input.phone, input.message);
-      // تسجيل في قاعدة البيانات إذا نجح
+      const result = await sendWhatsAppMessage(input.phone, input.message, input.accountId);
       if (result.success && input.leadId) {
         const db = await getDb();
         if (db) {
@@ -1647,7 +1655,6 @@ const whatsappAutomationRouter = router({
       }
       return result;
     }),
-
   // إرسال مجمع تلقائي
   sendBulk: protectedProcedure
     .input(z.object({
@@ -1657,11 +1664,12 @@ const whatsappAutomationRouter = router({
         leadId: z.number(),
         companyName: z.string(),
       })),
+      accountId: z.string().default("default"),
+      delayMs: z.number().default(10000),
     }))
     .mutation(async ({ input }) => {
       const { sendBulkMessages } = await import("./whatsappAutomation");
-      const results = await sendBulkMessages(input.messages);
-      // تسجيل النتائج في قاعدة البيانات
+      const results = await sendBulkMessages(input.messages, undefined, input.accountId, input.delayMs);
       const db = await getDb();
       if (db) {
         const { whatsappMessages } = await import("../drizzle/schema");

@@ -1,14 +1,13 @@
 /**
- * WhatsApp Web Automation Service
- * يستخدم whatsapp-web.js للتحكم الكامل في واتساب ويب
- * يولّد QR كـ Data URL ويرسل الرسائل مباشرة
+ * WhatsApp Web Automation Service - Multi-Account
+ * يدعم ربط أكثر من حساب واتساب في نفس الوقت
+ * كل حساب له client مستقل وجلسة مستقلة
  */
 
 import path from "path";
 
 const SESSION_DIR = path.join(process.cwd(), ".wwebjs_auth");
 
-// حالة الجلسة
 export type WaStatus =
   | "disconnected"
   | "qr_pending"
@@ -22,19 +21,42 @@ export type SendResult = {
   error?: string;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let client: any = null;
-let currentStatus: WaStatus = "disconnected";
-let qrDataUrl: string | null = null;
-let lastError: string | null = null;
-let isInitializing = false;
+// حالة كل حساب
+interface AccountSession {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any;
+  status: WaStatus;
+  qrDataUrl: string | null;
+  lastError: string | null;
+  isInitializing: boolean;
+}
 
-// إنشاء client جديد
-async function createClient() {
+// Map من accountId إلى جلسته
+const sessions = new Map<string, AccountSession>();
+
+// الحساب الافتراضي للتوافق مع الكود القديم
+const DEFAULT_ACCOUNT = "default";
+
+function getSession(accountId: string): AccountSession {
+  if (!sessions.has(accountId)) {
+    sessions.set(accountId, {
+      client: null,
+      status: "disconnected",
+      qrDataUrl: null,
+      lastError: null,
+      isInitializing: false,
+    });
+  }
+  return sessions.get(accountId)!;
+}
+
+// إنشاء client جديد لحساب معين
+async function createClient(accountId: string) {
   const wweb = await import("whatsapp-web.js");
   const { Client, LocalAuth } = (wweb.default || wweb) as typeof wweb.default;
   return new Client({
     authStrategy: new LocalAuth({
+      clientId: accountId, // كل حساب له مجلد جلسة منفصل
       dataPath: SESSION_DIR,
     }),
     puppeteer: {
@@ -62,112 +84,137 @@ async function generateQrDataUrl(qr: string): Promise<string> {
   });
 }
 
-// بدء جلسة واتساب
-export async function startWhatsAppSession(): Promise<{
+// بدء جلسة واتساب لحساب معين
+export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise<{
   status: WaStatus;
   qr?: string;
 }> {
-  if (isInitializing) {
-    return { status: currentStatus, qr: qrDataUrl || undefined };
+  const session = getSession(accountId);
+
+  if (session.isInitializing) {
+    return { status: session.status, qr: session.qrDataUrl || undefined };
   }
 
-  if (currentStatus === "connected" && client) {
+  if (session.status === "connected" && session.client) {
     return { status: "connected" };
   }
 
   try {
-    isInitializing = true;
-    currentStatus = "initializing";
-    qrDataUrl = null;
-    lastError = null;
+    session.isInitializing = true;
+    session.status = "initializing";
+    session.qrDataUrl = null;
+    session.lastError = null;
 
-    if (client) {
-      try { await client.destroy(); } catch { /* تجاهل */ }
-      client = null;
+    if (session.client) {
+      try { await session.client.destroy(); } catch { /* تجاهل */ }
+      session.client = null;
     }
 
-    client = await createClient();
+    session.client = await createClient(accountId);
 
-    client.on("qr", async (qr: string) => {
+    session.client.on("qr", async (qr: string) => {
       try {
-        qrDataUrl = await generateQrDataUrl(qr);
-        currentStatus = "qr_pending";
-        isInitializing = false;
+        session.qrDataUrl = await generateQrDataUrl(qr);
+        session.status = "qr_pending";
+        session.isInitializing = false;
       } catch (e) {
-        console.error("QR generation error:", e);
+        console.error(`[${accountId}] QR generation error:`, e);
       }
     });
 
-    client.on("ready", () => {
-      currentStatus = "connected";
-      qrDataUrl = null;
-      isInitializing = false;
+    session.client.on("ready", () => {
+      session.status = "connected";
+      session.qrDataUrl = null;
+      session.isInitializing = false;
     });
 
-    client.on("authenticated", () => {
-      currentStatus = "connected";
-      qrDataUrl = null;
-      isInitializing = false;
+    session.client.on("authenticated", () => {
+      session.status = "connected";
+      session.qrDataUrl = null;
+      session.isInitializing = false;
     });
 
-    client.on("auth_failure", (msg: string) => {
-      currentStatus = "error";
-      lastError = "فشل المصادقة: " + msg;
-      isInitializing = false;
+    session.client.on("auth_failure", (msg: string) => {
+      session.status = "error";
+      session.lastError = "فشل المصادقة: " + msg;
+      session.isInitializing = false;
     });
 
-    client.on("disconnected", () => {
-      currentStatus = "disconnected";
-      qrDataUrl = null;
-      isInitializing = false;
+    session.client.on("disconnected", () => {
+      session.status = "disconnected";
+      session.qrDataUrl = null;
+      session.isInitializing = false;
     });
 
-    client.initialize().catch((err: Error) => {
+    session.client.initialize().catch((err: Error) => {
       if (!err.message.includes("Target closed")) {
-        currentStatus = "error";
-        lastError = err.message;
+        session.status = "error";
+        session.lastError = err.message;
       }
-      isInitializing = false;
+      session.isInitializing = false;
     });
 
     // انتظر حتى يظهر QR أو يتصل (حد أقصى 40 ثانية)
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 2000));
-      const s = currentStatus as string;
+      const s = session.status as string;
       if (s === "qr_pending" || s === "connected") break;
       if (s === "error") return { status: "error" as WaStatus };
     }
 
-    return { status: currentStatus, qr: qrDataUrl || undefined };
+    return { status: session.status, qr: session.qrDataUrl || undefined };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    currentStatus = "error";
-    lastError = message;
-    isInitializing = false;
+    session.status = "error";
+    session.lastError = message;
+    session.isInitializing = false;
     return { status: "error" };
   }
 }
 
-// جلب حالة الجلسة الحالية
-export async function getSessionStatus(): Promise<{
+// جلب حالة جلسة حساب معين
+export async function getSessionStatus(accountId = DEFAULT_ACCOUNT): Promise<{
   status: WaStatus;
   qr?: string;
   error?: string;
 }> {
+  const session = getSession(accountId);
   return {
-    status: currentStatus,
-    qr: qrDataUrl || undefined,
-    error: lastError || undefined,
+    status: session.status,
+    qr: session.qrDataUrl || undefined,
+    error: session.lastError || undefined,
   };
 }
 
-// إرسال رسالة لرقم واحد
+// جلب حالة جميع الحسابات
+export function getAllSessionsStatus(): Array<{
+  accountId: string;
+  status: WaStatus;
+  qr?: string;
+  error?: string;
+}> {
+  const result: Array<{ accountId: string; status: WaStatus; qr?: string; error?: string }> = [];
+  sessions.forEach((session, accountId) => {
+    result.push({
+      accountId,
+      status: session.status,
+      qr: session.qrDataUrl || undefined,
+      error: session.lastError || undefined,
+    });
+  });
+  return result;
+}
+
+// إرسال رسالة لرقم واحد عبر حساب معين
 export async function sendWhatsAppMessage(
   phone: string,
-  message: string
+  message: string,
+  accountId = DEFAULT_ACCOUNT
 ): Promise<SendResult> {
-  if (currentStatus !== "connected" || !client) {
-    return { success: false, phone, error: "واتساب غير متصل، يرجى ربط الحساب أولاً" };
+  const session = getSession(accountId);
+
+  if (session.status !== "connected" || !session.client) {
+    return { success: false, phone, error: `واتساب (${accountId}) غير متصل، يرجى ربط الحساب أولاً` };
   }
 
   try {
@@ -179,7 +226,7 @@ export async function sendWhatsAppMessage(
         : "966" + cleanPhone;
     const chatId = intlPhone + "@c.us";
 
-    await client.sendMessage(chatId, message);
+    await session.client.sendMessage(chatId, message);
     return { success: true, phone };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -195,18 +242,20 @@ export async function sendBulkMessages(
     leadId: number;
     companyName: string;
   }>,
-  onProgress?: (index: number, result: SendResult) => void
+  onProgress?: (index: number, result: SendResult) => void,
+  accountId = DEFAULT_ACCOUNT,
+  delayMs = 10000
 ): Promise<SendResult[]> {
   const results: SendResult[] = [];
 
   for (let i = 0; i < messages.length; i++) {
     const { phone, message } = messages[i];
-    const result = await sendWhatsAppMessage(phone, message);
+    const result = await sendWhatsAppMessage(phone, message, accountId);
     results.push(result);
     if (onProgress) onProgress(i, result);
 
     if (i < messages.length - 1) {
-      const delay = 10000 + Math.random() * 2000; // 10-12 ثانية بين كل رسالة
+      const delay = delayMs + Math.random() * 2000; // تأخير + 0-2 ثانية عشوائية
       await new Promise((r) => setTimeout(r, delay));
     }
   }
@@ -214,15 +263,25 @@ export async function sendBulkMessages(
   return results;
 }
 
-// قطع الاتصال
-export async function disconnectWhatsApp(): Promise<void> {
-  isInitializing = false;
+// قطع الاتصال لحساب معين
+export async function disconnectWhatsApp(accountId = DEFAULT_ACCOUNT): Promise<void> {
+  const session = getSession(accountId);
+  session.isInitializing = false;
   try {
-    if (client) {
-      await client.destroy();
-      client = null;
+    if (session.client) {
+      await session.client.destroy();
+      session.client = null;
     }
   } catch { /* تجاهل */ }
-  currentStatus = "disconnected";
-  qrDataUrl = null;
+  session.status = "disconnected";
+  session.qrDataUrl = null;
+}
+
+// قطع الاتصال لجميع الحسابات
+export async function disconnectAll(): Promise<void> {
+  const accountIds: string[] = [];
+  sessions.forEach((_, accountId) => accountIds.push(accountId));
+  for (const accountId of accountIds) {
+    await disconnectWhatsApp(accountId);
+  }
 }

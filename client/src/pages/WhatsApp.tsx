@@ -15,8 +15,16 @@ import { Switch } from "@/components/ui/switch";
 import {
   MessageCircle, Wifi, WifiOff, QrCode, Send, Users, FileText,
   Plus, Trash2, Edit, Loader2, Sparkles, CheckCircle, RefreshCw,
-  Play, Square, Copy, ChevronDown, ChevronUp, Settings, Bell, Bot, Tag
+  Play, Square, Copy, ChevronDown, ChevronUp, Settings, Bell, Bot, Tag,
+  Smartphone, Pencil, Zap, UserCheck, Layers, AlertTriangle, ExternalLink
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 
 // ===== مكون حالة الاتصال =====
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -55,8 +63,16 @@ export default function WhatsApp() {
   const [newRule, setNewRule] = useState({ keywords: "", template: "", useAI: false, aiContext: "" });
   const [showNewRule, setShowNewRule] = useState(false);
   const [editingRule, setEditingRule] = useState<any | null>(null);
+  // ===== حسابات واتساب المتعددة =====
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any | null>(null);
+  const [deleteAccountTarget, setDeleteAccountTarget] = useState<{ id: number; label: string } | null>(null);
+  const [accountForm, setAccountForm] = useState({ label: "", phoneNumber: "", role: "bulk_sender" as "bulk_sender" | "human_handoff" | "both", assignedEmployee: "", notes: "", sortOrder: 0 });
   // ===== Queries =====
   const { data: statusData, refetch: refetchStatus } = trpc.wauto.status.useQuery(undefined, { refetchInterval: 3000 });
+  const { data: allSessionsData, refetch: refetchAllSessions } = trpc.wauto.allStatus.useQuery(undefined, { refetchInterval: 5000 });
+  const { data: accounts = [], refetch: refetchAccounts } = trpc.waAccounts.listAccounts.useQuery();
+  const { data: pendingAlerts = [], refetch: refetchAlerts } = trpc.waAccounts.listAlerts.useQuery({ status: "pending" });
   const { data: leads } = trpc.leads.list.useQuery({});
   const { data: templates, refetch: refetchTemplates } = trpc.whatsapp.listTemplates.useQuery();
   const { data: waSettings, refetch: refetchSettings } = trpc.waSettings.getSettings.useQuery({ accountId: "default" });
@@ -124,6 +140,46 @@ export default function WhatsApp() {
     onSuccess: () => { toast.success("تم حذف القاعدة"); refetchRules(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+  // ===== mutations الحسابات =====
+  const addAccount = trpc.waAccounts.addAccount.useMutation({
+    onSuccess: () => { toast.success("تم إضافة الحساب"); refetchAccounts(); setShowAddAccount(false); setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 }); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const updateAccount = trpc.waAccounts.updateAccount.useMutation({
+    onSuccess: () => { toast.success("تم تحديث الحساب"); refetchAccounts(); setEditingAccount(null); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const deleteAccount = trpc.waAccounts.deleteAccount.useMutation({
+    onSuccess: () => { toast.success("تم حذف الحساب"); refetchAccounts(); setDeleteAccountTarget(null); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const toggleAccountActive = trpc.waAccounts.updateAccount.useMutation({
+    onSuccess: () => refetchAccounts(),
+    onError: (e: any) => toast.error("خطأ", { description: e.message }),
+  });
+  const transferToHuman = trpc.waAccounts.transferToHuman.useMutation({
+    onSuccess: () => { toast.success("تم التحويل بنجاح"); refetchAlerts(); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const startAccountSession = trpc.wauto.startSession.useMutation({
+    onSuccess: (_, vars) => { toast.success("جاري تهيئة الحساب..."); refetchAllSessions(); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const disconnectAccount = trpc.wauto.disconnect.useMutation({
+    onSuccess: () => { toast.success("تم قطع الاتصال"); refetchAllSessions(); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const ROLE_LABELS: Record<string, { label: string; color: string; icon: React.ElementType; desc: string }> = {
+    bulk_sender: { label: "إرسال جماعي", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: Zap, desc: "مخصص لإرسال الرسائل الجماعية للعملاء" },
+    human_handoff: { label: "تحويل للموظف", color: "bg-green-500/20 text-green-400 border-green-500/30", icon: UserCheck, desc: "مخصص لاستقبال العملاء المهتمين وإتمام البيع" },
+    both: { label: "إرسال + تحويل", color: "bg-purple-500/20 text-purple-400 border-purple-500/30", icon: Layers, desc: "يقوم بالإرسال الجماعي وتحويل العملاء المهتمين" },
+  };
+  const handoffAccounts = (accounts as any[]).filter((a) => a.role === "human_handoff" || a.role === "both");
+  const handleAccountSave = () => {
+    const payload = { ...accountForm, assignedEmployee: accountForm.assignedEmployee || undefined, notes: accountForm.notes || undefined };
+    if (editingAccount) updateAccount.mutate({ id: editingAccount.id, ...payload });
+    else addAccount.mutate(payload);
+  };
 
   const status = statusData?.status ?? "disconnected";
   const qrCode = statusData?.qr;
@@ -220,24 +276,181 @@ export default function WhatsApp() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-            <TabsTrigger value="connect" className="flex items-center gap-2">
+          <TabsList className="grid grid-cols-5 w-full">
+            <TabsTrigger value="accounts" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <Smartphone className="w-4 h-4" />
+              الحسابات
+              {(pendingAlerts as any[]).length > 0 && (
+                <span className="bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{(pendingAlerts as any[]).length}</span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="connect" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Wifi className="w-4 h-4" />
               الربط
             </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-2">
+            <TabsTrigger value="templates" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <FileText className="w-4 h-4" />
               القوالب
             </TabsTrigger>
-            <TabsTrigger value="send" className="flex items-center gap-2">
+            <TabsTrigger value="send" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Send className="w-4 h-4" />
               الإرسال
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
+            <TabsTrigger value="settings" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Settings className="w-4 h-4" />
               الإعدادات
             </TabsTrigger>
           </TabsList>
+
+          {/* ===== تبويب الحسابات ===== */}
+          <TabsContent value="accounts" className="mt-6 space-y-6">
+            {/* رأس التبويب */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">حسابات واتساب</h2>
+                <p className="text-sm text-muted-foreground">أضف حسابات متعددة وحدد دور كل حساب — إرسال جماعي أو تحويل للموظف</p>
+              </div>
+              <Button onClick={() => { setEditingAccount(null); setAccountForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 }); setShowAddAccount(true); }}>
+                <Plus className="w-4 h-4 ml-2" />إضافة حساب
+              </Button>
+            </div>
+
+            {/* بطاقات الحسابات مع حالة الاتصال */}
+            {(accounts as any[]).length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-12 text-center">
+                  <Smartphone className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
+                  <p className="text-muted-foreground">لم تضف أي حساب بعد</p>
+                  <p className="text-sm text-muted-foreground/60 mt-1">اضغط "إضافة حساب" للبدء</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(accounts as any[]).map((account: any) => {
+                  const roleInfo = ROLE_LABELS[account.role] || ROLE_LABELS.bulk_sender;
+                  const RoleIcon = roleInfo.icon;
+                  const sessionInfo = (allSessionsData as any[] | undefined)?.find((s: any) => s.accountId === account.accountId);
+                  const sessionStatus = sessionInfo?.status ?? "disconnected";
+                  const sessionQr = sessionInfo?.qr;
+                  const isAccConnected = sessionStatus === "connected";
+                  const isAccQrPending = sessionStatus === "qr_pending";
+                  const isAccInitializing = sessionStatus === "initializing";
+                  return (
+                    <Card key={account.id} className={`transition-all ${ account.isActive ? "border-border" : "border-border/40 opacity-60" }`}>
+                      <CardContent className="p-5 space-y-4">
+                        {/* رأس البطاقة */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${ isAccConnected ? "bg-green-500/20" : "bg-muted" }`}>
+                              <Smartphone className={`w-5 h-5 ${ isAccConnected ? "text-green-400" : "text-muted-foreground" }`} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold truncate">{account.label}</p>
+                              <p className="text-xs text-muted-foreground font-mono" dir="ltr">{account.phoneNumber}</p>
+                            </div>
+                          </div>
+                          <Switch checked={account.isActive} onCheckedChange={(v) => toggleAccountActive.mutate({ id: account.id, isActive: v })} />
+                        </div>
+                        {/* الدور */}
+                        <div className="flex items-center gap-2">
+                          <Badge className={`${roleInfo.color} border text-xs flex items-center gap-1`}>
+                            <RoleIcon className="w-3 h-3" />{roleInfo.label}
+                          </Badge>
+                          {account.assignedEmployee && (
+                            <Badge variant="outline" className="text-xs">
+                              <UserCheck className="w-3 h-3 ml-1" />{account.assignedEmployee}
+                            </Badge>
+                          )}
+                        </div>
+                        {/* حالة الاتصال */}
+                        <div className="space-y-2">
+                          <StatusBadge status={sessionStatus} />
+                          {isAccInitializing && (
+                            <div className="text-center py-2">
+                              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                              <p className="text-xs text-muted-foreground mt-1">جاري التهيئة...</p>
+                            </div>
+                          )}
+                          {isAccQrPending && sessionQr && (
+                            <div className="text-center space-y-2">
+                              <p className="text-xs text-muted-foreground">امسح الرمز بواتساب</p>
+                              <div className="bg-white p-2 rounded-lg inline-block">
+                                <img src={sessionQr} alt="QR" className="w-32 h-32" />
+                              </div>
+                            </div>
+                          )}
+                          {isAccConnected && (
+                            <div className="flex items-center gap-2 py-1 px-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                              <CheckCircle className="w-4 h-4 text-green-500" />
+                              <span className="text-xs text-green-400">متصل بنجاح</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* أزرار */}
+                        <div className="flex gap-2">
+                          {!isAccConnected && !isAccInitializing && !isAccQrPending && (
+                            <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => startAccountSession.mutate({ accountId: account.accountId })} disabled={startAccountSession.isPending}>
+                              <Play className="w-3 h-3 ml-1" />ربط
+                            </Button>
+                          )}
+                          {(isAccConnected || isAccQrPending || isAccInitializing) && (
+                            <Button size="sm" variant="outline" className="flex-1 h-8 text-xs text-red-400 border-red-500/30" onClick={() => disconnectAccount.mutate({ accountId: account.accountId })} disabled={disconnectAccount.isPending}>
+                              <Square className="w-3 h-3 ml-1" />قطع
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setEditingAccount(account); setAccountForm({ label: account.label, phoneNumber: account.phoneNumber, role: account.role, assignedEmployee: account.assignedEmployee || "", notes: account.notes || "", sortOrder: account.sortOrder }); setShowAddAccount(true); }}>
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => setDeleteAccountTarget({ id: account.id, label: account.label })}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* إشعارات الاهتمام */}
+            {(pendingAlerts as any[]).length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  عملاء مهتمون ({(pendingAlerts as any[]).length})
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(pendingAlerts as any[]).map((alert: any) => (
+                    <Card key={alert.id} className="border-amber-500/30 bg-amber-500/5">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium">{alert.contactName || alert.phone}</p>
+                            <p className="text-xs text-muted-foreground font-mono" dir="ltr">{alert.phone}</p>
+                          </div>
+                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 border text-xs">
+                            اهتمام {alert.interestScore}%
+                          </Badge>
+                        </div>
+                        {alert.triggerMessage && (
+                          <p className="text-xs bg-muted/40 rounded p-2 text-muted-foreground line-clamp-2">{alert.triggerMessage}</p>
+                        )}
+                        {handoffAccounts.length > 0 && (
+                          <div className="flex gap-2">
+                            {handoffAccounts.map((acc: any) => (
+                              <Button key={acc.accountId} size="sm" className="flex-1 h-8 text-xs" onClick={() => transferToHuman.mutate({ alertId: alert.id, handoffAccountId: acc.accountId })} disabled={transferToHuman.isPending}>
+                                <ExternalLink className="w-3 h-3 ml-1" />{acc.assignedEmployee || acc.label}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
 
           {/* ===== تبويب الربط ===== */}
           <TabsContent value="connect" className="mt-6">
@@ -793,6 +1006,68 @@ export default function WhatsApp() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* ===== Dialog إضافة/تعديل حساب ===== */}
+      <Dialog open={showAddAccount} onOpenChange={(v) => { setShowAddAccount(v); if (!v) setEditingAccount(null); }}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>{editingAccount ? "تعديل الحساب" : "إضافة حساب واتساب"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>اسم الحساب *</Label>
+              <Input placeholder="مثال: واتساب المبيعات" value={accountForm.label} onChange={e => setAccountForm(f => ({ ...f, label: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>رقم الهاتف (مع كود الدولة) *</Label>
+              <Input placeholder="+966501234567" dir="ltr" value={accountForm.phoneNumber} onChange={e => setAccountForm(f => ({ ...f, phoneNumber: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>دور الحساب</Label>
+              <Select value={accountForm.role} onValueChange={(v: any) => setAccountForm(f => ({ ...f, role: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bulk_sender">إرسال جماعي</SelectItem>
+                  <SelectItem value="human_handoff">تحويل للموظف</SelectItem>
+                  <SelectItem value="both">إرسال + تحويل</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{ROLE_LABELS[accountForm.role]?.desc}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>اسم الموظف المسؤول (اختياري)</Label>
+              <Input placeholder="مثال: أحمد محمد" value={accountForm.assignedEmployee} onChange={e => setAccountForm(f => ({ ...f, assignedEmployee: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>ملاحظات (اختياري)</Label>
+              <Textarea placeholder="أي معلومات إضافية..." rows={2} value={accountForm.notes} onChange={e => setAccountForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddAccount(false)}>إلغاء</Button>
+            <Button onClick={handleAccountSave} disabled={!accountForm.label || !accountForm.phoneNumber || addAccount.isPending || updateAccount.isPending}>
+              {(addAccount.isPending || updateAccount.isPending) ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+              {editingAccount ? "حفظ التعديلات" : "إضافة الحساب"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== AlertDialog تأكيد حذف الحساب ===== */}
+      <AlertDialog open={!!deleteAccountTarget} onOpenChange={() => setDeleteAccountTarget(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد حذف الحساب</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف حساب "{deleteAccountTarget?.label}"? لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => deleteAccountTarget && deleteAccount.mutate({ id: deleteAccountTarget.id })}>حذف</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
