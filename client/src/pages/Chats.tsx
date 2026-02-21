@@ -244,10 +244,16 @@ export default function Chats() {
     }
   );
   const { data: waAccounts = [] } = trpc.waAccounts.listAccounts.useQuery();
+  const utils = trpc.useUtils();
 
   // ===== Mutations =====
   const sendMessage = trpc.waSettings.sendChatMessage.useMutation({
-    onSuccess: () => setNewMessage(""),
+    onSuccess: () => {
+      setNewMessage("");
+      // إعادة جلب الرسائل فوراً
+      utils.waSettings.getChatMessages.invalidate({ chatId: selectedChatId ?? 0 });
+      utils.waSettings.listChats.invalidate();
+    },
     onError: (err) => toast.error("فشل الإرسال", { description: err.message }),
   });
   const archiveChat = trpc.waSettings.archiveChat.useMutation();
