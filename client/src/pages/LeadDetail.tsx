@@ -67,12 +67,20 @@ export default function LeadDetail() {
   const updateWaStatus = trpc.whatsapp.updateStatus.useMutation();
   const generateWaMessage = trpc.whatsapp.generateMessage.useMutation();
   const logWaMessage = trpc.whatsapp.logMessage.useMutation();
+  const sendOneWa = trpc.wauto.sendOne.useMutation();
+  const { data: allSessionsData } = trpc.wauto.allStatus.useQuery(undefined, { refetchInterval: 5000 });
+  const [waSending, setWaSending] = useState(false);
+
+  // أول حساب متصل
+  const connectedSession = ((allSessionsData as any[]) ?? []).find((s: any) => s.status === "connected");
+  const isWaConnected = !!connectedSession;
 
   const handleCheckWhatsapp = async () => {
     if (!lead.verifiedPhone) { toast.error("لا يوجد رقم هاتف لهذا العميل"); return; }
-    const result = await checkWhatsapp.mutateAsync({ leadId: id, phone: lead.verifiedPhone });
-    window.open(result.waUrl, "_blank");
-    toast.info("تم فتح واتساب - حدد الحالة بعد التحقق");
+    // فتح wa.me للتحقق فقط (ليس للإرسال)
+    const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+    window.open(`https://wa.me/${phone}`, "_blank");
+    toast.info("تم فتح واتساب للتحقق - حدد الحالة بعد التحقق");
   };
 
   const handleGenerateWaMessage = async () => {
@@ -97,10 +105,31 @@ export default function LeadDetail() {
   const handleSendWhatsapp = async () => {
     if (!lead.verifiedPhone || !waMessage) return;
     const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
-    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`;
-    window.open(waUrl, "_blank");
-    await logWaMessage.mutateAsync({ leadId: id, phone, message: waMessage, messageType: "individual" });
-    toast.success("تم فتح واتساب مع الرسالة");
+    if (isWaConnected && connectedSession) {
+      // إرسال عبر النظام الداخلي
+      setWaSending(true);
+      try {
+        await sendOneWa.mutateAsync({
+          phone,
+          message: waMessage,
+          leadId: id,
+          accountId: connectedSession.accountId,
+        });
+        await logWaMessage.mutateAsync({ leadId: id, phone, message: waMessage, messageType: "individual" });
+        toast.success("تم إرسال الرسالة عبر واتساب بنجاح");
+        setWaMessage("");
+      } catch (e: any) {
+        toast.error("فشل الإرسال", { description: e.message });
+      } finally {
+        setWaSending(false);
+      }
+    } else {
+      // لا يوجد اتصال - فتح wa.me كبديل
+      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`;
+      window.open(waUrl, "_blank");
+      await logWaMessage.mutateAsync({ leadId: id, phone, message: waMessage, messageType: "individual" });
+      toast.info("تم فتح واتساب خارجياً (لا يوجد حساب متصل في النظام)");
+    }
   };
 
   if (isLoading) {
@@ -311,12 +340,17 @@ export default function LeadDetail() {
                     </button>
                   ))}
                 </div>
-                {/* Open WA direct */}
-                <button onClick={handleCheckWhatsapp} disabled={checkWhatsapp.isPending}
+                {/* حالة الاتصال */}
+                <div className="flex items-center gap-1.5 py-1 px-2 rounded-lg text-xs" style={isWaConnected ? { background: "oklch(0.55 0.2 145 / 0.1)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.2)" } : { background: "oklch(0.18 0.02 240)", color: "oklch(0.5 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: isWaConnected ? "oklch(0.65 0.2 145)" : "oklch(0.55 0.22 25)" }} />
+                  {isWaConnected ? `متصل — الإرسال عبر النظام` : "غير متصل — سيفتح واتساب خارجياً"}
+                </div>
+                {/* Open WA direct - للتحقق فقط */}
+                <button onClick={handleCheckWhatsapp}
                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-medium transition-all"
-                  style={{ background: "oklch(0.55 0.2 145 / 0.12)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.25)" }}>
-                  {checkWhatsapp.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
-                  فتح واتساب مباشرة
+                  style={{ background: "oklch(0.15 0.015 240)", color: "oklch(0.55 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
+                  <MessageCircle className="w-3 h-3" />
+                  فتح واتساب للتحقق فقط
                 </button>
                 {/* Message generator */}
                 <div className="space-y-2">
@@ -345,10 +379,11 @@ export default function LeadDetail() {
                           style={{ background: "oklch(0.15 0.015 240)", color: "oklch(0.6 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
                           <Copy className="w-3 h-3" /> نسخ
                         </button>
-                        <button onClick={handleSendWhatsapp}
+                        <button onClick={handleSendWhatsapp} disabled={waSending}
                           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                          style={{ background: "oklch(0.55 0.2 145)", color: "white" }}>
-                          <Send className="w-3 h-3" /> إرسال عبر واتساب
+                          style={{ background: "oklch(0.55 0.2 145)", color: "white", opacity: waSending ? 0.7 : 1 }}>
+                          {waSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                          {isWaConnected ? "إرسال عبر النظام" : "فتح واتساب"}
                         </button>
                       </div>
                     </>
