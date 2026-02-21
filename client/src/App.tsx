@@ -26,6 +26,7 @@ import WhatsAppAccounts from "./pages/WhatsAppAccounts";
 import InterestKeywords from "./pages/InterestKeywords";
 import Segments from "./pages/Segments";
 import DataSettings from "./pages/DataSettings";
+import BulkImport from "./pages/BulkImport";
 function Router() {
   return (
     <Layout>
@@ -51,6 +52,7 @@ function Router() {
         <Route path="/interest-keywords" component={InterestKeywords} />
           <Route path="/segments" component={Segments} />
           <Route path="/data-settings" component={DataSettings} />
+        <Route path="/bulk-import" component={BulkImport} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

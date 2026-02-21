@@ -150,6 +150,12 @@ export const aiSettingsRouter = router({
         globalAutoReplyEnabled: z.boolean().optional(),
         temperature: z.number().min(0).max(2).default(0.7),
         maxTokens: z.number().min(50).max(4000).default(500),
+        analysisStyle: z.enum(["balanced", "aggressive", "conservative", "detailed"]).optional(),
+        analysisPrompt: z.string().optional(),
+        messageTemplate: z.string().optional(),
+        brandTone: z.enum(["professional", "friendly", "formal", "casual"]).optional(),
+        countryContext: z.enum(["saudi", "gulf", "arabic", "international"]).optional(),
+        dialect: z.enum(["gulf", "egyptian", "levantine", "msa"]).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -166,6 +172,12 @@ export const aiSettingsRouter = router({
         businessContext: input.businessContext ?? null,
         temperature: input.temperature,
         maxTokens: input.maxTokens,
+        analysisStyle: input.analysisStyle ?? "balanced",
+        analysisPrompt: input.analysisPrompt ?? null,
+        messageTemplate: input.messageTemplate ?? null,
+        brandTone: input.brandTone ?? "professional",
+        countryContext: input.countryContext ?? "saudi",
+        dialect: input.dialect ?? "gulf",
       };
 
       // تحديث globalAutoReplyEnabled فقط إذا أُرسل

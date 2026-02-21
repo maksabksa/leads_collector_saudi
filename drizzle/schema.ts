@@ -20,6 +20,7 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  defaultWhatsappAccountId: varchar("defaultWhatsappAccountId", { length: 64 }), // حساب واتساب الافتراضي للموظف
 });
 
 export type User = typeof users.$inferSelect;
@@ -305,6 +306,15 @@ export const aiSettings = mysqlTable("ai_settings", {
   globalAutoReplyEnabled: boolean("globalAutoReplyEnabled").default(false).notNull(), // master switch
   temperature: float("temperature").default(0.7).notNull(),
   maxTokens: int("maxTokens").default(500).notNull(),
+  // تحكم في أسلوب التحليل
+  analysisStyle: varchar("analysisStyle", { length: 50 }).default("balanced"), // balanced | aggressive | conservative | detailed
+  analysisPrompt: text("analysisPrompt"), // برومبت مخصص لتحليل العملاء
+  // صيغة الرسائل
+  messageTemplate: text("messageTemplate"), // قالب الرسالة الافتراضي
+  brandTone: varchar("brandTone", { length: 50 }).default("professional"), // professional | friendly | formal | casual
+  // هوية البلد
+  countryContext: varchar("countryContext", { length: 50 }).default("saudi"), // saudi | gulf | arabic | international
+  dialect: varchar("dialect", { length: 50 }).default("gulf"), // gulf | egyptian | levantine | msa
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -19,6 +19,7 @@ import {
   Smartphone,
   Layers,
   Settings2,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -38,6 +39,7 @@ const adminNavItems = [
   { path: "/segments", label: "شرائح العملاء", icon: Layers },
   { path: "/ai-settings", label: "إعدادات AI", icon: Brain },
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
+  { path: "/bulk-import", label: "رفع جماعي (Excel)", icon: FileSpreadsheet },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

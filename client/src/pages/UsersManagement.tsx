@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Users, UserPlus, Mail, Shield, Trash2, Copy, CheckCircle, Clock, XCircle, RefreshCw } from "lucide-react";
+import { Users, UserPlus, Mail, Shield, Trash2, Copy, CheckCircle, Clock, XCircle, RefreshCw, Smartphone } from "lucide-react";
 
 const PERMISSIONS_LABELS: Record<string, string> = {
   "leads.view": "عرض العملاء",
@@ -41,12 +41,13 @@ export default function UsersManagement() {
   const [inviteRole, setInviteRole] = useState<"user" | "admin">("user");
   const [invitePermissions, setInvitePermissions] = useState<string[]>(["leads.view", "search.use"]);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<{ id: number; permissions: string[]; role: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ id: number; permissions: string[]; role: string; defaultWhatsappAccountId?: string | null } | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
   const { data: invitations, isLoading: loadingInvitations } = trpc.invitations.listInvitations.useQuery();
   const { data: allUsers, isLoading: loadingUsers } = trpc.invitations.listUsers.useQuery();
+  const { data: waAccounts } = trpc.waAccounts.listAccounts.useQuery();
 
   const sendInvitation = trpc.invitations.sendInvitation.useMutation({
     onSuccess: (data) => {
@@ -75,6 +76,13 @@ export default function UsersManagement() {
       setEditingUser(null);
       utils.invitations.listUsers.invalidate();
     },
+  });
+
+  const setDefaultWa = trpc.invitations.setDefaultWhatsappAccount.useMutation({
+    onSuccess: () => {
+      utils.invitations.listUsers.invalidate();
+    },
+    onError: (err) => toast.error("خطأ في تعيين الحساب", { description: err.message }),
   });
 
   const togglePermission = (perm: string, current: string[], setter: (p: string[]) => void) => {
@@ -208,54 +216,89 @@ export default function UsersManagement() {
             <div className="text-center py-8 text-muted-foreground">جاري التحميل...</div>
           ) : (
             <div className="space-y-3">
-              {allUsers?.map((u) => (
-                <Card key={u.id} className="border-border/50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                          {(u.name || u.email || "?")[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium">{u.name || "بدون اسم"}</p>
-                          <p className="text-sm text-muted-foreground">{u.email || "بدون إيميل"}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-xs">
-                              {u.role === "admin" ? "مدير" : "مستخدم"}
-                            </Badge>
-                            {(u as { permissions?: string[] }).permissions?.slice(0, 3).map((p) => (
-                              <Badge key={p} variant="outline" className="text-xs">
-                                {PERMISSIONS_LABELS[p] || p}
+              {allUsers?.map((u) => {
+                const userWaAccount = waAccounts?.find(a => a.accountId === (u as any).defaultWhatsappAccountId);
+                return (
+                  <Card key={u.id} className="border-border/50">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
+                            {(u.name || u.email || "?")[0].toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium">{u.name || "بدون اسم"}</p>
+                            <p className="text-sm text-muted-foreground">{u.email || "بدون إيميل"}</p>
+                            <div className="flex items-center flex-wrap gap-2 mt-1">
+                              <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-xs">
+                                {u.role === "admin" ? "مدير" : "مستخدم"}
                               </Badge>
-                            ))}
-                            {((u as { permissions?: string[] }).permissions?.length || 0) > 3 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{((u as { permissions?: string[] }).permissions?.length || 0) - 3}
-                              </Badge>
+                              {(u as { permissions?: string[] }).permissions?.slice(0, 3).map((p) => (
+                                <Badge key={p} variant="outline" className="text-xs">
+                                  {PERMISSIONS_LABELS[p] || p}
+                                </Badge>
+                              ))}
+                              {((u as { permissions?: string[] }).permissions?.length || 0) > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{((u as { permissions?: string[] }).permissions?.length || 0) - 3}
+                                </Badge>
+                              )}
+                            </div>
+                            {/* حساب واتساب الافتراضي */}
+                            {waAccounts && waAccounts.length > 0 && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <Smartphone className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                                <span className="text-xs text-muted-foreground">واتساب الإرسال:</span>
+                                <Select
+                                  value={(u as any).defaultWhatsappAccountId || "none"}
+                                  onValueChange={(val) => {
+                                    setDefaultWa.mutate({
+                                      userId: u.id,
+                                      accountId: val === "none" ? null : val,
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="h-7 text-xs w-44 border-dashed">
+                                    <SelectValue placeholder="غير محدد" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">غير محدد (الافتراضي)</SelectItem>
+                                    {waAccounts.map(acc => (
+                                      <SelectItem key={acc.accountId} value={acc.accountId}>
+                                        {acc.label} — {acc.phoneNumber || acc.accountId}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {userWaAccount && (
+                                  <span className="text-xs text-green-500">✓ {userWaAccount.label}</span>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
+                        {u.id !== user?.id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setEditingUser({
+                                id: u.id,
+                                permissions: (u as { permissions?: string[] }).permissions || [],
+                                role: u.role,
+                                defaultWhatsappAccountId: (u as any).defaultWhatsappAccountId,
+                              })
+                            }
+                          >
+                            <Shield className="h-4 w-4 ml-1" />
+                            تعديل الصلاحيات
+                          </Button>
+                        )}
                       </div>
-                      {u.id !== user?.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setEditingUser({
-                              id: u.id,
-                              permissions: (u as { permissions?: string[] }).permissions || [],
-                              role: u.role,
-                            })
-                          }
-                        >
-                          <Shield className="h-4 w-4 ml-1" />
-                          تعديل الصلاحيات
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
@@ -358,6 +401,34 @@ export default function UsersManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              {/* حساب واتساب الافتراضي في نافذة التعديل */}
+              {waAccounts && waAccounts.length > 0 && (
+                <div>
+                  <Label className="mb-2 block flex items-center gap-2">
+                    <Smartphone className="h-4 w-4 text-green-500" />
+                    حساب واتساب الإرسال الافتراضي
+                  </Label>
+                  <Select
+                    value={editingUser.defaultWhatsappAccountId || "none"}
+                    onValueChange={(v) => setEditingUser({ ...editingUser, defaultWhatsappAccountId: v === "none" ? null : v })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="غير محدد" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">غير محدد (الافتراضي للنظام)</SelectItem>
+                      {waAccounts.map(acc => (
+                        <SelectItem key={acc.accountId} value={acc.accountId}>
+                          {acc.label} — {acc.phoneNumber || acc.accountId}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    سيُستخدم هذا الحساب تلقائياً عند إرسال رسائل واتساب من قِبل هذا الموظف
+                  </p>
+                </div>
+              )}
               <div>
                 <Label className="mb-2 block">الصلاحيات</Label>
                 <div className="grid grid-cols-2 gap-2 border rounded-lg p-3 bg-muted/30">
@@ -384,13 +455,19 @@ export default function UsersManagement() {
               </div>
               <div className="flex gap-2">
                 <Button
-                  onClick={() =>
+                  onClick={() => {
+                    // حفظ الصلاحيات والدور
                     updatePermissions.mutate({
                       userId: editingUser.id,
                       permissions: editingUser.permissions,
                       role: editingUser.role as "user" | "admin",
-                    })
-                  }
+                    });
+                    // حفظ حساب واتساب الافتراضي إذا تغيّر
+                    setDefaultWa.mutate({
+                      userId: editingUser.id,
+                      accountId: editingUser.defaultWhatsappAccountId || null,
+                    });
+                  }}
                   disabled={updatePermissions.isPending}
                   className="flex-1"
                 >

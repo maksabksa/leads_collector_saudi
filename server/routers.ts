@@ -158,6 +158,7 @@ const leadsRouter = router({
       reviewCount: z.number().optional(),
       socialSince: z.string().optional(),
       notes: z.string().optional(),
+      hasWhatsapp: z.enum(["yes", "no", "unknown"]).optional(),
     }))
     .mutation(async ({ input }) => {
       const id = await createLead(input);
@@ -366,6 +367,43 @@ const leadsRouter = router({
       const websiteAnalysis = await getWebsiteAnalysisByLeadId(input.id);
       const socialAnalysesList = await getSocialAnalysesByLeadId(input.id);
       return { lead, websiteAnalysis, socialAnalyses: socialAnalysesList };
+    }),
+
+  bulkImport: protectedProcedure
+    .input(z.object({
+      leads: z.array(z.object({
+        companyName: z.string().min(1),
+        businessType: z.string().min(1),
+        city: z.string().min(1),
+        country: z.string().optional(),
+        district: z.string().optional(),
+        verifiedPhone: z.string().optional(),
+        website: z.string().optional(),
+        googleMapsUrl: z.string().optional(),
+        instagramUrl: z.string().optional(),
+        twitterUrl: z.string().optional(),
+        snapchatUrl: z.string().optional(),
+        tiktokUrl: z.string().optional(),
+        facebookUrl: z.string().optional(),
+        reviewCount: z.number().optional(),
+        notes: z.string().optional(),
+        hasWhatsapp: z.enum(["yes", "no", "unknown"]).optional(),
+      })).max(1000),
+    }))
+    .mutation(async ({ input }) => {
+      let created = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      for (const leadData of input.leads) {
+        try {
+          await createLead(leadData);
+          created++;
+        } catch (e) {
+          failed++;
+          errors.push(`${leadData.companyName}: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`);
+        }
+      }
+      return { created, failed, errors };
     }),
 });
 
@@ -613,7 +651,7 @@ const analysisRouter = router({
   // ===== تحليل جماعي بضغطة واحدة =====
   bulkAnalyze: protectedProcedure
     .input(z.object({
-      leadIds: z.array(z.number()).min(1).max(50),
+      leadIds: z.array(z.number()).min(1).max(500),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();

@@ -207,6 +207,20 @@ export const invitationsRouter = router({
       return { success: true };
     }),
 
+  // تعيين حساب واتساب افتراضي للمستخدم
+  setDefaultWhatsappAccount: protectedProcedure
+    .input(z.object({
+      userId: z.number(),
+      accountId: z.string().nullable(), // accountId is varchar in DB
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(users).set({ defaultWhatsappAccountId: input.accountId }).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
+
   // جلب صلاحيات المستخدم الحالي
   myPermissions: protectedProcedure.query(async ({ ctx }) => {
     if (ctx.user.role === "admin") {

@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag } from "lucide-react";
+import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 
@@ -30,6 +30,7 @@ export default function AddLead() {
     zoneId: undefined as number | undefined,
     zoneName: "",
     verifiedPhone: "",
+    hasWhatsapp: "unknown" as "yes" | "no" | "unknown",
     website: "",
     googleMapsUrl: "",
     instagramUrl: "",
@@ -72,6 +73,12 @@ export default function AddLead() {
     setForm(f => ({ ...f, [field]: value }));
     if (errors[field]) setErrors(e => ({ ...e, [field]: "" }));
   };
+
+  const whatsappOptions = [
+    { value: "yes", label: "لديه واتساب", icon: CheckCircle2, color: "oklch(0.65 0.18 145)", bg: "oklch(0.65 0.18 145 / 0.15)", border: "oklch(0.65 0.18 145 / 0.5)" },
+    { value: "no", label: "ليس لديه", icon: XCircle, color: "oklch(0.65 0.18 25)", bg: "oklch(0.65 0.18 25 / 0.15)", border: "oklch(0.65 0.18 25 / 0.5)" },
+    { value: "unknown", label: "غير محدد", icon: HelpCircle, color: "oklch(0.65 0.05 240)", bg: "oklch(0.65 0.05 240 / 0.1)", border: "oklch(0.65 0.05 240 / 0.3)" },
+  ] as const;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -164,6 +171,42 @@ export default function AddLead() {
                 className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary"
                 min={0} />
             </div>
+          </div>
+
+          {/* حالة واتساب - يدوي */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+              <MessageCircle className="w-3.5 h-3.5" style={{ color: "oklch(0.65 0.18 145)" }} />
+              حالة واتساب (يدوي)
+            </label>
+            <div className="flex gap-2">
+              {whatsappOptions.map(opt => {
+                const Icon = opt.icon;
+                const isSelected = form.hasWhatsapp === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => set("hasWhatsapp", opt.value)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all border"
+                    style={{
+                      background: isSelected ? opt.bg : "transparent",
+                      borderColor: isSelected ? opt.border : "var(--border)",
+                      color: isSelected ? opt.color : "var(--muted-foreground)",
+                      boxShadow: isSelected ? `0 0 0 1px ${opt.border}` : "none",
+                    }}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {form.hasWhatsapp === "yes" && (
+              <p className="text-xs mt-1.5" style={{ color: "oklch(0.65 0.18 145)" }}>
+                ✓ سيُضاف لقائمة الإرسال عبر واتساب تلقائياً
+              </p>
+            )}
           </div>
         </div>
 

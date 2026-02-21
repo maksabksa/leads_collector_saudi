@@ -34,6 +34,9 @@ import {
   MessageSquare,
   Brain,
   Settings2,
+  Globe,
+  BarChart2,
+  Pencil,
 } from "lucide-react";
 
 // ===== مكون بطاقة القسم =====
@@ -122,6 +125,13 @@ export default function AISettings() {
   const [businessContext, setBusinessContext] = useState("");
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(500);
+  // تحكم في التحليل والرسائل
+  const [analysisStyle, setAnalysisStyle] = useState<"balanced" | "aggressive" | "conservative" | "detailed">("balanced");
+  const [analysisPrompt, setAnalysisPrompt] = useState("");
+  const [messageTemplate, setMessageTemplate] = useState("");
+  const [brandTone, setBrandTone] = useState<"professional" | "friendly" | "formal" | "casual">("professional");
+  const [countryContext, setCountryContext] = useState<"saudi" | "gulf" | "arabic" | "international">("saudi");
+  const [dialect, setDialect] = useState<"gulf" | "egyptian" | "levantine" | "msa">("gulf");
   const [testResult, setTestResult] = useState<{
     success: boolean;
     reply?: string;
@@ -144,6 +154,12 @@ export default function AISettings() {
       setBusinessContext(settings.businessContext || "");
       setTemperature(settings.temperature ?? 0.7);
       setMaxTokens(settings.maxTokens ?? 500);
+      setAnalysisStyle((settings as any).analysisStyle || "balanced");
+      setAnalysisPrompt((settings as any).analysisPrompt || "");
+      setMessageTemplate((settings as any).messageTemplate || "");
+      setBrandTone((settings as any).brandTone || "professional");
+      setCountryContext((settings as any).countryContext || "saudi");
+      setDialect((settings as any).dialect || "gulf");
     }
   }, [settings]);
 
@@ -200,6 +216,12 @@ export default function AISettings() {
       businessContext: businessContext || undefined,
       temperature,
       maxTokens,
+      analysisStyle,
+      analysisPrompt: analysisPrompt || undefined,
+      messageTemplate: messageTemplate || undefined,
+      brandTone,
+      countryContext,
+      dialect,
     });
   };
 
@@ -500,6 +522,138 @@ export default function AISettings() {
               </div>
             </div>
           )}
+        </div>
+      </Section>
+
+      {/* ===== قسم جديد: أسلوب التحليل ===== */}
+      <Section
+        icon={BarChart2}
+        title="أسلوب تحليل العملاء"
+        subtitle="تحديد كيف يحلل الذكاء الاصطناعي بيانات كل عميل"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">نمط التحليل</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: "balanced", label: "متوازن", desc: "تحليل شامل ومتوازن" },
+                { value: "aggressive", label: "تنافسي", desc: "ركز على الفرص والثغرات" },
+                { value: "conservative", label: "محافظ", desc: "تحليل دقيق ومتحفظ" },
+                { value: "detailed", label: "تفصيلي", desc: "تقرير شامل ومفصل" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setAnalysisStyle(opt.value)}
+                  className={`p-3 rounded-lg border-2 text-right transition-all ${
+                    analysisStyle === opt.value
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <p className="text-sm font-medium">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              برومبت تحليل مخصص{" "}
+              <span className="text-muted-foreground font-normal">(اختياري)</span>
+            </label>
+            <Textarea
+              value={analysisPrompt}
+              onChange={(e) => setAnalysisPrompt(e.target.value)}
+              placeholder="مثال: ركز على تحليل الموقع الإلكتروني ووجود المتجر الإلكتروني وخدمة التوصيل. أعطِ أهمية للنشاطات ذات الإيرادات المرتفعة."
+              rows={4}
+              className="text-sm resize-none"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              إذا تركته فارغاً سيستخدم النظام البرومبت الافتراضي حسب نمط التحليل المختار
+            </p>
+          </div>
+        </div>
+      </Section>
+
+      {/* ===== قسم جديد: صيغة الرسائل وهوية البلد ===== */}
+      <Section
+        icon={Globe}
+        title="هوية البلد وصيغة الرسائل"
+        subtitle="تدريب الذكاء الاصطناعي على لغة وأسلوب يناسب سوقك المستهدف"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">السياق الجغرافي</label>
+              <Select value={countryContext} onValueChange={(v: any) => setCountryContext(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="saudi">السوق السعودي</SelectItem>
+                  <SelectItem value="gulf">دول الخليج</SelectItem>
+                  <SelectItem value="arabic">العالم العربي</SelectItem>
+                  <SelectItem value="international">دولي</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">اللهجة</label>
+              <Select value={dialect} onValueChange={(v: any) => setDialect(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gulf">خليجي سعودي</SelectItem>
+                  <SelectItem value="msa">عربي فصيح</SelectItem>
+                  <SelectItem value="egyptian">مصري</SelectItem>
+                  <SelectItem value="levantine">شامي</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">نبرة العلامة</label>
+              <Select value={brandTone} onValueChange={(v: any) => setBrandTone(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="professional">احترافي</SelectItem>
+                  <SelectItem value="friendly">ودي</SelectItem>
+                  <SelectItem value="formal">رسمي</SelectItem>
+                  <SelectItem value="casual">عادي</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              <Pencil className="w-4 h-4 inline ml-1" />
+              قالب الرسالة الافتراضي{" "}
+              <span className="text-muted-foreground font-normal">(اختياري)</span>
+            </label>
+            <Textarea
+              value={messageTemplate}
+              onChange={(e) => setMessageTemplate(e.target.value)}
+              placeholder="مثال: السلام عليكم {{name}}\n\nأتواصل معكم بخصوص خدماتنا في {{business_type}}.\n\nهل تودون معرفة المزيد?"
+              rows={5}
+              className="text-sm resize-none font-mono"
+            />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {["{{name}}", "{{business_type}}", "{{city}}", "{{phone}}", "{{website}}"].map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setMessageTemplate((prev) => prev + v)}
+                  className="text-xs px-2 py-1 bg-primary/10 text-primary rounded border border-primary/20 hover:bg-primary/20 transition-colors"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              اضغط على المتغيرات أعلاه لإدراجها في القالب — سيتم استبدالها تلقائياً ببيانات كل عميل
+            </p>
+          </div>
         </div>
       </Section>
 
