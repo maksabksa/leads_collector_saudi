@@ -11,6 +11,9 @@ import {
   getSocialAnalysesByLeadId, createSocialAnalysis,
   getTopGaps, getDb,
   createSearchJob, getSearchJobById, getAllSearchJobs, updateSearchJob, deleteSearchJob, checkLeadDuplicate,
+  createInstagramSearch, updateInstagramSearch, getAllInstagramSearches,
+  getInstagramSearchById, createInstagramAccounts, getInstagramAccountsBySearchId,
+  markInstagramAccountAsLead,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { whatsappMessages } from "../drizzle/schema";
@@ -1597,6 +1600,185 @@ const whatsappAutomationRouter = router({
     }),
 });
 
+// ===== INSTAGRAM ROUTER =====
+const instagramRouter = router({
+  // جلب كل عمليات البحث
+  listSearches: protectedProcedure.query(async () => {
+    return getAllInstagramSearches();
+  }),
+
+  // بدء بحث جديد بالهاشتاق
+  startSearch: protectedProcedure
+    .input(z.object({
+      hashtag: z.string().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const token = process.env.INSTAGRAM_ACCESS_TOKEN;
+      const appId = process.env.INSTAGRAM_APP_ID;
+
+      if (!token || !appId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "يجب إضافة INSTAGRAM_ACCESS_TOKEN و INSTAGRAM_APP_ID في إعدادات المشروع",
+        });
+      }
+
+      // تنظيف الهاشتاق
+      const hashtag = input.hashtag.replace(/^#/, "").trim();
+
+      // إنشاء سجل البحث
+      const searchId = await createInstagramSearch({ hashtag, status: "running", resultsCount: 0 });
+
+      try {
+        // الخطوة 1: الحصول على معرف الهاشتاق
+        const hashtagRes = await fetch(
+          `https://graph.facebook.com/v18.0/ig_hashtag_search?user_id=${appId}&q=${encodeURIComponent(hashtag)}&access_token=${token}`
+        );
+        const hashtagData = await hashtagRes.json() as any;
+
+        if (!hashtagData.data || hashtagData.data.length === 0) {
+          await updateInstagramSearch(searchId, { status: "error", errorMsg: "لم يُعثر على الهاشتاق" });
+          return { searchId, status: "error", error: "لم يُعثر على الهاشتاق" };
+        }
+
+        const hashtagId = hashtagData.data[0].id;
+
+        // الخطوة 2: جلب المنشورات الحديثة بهذا الهاشتاق
+        const postsRes = await fetch(
+          `https://graph.facebook.com/v18.0/${hashtagId}/recent_media?user_id=${appId}&fields=id,caption,media_type,timestamp,owner&access_token=${token}&limit=50`
+        );
+        const postsData = await postsRes.json() as any;
+
+        if (!postsData.data || postsData.data.length === 0) {
+          await updateInstagramSearch(searchId, { status: "done", resultsCount: 0 });
+          return { searchId, status: "done", count: 0 };
+        }
+
+        // الخطوة 3: جلب تفاصيل كل حساب
+        const ownerIds = Array.from(new Set((postsData.data as any[]).map((p: any) => p.owner?.id).filter(Boolean))) as string[];
+        const accounts: any[] = [];
+
+        for (const ownerId of ownerIds.slice(0, 30)) {
+          try {
+            const profileRes = await fetch(
+              `https://graph.facebook.com/v18.0/${ownerId}?fields=id,username,name,biography,website,followers_count,follows_count,media_count,profile_picture_url,is_business_account,category&access_token=${token}`
+            );
+            const profile = await profileRes.json() as any;
+
+            if (profile.username) {
+              // استخراج الهاتف والإيميل من البيو
+              const bio = profile.biography || "";
+              const phoneMatch = bio.match(/(?:\+966|966|05|5)[0-9\s\-]{8,12}/);
+              const emailMatch = bio.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+
+              accounts.push({
+                searchId,
+                username: profile.username,
+                fullName: profile.name || null,
+                bio: bio || null,
+                website: profile.website || null,
+                followersCount: profile.followers_count || 0,
+                followingCount: profile.follows_count || 0,
+                postsCount: profile.media_count || 0,
+                profilePicUrl: profile.profile_picture_url || null,
+                isBusinessAccount: profile.is_business_account || false,
+                businessCategory: profile.category || null,
+                phone: phoneMatch ? phoneMatch[0].replace(/\s/g, "") : null,
+                email: emailMatch ? emailMatch[0] : null,
+                city: null,
+              });
+            }
+          } catch {
+            // تجاهل الحسابات التي لا يمكن جلبها
+          }
+        }
+
+        if (accounts.length > 0) {
+          await createInstagramAccounts(accounts);
+        }
+
+        await updateInstagramSearch(searchId, { status: "done", resultsCount: accounts.length });
+        return { searchId, status: "done", count: accounts.length };
+
+      } catch (err: any) {
+        await updateInstagramSearch(searchId, { status: "error", errorMsg: err.message });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
+  // جلب حسابات بحث معين
+  getAccounts: protectedProcedure
+    .input(z.object({ searchId: z.number() }))
+    .query(async ({ input }) => {
+      return getInstagramAccountsBySearchId(input.searchId);
+    }),
+
+  // إضافة حساب كـ lead
+  addAsLead: protectedProcedure
+    .input(z.object({
+      accountId: z.number(),
+      companyName: z.string(),
+      businessType: z.string(),
+      city: z.string().optional(),
+      instagramUrl: z.string().optional(),
+      phone: z.string().optional(),
+      email: z.string().optional(),
+      website: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { accountId, ...leadData } = input;
+        const leadId = await createLead({
+          companyName: leadData.companyName,
+          businessType: leadData.businessType,
+          city: leadData.city || "غير محدد",
+          instagramUrl: leadData.instagramUrl || null,
+          verifiedPhone: leadData.phone || null,
+          website: leadData.website || null,
+          notes: leadData.notes || null,
+          country: "السعودية",
+        });
+      await markInstagramAccountAsLead(accountId, leadId);
+      return { success: true, leadId };
+    }),
+
+  // اقتراح هاشتاقات بالذكاء الاصطناعي
+  suggestHashtags: protectedProcedure
+    .input(z.object({ niche: z.string() }))
+    .mutation(async ({ input }) => {
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: "أنت خبير في التسويق الرقمي السعودي. مهمتك اقتراح هاشتاقات إنستغرام للبحث عن أنشطة تجارية سعودية."
+          },
+          {
+            role: "user",
+            content: `اقترح 10 هاشتاقات إنستغرام باللغة العربية للبحث عن: ${input.niche}\n\nأرجع JSON فقط: { "hashtags": ["هاشتاق1", "هاشتاق2", ...] }`
+          }
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "hashtags_response",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                hashtags: { type: "array", items: { type: "string" } }
+              },
+              required: ["hashtags"],
+              additionalProperties: false
+            }
+          }
+        }
+      });
+      const content = response.choices[0].message.content;
+      const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+      return parsed.hashtags as string[];
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1616,5 +1798,6 @@ export const appRouter = router({
   aiSearch: aiSearchRouter,
   whatsapp: whatsappRouter,
   wauto: whatsappAutomationRouter,
+  instagram: instagramRouter,
 });
 export type AppRouter = typeof appRouter;

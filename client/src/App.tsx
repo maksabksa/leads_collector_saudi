@@ -15,6 +15,7 @@ import SearchEngine from "./pages/SearchEngine";
 import Layout from "./components/Layout";
 import BulkWhatsapp from "./pages/BulkWhatsapp";
 import WhatsAppAuto from "./pages/WhatsAppAuto";
+import InstagramSearch from "./pages/InstagramSearch";
 
 function Router() {
   return (
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/engine" component={SearchEngine} />
         <Route path="/bulk-whatsapp" component={BulkWhatsapp} />
         <Route path="/whatsapp-auto" component={WhatsAppAuto} />
+        <Route path="/instagram" component={InstagramSearch} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

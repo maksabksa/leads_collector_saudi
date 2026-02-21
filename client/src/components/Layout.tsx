@@ -15,6 +15,7 @@ import {
   Search,
   Bot,
   MessageCircle,
+  Instagram,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -29,6 +30,7 @@ const navItems = [
   { path: "/leads/add", label: "إضافة عميل", icon: Plus },
   { path: "/bulk-whatsapp", label: "واتساب مجمع", icon: MessageCircle },
   { path: "/whatsapp-auto", label: "إرسال تلقائي", icon: MessageCircle },
+  { path: "/instagram", label: "بحث إنستغرام", icon: Instagram },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

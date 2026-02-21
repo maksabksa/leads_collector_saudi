@@ -196,3 +196,39 @@ export const whatsappTemplates = mysqlTable("whatsapp_templates", {
 
 export type WhatsappTemplate = typeof whatsappTemplates.$inferSelect;
 export type InsertWhatsappTemplate = typeof whatsappTemplates.$inferInsert;
+
+// ===== INSTAGRAM SEARCHES TABLE =====
+export const instagramSearches = mysqlTable("instagram_searches", {
+  id: int("id").autoincrement().primaryKey(),
+  hashtag: varchar("hashtag", { length: 100 }).notNull(),
+  resultsCount: int("resultsCount").default(0).notNull(),
+  status: mysqlEnum("status", ["pending", "running", "done", "error"]).default("pending").notNull(),
+  errorMsg: text("errorMsg"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InstagramSearch = typeof instagramSearches.$inferSelect;
+export type InsertInstagramSearch = typeof instagramSearches.$inferInsert;
+
+// ===== INSTAGRAM ACCOUNTS TABLE =====
+export const instagramAccounts = mysqlTable("instagram_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  searchId: int("searchId").notNull(),
+  username: varchar("username", { length: 100 }).notNull(),
+  fullName: varchar("fullName", { length: 200 }),
+  bio: text("bio"),
+  website: varchar("website", { length: 500 }),
+  followersCount: int("followersCount").default(0),
+  followingCount: int("followingCount").default(0),
+  postsCount: int("postsCount").default(0),
+  profilePicUrl: text("profilePicUrl"),
+  isBusinessAccount: boolean("isBusinessAccount").default(false),
+  businessCategory: varchar("businessCategory", { length: 100 }),
+  phone: varchar("phone", { length: 30 }),
+  email: varchar("email", { length: 200 }),
+  city: varchar("city", { length: 100 }),
+  isAddedAsLead: boolean("isAddedAsLead").default(false),
+  leadId: int("leadId"),
+  discoveredAt: timestamp("discoveredAt").defaultNow().notNull(),
+});
+export type InstagramAccount = typeof instagramAccounts.$inferSelect;
+export type InsertInstagramAccount = typeof instagramAccounts.$inferInsert;
