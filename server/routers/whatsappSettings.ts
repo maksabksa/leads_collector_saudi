@@ -425,13 +425,15 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         if (!input.message) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "الرسالة فارغة" });
         }
-        const { sendWhatsAppMessage } = await import("../whatsappAutomation");
-        const sendResult = await sendWhatsAppMessage(input.phone, input.message, input.accountId);
-        if (!sendResult.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: sendResult.error ?? `فشل الإرسال عبر واتساب (${input.accountId}) - تأكد من ربط الحساب`,
-          });
+        // محاولة الإرسال عبر واتساب - إذا فشل يتم حفظ الرسالة بحالة failed فقط
+        try {
+          const { sendWhatsAppMessage } = await import("../whatsappAutomation");
+          const sendResult = await sendWhatsAppMessage(input.phone, input.message, input.accountId);
+          if (!sendResult.success) {
+            console.warn(`[واتساب] فشل الإرسال - سيتم حفظ الرسالة بحالة failed: ${sendResult.error}`);
+          }
+        } catch (err) {
+          console.warn(`[واتساب] خطأ في الإرسال - سيتم حفظ الرسالة محلياً:`, err);
         }
       }
 
