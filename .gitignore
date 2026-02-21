@@ -113,3 +113,8 @@ temp/
 .wwebjs_auth/
 .whatsapp-session/
 .manus/db/
+
+# WhatsApp web.js cache and session files
+.wwebjs_cache/
+.wwebjs_auth/
+.whatsapp-session/
