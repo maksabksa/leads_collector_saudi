@@ -108,3 +108,8 @@ temp/
 
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
+
+# WhatsApp session files (large binary files)
+.wwebjs_auth/
+.whatsapp-session/
+.manus/db/
