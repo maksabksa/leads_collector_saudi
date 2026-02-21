@@ -64,6 +64,13 @@
       "when": 1771666638411,
       "tag": "0008_peaceful_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1771667521832,
+      "tag": "0009_lyrical_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }

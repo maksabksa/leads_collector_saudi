@@ -22,6 +22,7 @@ import UsersManagement from "./pages/UsersManagement";
 import JoinPage from "./pages/JoinPage";
 import Chats from "./pages/Chats";
 import AISettings from "./pages/AISettings";
+import WhatsAppAccounts from "./pages/WhatsAppAccounts";
 
 function Router() {
   return (
@@ -44,6 +45,7 @@ function Router() {
         <Route path="/join" component={JoinPage} />
         <Route path="/chats" component={Chats} />
         <Route path="/ai-settings" component={AISettings} />
+        <Route path="/whatsapp-accounts" component={WhatsAppAccounts} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

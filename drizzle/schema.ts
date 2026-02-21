@@ -342,3 +342,44 @@ export const whatsappChatMessages = mysqlTable("whatsapp_chat_messages", {
 });
 export type WhatsappChatMessage = typeof whatsappChatMessages.$inferSelect;
 export type InsertWhatsappChatMessage = typeof whatsappChatMessages.$inferInsert;
+
+// ===== WHATSAPP ACCOUNTS TABLE (multi-account with roles) =====
+export const whatsappAccounts = mysqlTable("whatsapp_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: varchar("accountId", { length: 64 }).notNull().unique(), // unique identifier
+  label: varchar("label", { length: 100 }).notNull(), // display name e.g. "واتساب 1 - إرسال جماعي"
+  phoneNumber: varchar("phoneNumber", { length: 30 }).notNull(), // the WhatsApp number
+  // Role: bulk_sender = إرسال جماعي, human_handoff = تحويل للموظف, both = كلاهما
+  role: mysqlEnum("role", ["bulk_sender", "human_handoff", "both"]).default("bulk_sender").notNull(),
+  assignedEmployee: varchar("assignedEmployee", { length: 100 }), // employee name for human_handoff
+  isActive: boolean("isActive").default(true).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(), // for ordering in UI
+  notes: text("notes"), // optional notes
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type WhatsappAccount = typeof whatsappAccounts.$inferSelect;
+export type InsertWhatsappAccount = typeof whatsappAccounts.$inferInsert;
+
+// ===== INTEREST ALERTS TABLE =====
+// When a customer shows interest, an alert is created and can be transferred to a human agent
+export const interestAlerts = mysqlTable("interest_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  chatId: int("chatId"), // linked chat if any
+  leadId: int("leadId"), // linked lead if any
+  phone: varchar("phone", { length: 30 }).notNull(), // customer phone
+  contactName: varchar("contactName", { length: 200 }), // customer name
+  triggerMessage: text("triggerMessage"), // the message that triggered the alert
+  interestScore: int("interestScore").default(0).notNull(), // 0-100 interest level
+  detectedKeywords: json("detectedKeywords").$type<string[]>().default([]), // keywords found
+  // Status: pending = انتظار, transferred = تم التحويل, dismissed = تم الرفض
+  status: mysqlEnum("status", ["pending", "transferred", "dismissed"]).default("pending").notNull(),
+  handoffAccountId: varchar("handoffAccountId", { length: 64 }), // which account to transfer to
+  handoffPhone: varchar("handoffPhone", { length: 30 }), // employee phone number
+  transferredAt: timestamp("transferredAt"),
+  transferredBy: varchar("transferredBy", { length: 100 }), // who transferred
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InterestAlert = typeof interestAlerts.$inferSelect;
+export type InsertInterestAlert = typeof interestAlerts.$inferInsert;
