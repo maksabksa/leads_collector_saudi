@@ -298,7 +298,18 @@ export async function sendWhatsAppMedia(
     } else {
       intlPhone = cleanPhone;
     }
-    const chatId = intlPhone + "@c.us";
+    // استخدام getNumberId للحصول على chatId الصحيح
+    let chatId: string;
+    try {
+      const numberId = await session.client.getNumberId(intlPhone);
+      if (numberId) {
+        chatId = numberId._serialized;
+      } else {
+        return { success: false, phone, error: `الرقم ${phone} غير مسجل على واتساب` };
+      }
+    } catch {
+      chatId = intlPhone + "@c.us";
+    }
     const media = new MessageMedia(mimetype, mediaBase64, filename);
     await session.client.sendMessage(chatId, media, { caption });
     return { success: true, phone };
@@ -367,8 +378,19 @@ export async function sendWhatsAppMessage(
     } else {
       intlPhone = cleanPhone; // احتفظ بالرقم كما هو (يحتوي على كود دولي مثل 20 مصر أو 966 سعودي)
     }
-    const chatId = intlPhone + "@c.us";
-
+    // استخدام getNumberId للحصول على chatId الصحيح وتجنب خطأ "No LID for user"
+    let chatId: string;
+    try {
+      const numberId = await session.client.getNumberId(intlPhone);
+      if (numberId) {
+        chatId = numberId._serialized;
+      } else {
+        return { success: false, phone, error: `الرقم ${phone} غير مسجل على واتساب` };
+      }
+    } catch {
+      // fallback: استخدام التنسيق اليدوي إذا فشل getNumberId
+      chatId = intlPhone + "@c.us";
+    }
     await session.client.sendMessage(chatId, message);
     return { success: true, phone };
   } catch (err: unknown) {
