@@ -346,6 +346,9 @@ export const whatsappChatMessages = mysqlTable("whatsapp_chat_messages", {
   accountId: varchar("accountId", { length: 64 }).notNull().default("default"),
   direction: mysqlEnum("direction", ["outgoing", "incoming"]).notNull(),
   message: text("message").notNull(),
+  mediaUrl: text("mediaUrl"),       // URL للصورة أو الملف
+  mediaType: varchar("mediaType", { length: 50 }), // image/video/audio/document
+  mediaFilename: varchar("mediaFilename", { length: 255 }), // اسم الملف
   isAutoReply: boolean("isAutoReply").default(false).notNull(),
   status: mysqlEnum("status", ["sent", "delivered", "read", "failed"]).default("sent").notNull(),
   sentAt: timestamp("sentAt").defaultNow().notNull(),

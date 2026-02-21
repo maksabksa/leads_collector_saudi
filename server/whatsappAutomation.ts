@@ -146,6 +146,53 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
       session.isInitializing = false;
     });
 
+    // معالجة الرسائل الواردة
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    session.client.on("message", async (msg: any) => {
+      try {
+        // تجاهل الرسائل الصادرة من الحساب نفسه
+        if (msg.fromMe) return;
+        // استخراج رقم المرسل
+        const rawPhone = msg.from.replace("@c.us", "").replace("@s.whatsapp.net", "");
+        // محاولة جلب اسم جهة الاتصال
+        let contactName: string | undefined;
+        try {
+          const contact = await msg.getContact();
+          contactName = contact.pushname || contact.name || undefined;
+        } catch { /* تجاهل */ }
+
+        let mediaBase64: string | undefined;
+        let mimetype: string | undefined;
+        let filename: string | undefined;
+
+        if (msg.hasMedia) {
+          try {
+            const media = await msg.downloadMedia();
+            if (media) {
+              mediaBase64 = media.data;
+              mimetype = media.mimetype;
+              filename = media.filename || undefined;
+            }
+          } catch { /* تجاهل خطأ تحميل الوسائط */ }
+        }
+
+        if (incomingMessageHandler) {
+          await incomingMessageHandler({
+            accountId,
+            phone: rawPhone,
+            contactName,
+            message: msg.body || "",
+            hasMedia: msg.hasMedia,
+            mediaBase64,
+            mimetype,
+            filename,
+          });
+        }
+      } catch (err) {
+        console.error(`[${accountId}] خطأ في معالجة رسالة واردة:`, err);
+      }
+    });
+
     session.client.initialize().catch((err: Error) => {
       if (!err.message.includes("Target closed")) {
         session.status = "error";
@@ -203,6 +250,80 @@ export function getAllSessionsStatus(): Array<{
     });
   });
   return result;
+}
+
+export type SendMediaResult = {
+  success: boolean;
+  phone: string;
+  error?: string;
+};
+
+// إرسال صورة أو ملف عبر واتساب
+export async function sendWhatsAppMedia(
+  phone: string,
+  mediaBase64: string,
+  mimetype: string,
+  filename: string,
+  caption: string = "",
+  accountId = DEFAULT_ACCOUNT
+): Promise<SendMediaResult> {
+  let resolvedAccountId = accountId;
+  let session = getSession(accountId);
+
+  if (session.status !== "connected" || !session.client) {
+    let foundConnected = false;
+    sessions.forEach((s, id) => {
+      if (!foundConnected && s.status === "connected" && s.client) {
+        resolvedAccountId = id;
+        session = s;
+        foundConnected = true;
+      }
+    });
+    if (!foundConnected) {
+      return { success: false, phone, error: `لا يوجد حساب واتساب متصل` };
+    }
+  }
+
+  try {
+    const wweb = await import("whatsapp-web.js");
+    const { MessageMedia } = (wweb.default || wweb) as typeof wweb.default;
+    const cleanPhone = phone.replace(/[^0-9]/g, "");
+    let intlPhone: string;
+    if (cleanPhone.startsWith("00")) {
+      intlPhone = cleanPhone.slice(2);
+    } else if (cleanPhone.startsWith("0") && cleanPhone.length <= 10) {
+      intlPhone = "966" + cleanPhone.slice(1);
+    } else if (cleanPhone.length <= 9) {
+      intlPhone = "966" + cleanPhone;
+    } else {
+      intlPhone = cleanPhone;
+    }
+    const chatId = intlPhone + "@c.us";
+    const media = new MessageMedia(mimetype, mediaBase64, filename);
+    await session.client.sendMessage(chatId, media, { caption });
+    return { success: true, phone };
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return { success: false, phone, error: errMsg };
+  }
+}
+
+// نوع callback لمعالجة الرسائل الواردة
+export type IncomingMessageHandler = (params: {
+  accountId: string;
+  phone: string;
+  contactName?: string;
+  message: string;
+  hasMedia: boolean;
+  mediaBase64?: string;
+  mimetype?: string;
+  filename?: string;
+}) => Promise<void>;
+
+let incomingMessageHandler: IncomingMessageHandler | null = null;
+
+export function setIncomingMessageHandler(handler: IncomingMessageHandler) {
+  incomingMessageHandler = handler;
 }
 
 // إرسال رسالة لرقم واحد عبر حساب معين

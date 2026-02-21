@@ -21,6 +21,9 @@ import {
   Smartphone,
   MoreVertical,
   Circle,
+  Paperclip,
+  FileText,
+  Download,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -69,6 +72,9 @@ type ChatMessage = {
   accountId: string;
   direction: "outgoing" | "incoming";
   message: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  mediaFilename?: string | null;
   isAutoReply: boolean;
   status: "sent" | "delivered" | "read" | "failed";
   sentAt: string | Date;
@@ -197,7 +203,36 @@ function MessageBubble({ msg, showAccountBadge }: { msg: ChatMessage; showAccoun
               <span>رد تلقائي</span>
             </div>
           )}
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+          {/* عرض الوسائط */}
+          {msg.mediaUrl && (
+            <div className="mb-2">
+              {msg.mediaType === "image" ? (
+                <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={msg.mediaUrl}
+                    alt={msg.mediaFilename || "صورة"}
+                    className="max-w-full rounded-xl max-h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  />
+                </a>
+              ) : msg.mediaType === "video" ? (
+                <video src={msg.mediaUrl} controls className="max-w-full rounded-xl max-h-64" />
+              ) : msg.mediaType === "audio" ? (
+                <audio src={msg.mediaUrl} controls className="w-full" />
+              ) : (
+                <a
+                  href={msg.mediaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
+                >
+                  <FileText className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm truncate">{msg.mediaFilename || "ملف"}</span>
+                  <Download className="w-4 h-4 flex-shrink-0 opacity-60" />
+                </a>
+              )}
+            </div>
+          )}
+          {msg.message && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>}
           <div className={`flex items-center gap-1 mt-1 ${isOut ? "justify-start" : "justify-end"}`}>
             <span className="text-xs opacity-60">{time}</span>
             {isOut && (
@@ -224,6 +259,9 @@ export default function Chats() {
   const [showNewChat, setShowNewChat] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState("all");
   const [liveDot, setLiveDot] = useState(true);
+  // وسائط مرفوعة
+  const [pendingMedia, setPendingMedia] = useState<{ base64: string; mimetype: string; filename: string; previewUrl: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -332,15 +370,51 @@ export default function Chats() {
     return () => clearInterval(t);
   }, []);
 
+  // ===== اختيار ملف =====
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // حد الحجم: 16MB
+    if (file.size > 16 * 1024 * 1024) {
+      toast.error("حجم الملف كبير جداً", { description: "الحد الأقصى 16MB" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      const previewUrl = result;
+      setPendingMedia({ base64, mimetype: file.type, filename: file.name, previewUrl });
+    };
+    reader.readAsDataURL(file);
+    // إعادة تعيين القيمة للسماح باختيار نفس الملف مرة ثانية
+    e.target.value = "";
+  };
+
   // ===== إرسال رسالة =====
   const handleSend = () => {
-    if (!newMessage.trim() || !selectedChat) return;
-    sendMessage.mutate({
-      chatId: selectedChat.id,
-      accountId: selectedChat.accountId,
-      phone: selectedChat.phone,
-      message: newMessage.trim(),
-    });
+    if (!selectedChat) return;
+    if (!newMessage.trim() && !pendingMedia) return;
+    if (pendingMedia) {
+      sendMessage.mutate({
+        chatId: selectedChat.id,
+        accountId: selectedChat.accountId,
+        phone: selectedChat.phone,
+        message: newMessage.trim(),
+        mediaBase64: pendingMedia.base64,
+        mimetype: pendingMedia.mimetype,
+        mediaFilename: pendingMedia.filename,
+      }, {
+        onSuccess: () => setPendingMedia(null),
+      });
+    } else {
+      sendMessage.mutate({
+        chatId: selectedChat.id,
+        accountId: selectedChat.accountId,
+        phone: selectedChat.phone,
+        message: newMessage.trim(),
+      });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -609,20 +683,65 @@ export default function Chats() {
                     phone={selectedChat.senderPhoneNumber}
                   />
                 </div>
+                {/* معاينة الوسائط قبل الإرسال */}
+                {pendingMedia && (
+                  <div
+                    className="flex items-center gap-2 mb-2 p-2 rounded-xl border"
+                    style={{ background: "oklch(0.16 0.015 240)", borderColor: "oklch(0.3 0.02 240)" }}
+                  >
+                    {pendingMedia.mimetype.startsWith("image") ? (
+                      <img src={pendingMedia.previewUrl} alt="معاينة" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{pendingMedia.filename}</p>
+                      <p className="text-xs text-muted-foreground">{pendingMedia.mimetype}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 flex-shrink-0"
+                      onClick={() => setPendingMedia(null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
                 <div className="flex items-end gap-2">
+                  {/* زر رفع ملف */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt"
+                    onChange={handleFileSelect}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-11 w-11 p-0 flex-shrink-0"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="إرفاق ملف أو صورة"
+                    style={{ color: getAccountColor(selectedChat.accountId).text }}
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </Button>
                   <Textarea
                     ref={textareaRef}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="اكتب رسالتك... (Enter للإرسال، Shift+Enter لسطر جديد)"
+                    placeholder={pendingMedia ? "تعليق على الملف (اختياري)..." : "اكتب رسالتك... (Enter للإرسال، Shift+Enter لسطر جديد)"}
                     className="flex-1 min-h-[44px] max-h-32 resize-none text-sm py-2.5"
                     rows={1}
                     style={{ background: "oklch(0.16 0.015 240)", borderColor: "oklch(0.25 0.02 240)" }}
                   />
                   <Button
                     onClick={handleSend}
-                    disabled={!newMessage.trim() || sendMessage.isPending}
+                    disabled={(!newMessage.trim() && !pendingMedia) || sendMessage.isPending}
                     className="h-11 w-11 p-0 flex-shrink-0"
                     style={{ background: getAccountColor(selectedChat.accountId).bg }}
                   >

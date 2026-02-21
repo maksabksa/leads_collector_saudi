@@ -365,7 +365,7 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
 
   // ===== إدارة المحادثات المتقدمة =====
 
-  // إرسال رسالة من الشات مباشرة
+  // إرسال رسالة من الشات مباشرة (نص أو وسائط)
   sendChatMessage: protectedProcedure
     .input(
       z.object({
@@ -373,26 +373,71 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         accountId: z.string().default("default"),
         phone: z.string(),
         contactName: z.string().optional(),
-        message: z.string().min(1),
+        message: z.string().default(""),
         leadId: z.number().optional(),
+        // وسائط اختيارية
+        mediaBase64: z.string().optional(),
+        mimetype: z.string().optional(),
+        mediaFilename: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // ===== الإرسال الفعلي عبر واتساب =====
-      const { sendWhatsAppMessage } = await import("../whatsappAutomation");
-      const sendResult = await sendWhatsAppMessage(input.phone, input.message, input.accountId);
-      if (!sendResult.success) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: sendResult.error ?? `فشل الإرسال عبر واتساب (${input.accountId}) - تأكد من ربط الحساب`,
-        });
+      let uploadedMediaUrl: string | undefined;
+      let resolvedMediaType: string | undefined;
+
+      if (input.mediaBase64 && input.mimetype) {
+        // إرسال وسائط عبر واتساب
+        const { sendWhatsAppMedia } = await import("../whatsappAutomation");
+        const sendResult = await sendWhatsAppMedia(
+          input.phone,
+          input.mediaBase64,
+          input.mimetype,
+          input.mediaFilename || "file",
+          input.message,
+          input.accountId
+        );
+        if (!sendResult.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: sendResult.error ?? `فشل إرسال الوسائط - تأكد من ربط الحساب`,
+          });
+        }
+        // رفع الوسائط إلى S3
+        try {
+          const { storagePut } = await import("../storage");
+          const ext = input.mimetype.split("/")[1]?.split(";")[0] || "bin";
+          const key = `wa-media/${input.accountId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+          const buffer = Buffer.from(input.mediaBase64, "base64");
+          const { url } = await storagePut(key, buffer, input.mimetype);
+          uploadedMediaUrl = url;
+          resolvedMediaType = input.mimetype.startsWith("image") ? "image"
+            : input.mimetype.startsWith("video") ? "video"
+            : input.mimetype.startsWith("audio") ? "audio"
+            : "document";
+        } catch (e) {
+          console.error("خطأ رفع وسائط صادرة:", e);
+        }
+      } else {
+        // إرسال نص عادي
+        if (!input.message) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "الرسالة فارغة" });
+        }
+        const { sendWhatsAppMessage } = await import("../whatsappAutomation");
+        const sendResult = await sendWhatsAppMessage(input.phone, input.message, input.accountId);
+        if (!sendResult.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: sendResult.error ?? `فشل الإرسال عبر واتساب (${input.accountId}) - تأكد من ربط الحساب`,
+          });
+        }
       }
 
       // البحث عن محادثة موجودة أو إنشاء جديدة
       let chatId = input.chatId;
+      const lastMsg = uploadedMediaUrl ? (input.message || `📎 ${input.mediaFilename || "ملف"}`) : input.message;
       if (!chatId) {
         let [chat] = await db
           .select()
@@ -411,7 +456,7 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
             phone: input.phone,
             contactName: input.contactName,
             leadId: input.leadId,
-            lastMessage: input.message,
+            lastMessage: lastMsg,
             lastMessageAt: new Date(),
             unreadCount: 0,
           });
@@ -424,7 +469,7 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       // تحديث آخر رسالة في المحادثة
       await db
         .update(whatsappChats)
-        .set({ lastMessage: input.message, lastMessageAt: new Date() })
+        .set({ lastMessage: lastMsg, lastMessageAt: new Date() })
         .where(eq(whatsappChats.id, chatId));
 
       // تسجيل الرسالة
@@ -433,6 +478,9 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         accountId: input.accountId,
         direction: "outgoing",
         message: input.message,
+        mediaUrl: uploadedMediaUrl,
+        mediaType: resolvedMediaType,
+        mediaFilename: input.mediaFilename,
         status: "sent",
       });
 
