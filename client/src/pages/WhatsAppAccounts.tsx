@@ -131,12 +131,24 @@ function AccountCard({
         />
       </div>
 
-      {/* الدور */}
-      <div className="flex items-center gap-2">
+      {/* الدور ونوع الحساب */}
+      <div className="flex items-center gap-2 flex-wrap">
         <Badge className={`${roleInfo.color} border text-xs flex items-center gap-1`}>
           <RoleIcon className="w-3 h-3" />
           {roleInfo.label}
         </Badge>
+        {(account as any).accountType && (
+          <Badge variant="outline" className={`text-xs ${
+            (account as any).accountType === 'collection' ? 'border-blue-400 text-blue-400' :
+            (account as any).accountType === 'sales' ? 'border-green-400 text-green-400' :
+            (account as any).accountType === 'analysis' ? 'border-purple-400 text-purple-400' :
+            'border-orange-400 text-orange-400'
+          }`}>
+            {(account as any).accountType === 'collection' ? 'تجميع' :
+             (account as any).accountType === 'sales' ? 'سيلز' :
+             (account as any).accountType === 'analysis' ? 'تحليل' : 'متابعة'}
+          </Badge>
+        )}
         {account.assignedEmployee && (
           <Badge variant="outline" className="text-xs">
             <UserCheck className="w-3 h-3 ml-1" />
@@ -323,6 +335,13 @@ export default function WhatsAppAccounts() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
 
   // Form state
+  const ACCOUNT_TYPE_OPTIONS = [
+    { value: "collection", label: "تجميع", desc: "تجميع البيانات والعملاء" },
+    { value: "sales", label: "سيلز", desc: "إرسال عروض ومتابعة المبيعات" },
+    { value: "analysis", label: "تحليل", desc: "تحليل العملاء والسوق" },
+    { value: "followup", label: "متابعة", desc: "متابعة العملاء الحاليين" },
+  ];
+
   const [form, setForm] = useState({
     label: "",
     phoneNumber: "",
@@ -330,6 +349,7 @@ export default function WhatsAppAccounts() {
     assignedEmployee: "",
     notes: "",
     sortOrder: 0,
+    accountType: "collection" as "collection" | "sales" | "analysis" | "followup",
   });
 
   // ===== Queries =====
@@ -393,7 +413,7 @@ export default function WhatsAppAccounts() {
   });
 
   const resetForm = () =>
-    setForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0 });
+    setForm({ label: "", phoneNumber: "", role: "bulk_sender", assignedEmployee: "", notes: "", sortOrder: 0, accountType: "collection" });
 
   const handleEdit = (account: typeof editingAccount) => {
     setEditingAccount(account);
@@ -404,6 +424,7 @@ export default function WhatsAppAccounts() {
       assignedEmployee: account!.assignedEmployee || "",
       notes: account!.notes || "",
       sortOrder: account!.sortOrder,
+      accountType: ((account as any).accountType || "collection") as "collection" | "sales" | "analysis" | "followup",
     });
   };
 
@@ -748,6 +769,24 @@ export default function WhatsAppAccounts() {
               />
             </div>
 
+            {/* نوع الحساب */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">نوع الحساب</label>
+              <div className="grid grid-cols-2 gap-2">
+                {ACCOUNT_TYPE_OPTIONS.map(opt => (
+                  <button key={opt.value} type="button"
+                    onClick={() => setForm(f => ({ ...f, accountType: opt.value as any }))}
+                    className={`p-3 rounded-lg border text-right transition-all ${
+                      form.accountType === opt.value
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-transparent text-muted-foreground hover:border-primary/50"
+                    }`}>
+                    <p className="font-medium text-sm">{opt.label}</p>
+                    <p className="text-xs mt-0.5 opacity-70">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* الترتيب */}
             <div>
               <label className="text-sm font-medium mb-1.5 block">الترتيب في القائمة</label>

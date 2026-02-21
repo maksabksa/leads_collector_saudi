@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 
@@ -41,15 +41,38 @@ export default function AddLead() {
     reviewCount: 0,
     socialSince: "",
     notes: "",
+    stage: "new" as "new" | "contacted" | "interested" | "price_offer" | "meeting" | "won" | "lost",
+    priority: "medium" as "high" | "medium" | "low",
+    nextStep: "",
+    nextFollowup: undefined as number | undefined,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const STAGE_OPTIONS = [
+    { value: "new", label: "جديد", color: "oklch(0.65 0.05 240)" },
+    { value: "contacted", label: "تم التواصل", color: "oklch(0.65 0.15 200)" },
+    { value: "interested", label: "مهتم", color: "oklch(0.65 0.18 145)" },
+    { value: "price_offer", label: "عرض سعر", color: "oklch(0.65 0.18 60)" },
+    { value: "meeting", label: "اجتماع", color: "oklch(0.65 0.18 280)" },
+    { value: "won", label: "عميل فعلي", color: "oklch(0.65 0.18 145)" },
+    { value: "lost", label: "خسرناه", color: "oklch(0.55 0.18 25)" },
+  ] as const;
+
+  const PRIORITY_OPTIONS = [
+    { value: "high", label: "عالية", color: "oklch(0.65 0.18 25)" },
+    { value: "medium", label: "متوسطة", color: "oklch(0.65 0.18 60)" },
+    { value: "low", label: "منخفضة", color: "oklch(0.65 0.05 240)" },
+  ] as const;
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.companyName.trim()) newErrors.companyName = "اسم النشاط مطلوب";
     if (form.verifiedPhone && !/^(\+966|05)\d{8,9}$/.test(form.verifiedPhone.replace(/\s/g, ""))) {
       newErrors.verifiedPhone = "رقم الهاتف يجب أن يبدأ بـ +966 أو 05";
+    }
+    if (form.stage === "interested" && !form.nextFollowup) {
+      newErrors.nextFollowup = "عند تحديد العميل كمهتم يجب تحديد موعد متابعة";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -250,6 +273,78 @@ export default function AddLead() {
               dir="ltr"
             />
             <p className="text-xs text-muted-foreground mt-1">السنة أو الشهر-السنة التي بدأ فيها النشاط على السوشيال</p>
+          </div>
+        </div>
+
+        {/* التصنيف الإلزامي */}
+        <div className="rounded-2xl p-5 border-2 space-y-4" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 60 / 0.4)" }}>
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" style={{ color: "oklch(0.65 0.18 60)" }} />
+            التصنيف والمتابعة
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 60 / 0.15)", color: "oklch(0.65 0.18 60)" }}>مهم</span>
+          </h3>
+          {/* مرحلة العميل */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" />
+              مرحلة العميل
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {STAGE_OPTIONS.map(opt => (
+                <button key={opt.value} type="button" onClick={() => set("stage", opt.value)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all border"
+                  style={{
+                    background: form.stage === opt.value ? `${opt.color} / 0.15` : "transparent",
+                    borderColor: form.stage === opt.value ? opt.color : "var(--border)",
+                    color: form.stage === opt.value ? opt.color : "var(--muted-foreground)",
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* الأولوية */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Flag className="w-3.5 h-3.5" />
+              الأولوية
+            </label>
+            <div className="flex gap-2">
+              {PRIORITY_OPTIONS.map(opt => (
+                <button key={opt.value} type="button" onClick={() => set("priority", opt.value)}
+                  className="flex-1 py-2 rounded-lg text-sm font-medium transition-all border"
+                  style={{
+                    background: form.priority === opt.value ? `${opt.color} / 0.15` : "transparent",
+                    borderColor: form.priority === opt.value ? opt.color : "var(--border)",
+                    color: form.priority === opt.value ? opt.color : "var(--muted-foreground)",
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* الخطوة التالية */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <ChevronDown className="w-3.5 h-3.5" />
+              الخطوة التالية (اختياري)
+            </label>
+            <input value={form.nextStep} onChange={e => set("nextStep", e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary"
+              placeholder="مثال: إرسال عرض سعر غداً" />
+          </div>
+          {/* موعد المتابعة */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5" />
+              موعد المتابعة {form.stage === "interested" && <span style={{ color: "oklch(0.65 0.18 25)" }}>*</span>}
+            </label>
+            <input type="datetime-local"
+              value={form.nextFollowup ? new Date(form.nextFollowup).toISOString().slice(0, 16) : ""}
+              onChange={e => set("nextFollowup", e.target.value ? new Date(e.target.value).getTime() : undefined)}
+              className={`w-full px-4 py-2.5 rounded-xl text-sm border bg-background text-foreground focus:outline-none focus:border-primary ${errors.nextFollowup ? "border-red-500" : "border-border"}`}
+              dir="ltr" />
+            {errors.nextFollowup && <p className="text-xs mt-1" style={{ color: "var(--brand-red)" }}>{errors.nextFollowup}</p>}
           </div>
         </div>
 

@@ -251,12 +251,18 @@ function MessageBubble({ msg, showAccountBadge }: { msg: ChatMessage; showAccoun
 
 // ===== الصفحة الرئيسية =====
 export default function Chats() {
+  // قراءة query parameters لفتح محادثة محددة
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const phoneFromUrl = urlParams.get("phone") || "";
+  const nameFromUrl = urlParams.get("name") || "";
+
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"all" | "unread" | "archived">("all");
   const [newMessage, setNewMessage] = useState("");
-  const [newChatPhone, setNewChatPhone] = useState("");
-  const [showNewChat, setShowNewChat] = useState(false);
+  const [newChatPhone, setNewChatPhone] = useState(phoneFromUrl);
+  const [newChatName, setNewChatName] = useState(nameFromUrl);
+  const [showNewChat, setShowNewChat] = useState(!!phoneFromUrl);
   const [selectedAccountId, setSelectedAccountId] = useState("all");
   const [liveDot, setLiveDot] = useState(true);
   // وسائط مرفوعة
@@ -428,12 +434,13 @@ export default function Chats() {
   const handleNewChat = () => {
     if (!newChatPhone.trim()) return;
     sendMessage.mutate(
-      { accountId: "default", phone: newChatPhone.trim(), message: "مرحباً" },
+      { accountId: "default", phone: newChatPhone.trim(), contactName: newChatName.trim() || undefined, message: "مرحباً" },
       {
         onSuccess: (data) => {
           setSelectedChatId(data.chatId);
           setShowNewChat(false);
           setNewChatPhone("");
+          setNewChatName("");
         },
       }
     );
@@ -802,6 +809,15 @@ export default function Chats() {
               </Button>
             </div>
             <div className="space-y-3">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">اسم العميل (اختياري)</label>
+                <Input
+                  value={newChatName}
+                  onChange={(e) => setNewChatName(e.target.value)}
+                  placeholder="اسم العميل أو اسم الشركة"
+                  style={{ background: "oklch(0.18 0.015 240)" }}
+                />
+              </div>
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">رقم الهاتف</label>
                 <Input

@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
-  Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown
+  Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown, MessagesSquare
 } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -184,6 +184,22 @@ export default function LeadDetail() {
     } catch { toast.error("فشل إنشاء التقرير"); }
   };
 
+  const STAGE_OPTIONS = [
+    { value: "new", label: "جديد", color: "oklch(0.65 0.05 240)" },
+    { value: "contacted", label: "تم التواصل", color: "oklch(0.65 0.15 200)" },
+    { value: "interested", label: "مهتم", color: "oklch(0.65 0.18 145)" },
+    { value: "price_offer", label: "عرض سعر", color: "oklch(0.65 0.18 60)" },
+    { value: "meeting", label: "اجتماع", color: "oklch(0.65 0.18 280)" },
+    { value: "won", label: "عميل فعلي", color: "oklch(0.65 0.18 145)" },
+    { value: "lost", label: "خسرناه", color: "oklch(0.55 0.18 25)" },
+  ];
+
+  const PRIORITY_OPTIONS = [
+    { value: "high", label: "عالية", color: "oklch(0.65 0.18 25)" },
+    { value: "medium", label: "متوسطة", color: "oklch(0.65 0.18 60)" },
+    { value: "low", label: "منخفضة", color: "oklch(0.65 0.05 240)" },
+  ];
+
   const handleEdit = () => {
     setEditForm({
       companyName: lead.companyName,
@@ -196,6 +212,10 @@ export default function LeadDetail() {
       instagramUrl: lead.instagramUrl || "",
       twitterUrl: lead.twitterUrl || "",
       notes: lead.notes || "",
+      stage: (lead as any).stage || "new",
+      priority: (lead as any).priority || "medium",
+      nextStep: (lead as any).nextStep || "",
+      nextFollowup: (lead as any).nextFollowup || undefined,
     });
     setIsEditing(true);
   };
@@ -237,6 +257,25 @@ export default function LeadDetail() {
             </span>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">{lead.businessType} · {lead.city}{lead.district ? ` · ${lead.district}` : ""}</p>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {(lead as any).stage && (() => {
+              const stageColors: Record<string, string> = { new: "oklch(0.65 0.05 240)", contacted: "oklch(0.65 0.15 200)", interested: "oklch(0.65 0.18 145)", price_offer: "oklch(0.65 0.18 60)", meeting: "oklch(0.65 0.18 280)", won: "oklch(0.65 0.18 145)", lost: "oklch(0.55 0.18 25)" };
+              const stageLabels: Record<string, string> = { new: "جديد", contacted: "تم التواصل", interested: "مهتم", price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه" };
+              const c = stageColors[(lead as any).stage] ?? "oklch(0.65 0.05 240)";
+              return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `color-mix(in oklch, ${c} 15%, transparent)`, color: c, border: `1px solid color-mix(in oklch, ${c} 30%, transparent)` }}>• {stageLabels[(lead as any).stage] ?? (lead as any).stage}</span>;
+            })()}
+            {(lead as any).priority && (() => {
+              const priorityColors: Record<string, string> = { high: "oklch(0.65 0.18 25)", medium: "oklch(0.65 0.18 60)", low: "oklch(0.65 0.05 240)" };
+              const priorityLabels: Record<string, string> = { high: "أولوية عالية", medium: "أولوية متوسطة", low: "أولوية منخفضة" };
+              const c = priorityColors[(lead as any).priority] ?? "oklch(0.65 0.05 240)";
+              return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `color-mix(in oklch, ${c} 15%, transparent)`, color: c, border: `1px solid color-mix(in oklch, ${c} 30%, transparent)` }}>{priorityLabels[(lead as any).priority]}</span>;
+            })()}
+            {(lead as any).nextFollowup && (
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.18 0.02 240)", color: "oklch(0.65 0.05 240)" }}>
+                ⏰ {new Date((lead as any).nextFollowup).toLocaleDateString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleGenerateReport} disabled={generateReport.isPending}
@@ -273,6 +312,48 @@ export default function LeadDetail() {
                   className="w-full px-3 py-2 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary" />
               </div>
             ))}
+          </div>
+          {/* التصنيف */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <p className="text-xs font-medium text-muted-foreground">التصنيف والمتابعة</p>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">مرحلة العميل</label>
+              <div className="flex flex-wrap gap-2">
+                {STAGE_OPTIONS.map(opt => (
+                  <button key={opt.value} type="button" onClick={() => setEditForm((f: any) => ({ ...f, stage: opt.value }))}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                    style={{ background: editForm.stage === opt.value ? `color-mix(in oklch, ${opt.color} 15%, transparent)` : "transparent", borderColor: editForm.stage === opt.value ? opt.color : "var(--border)", color: editForm.stage === opt.value ? opt.color : "var(--muted-foreground)" }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">الأولوية</label>
+                <div className="flex gap-2">
+                  {PRIORITY_OPTIONS.map(opt => (
+                    <button key={opt.value} type="button" onClick={() => setEditForm((f: any) => ({ ...f, priority: opt.value }))}
+                      className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                      style={{ background: editForm.priority === opt.value ? `color-mix(in oklch, ${opt.color} 15%, transparent)` : "transparent", borderColor: editForm.priority === opt.value ? opt.color : "var(--border)", color: editForm.priority === opt.value ? opt.color : "var(--muted-foreground)" }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">موعد المتابعة</label>
+                <input type="datetime-local" value={editForm.nextFollowup ? new Date(editForm.nextFollowup).toISOString().slice(0, 16) : ""}
+                  onChange={e => setEditForm((f: any) => ({ ...f, nextFollowup: e.target.value ? new Date(e.target.value).getTime() : undefined }))}
+                  className="w-full px-3 py-1.5 rounded-xl text-xs border border-border bg-background text-foreground focus:outline-none" dir="ltr" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">الخطوة التالية</label>
+              <input value={editForm.nextStep || ""} onChange={e => setEditForm((f: any) => ({ ...f, nextStep: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none"
+                placeholder="مثال: إرسال عرض سعر" />
+            </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleSaveEdit} disabled={updateLead.isPending}
@@ -345,6 +426,14 @@ export default function LeadDetail() {
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: isWaConnected ? "oklch(0.65 0.2 145)" : "oklch(0.55 0.22 25)" }} />
                   {isWaConnected ? `متصل — الإرسال عبر النظام` : "غير متصل — سيفتح واتساب خارجياً"}
                 </div>
+                {/* زر فتح المحادثة في الشات الداخلي */}
+                <button
+                  onClick={() => navigate(`/chats?phone=${encodeURIComponent(lead.verifiedPhone || '')}&name=${encodeURIComponent((lead as any).businessName || lead.companyName || '')}`)}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+                  style={{ background: "oklch(0.55 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.3)" }}>
+                  <MessagesSquare className="w-3 h-3" />
+                  فتح المحادثة
+                </button>
                 {/* Open WA direct - للتحقق فقط */}
                 <button onClick={handleCheckWhatsapp}
                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-medium transition-all"

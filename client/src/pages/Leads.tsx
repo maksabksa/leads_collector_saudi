@@ -36,7 +36,9 @@ export default function Leads() {
   const [filterZone, setFilterZone] = useState<number | undefined>();
   const [showFilters, setShowFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [filterWhatsapp, setFilterWhatsapp] = useState<"" | "yes" | "no" | "unknown">("");
+  const [filterWhatsapp, setFilterWhatsapp] = useState<"" | "yes" | "no" | "unknown">("")
+  const [filterStage, setFilterStage] = useState("")
+  const [filterPriority, setFilterPriority] = useState("");
   const [showSegmentDialog, setShowSegmentDialog] = useState(false);
   const [targetSegmentId, setTargetSegmentId] = useState<string>("");
 
@@ -66,6 +68,8 @@ export default function Leads() {
     analysisStatus: filterStatus || undefined,
     zoneId: filterZone,
     hasWhatsapp: filterWhatsapp || undefined,
+    stage: (filterStage || undefined) as "new" | "contacted" | "interested" | "price_offer" | "meeting" | "won" | "lost" | undefined,
+    priority: (filterPriority || undefined) as "high" | "medium" | "low" | undefined,
   });
   const { data: zones } = trpc.zones.list.useQuery();
   const { data: segmentsList } = trpc.segments.list.useQuery();
@@ -410,6 +414,30 @@ export default function Leads() {
                 <option value="unknown">❓ غير محدد</option>
               </select>
             </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">مرحلة العميل</label>
+              <select value={filterStage} onChange={e => setFilterStage(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
+                <option value="">الكل</option>
+                <option value="new">جديد</option>
+                <option value="contacted">تم التواصل</option>
+                <option value="interested">مهتم</option>
+                <option value="price_offer">عرض سعر</option>
+                <option value="meeting">اجتماع</option>
+                <option value="won">عميل فعلي</option>
+                <option value="lost">خسرناه</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">الأولوية</label>
+              <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
+                <option value="">الكل</option>
+                <option value="high">عالية</option>
+                <option value="medium">متوسطة</option>
+                <option value="low">منخفضة</option>
+              </select>
+            </div>
           </div>
         )}
       </div>
@@ -498,11 +526,18 @@ export default function Leads() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{lead.companyName}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-xs text-muted-foreground truncate">{lead.businessType}</span>
                         <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: statusInfo.bg, color: statusInfo.color }}>
                           {statusInfo.label}
                         </span>
+                        {(lead as any).stage && (lead as any).stage !== "new" && (() => {
+                          const stageColors: Record<string, string> = { contacted: "oklch(0.65 0.15 200)", interested: "oklch(0.65 0.18 145)", price_offer: "oklch(0.65 0.18 60)", meeting: "oklch(0.65 0.18 280)", won: "oklch(0.65 0.18 145)", lost: "oklch(0.55 0.18 25)" };
+                          const stageLabels: Record<string, string> = { contacted: "تم التواصل", interested: "مهتم", price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه" };
+                          const c = stageColors[(lead as any).stage] ?? "oklch(0.65 0.05 240)";
+                          return <span key="stage" className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: `color-mix(in oklch, ${c} 15%, transparent)`, color: c }}>{stageLabels[(lead as any).stage] ?? (lead as any).stage}</span>;
+                        })()}
+                        {(lead as any).priority === "high" && <span key="priority" className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 25 / 0.15)", color: "oklch(0.65 0.18 25)" }}>أولوية عالية</span>}
                       </div>
                     </div>
                   </div>

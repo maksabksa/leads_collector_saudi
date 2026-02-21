@@ -642,4 +642,16 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
 
       return { success: true, chatId: chat.id };
     }),
+
+  // جلب إجمالي الرسائل غير المقروءة عبر جميع المحادثات
+  getTotalUnread: protectedProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) return { total: 0 };
+      const result = await db
+        .select({ total: sql<number>`COALESCE(SUM(${whatsappChats.unreadCount}), 0)` })
+        .from(whatsappChats)
+        .where(eq(whatsappChats.isArchived, false));
+      return { total: Number(result[0]?.total ?? 0) };
+    }),
 });

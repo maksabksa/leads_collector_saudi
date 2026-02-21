@@ -53,6 +53,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
   const userPermissionsList = myPerms?.permissions ?? [];
   const isAdmin = user?.role === "admin";
+  // جلب عداد الرسائل غير المقروءة
+  const { data: unreadData } = trpc.waSettings.getTotalUnread.useQuery(undefined, {
+    enabled: isAuthenticated,
+    refetchInterval: 10000,
+  });
+  const totalUnread = unreadData?.total ?? 0;
   // فلترة navItems حسب الصلاحيات
   const visibleNavItems = navItems.filter((item) => {
     if (isAdmin) return true;
@@ -152,7 +158,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   } : {}}
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.path === "/chats" && totalUnread > 0 && (
+                    <span
+                      className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold text-white"
+                      style={{ background: "oklch(0.55 0.22 25)" }}
+                    >
+                      {totalUnread > 99 ? "99+" : totalUnread}
+                    </span>
+                  )}
                 </div>
               </Link>
             );

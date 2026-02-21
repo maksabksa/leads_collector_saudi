@@ -140,6 +140,7 @@ export const whatsappAccountsRouter = router({
         assignedEmployee: z.string().optional(),
         notes: z.string().optional(),
         sortOrder: z.number().default(0),
+        accountType: z.enum(["collection", "sales", "analysis", "followup"]).default("collection"),
       })
     )
     .mutation(async ({ input }) => {
@@ -156,6 +157,7 @@ export const whatsappAccountsRouter = router({
         assignedEmployee: input.assignedEmployee,
         notes: input.notes,
         sortOrder: input.sortOrder,
+        accountType: input.accountType,
         isActive: true,
       });
 
@@ -174,6 +176,7 @@ export const whatsappAccountsRouter = router({
         notes: z.string().optional(),
         sortOrder: z.number().optional(),
         isActive: z.boolean().optional(),
+        accountType: z.enum(["collection", "sales", "analysis", "followup"]).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -191,6 +194,7 @@ export const whatsappAccountsRouter = router({
       if (data.notes !== undefined) updateData.notes = data.notes;
       if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
       if (data.isActive !== undefined) updateData.isActive = data.isActive;
+      if (data.accountType !== undefined) updateData.accountType = data.accountType;
 
       await db
         .update(whatsappAccounts)

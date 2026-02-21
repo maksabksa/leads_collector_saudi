@@ -125,6 +125,9 @@ const leadsRouter = router({
       search: z.string().optional(),
       hasWhatsapp: z.enum(["yes", "no", "unknown"]).optional(),
       hasPhone: z.boolean().optional(),
+      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).optional(),
+      priority: z.enum(["high", "medium", "low"]).optional(),
+      ownerUserId: z.number().optional(),
     }).optional())
     .query(async ({ input }) => {
       return getAllLeads(input ?? {});
@@ -159,6 +162,11 @@ const leadsRouter = router({
       socialSince: z.string().optional(),
       notes: z.string().optional(),
       hasWhatsapp: z.enum(["yes", "no", "unknown"]).optional(),
+      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).optional(),
+      priority: z.enum(["high", "medium", "low"]).optional(),
+      nextStep: z.string().optional(),
+      nextFollowup: z.number().optional(),
+      ownerUserId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
       const id = await createLead(input);
@@ -341,6 +349,11 @@ const leadsRouter = router({
       suggestedSalesEntryAngle: z.string().optional(),
       analysisStatus: z.enum(["pending", "analyzing", "completed", "failed"]).optional(),
       notes: z.string().optional(),
+      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).optional(),
+      priority: z.enum(["high", "medium", "low"]).optional(),
+      nextStep: z.string().optional(),
+      nextFollowup: z.number().optional(),
+      ownerUserId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;

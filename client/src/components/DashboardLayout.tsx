@@ -21,15 +21,66 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import {
+  LayoutDashboard, LogOut, PanelLeft, Users, UserPlus, Search, MessageSquare,
+  Send, Smartphone, BarChart2, Globe, Bot, Database, Map, Layers,
+  Upload, Key, Bell, ChevronDown, ChevronRight
+} from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+// مجموعات القائمة
+const menuGroups = [
+  {
+    group: "الرئيسية",
+    items: [
+      { icon: LayoutDashboard, label: "لوحة التحكم", path: "/" },
+    ]
+  },
+  {
+    group: "العملاء",
+    items: [
+      { icon: Users, label: "قائمة العملاء", path: "/leads" },
+      { icon: UserPlus, label: "إضافة عميل", path: "/leads/add" },
+      { icon: Map, label: "المناطق", path: "/zones" },
+    ]
+  },
+  {
+    group: "البحث والاستكشاف",
+    items: [
+      { icon: Search, label: "بحث سريع", path: "/search" },
+      { icon: Globe, label: "محرك البحث", path: "/engine" },
+      { icon: Bot, label: "الاستكشاف الذكي", path: "/scout" },
+      { icon: BarChart2, label: "مركز البحث", path: "/search-hub" },
+    ]
+  },
+  {
+    group: "واتساب",
+    items: [
+      { icon: MessageSquare, label: "المحادثات", path: "/chats" },
+      { icon: Send, label: "إرسال جماعي", path: "/bulk-whatsapp" },
+      { icon: Smartphone, label: "حسابات واتساب", path: "/whatsapp-accounts" },
+      { icon: Bell, label: "إشعارات الاهتمام", path: "/whatsapp-auto" },
+    ]
+  },
+  {
+    group: "البيانات",
+    items: [
+      { icon: Upload, label: "رفع جماعي", path: "/bulk-import" },
+      { icon: Layers, label: "الشرائح", path: "/segments" },
+      { icon: Database, label: "إعدادات البيانات", path: "/data-settings" },
+    ]
+  },
+  {
+    group: "النظام",
+    items: [
+      { icon: Users, label: "المستخدمون", path: "/users" },
+      { icon: Key, label: "كلمات الاهتمام", path: "/interest-keywords" },
+      { icon: Bot, label: "إعدادات الذكاء", path: "/ai-settings" },
+    ]
+  },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -62,10 +113,10 @@ export default function DashboardLayout({
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
+              تسجيل الدخول مطلوب
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
+              يتطلب الوصول إلى هذه اللوحة تسجيل الدخول.
             </p>
           </div>
           <Button
@@ -75,7 +126,7 @@ export default function DashboardLayout({
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            Sign in
+            تسجيل الدخول
           </Button>
         </div>
       </div>
@@ -111,9 +162,19 @@ function DashboardLayoutContent({
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
+
+  // إيجاد العنصر النشط
+  const activeItem = menuGroups.flatMap(g => g.items).find(item => {
+    if (item.path === "/") return location === "/";
+    return location.startsWith(item.path);
+  });
+
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [group]: !prev[group] }));
+  };
 
   useEffect(() => {
     if (isCollapsed) {
@@ -124,25 +185,21 @@ function DashboardLayoutContent({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-
       const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
       const newWidth = e.clientX - sidebarLeft;
       if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
         setSidebarWidth(newWidth);
       }
     };
-
     const handleMouseUp = () => {
       setIsResizing(false);
     };
-
     if (isResizing) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
     }
-
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
@@ -170,35 +227,60 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
+                  <span className="font-semibold tracking-tight truncate text-sm">
+                    مجمع بيانات الأعمال
                   </span>
                 </div>
               ) : null}
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="gap-0">
-            <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
-                const isActive = location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
-                      className={`h-10 transition-all font-normal`}
+          <SidebarContent className="gap-0 overflow-y-auto" dir="rtl">
+            {menuGroups.map((group) => {
+              const isGroupCollapsed = collapsedGroups[group.group];
+              return (
+                <div key={group.group} className="mb-1">
+                  {/* عنوان المجموعة */}
+                  {!isCollapsed && (
+                    <button
+                      onClick={() => toggleGroup(group.group)}
+                      className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
                     >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                      />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
+                      <span>{group.group}</span>
+                      {isGroupCollapsed
+                        ? <ChevronRight className="w-3 h-3" />
+                        : <ChevronDown className="w-3 h-3" />
+                      }
+                    </button>
+                  )}
+                  {/* عناصر المجموعة */}
+                  {(!isGroupCollapsed || isCollapsed) && (
+                    <SidebarMenu className="px-2 py-0.5">
+                      {group.items.map(item => {
+                        const isActive = item.path === "/"
+                          ? location === "/"
+                          : location.startsWith(item.path);
+                        return (
+                          <SidebarMenuItem key={item.path}>
+                            <SidebarMenuButton
+                              isActive={isActive}
+                              onClick={() => setLocation(item.path)}
+                              tooltip={item.label}
+                              className={`h-9 transition-all font-normal text-sm`}
+                            >
+                              <item.icon
+                                className={`h-4 w-4 shrink-0 ${isActive ? "text-primary" : ""}`}
+                              />
+                              <span className="truncate">{item.label}</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  )}
+                </div>
+              );
+            })}
           </SidebarContent>
 
           <SidebarFooter className="p-3">
@@ -226,7 +308,7 @@ function DashboardLayoutContent({
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>تسجيل الخروج</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -250,7 +332,7 @@ function DashboardLayoutContent({
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
                   <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
+                    {activeItem?.label ?? "القائمة"}
                   </span>
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import {
   int,
+  bigint,
   mysqlEnum,
   mysqlTable,
   text,
@@ -75,6 +76,12 @@ export const leads = mysqlTable("leads", {
   whatsappCheckedAt: timestamp("whatsappCheckedAt"),
   lastWhatsappSentAt: timestamp("lastWhatsappSentAt"),
   notes: text("notes"),
+  // ===== التصنيف الإلزامي =====
+  stage: mysqlEnum("stage", ["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).default("new").notNull(),
+  priority: mysqlEnum("priority", ["high", "medium", "low"]).default("medium").notNull(),
+  nextStep: text("next_step"),
+  nextFollowup: bigint("next_followup", { mode: "number" }),
+  ownerUserId: int("owner_user_id"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -367,6 +374,8 @@ export const whatsappAccounts = mysqlTable("whatsapp_accounts", {
   assignedEmployee: varchar("assignedEmployee", { length: 100 }), // employee name for human_handoff
   isActive: boolean("isActive").default(true).notNull(),
   sortOrder: int("sortOrder").default(0).notNull(), // for ordering in UI
+  // نوع الحساب: collection=تجميع, sales=سيلز, analysis=تحليل, followup=متابعة
+  accountType: mysqlEnum("account_type", ["collection", "sales", "analysis", "followup"]).default("collection").notNull(),
   notes: text("notes"), // optional notes
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
