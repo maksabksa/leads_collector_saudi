@@ -1,0 +1,635 @@
+import { useState, useEffect } from "react";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Bot,
+  Key,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Save,
+  TestTube2,
+  Zap,
+  Users,
+  ToggleLeft,
+  ToggleRight,
+  Info,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  MessageSquare,
+  Brain,
+  Settings2,
+} from "lucide-react";
+
+// ===== مكون بطاقة القسم =====
+function Section({
+  icon: Icon,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Icon className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-base">{title}</h2>
+          {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ===== مكون صف عميل =====
+function ChatRow({
+  chat,
+  onToggle,
+}: {
+  chat: {
+    id: number;
+    phone: string;
+    contactName: string | null;
+    aiAutoReplyEnabled: boolean;
+    unreadCount: number;
+    lastMessage: string | null;
+  };
+  onToggle: (chatId: number, enabled: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+          {(chat.contactName || chat.phone).charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{chat.contactName || chat.phone}</p>
+          <p className="text-xs text-muted-foreground truncate" dir="ltr">
+            {chat.phone}
+          </p>
+        </div>
+        {chat.unreadCount > 0 && (
+          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs flex-shrink-0">
+            {chat.unreadCount}
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className={`text-xs ${chat.aiAutoReplyEnabled ? "text-green-400" : "text-muted-foreground"}`}>
+          {chat.aiAutoReplyEnabled ? "مفعّل" : "موقوف"}
+        </span>
+        <Switch
+          checked={chat.aiAutoReplyEnabled}
+          onCheckedChange={(v) => onToggle(chat.id, v)}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ===== الصفحة الرئيسية =====
+export default function AISettings() {
+  // ===== State =====
+  const [provider, setProvider] = useState<"openai" | "builtin">("builtin");
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [assistantId, setAssistantId] = useState("");
+  const [model, setModel] = useState("gpt-4o-mini");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [businessContext, setBusinessContext] = useState("");
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(500);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    reply?: string;
+    error?: string;
+  } | null>(null);
+
+  // ===== Queries =====
+  const { data: settings, refetch: refetchSettings } = trpc.aiConfig.getSettings.useQuery();
+  const { data: chats = [], refetch: refetchChats } = trpc.aiConfig.listChatsWithAIStatus.useQuery({
+    accountId: "default",
+  });
+
+  // ===== تحميل الإعدادات =====
+  useEffect(() => {
+    if (settings) {
+      setProvider(settings.provider as "openai" | "builtin");
+      setAssistantId(settings.openaiAssistantId || "");
+      setModel(settings.openaiModel || "gpt-4o-mini");
+      setSystemPrompt(settings.systemPrompt || "");
+      setBusinessContext(settings.businessContext || "");
+      setTemperature(settings.temperature ?? 0.7);
+      setMaxTokens(settings.maxTokens ?? 500);
+    }
+  }, [settings]);
+
+  // ===== Mutations =====
+  const saveSettings = trpc.aiConfig.saveSettings.useMutation({
+    onSuccess: () => {
+      toast.success("تم حفظ الإعدادات بنجاح");
+      refetchSettings();
+    },
+    onError: (e) => toast.error("فشل الحفظ", { description: e.message }),
+  });
+
+  const testConnection = trpc.aiConfig.testConnection.useMutation({
+    onSuccess: (data) => {
+      setTestResult({ success: true, reply: data.reply });
+      toast.success(`اتصال ناجح (${data.mode === "assistant" ? "Assistant" : "Chat API"})`);
+    },
+    onError: (e) => {
+      setTestResult({ success: false, error: e.message });
+      toast.error("فشل الاتصال", { description: e.message });
+    },
+  });
+
+  const setGlobalAutoReply = trpc.aiConfig.setGlobalAutoReply.useMutation({
+    onSuccess: (_, vars) => {
+      toast.success(vars.enabled ? "تم تفعيل الرد التلقائي للكل" : "تم إيقاف الرد التلقائي للكل");
+      refetchSettings();
+    },
+  });
+
+  const setBulkChatAutoReply = trpc.aiConfig.setBulkChatAutoReply.useMutation({
+    onSuccess: (data, vars) => {
+      toast.success(
+        vars.enabled
+          ? `تم تفعيل الرد لـ ${data.updatedCount} محادثة`
+          : `تم إيقاف الرد لـ ${data.updatedCount} محادثة`
+      );
+      refetchChats();
+    },
+  });
+
+  const setChatAutoReply = trpc.aiConfig.setChatAutoReply.useMutation({
+    onSuccess: () => refetchChats(),
+    onError: (e) => toast.error("فشل التحديث", { description: e.message }),
+  });
+
+  const handleSave = () => {
+    saveSettings.mutate({
+      provider,
+      openaiApiKey: apiKey || undefined,
+      openaiAssistantId: assistantId || undefined,
+      openaiModel: model,
+      systemPrompt: systemPrompt || undefined,
+      businessContext: businessContext || undefined,
+      temperature,
+      maxTokens,
+    });
+  };
+
+  const handleTest = () => {
+    setTestResult(null);
+    testConnection.mutate({
+      apiKey: apiKey.startsWith("sk-") ? apiKey : undefined,
+      assistantId: assistantId || undefined,
+    });
+  };
+
+  const enabledCount = (chats as any[]).filter((c) => c.aiAutoReplyEnabled).length;
+  const totalCount = (chats as any[]).length;
+
+  return (
+    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6" dir="rtl">
+      {/* رأس الصفحة */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Brain className="w-7 h-7 text-primary" />
+            إعدادات الذكاء الاصطناعي
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            ربط OpenAI وتوجيه الردود التلقائية والتحكم بكل عميل
+          </p>
+        </div>
+        <Button onClick={handleSave} disabled={saveSettings.isPending}>
+          {saveSettings.isPending ? (
+            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 ml-2" />
+          )}
+          حفظ الإعدادات
+        </Button>
+      </div>
+
+      {/* ===== القسم 1: مزود الذكاء الاصطناعي ===== */}
+      <Section icon={Zap} title="مزود الذكاء الاصطناعي" subtitle="اختر بين OpenAI الخاص أو المزود المدمج">
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setProvider("builtin")}
+            className={`p-4 rounded-lg border-2 text-right transition-all ${
+              provider === "builtin"
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/40"
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="w-5 h-5 text-primary" />
+              <span className="font-medium">المزود المدمج</span>
+              {provider === "builtin" && (
+                <Badge className="bg-primary/20 text-primary text-xs mr-auto">مفعّل</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              يستخدم نموذج الذكاء الاصطناعي المدمج في المنصة — لا يحتاج API Key
+            </p>
+          </button>
+
+          <button
+            onClick={() => setProvider("openai")}
+            className={`p-4 rounded-lg border-2 text-right transition-all ${
+              provider === "openai"
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/40"
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Bot className="w-5 h-5 text-green-400" />
+              <span className="font-medium">OpenAI الخاص</span>
+              {provider === "openai" && (
+                <Badge className="bg-green-500/20 text-green-400 text-xs mr-auto">مفعّل</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              استخدم API Key الخاص بك للتحكم الكامل في النموذج والتكاليف
+            </p>
+          </button>
+        </div>
+      </Section>
+
+      {/* ===== القسم 2: إعدادات OpenAI (تظهر فقط عند اختيار openai) ===== */}
+      {provider === "openai" && (
+        <Section
+          icon={Key}
+          title="بيانات OpenAI"
+          subtitle="أدخل API Key ومعرف الـ Assistant (اختياري)"
+        >
+          <div className="space-y-4">
+            {/* API Key */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                OpenAI API Key <span className="text-destructive">*</span>
+              </label>
+              <div className="relative">
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={settings?.hasApiKey ? "sk-...محفوظ (اتركه فارغاً للإبقاء)" : "sk-..."}
+                  dir="ltr"
+                  className="pl-10 font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {settings?.hasApiKey && (
+                <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  API Key محفوظ ({settings.openaiApiKey})
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                احصل على مفتاحك من{" "}
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  platform.openai.com/api-keys
+                </a>
+              </p>
+            </div>
+
+            {/* Assistant ID */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                OpenAI Assistant ID{" "}
+                <span className="text-muted-foreground font-normal">(اختياري)</span>
+              </label>
+              <Input
+                value={assistantId}
+                onChange={(e) => setAssistantId(e.target.value)}
+                placeholder="asst_..."
+                dir="ltr"
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                إذا أدخلت معرف Assistant سيتم استخدامه بدلاً من Chat Completion. أنشئ Assistant من{" "}
+                <a
+                  href="https://platform.openai.com/assistants"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  platform.openai.com/assistants
+                </a>
+              </p>
+            </div>
+
+            {/* النموذج */}
+            {!assistantId && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">النموذج</label>
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gpt-4o-mini">GPT-4o Mini (موصى به - سريع وقليل التكلفة)</SelectItem>
+                    <SelectItem value="gpt-4o">GPT-4o (أقوى)</SelectItem>
+                    <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (الأرخص)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* اختبار الاتصال */}
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                onClick={handleTest}
+                disabled={testConnection.isPending || (!apiKey && !settings?.hasApiKey)}
+                className="w-full"
+              >
+                {testConnection.isPending ? (
+                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                ) : (
+                  <TestTube2 className="w-4 h-4 ml-2" />
+                )}
+                اختبار الاتصال بـ OpenAI
+              </Button>
+
+              {testResult && (
+                <div
+                  className={`mt-3 p-3 rounded-lg border text-sm ${
+                    testResult.success
+                      ? "bg-green-500/10 border-green-500/30 text-green-400"
+                      : "bg-destructive/10 border-destructive/30 text-destructive"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    {testResult.success ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <XCircle className="w-4 h-4" />
+                    )}
+                    <span className="font-medium">
+                      {testResult.success ? "الاتصال ناجح" : "فشل الاتصال"}
+                    </span>
+                  </div>
+                  {testResult.reply && (
+                    <p className="text-xs mt-1 opacity-80">رد الـ AI: {testResult.reply}</p>
+                  )}
+                  {testResult.error && (
+                    <p className="text-xs mt-1 opacity-80">{testResult.error}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* ===== القسم 3: توجيه الردود ===== */}
+      <Section
+        icon={MessageSquare}
+        title="توجيه الردود"
+        subtitle="حدد كيف يتصرف الذكاء الاصطناعي عند الرد على العملاء"
+      >
+        <div className="space-y-4">
+          {/* System Prompt */}
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              System Prompt (توجيهات الذكاء الاصطناعي)
+            </label>
+            <Textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="مثال: أنت مساعد تجاري سعودي محترف متخصص في مجال اللحوم والمواد الغذائية. ردودك باللغة العربية، مختصرة ومفيدة. لا تعطِ أسعاراً دون التحقق. كن ودوداً ومهنياً."
+              rows={5}
+              className="text-sm resize-none"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              هذا النص يُرسَل للـ AI قبل كل رسالة ليحدد شخصيته وأسلوبه
+            </p>
+          </div>
+
+          {/* Business Context */}
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              معلومات النشاط التجاري{" "}
+              <span className="text-muted-foreground font-normal">(اختياري)</span>
+            </label>
+            <Textarea
+              value={businessContext}
+              onChange={(e) => setBusinessContext(e.target.value)}
+              placeholder="مثال: نحن شركة توزيع لحوم ومواد غذائية في الرياض. نخدم المطاعم والفنادق والتجزئة. ساعات العمل 8ص-10م. التوصيل متاح داخل الرياض."
+              rows={3}
+              className="text-sm resize-none"
+            />
+          </div>
+
+          {/* إعدادات متقدمة */}
+          {provider === "openai" && !assistantId && (
+            <div className="grid grid-cols-2 gap-6 pt-2">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  درجة الإبداع (Temperature): {temperature.toFixed(1)}
+                </label>
+                <Slider
+                  value={[temperature]}
+                  onValueChange={([v]) => setTemperature(v)}
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>محافظ (0)</span>
+                  <span>إبداعي (2)</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  الحد الأقصى للكلمات: {maxTokens}
+                </label>
+                <Slider
+                  value={[maxTokens]}
+                  onValueChange={([v]) => setMaxTokens(v)}
+                  min={50}
+                  max={2000}
+                  step={50}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>50</span>
+                  <span>2000</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* ===== القسم 4: التحكم الجماعي ===== */}
+      <Section
+        icon={Settings2}
+        title="التحكم الجماعي في الرد التلقائي"
+        subtitle="تفعيل أو إيقاف الرد التلقائي لجميع العملاء دفعة واحدة"
+      >
+        <div className="space-y-4">
+          {/* مفتاح رئيسي */}
+          <div className="flex items-center justify-between p-4 bg-muted/20 rounded-lg border border-border">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  settings?.globalAutoReplyEnabled
+                    ? "bg-green-500/20"
+                    : "bg-muted"
+                }`}
+              >
+                <Bot
+                  className={`w-5 h-5 ${
+                    settings?.globalAutoReplyEnabled ? "text-green-400" : "text-muted-foreground"
+                  }`}
+                />
+              </div>
+              <div>
+                <p className="font-medium text-sm">المفتاح الرئيسي</p>
+                <p className="text-xs text-muted-foreground">
+                  {settings?.globalAutoReplyEnabled
+                    ? "الرد التلقائي مفعّل لجميع العملاء"
+                    : "الرد التلقائي موقوف لجميع العملاء"}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={settings?.globalAutoReplyEnabled ?? false}
+              onCheckedChange={(v) => setGlobalAutoReply.mutate({ enabled: v })}
+              disabled={setGlobalAutoReply.isPending}
+            />
+          </div>
+
+          {/* أزرار التحكم الجماعي */}
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="border-green-500/30 text-green-400 hover:bg-green-500/10"
+              onClick={() => setBulkChatAutoReply.mutate({ enabled: true, accountId: "default" })}
+              disabled={setBulkChatAutoReply.isPending}
+            >
+              {setBulkChatAutoReply.isPending ? (
+                <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+              ) : (
+                <ToggleRight className="w-4 h-4 ml-2" />
+              )}
+              تفعيل الكل ({totalCount})
+            </Button>
+            <Button
+              variant="outline"
+              className="border-destructive/30 text-destructive hover:bg-destructive/10"
+              onClick={() => setBulkChatAutoReply.mutate({ enabled: false, accountId: "default" })}
+              disabled={setBulkChatAutoReply.isPending}
+            >
+              {setBulkChatAutoReply.isPending ? (
+                <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+              ) : (
+                <ToggleLeft className="w-4 h-4 ml-2" />
+              )}
+              إيقاف الكل ({totalCount})
+            </Button>
+          </div>
+
+          {/* إحصائية */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Info className="w-4 h-4 flex-shrink-0" />
+            <span>
+              {enabledCount} من {totalCount} محادثة مفعّل فيها الرد التلقائي
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 mr-auto"
+              onClick={() => refetchChats()}
+            >
+              <RefreshCw className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      {/* ===== القسم 5: التحكم الفردي ===== */}
+      <Section
+        icon={Users}
+        title="التحكم الفردي لكل عميل"
+        subtitle={`${totalCount} محادثة — ${enabledCount} مفعّل`}
+      >
+        {(chats as any[]).length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
+            <p className="text-sm">لا توجد محادثات بعد</p>
+            <p className="text-xs mt-1">ستظهر هنا بعد بدء أول محادثة</p>
+          </div>
+        ) : (
+          <ScrollArea className="max-h-96">
+            <div className="pr-1">
+              {(chats as any[]).map((chat) => (
+                <ChatRow
+                  key={chat.id}
+                  chat={chat}
+                  onToggle={(chatId, enabled) =>
+                    setChatAutoReply.mutate({ chatId, enabled })
+                  }
+                />
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </Section>
+
+      {/* زر الحفظ في الأسفل */}
+      <div className="flex justify-end pb-4">
+        <Button onClick={handleSave} disabled={saveSettings.isPending} size="lg">
+          {saveSettings.isPending ? (
+            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 ml-2" />
+          )}
+          حفظ جميع الإعدادات
+        </Button>
+      </div>
+    </div>
+  );
+}

@@ -15,6 +15,7 @@ import {
   Shield,
   Zap,
   Globe,
+  Brain,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -30,6 +31,7 @@ const navItems = [
 
 const adminNavItems = [
   { path: "/users", label: "إدارة المستخدمين", icon: Shield },
+  { path: "/ai-settings", label: "إعدادات AI", icon: Brain },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

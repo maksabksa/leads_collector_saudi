@@ -143,3 +143,17 @@
 - [x] أرشفة وحذف المحادثات
 - [x] ربط المحادثة بالعميل (Lead) مع رابط مباشر
 - [x] إضافة صفحة المحادثات للـ sidebar
+
+## الدفعة العاشرة - إعدادات OpenAI Assistant والتحكم بالرد التلقائي
+
+- [x] إضافة جدول ai_settings في قاعدة البيانات (API Key، Assistant ID، System Prompt، إعدادات)
+- [x] إضافة حقل aiAutoReplyEnabled في جدول whatsapp_chats (تحكم فردي لكل عميل)
+- [x] migration وتطبيق التغييرات
+- [x] backend: حفظ وجلب إعدادات AI (إخفاء API Key)
+- [x] backend: توليد رد AI باستخدام OpenAI API Key الخاص أو Assistant
+- [x] backend: تحكم جماعي - تفعيل/إيقاف الرد لجميع العملاء
+- [x] backend: تحكم فردي - تفعيل/إيقاف الرد لعميل محدد
+- [x] صفحة /ai-settings: ربط API Key + Assistant ID + System Prompt
+- [x] صفحة /ai-settings: اختبار الاتصال بـ OpenAI
+- [x] صفحة /ai-settings: مفتاح تفعيل/إيقاف الكل
+- [x] صفحة /ai-settings: تحكم فردي لكل محادثة

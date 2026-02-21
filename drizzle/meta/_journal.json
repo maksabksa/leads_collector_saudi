@@ -57,6 +57,13 @@
       "when": 1771635923394,
       "tag": "0007_tiny_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1771666638411,
+      "tag": "0008_peaceful_paladin",
+      "breakpoints": true
     }
   ]
 }

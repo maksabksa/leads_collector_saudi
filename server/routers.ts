@@ -1864,6 +1864,7 @@ const instagramRouter = router({
 
 import { invitationsRouter } from "./routers/invitations";
 import { whatsappSettingsRouter } from "./routers/whatsappSettings";
+import { aiSettingsRouter } from "./routers/aiSettings";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1887,5 +1888,6 @@ export const appRouter = router({
   instagram: instagramRouter,
   invitations: invitationsRouter,
   waSettings: whatsappSettingsRouter,
+  aiConfig: aiSettingsRouter,
 });
 export type AppRouter = typeof appRouter;

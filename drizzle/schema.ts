@@ -293,6 +293,24 @@ export const autoReplyRules = mysqlTable("auto_reply_rules", {
 export type AutoReplyRule = typeof autoReplyRules.$inferSelect;
 export type InsertAutoReplyRule = typeof autoReplyRules.$inferInsert;
 
+// ===== AI SETTINGS TABLE =====
+export const aiSettings = mysqlTable("ai_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  provider: mysqlEnum("provider", ["openai", "builtin"]).default("builtin").notNull(),
+  openaiApiKey: text("openaiApiKey"), // encrypted API key
+  openaiAssistantId: varchar("openaiAssistantId", { length: 100 }), // OpenAI Assistant ID
+  openaiModel: varchar("openaiModel", { length: 50 }).default("gpt-4o-mini").notNull(),
+  systemPrompt: text("systemPrompt"), // global system prompt for all AI replies
+  businessContext: text("businessContext"), // business description for AI
+  globalAutoReplyEnabled: boolean("globalAutoReplyEnabled").default(false).notNull(), // master switch
+  temperature: float("temperature").default(0.7).notNull(),
+  maxTokens: int("maxTokens").default(500).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AiSettings = typeof aiSettings.$inferSelect;
+export type InsertAiSettings = typeof aiSettings.$inferInsert;
+
 // ===== WHATSAPP CHATS TABLE =====
 export const whatsappChats = mysqlTable("whatsapp_chats", {
   id: int("id").autoincrement().primaryKey(),
@@ -304,6 +322,7 @@ export const whatsappChats = mysqlTable("whatsapp_chats", {
   lastMessageAt: timestamp("lastMessageAt"),
   unreadCount: int("unreadCount").default(0).notNull(),
   isArchived: boolean("isArchived").default(false).notNull(),
+  aiAutoReplyEnabled: boolean("aiAutoReplyEnabled").default(true).notNull(), // per-chat AI control
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

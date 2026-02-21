@@ -21,6 +21,7 @@ import SearchHub from "./pages/SearchHub";
 import UsersManagement from "./pages/UsersManagement";
 import JoinPage from "./pages/JoinPage";
 import Chats from "./pages/Chats";
+import AISettings from "./pages/AISettings";
 
 function Router() {
   return (
@@ -42,6 +43,7 @@ function Router() {
         <Route path="/users" component={UsersManagement} />
         <Route path="/join" component={JoinPage} />
         <Route path="/chats" component={Chats} />
+        <Route path="/ai-settings" component={AISettings} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
