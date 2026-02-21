@@ -24,6 +24,7 @@ import Chats from "./pages/Chats";
 import AISettings from "./pages/AISettings";
 import WhatsAppAccounts from "./pages/WhatsAppAccounts";
 import InterestKeywords from "./pages/InterestKeywords";
+import Segments from "./pages/Segments";
 
 function Router() {
   return (
@@ -48,6 +49,7 @@ function Router() {
         <Route path="/ai-settings" component={AISettings} />
         <Route path="/whatsapp-accounts" component={WhatsAppAccounts} />
         <Route path="/interest-keywords" component={InterestKeywords} />
+          <Route path="/segments" component={Segments} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

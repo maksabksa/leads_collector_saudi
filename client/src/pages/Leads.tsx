@@ -1,9 +1,13 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Link } from "wouter";
-import { Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone, MapPin, ChevronDown } from "lucide-react";
+import { Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone, MapPin, ChevronDown, Layers, CheckSquare, Square } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const statusColors: Record<string, { color: string; bg: string; label: string }> = {
   pending: { color: "oklch(0.55 0.01 240)", bg: "oklch(0.18 0.02 240)", label: "معلق" },
@@ -19,20 +23,33 @@ export default function Leads() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterZone, setFilterZone] = useState<number | undefined>();
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showSegmentDialog, setShowSegmentDialog] = useState(false);
+  const [targetSegmentId, setTargetSegmentId] = useState<string>("");
 
   const availableFilterCities = filterCountry
     ? (COUNTRIES_DATA.find(c => c.name === filterCountry)?.cities ?? [])
     : [];
 
-  const { data: leads, isLoading, refetch } = trpc.leads.list.useQuery({
+  const { data: leads, isLoading } = trpc.leads.list.useQuery({
     search: search || undefined,
     city: filterCity || undefined,
     analysisStatus: filterStatus || undefined,
     zoneId: filterZone,
   });
   const { data: zones } = trpc.zones.list.useQuery();
+  const { data: segmentsList } = trpc.segments.list.useQuery();
   const deleteLead = trpc.leads.delete.useMutation();
   const exportCSV = trpc.export.exportCSV.useMutation();
+  const addToSegment = trpc.segments.addLeads.useMutation({
+    onSuccess: (data) => {
+      toast.success(`تمت إضافة ${data.added} عميل للشريحة`);
+      setShowSegmentDialog(false);
+      setSelectedIds(new Set());
+      setTargetSegmentId("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const utils = trpc.useUtils();
 
   const handleDelete = async (id: number, name: string) => {
@@ -56,7 +73,30 @@ export default function Leads() {
     toast.success(`✅ تم تصدير ${result.count} سجل بالتحليل الكامل في صف واحد`);
   };
 
-  const cities = Array.from(new Set((leads ?? []).map(l => l.city))).filter(Boolean);
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!leads) return;
+    if (selectedIds.size === leads.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(leads.map((l) => l.id)));
+    }
+  };
+
+  const handleAddToSegment = async () => {
+    if (!targetSegmentId || selectedIds.size === 0) return;
+    await addToSegment.mutateAsync({
+      segmentId: Number(targetSegmentId),
+      leadIds: Array.from(selectedIds),
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -67,6 +107,16 @@ export default function Leads() {
           <p className="text-muted-foreground text-sm mt-1">{leads?.length ?? 0} عميل مسجل</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => setShowSegmentDialog(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
+            >
+              <Layers className="w-4 h-4" />
+              إضافة {selectedIds.size} للشريحة
+            </button>
+          )}
           <button
             onClick={handleExport}
             disabled={exportCSV.isPending || !leads?.length}
@@ -109,7 +159,7 @@ export default function Leads() {
           </button>
         </div>
         {showFilters && (
-          <div className="grid grid-cols-4 gap-3 p-4 rounded-xl border border-border" style={{ background: "oklch(0.12 0.015 240)" }}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 rounded-xl border border-border" style={{ background: "oklch(0.12 0.015 240)" }}>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">الدولة</label>
               <select value={filterCountry} onChange={e => { setFilterCountry(e.target.value); setFilterCity(""); }}
@@ -149,6 +199,23 @@ export default function Leads() {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      {leads && leads.length > 0 && (
+        <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-border text-sm" style={{ background: "oklch(0.12 0.015 240)" }}>
+          <button onClick={toggleSelectAll} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            {selectedIds.size === leads.length && leads.length > 0
+              ? <CheckSquare className="w-4 h-4 text-primary" />
+              : <Square className="w-4 h-4" />}
+            تحديد الكل
+          </button>
+          {selectedIds.size > 0 && (
+            <span className="text-muted-foreground">
+              — تم تحديد <span className="text-foreground font-medium">{selectedIds.size}</span> عميل
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Leads table */}
       {isLoading ? (
         <div className="space-y-2">
@@ -171,7 +238,14 @@ export default function Leads() {
         <div className="rounded-2xl border border-border overflow-hidden" style={{ background: "oklch(0.12 0.015 240)" }}>
           {/* Table header */}
           <div className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-border text-xs text-muted-foreground font-medium">
-            <div className="col-span-4">النشاط</div>
+            <div className="col-span-1 flex items-center justify-center">
+              <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground transition-colors">
+                {selectedIds.size === (leads?.length ?? 0) && (leads?.length ?? 0) > 0
+                  ? <CheckSquare className="w-4 h-4 text-primary" />
+                  : <Square className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="col-span-3">النشاط</div>
             <div className="col-span-2">المدينة / المنطقة</div>
             <div className="col-span-2">الاتصال</div>
             <div className="col-span-2">الحضور الرقمي</div>
@@ -182,10 +256,22 @@ export default function Leads() {
           <div className="divide-y divide-border">
             {leads?.map((lead) => {
               const statusInfo = statusColors[lead.analysisStatus];
+              const isSelected = selectedIds.has(lead.id);
               return (
-                <div key={lead.id} className="grid grid-cols-12 gap-3 px-4 py-3.5 items-center hover:bg-white/3 transition-colors group">
+                <div
+                  key={lead.id}
+                  className={`grid grid-cols-12 gap-3 px-4 py-3.5 items-center hover:bg-white/3 transition-colors group ${isSelected ? "bg-primary/5" : ""}`}
+                >
+                  {/* Checkbox */}
+                  <div className="col-span-1 flex items-center justify-center">
+                    <button onClick={() => toggleSelect(lead.id)} className="text-muted-foreground hover:text-foreground transition-colors">
+                      {isSelected
+                        ? <CheckSquare className="w-4 h-4 text-primary" />
+                        : <Square className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {/* Name & type */}
-                  <div className="col-span-4 flex items-center gap-3 min-w-0">
+                  <div className="col-span-3 flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold"
                       style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)" }}>
                       {lead.companyName.charAt(0)}
@@ -269,6 +355,47 @@ export default function Leads() {
           </div>
         </div>
       )}
+
+      {/* Dialog إضافة للشريحة */}
+      <Dialog open={showSegmentDialog} onOpenChange={setShowSegmentDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>إضافة {selectedIds.size} عميل لشريحة</DialogTitle>
+          </DialogHeader>
+          <div className="py-3">
+            <label className="text-sm text-muted-foreground mb-2 block">اختر الشريحة</label>
+            <select
+              value={targetSegmentId}
+              onChange={e => setTargetSegmentId(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="">-- اختر شريحة --</option>
+              {segmentsList?.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.leadCount} عميل)
+                </option>
+              ))}
+            </select>
+            {(!segmentsList || segmentsList.length === 0) && (
+              <p className="text-xs text-muted-foreground mt-2">
+                لا توجد شرائح بعد.{" "}
+                <Link href="/segments">
+                  <span className="text-primary cursor-pointer hover:underline">أنشئ شريحة أولاً</span>
+                </Link>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSegmentDialog(false)}>إلغاء</Button>
+            <Button
+              onClick={handleAddToSegment}
+              disabled={!targetSegmentId || addToSegment.isPending}
+            >
+              {addToSegment.isPending ? "جاري الإضافة..." : "إضافة للشريحة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

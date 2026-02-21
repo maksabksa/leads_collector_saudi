@@ -409,3 +409,40 @@ export const aiTrainingExamples = mysqlTable("ai_training_examples", {
 });
 export type AiTrainingExample = typeof aiTrainingExamples.$inferSelect;
 export type InsertAiTrainingExample = typeof aiTrainingExamples.$inferInsert;
+
+// ===== SEGMENTS TABLE =====
+// Customer segments for targeted messaging with optimal send times
+export const segments = mysqlTable("segments", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 20 }).default("#3b82f6").notNull(), // hex color for UI
+  // Optimal send times: JSON array of { day: 0-6, hour: 0-23 }
+  optimalSendTimes: json("optimalSendTimes").$type<{ day: number; hour: number; label: string }[]>().default([]),
+  // Auto-filter criteria: JSON object for automatic lead assignment
+  filterCriteria: json("filterCriteria").$type<{
+    cities?: string[];
+    sources?: string[];
+    statuses?: string[];
+    minInterestScore?: number;
+    hasWhatsapp?: boolean;
+    country?: string;
+  }>().default({}),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Segment = typeof segments.$inferSelect;
+export type InsertSegment = typeof segments.$inferInsert;
+
+// ===== LEAD SEGMENTS TABLE =====
+// Many-to-many: leads ↔ segments
+export const leadSegments = mysqlTable("lead_segments", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  segmentId: int("segmentId").notNull(),
+  addedAt: timestamp("addedAt").defaultNow().notNull(),
+  addedBy: varchar("addedBy", { length: 100 }), // user who added
+});
+export type LeadSegment = typeof leadSegments.$inferSelect;
+export type InsertLeadSegment = typeof leadSegments.$inferInsert;

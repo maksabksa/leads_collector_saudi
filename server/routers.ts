@@ -1874,6 +1874,7 @@ import { invitationsRouter } from "./routers/invitations";
 import { whatsappSettingsRouter } from "./routers/whatsappSettings";
 import { aiSettingsRouter } from "./routers/aiSettings";
 import { whatsappAccountsRouter } from "./routers/whatsappAccounts";
+import { segmentsRouter } from "./routers/segments";
 import { interestKeywordsRouter } from "./routers/interestKeywords";
 
 export const appRouter = router({
@@ -1901,5 +1902,6 @@ export const appRouter = router({
   aiConfig: aiSettingsRouter,
   waAccounts: whatsappAccountsRouter,
   interestKw: interestKeywordsRouter,
+  segments: segmentsRouter,
 });
 export type AppRouter = typeof appRouter;

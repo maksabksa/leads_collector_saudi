@@ -17,6 +17,7 @@ import {
   Globe,
   Brain,
   Smartphone,
+  Layers,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -33,6 +34,7 @@ const navItems = [
 const adminNavItems = [
   { path: "/users", label: "إدارة المستخدمين", icon: Shield },
   { path: "/interest-keywords", label: "كشف الاهتمام", icon: Zap },
+  { path: "/segments", label: "شرائح العملاء", icon: Layers },
   { path: "/ai-settings", label: "إعدادات AI", icon: Brain },
 ];
 

@@ -78,6 +78,13 @@
       "when": 1771670042516,
       "tag": "0010_adorable_santa_claus",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1771681057396,
+      "tag": "0011_warm_steel_serpent",
+      "breakpoints": true
     }
   ]
 }
