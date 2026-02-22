@@ -27,6 +27,7 @@ import InterestKeywords from "./pages/InterestKeywords";
 import Segments from "./pages/Segments";
 import DataSettings from "./pages/DataSettings";
 import BulkImport from "./pages/BulkImport";
+import KnowledgeBase from "./pages/KnowledgeBase";
 function Router() {
   return (
     <Layout>
@@ -53,6 +54,7 @@ function Router() {
           <Route path="/segments" component={Segments} />
           <Route path="/data-settings" component={DataSettings} />
         <Route path="/bulk-import" component={BulkImport} />
+        <Route path="/knowledge-base" component={KnowledgeBase} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

@@ -20,6 +20,7 @@ import {
   Layers,
   Settings2,
   FileSpreadsheet,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -38,6 +39,7 @@ const adminNavItems = [
   { path: "/interest-keywords", label: "كشف الاهتمام", icon: Zap },
   { path: "/segments", label: "شرائح العملاء", icon: Layers },
   { path: "/ai-settings", label: "إعدادات AI", icon: Brain },
+  { path: "/knowledge-base", label: "قاعدة معرفة AI", icon: BookOpen },
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
   { path: "/bulk-import", label: "رفع جماعي (Excel)", icon: FileSpreadsheet },
 ];

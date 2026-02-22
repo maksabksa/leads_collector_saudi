@@ -483,3 +483,72 @@ export const dataSettings = mysqlTable("data_settings", {
 });
 export type DataSetting = typeof dataSettings.$inferSelect;
 export type InsertDataSetting = typeof dataSettings.$inferInsert;
+
+// ===== RAG KNOWLEDGE BASE TABLES =====
+// قاعدة المعرفة للذكاء الاصطناعي - RAG (Retrieval Augmented Generation)
+
+export const ragDocuments = mysqlTable("rag_documents", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }).default("general").notNull(),
+  // نوع المستند: text (نص مباشر), faq (سؤال وجواب), product (منتج/خدمة), policy (سياسة), example (مثال رد)
+  docType: mysqlEnum("docType", ["text", "faq", "product", "policy", "example", "tone"]).default("text").notNull(),
+  content: text("content").notNull(),
+  // عدد مرات الاستخدام في الردود
+  usageCount: int("usageCount").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: varchar("createdBy", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type RagDocument = typeof ragDocuments.$inferSelect;
+export type InsertRagDocument = typeof ragDocuments.$inferInsert;
+
+// أجزاء المستندات المقسّمة للبحث الدلالي
+export const ragChunks = mysqlTable("rag_chunks", {
+  id: int("id").autoincrement().primaryKey(),
+  documentId: int("documentId").notNull(),
+  chunkIndex: int("chunkIndex").default(0).notNull(),
+  content: text("content").notNull(),
+  // embedding كـ JSON array من الأرقام (vector)
+  embedding: json("embedding").$type<number[]>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type RagChunk = typeof ragChunks.$inferSelect;
+export type InsertRagChunk = typeof ragChunks.$inferInsert;
+
+// سجل محادثات التدريب - أمثلة ردود احترافية
+export const ragConversationExamples = mysqlTable("rag_conversation_examples", {
+  id: int("id").autoincrement().primaryKey(),
+  customerMessage: text("customerMessage").notNull(),
+  idealResponse: text("idealResponse").notNull(),
+  context: varchar("context", { length: 200 }),
+  // أسلوب الرد: formal (رسمي), friendly (ودي), direct (مباشر), persuasive (مقنع)
+  tone: mysqlEnum("tone", ["formal", "friendly", "direct", "persuasive"]).default("friendly").notNull(),
+  category: varchar("category", { length: 100 }).default("general"),
+  rating: int("rating").default(5), // تقييم جودة المثال 1-5
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type RagConversationExample = typeof ragConversationExamples.$inferSelect;
+export type InsertRagConversationExample = typeof ragConversationExamples.$inferInsert;
+
+// إعدادات شخصية AI (هوية، أسلوب، قواعد)
+export const aiPersonality = mysqlTable("ai_personality", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).default("مساعد المبيعات").notNull(),
+  role: varchar("role", { length: 200 }).default("مساعد مبيعات احترافي").notNull(),
+  businessContext: text("businessContext"), // وصف النشاط التجاري
+  defaultTone: mysqlEnum("defaultTone", ["formal", "friendly", "direct", "persuasive"]).default("friendly").notNull(),
+  language: varchar("language", { length: 20 }).default("ar").notNull(),
+  systemPrompt: text("systemPrompt"), // prompt مخصص كامل
+  rules: json("rules").$type<string[]>().default([]), // قواعد يجب الالتزام بها
+  forbiddenTopics: json("forbiddenTopics").$type<string[]>().default([]), // مواضيع محظورة
+  greetingMessage: text("greetingMessage"), // رسالة ترحيب افتراضية
+  closingMessage: text("closingMessage"), // رسالة إنهاء محادثة
+  isActive: boolean("isActive").default(true).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type AiPersonality = typeof aiPersonality.$inferSelect;
+export type InsertAiPersonality = typeof aiPersonality.$inferInsert;

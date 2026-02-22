@@ -137,6 +137,8 @@ function ManualSearchGuide({
   setKeyword,
   city,
   setCity,
+  country = "السعودية",
+  setCountry,
   searchUrl,
   steps,
   tips,
@@ -156,6 +158,8 @@ function ManualSearchGuide({
   setKeyword: (v: string) => void;
   city: string;
   setCity: (v: string) => void;
+  country?: string;
+  setCountry?: (v: string) => void;
   searchUrl: string;
   steps: { icon: any; title: string; desc: string }[];
   tips: string[];
@@ -207,7 +211,7 @@ function ManualSearchGuide({
           <p className="text-xs text-muted-foreground">بحث يدوي موجَّه — يفتح المنصة مباشرة بكلمة البحث وتُدخل البيانات يدوياً</p>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
               <Label className="text-xs mb-1 block">نوع النشاط / الكلمة المفتاحية</Label>
               <Input
@@ -218,11 +222,23 @@ function ManualSearchGuide({
               />
             </div>
             <div>
-              <Label className="text-xs mb-1 block">المدينة</Label>
+              <Label className="text-xs mb-1 block">البلد</Label>
+              <Input
+                value={country}
+                onChange={e => setCountry?.(e.target.value)}
+                placeholder="السعودية"
+                list={`countries-${platform}`}
+              />
+              <datalist id={`countries-${platform}`}>
+                {["السعودية", "الإمارات", "الكويت", "قطر", "البحرين", "عُمان", "مصر", "الأردن", "العراق"].map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">المدينة <span className="text-muted-foreground text-xs">(اختياري)</span></Label>
               <Input
                 value={city}
                 onChange={e => setCity(e.target.value)}
-                placeholder="الرياض"
+                placeholder="الرياض، جدة، الدمام..."
                 list={`cities-${platform}`}
               />
               <datalist id={`cities-${platform}`}>
@@ -412,9 +428,10 @@ export default function SearchHub() {
   const [activeTab, setActiveTab] = useState("google");
   const [duplicateKeys, setDuplicateKeys] = useState<string[]>([]);
 
-  // ===== Google Text Search =====
+  // ===== Google Web Search =====
   const [googleQuery, setGoogleQuery] = useState("");
-  const [googleCity, setGoogleCity] = useState("الرياض");
+  const [googleCity, setGoogleCity] = useState("");
+  const [googleCountry, setGoogleCountry] = useState("السعودية");
   const [googleResults, setGoogleResults] = useState<any[]>([]);
   const [googleNextToken, setGoogleNextToken] = useState<string | null>(null);
   const searchPlaces = trpc.search.searchPlaces.useMutation({
@@ -435,7 +452,8 @@ export default function SearchHub() {
 
   // ===== Google Maps =====
   const [mapsQuery, setMapsQuery] = useState("");
-  const [mapsCity, setMapsCity] = useState("الرياض");
+  const [mapsCity, setMapsCity] = useState("");
+  const [mapsCountry, setMapsCountry] = useState("السعودية");
   const [mapsResults, setMapsResults] = useState<any[]>([]);
   const [mapsNextToken, setMapsNextToken] = useState<string | null>(null);
   const searchMaps = trpc.search.searchPlaces.useMutation({
@@ -457,7 +475,8 @@ export default function SearchHub() {
   // ===== Instagram =====
   const [igHashtag, setIgHashtag] = useState("");
   const [igBusinessType, setIgBusinessType] = useState("");
-  const [igCity, setIgCity] = useState("الرياض");
+  const [igCity, setIgCity] = useState("");
+  const [igCountry, setIgCountry] = useState("السعودية");
   const [igSearchId, setIgSearchId] = useState<number | null>(null);
   const getIgAccounts = trpc.instagram.getAccounts.useQuery(
     { searchId: igSearchId! },
@@ -480,7 +499,8 @@ export default function SearchHub() {
 
   // ===== TikTok - بحث يدوي موجَّه =====
   const [tiktokKeyword, setTiktokKeyword] = useState("");
-  const [tiktokCity, setTiktokCity] = useState("الرياض");
+  const [tiktokCity, setTiktokCity] = useState("");
+  const [tiktokCountry, setTiktokCountry] = useState("السعودية");
   const [tiktokHashtags, setTiktokHashtags] = useState<string[]>([]);
   const [tiktokManualResults, setTiktokManualResults] = useState<any[]>([]);
   const suggestTiktokHashtags = trpc.socialSearch.suggestSocialHashtags.useMutation({
@@ -493,7 +513,8 @@ export default function SearchHub() {
 
   // ===== Snapchat - بحث يدوي موجَّه =====
   const [snapKeyword, setSnapKeyword] = useState("");
-  const [snapCity, setSnapCity] = useState("الرياض");
+  const [snapCity, setSnapCity] = useState("");
+  const [snapCountry, setSnapCountry] = useState("السعودية");
   const [snapHashtags, setSnapHashtags] = useState<string[]>([]);
   const [snapManualResults, setSnapManualResults] = useState<any[]>([]);
   const suggestSnapHashtags = trpc.socialSearch.suggestSocialHashtags.useMutation({
@@ -506,7 +527,8 @@ export default function SearchHub() {
 
   // ===== Telegram =====
   const [telegramKeyword, setTelegramKeyword] = useState("");
-  const [telegramCity, setTelegramCity] = useState("الرياض");
+  const [telegramCity, setTelegramCity] = useState("");
+  const [telegramCountry, setTelegramCountry] = useState("السعودية");
   const [telegramResults, setTelegramResults] = useState<any[]>([]);
   const [telegramHashtags, setTelegramHashtags] = useState<string[]>([]);
   const searchTelegram = trpc.socialSearch.searchTelegram.useMutation({

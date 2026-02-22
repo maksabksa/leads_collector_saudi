@@ -360,12 +360,19 @@ export const aiSettingsRouter = router({
     .input(
       z.object({
         enabled: z.boolean(),
-        accountId: z.string().default("default"),
+        accountId: z.string().default("all"),
       })
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // إذا accountId = "all" نحدّث جميع المحادثات بغض النظر عن الحساب
+      if (input.accountId === "all") {
+        await db.update(whatsappChats).set({ aiAutoReplyEnabled: input.enabled });
+        const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(whatsappChats);
+        return { success: true, updatedCount: Number(countRow?.count ?? 0) };
+      }
 
       await db
         .update(whatsappChats)

@@ -803,12 +803,15 @@ const searchRouter = router({
   searchPlaces: protectedProcedure
     .input(z.object({
       query: z.string().min(1),
-      city: z.string().min(1),
+      city: z.string().optional(),
+      country: z.string().optional(),
       pagetoken: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const { makeRequest } = await import("./_core/map");
-      const searchQuery = `${input.query} في ${input.city} السعودية`;
+      const countryPart = input.country || "السعودية";
+      const cityPart = input.city ? ` في ${input.city}` : "";
+      const searchQuery = `${input.query}${cityPart} ${countryPart}`;
       const params: Record<string, unknown> = {
         query: searchQuery,
         language: "ar",
@@ -2089,6 +2092,7 @@ const dataSettingsRouter = router({
 import { whatsappSettingsRouter } from "./routers/whatsappSettings";
 import { socialSearchRouter } from "./routers/socialSearch";
 import { aiSettingsRouter } from "./routers/aiSettings";
+import { ragKnowledgeRouter } from "./routers/ragKnowledge";
 import { whatsappAccountsRouter } from "./routers/whatsappAccounts";
 import { segmentsRouter } from "./routers/segments";
 import { interestKeywordsRouter } from "./routers/interestKeywords";
@@ -2116,6 +2120,7 @@ export const appRouter = router({
   invitations: invitationsRouter,
   waSettings: whatsappSettingsRouter,
   aiConfig: aiSettingsRouter,
+  ragKnowledge: ragKnowledgeRouter,
   waAccounts: whatsappAccountsRouter,
   interestKw: interestKeywordsRouter,
   segments: segmentsRouter,
