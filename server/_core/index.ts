@@ -80,8 +80,13 @@ async function restoreWhatsAppSessions() {
           const insertId = (res as { insertId: number }).insertId;
           [chat] = await db2.select().from(whatsappChats).where(eq(whatsappChats.id, insertId)).limit(1);
         } else {
+          // تحديث الاسم تلقائياً: أولوية اسم واتساب (pushname) > الاسم المحفوظ > رقم الهاتف
+          const nameUpdate = contactName && contactName !== chat.contactName ? { contactName } : {};
           await db2.update(whatsappChats).set({
-            lastMessage: lastMsg, lastMessageAt: new Date(), unreadCount: chat.unreadCount + 1,
+            lastMessage: lastMsg,
+            lastMessageAt: new Date(),
+            unreadCount: chat.unreadCount + 1,
+            ...nameUpdate,
           }).where(eq(whatsappChats.id, chat.id));
         }
 

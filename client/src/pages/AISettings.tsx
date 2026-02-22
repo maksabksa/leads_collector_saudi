@@ -137,6 +137,7 @@ export default function AISettings() {
     reply?: string;
     error?: string;
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<"settings" | "knowledge">("settings");
 
   // ===== Queries =====
   const { data: settings, refetch: refetchSettings } = trpc.aiConfig.getSettings.useQuery();
@@ -243,22 +244,82 @@ export default function AISettings() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Brain className="w-7 h-7 text-primary" />
-            إعدادات الذكاء الاصطناعي
+            ذكاء اصطناعي AI
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            ربط OpenAI وتوجيه الردود التلقائية والتحكم بكل عميل
+            إعدادات النموذج وقاعدة المعرفة والردود التلقائية
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saveSettings.isPending}>
-          {saveSettings.isPending ? (
-            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4 ml-2" />
-          )}
-          حفظ الإعدادات
-        </Button>
+        {activeTab === "settings" && (
+          <Button onClick={handleSave} disabled={saveSettings.isPending}>
+            {saveSettings.isPending ? (
+              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 ml-2" />
+            )}
+            حفظ الإعدادات
+          </Button>
+        )}
       </div>
 
+      {/* تبويبات الصفحة */}
+      <div className="flex gap-1 p-1 rounded-xl border border-border" style={{ background: "oklch(0.13 0.012 240)" }}>
+        {[
+          { id: "settings", label: "إعدادات AI", icon: Settings2 },
+          { id: "knowledge", label: "قاعدة المعرفة", icon: MessageSquare },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as "settings" | "knowledge")}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+            style={activeTab === tab.id ? {
+              background: "oklch(0.65 0.18 200 / 0.15)",
+              border: "1px solid oklch(0.65 0.18 200 / 0.3)",
+              color: "var(--brand-cyan)",
+            } : { color: "var(--muted-foreground)" }}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ===== تبويب قاعدة المعرفة ===== */}
+      {activeTab === "knowledge" && (
+        <div className="bg-card border border-border rounded-xl p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+            <MessageSquare className="w-8 h-8 text-primary" />
+          </div>
+          <h3 className="text-xl font-bold mb-2">قاعدة معرفة AI</h3>
+          <p className="text-muted-foreground text-sm mb-6 max-w-md mx-auto">
+            أدرب الذكاء الاصطناعي على معلومات شركتك ومنتجاتك وأسلوب ردودك ليرد بشكل احترافي على عملائك
+          </p>
+          <div className="grid grid-cols-3 gap-4 mb-6 text-right">
+            {[
+              { icon: Globe, title: "معلومات الشركة", desc: "أضف نصوصاً عن شركتك وخدماتك" },
+              { icon: MessageSquare, title: "أمثلة محادثات", desc: "درب AI على محادثات حقيقية ناجحة" },
+              { icon: Brain, title: "شخصية AI", desc: "حدد أسلوب ولغة ونبرة الرد" },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="p-4 rounded-xl border border-border bg-background/50">
+                <Icon className="w-6 h-6 text-primary mb-2" />
+                <p className="font-medium text-sm mb-1">{title}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
+            ))}
+          </div>
+          <a
+            href="/knowledge-base"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ background: "oklch(0.65 0.18 200)" }}
+          >
+            <MessageSquare className="w-4 h-4" />
+            فتح صفحة قاعدة المعرفة
+          </a>
+        </div>
+      )}
+
+      {/* ===== تبويب إعدادات AI ===== */}
+      {activeTab === "settings" && <>
       {/* ===== القسم 1: مزود الذكاء الاصطناعي ===== */}
       <Section icon={Zap} title="مزود الذكاء الاصطناعي" subtitle="اختر بين OpenAI الخاص أو المزود المدمج">
         <div className="grid grid-cols-2 gap-3">
@@ -784,6 +845,7 @@ export default function AISettings() {
           حفظ جميع الإعدادات
         </Button>
       </div>
+      </>}
     </div>
   );
 }

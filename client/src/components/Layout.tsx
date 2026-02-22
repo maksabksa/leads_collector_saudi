@@ -4,7 +4,6 @@ import { trpc } from "@/lib/trpc";
 import {
   BarChart3,
   LogOut,
-  Plus,
   Users,
   ChevronRight,
   Menu,
@@ -20,28 +19,31 @@ import {
   Layers,
   Settings2,
   FileSpreadsheet,
-  BookOpen,
+  Upload,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
+// القائمة الرئيسية - مرتبة بشكل احترافي
 const navItems = [
   { path: "/", label: "لوحة التحكم", icon: BarChart3, permission: null },
-  { path: "/search-hub", label: "مركز البحث", icon: Search, permission: "search.use" },
-  { path: "/leads", label: "قائمة العملاء", icon: Users, permission: "leads.view" },
-  { path: "/leads/add", label: "إضافة عميل", icon: Plus, permission: "leads.add" },
-  { path: "/whatsapp", label: "واتساب", icon: MessageCircle, permission: "whatsapp.send" },
   { path: "/chats", label: "المحادثات", icon: MessagesSquare, permission: "whatsapp.send" },
+  { path: "/whatsapp", label: "إرسال واتساب", icon: MessageCircle, permission: "whatsapp.send" },
+  { path: "/leads", label: "قائمة العملاء", icon: Users, permission: "leads.view" },
+  { path: "/search-hub", label: "مركز البحث", icon: Search, permission: "search.use" },
 ];
 
+// قائمة الإدارة - مدمجة ومرتبة بدون تكرار
 const adminNavItems = [
   { path: "/users", label: "إدارة المستخدمين", icon: Shield },
+  // AI مدمج: إعدادات AI + قاعدة المعرفة في صفحة واحدة
+  { path: "/ai-settings", label: "ذكاء اصطناعي AI", icon: Brain },
   { path: "/interest-keywords", label: "كشف الاهتمام", icon: Zap },
-  { path: "/segments", label: "شرائح العملاء", icon: Layers },
-  { path: "/ai-settings", label: "إعدادات AI", icon: Brain },
-  { path: "/knowledge-base", label: "قاعدة معرفة AI", icon: BookOpen },
+  // إعدادات البيانات تشمل شرائح العملاء والرفع الجماعي
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
-  { path: "/bulk-import", label: "رفع جماعي (Excel)", icon: FileSpreadsheet },
+  { path: "/segments", label: "شرائح العملاء", icon: Layers },
+  { path: "/bulk-import", label: "رفع جماعي", icon: Upload },
+  { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
