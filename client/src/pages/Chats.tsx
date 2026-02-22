@@ -512,40 +512,50 @@ export default function Chats() {
   return (
     <div className="h-screen flex flex-col" style={{ background: "#111b21" }}>
       {/* ===== شريط علوي ===== */}
-      <div className="flex items-center justify-between px-4 py-2.5 flex-shrink-0 border-b border-white/10" style={{ background: "#202c33" }}>
-        <div className="flex items-center gap-3">
-          <MessageCircle className="w-5 h-5 text-[#25D366]" />
-          <span className="font-semibold text-white text-sm">المحادثات</span>
-          {stats && (
-            <Badge variant="outline" className="text-xs border-[#25D366]/40 text-[#25D366]">
-              {(stats as any).total ?? 0} محادثة
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* ===== مفتاح AI الإجمالي ===== */}
-          <AiToggle
-            enabled={globalAiEnabled}
-            loading={globalAiLoading}
-            label={globalAiEnabled ? "AI مفعّل للكل" : "AI موقف للكل"}
-            onClick={handleToggleGlobalAI}
-          />
-          {waAccounts.length > 1 && (
-            <select
-              value={selectedAccountId}
-              onChange={e => setSelectedAccountId(e.target.value)}
-              className="text-xs rounded-lg px-2 py-1.5 border text-white"
-              style={{ background: "#2a3942", borderColor: "rgba(255,255,255,0.1)" }}
-            >
-              <option value="all">كل الحسابات</option>
-              {(waAccounts as any[]).map((acc) => (
-                <option key={acc.accountId} value={acc.accountId}>{acc.label}</option>
-              ))}
-            </select>
-          )}
-          <Button size="sm" onClick={() => setShowNewChat(true)} className="gap-1.5 text-xs h-8 text-white" style={{ background: "#25D366" }}>
-            <Plus className="w-3.5 h-3.5" /> جديد
-          </Button>
+      <div className="flex-shrink-0 border-b border-white/10" style={{ background: "#202c33" }}>
+        {/* شريط حالة AI الإجمالي */}
+        {globalAiEnabled && (
+          <div className="flex items-center justify-center gap-2 px-4 py-1.5 border-b border-[#25D366]/20" style={{ background: "rgba(37,211,102,0.08)" }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
+            <span className="text-[11px] text-[#25D366] font-medium">الرد التلقائي بالـ AI مفعّل لجميع المحادثات</span>
+            <Link href="/ai-settings" className="text-[11px] text-[#25D366] underline opacity-70 hover:opacity-100">إعدادات AI</Link>
+          </div>
+        )}
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <MessageCircle className="w-5 h-5 text-[#25D366]" />
+            <span className="font-semibold text-white text-sm">المحادثات</span>
+            {stats && (
+              <Badge variant="outline" className="text-xs border-[#25D366]/40 text-[#25D366]">
+                {(stats as any).total ?? 0} محادثة
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* ===== مفتاح AI الإجمالي ===== */}
+            <AiToggle
+              enabled={globalAiEnabled}
+              loading={globalAiLoading}
+              label={globalAiEnabled ? "AI مفعّل للكل" : "AI موقف للكل"}
+              onClick={handleToggleGlobalAI}
+            />
+            {waAccounts.length > 1 && (
+              <select
+                value={selectedAccountId}
+                onChange={e => setSelectedAccountId(e.target.value)}
+                className="text-xs rounded-lg px-2 py-1.5 border text-white"
+                style={{ background: "#2a3942", borderColor: "rgba(255,255,255,0.1)" }}
+              >
+                <option value="all">كل الحسابات</option>
+                {(waAccounts as any[]).map((acc) => (
+                  <option key={acc.accountId} value={acc.accountId}>{acc.label}</option>
+                ))}
+              </select>
+            )}
+            <Button size="sm" onClick={() => setShowNewChat(true)} className="gap-1.5 text-xs h-8 text-white" style={{ background: "#25D366" }}>
+              <Plus className="w-3.5 h-3.5" /> جديد
+            </Button>
+          </div>
         </div>
       </div>
 

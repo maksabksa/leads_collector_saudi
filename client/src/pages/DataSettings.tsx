@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import InterestKeywords from "./InterestKeywords";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -285,8 +286,9 @@ function CategoryCard({ category }: { category: CategoryConfig }) {
 // ===== الصفحة الرئيسية =====
 export default function DataSettings() {
   const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState<"data" | "interest">("data");
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <div
@@ -297,57 +299,82 @@ export default function DataSettings() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-foreground">إعدادات البيانات</h1>
-          <p className="text-sm text-muted-foreground">إدارة القوائم المنسدلة والخيارات المستخدمة في النظام</p>
+          <p className="text-sm text-muted-foreground">إدارة القوائم المنسدلة وكشف اهتمام العملاء</p>
         </div>
       </div>
-
-      {/* بطاقة التوضيح */}
-      <div
-        className="rounded-2xl p-4 border text-sm text-muted-foreground"
-        style={{ background: "oklch(0.13 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.2)" }}
-      >
-        <p>
-          هذه الصفحة تتيح لك تخصيص القوائم المنسدلة في نماذج إضافة وتعديل العملاء.
-          يمكنك إضافة أنواع أعمال جديدة، مدن، أحياء، ومصادر بيانات حسب احتياجاتك.
-          التغييرات تُطبَّق فوراً على جميع النماذج في النظام.
-        </p>
-      </div>
-
-      {/* روابط سريعة */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => navigate("/interest-keywords")}
-          className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all text-right group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-            <Search className="w-5 h-5 text-amber-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">كشف الاهتمام</p>
-            <p className="text-xs text-muted-foreground mt-0.5">كلمات مفتاحية لتحديد اهتمامات العملاء</p>
-          </div>
-          <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </button>
-        <button
-          onClick={() => navigate("/segments")}
-          className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all text-right group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-            <Users className="w-5 h-5 text-purple-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">شرائح العملاء</p>
-            <p className="text-xs text-muted-foreground mt-0.5">تجميع العملاء في مجموعات مستهدفة</p>
-          </div>
-          <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </button>
-      </div>
-      {/* بطاقات الفئات */}
-      <div className="space-y-3">
-        {CATEGORIES.map((cat) => (
-          <CategoryCard key={cat.key} category={cat} />
+      {/* تبويبات */}
+      <div className="flex gap-1 p-1 rounded-xl border border-border" style={{ background: "oklch(0.13 0.012 240)" }}>
+        {[
+          { id: "data", label: "إعدادات البيانات", icon: Settings2 },
+          { id: "interest", label: "كشف الاهتمام", icon: Search },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as "data" | "interest")}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+            style={activeTab === tab.id ? {
+              background: "oklch(0.65 0.18 200 / 0.15)",
+              border: "1px solid oklch(0.65 0.18 200 / 0.3)",
+              color: "oklch(0.75 0.18 200)",
+            } : { color: "var(--muted-foreground)" }}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
         ))}
       </div>
+      {/* تبويب إعدادات البيانات */}
+      {activeTab === "data" && (
+        <div className="space-y-6">
+          <div
+            className="rounded-2xl p-4 border text-sm text-muted-foreground"
+            style={{ background: "oklch(0.13 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.2)" }}
+          >
+            <p>
+              هذه الصفحة تتيح لك تخصيص القوائم المنسدلة في نماذج إضافة وتعديل العملاء.
+              يمكنك إضافة أنواع أعمال جديدة، مدن، أحياء، ومصادر بيانات حسب احتياجاتك.
+              التغييرات تُطبَّق فوراً على جميع النماذج في النظام.
+            </p>
+          </div>
+          {/* روابط سريعة */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => navigate("/segments")}
+              className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all text-right group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 text-purple-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">شرائح العملاء</p>
+                <p className="text-xs text-muted-foreground mt-0.5">تجميع العملاء في مجموعات مستهدفة</p>
+              </div>
+              <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+            </button>
+            <button
+              onClick={() => navigate("/leads")}
+              className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all text-right group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+                <Layers className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">رفع جماعي</p>
+                <p className="text-xs text-muted-foreground mt-0.5">استيراد عملاء من ملف Excel/CSV</p>
+              </div>
+              <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+            </button>
+          </div>
+          {/* بطاقات الفئات */}
+          <div className="space-y-3">
+            {CATEGORIES.map((cat) => (
+              <CategoryCard key={cat.key} category={cat} />
+            ))}
+          </div>
+        </div>
+      )}
+      {/* تبويب كشف الاهتمام */}
+      {activeTab === "interest" && <InterestKeywords />}
     </div>
   );
 }

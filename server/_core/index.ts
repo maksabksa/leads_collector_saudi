@@ -98,6 +98,93 @@ async function restoreWhatsAppSessions() {
           mediaFilename: resolvedFilename,
           status: "read",
         });
+
+        // ===== الرد التلقائي بالـ AI =====
+        if (message && message.trim()) {
+          // نفذ بشكل غير متزامن حتى لا يؤخر حفظ الرسالة الواردة
+          setImmediate(async () => {
+            try {
+              const { aiSettings, aiPersonality, ragDocuments, ragConversationExamples } = await import("../../drizzle/schema");
+              const { sql: sqlFn } = await import("drizzle-orm");
+              const { invokeLLM } = await import("./llm");
+              const { sendWhatsAppMessage } = await import("../whatsappAutomation");
+              const db3 = await getDb();
+              if (!db3) return;
+              // جلب الإعدادات العامة
+              const [settings] = await db3.select().from(aiSettings).limit(1);
+              const globalEnabled = settings?.globalAutoReplyEnabled ?? false;
+              // جلب حالة المحادثة
+              const { whatsappChats: waChats } = await import("../../drizzle/schema");
+              const { and: and2, eq: eq2 } = await import("drizzle-orm");
+              const [freshChat] = await db3.select().from(waChats).where(
+                and2(eq2(waChats.accountId, accountId), eq2(waChats.phone, phone))
+              ).limit(1);
+              const chatAutoReply = freshChat?.aiAutoReplyEnabled ?? false;
+              if (!globalEnabled && !chatAutoReply) return;
+              // جلب شخصية AI
+              const [personality] = await db3.select().from(aiPersonality).limit(1);
+              // البحث في قاعدة المعرفة
+              const keywords = message.split(/\s+/).filter((w: string) => w.length > 2).slice(0, 5);
+              const ragContext: string[] = [];
+              for (const keyword of keywords) {
+                const docs = await db3.select({ content: ragDocuments.content, title: ragDocuments.title, docType: ragDocuments.docType })
+                  .from(ragDocuments)
+                  .where(and2(
+                    eq2(ragDocuments.isActive, true),
+                    sqlFn`(${ragDocuments.content} LIKE ${`%${keyword}%`} OR ${ragDocuments.title} LIKE ${`%${keyword}%`})`
+                  ))
+                  .limit(2);
+                for (const doc of docs) {
+                  const snippet = `[${doc.docType === "faq" ? "سؤال وجواب" : "معلومة"}] ${doc.title}: ${doc.content.substring(0, 200)}`;
+                  if (!ragContext.includes(snippet)) ragContext.push(snippet);
+                }
+                const examples = await db3.select({ customerMessage: ragConversationExamples.customerMessage, idealResponse: ragConversationExamples.idealResponse })
+                  .from(ragConversationExamples)
+                  .where(and2(
+                    eq2(ragConversationExamples.isActive, true),
+                    sqlFn`${ragConversationExamples.customerMessage} LIKE ${`%${keyword}%`}`
+                  ))
+                  .limit(1);
+                for (const ex of examples) {
+                  ragContext.push(`[مثال] عندما يقول العميل: "${ex.customerMessage}" → الرد: "${ex.idealResponse}"`);
+                }
+              }
+              // بناء system prompt
+              const systemPrompt = [
+                personality?.systemPrompt || settings?.systemPrompt || "أنت مساعد مبيعات سعودي محترف يرد على رسائل العملاء بشكل ودي واحترافي.",
+                settings?.businessContext ? `\nمعلومات النشاط التجاري: ${settings.businessContext}` : "",
+                personality?.businessContext ? `\nمعلومات إضافية: ${personality.businessContext}` : "",
+                personality?.rules?.length ? `\nالقواعد: ${(personality.rules as string[]).join(" | ")}` : "",
+                ragContext.length > 0 ? `\n\n=== معلومات من قاعدة المعرفة ===\n${ragContext.join("\n")}` : "",
+                "\n\nالتعليمات: رد باللغة العربية بشكل مختصر ومفيد. لا تذكر أنك AI. رد مباشرة على استفسار العميل.",
+              ].filter(Boolean).join("");
+              const aiResponse = await invokeLLM({
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: `رسالة العميل${freshChat?.contactName ? ` (${freshChat.contactName})` : ""}: "${message}"` },
+                ],
+              });
+              const aiReply = ((aiResponse.choices[0]?.message?.content as string) || "").trim();
+              if (aiReply && freshChat) {
+                const { whatsappChatMessages: waChatMsgs } = await import("../../drizzle/schema");
+                // إرسال الرد عبر واتساب
+                await sendWhatsAppMessage(phone, aiReply, accountId);
+                // حفظ الرد في قاعدة البيانات
+                await db3.insert(waChatMsgs).values({
+                  chatId: freshChat.id, accountId, direction: "outgoing",
+                  message: aiReply, status: "sent",
+                });
+                await db3.update(waChats).set({
+                  lastMessage: aiReply,
+                  lastMessageAt: new Date(),
+                }).where(eq2(waChats.id, freshChat.id));
+                console.log(`[AI AutoReply] ✅ رد تلقائي أُرسل إلى ${phone}`);
+              }
+            } catch (aiErr) {
+              console.error("[AI AutoReply] خطأ في الرد التلقائي:", aiErr);
+            }
+          });
+        }
       } catch (err) {
         console.error("[WhatsApp] خطأ في حفظ رسالة واردة:", err);
       }

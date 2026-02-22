@@ -4,8 +4,9 @@ import { Link } from "wouter";
 import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, MessageCircle, Zap,
-  Send, X, Loader2, CheckCircle2, XCircle, Pause, Play, Sparkles,
+  Send, X, Loader2, CheckCircle2, XCircle, Pause, Play, Sparkles, Upload,
 } from "lucide-react";
+import BulkImport from "./BulkImport";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 import {
@@ -41,6 +42,7 @@ export default function Leads() {
   const [filterPriority, setFilterPriority] = useState("");
   const [showSegmentDialog, setShowSegmentDialog] = useState(false);
   const [targetSegmentId, setTargetSegmentId] = useState<string>("");
+  const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
 
   // === Bulk WhatsApp Send State ===
   const [showBulkWaDialog, setShowBulkWaDialog] = useState(false);
@@ -334,6 +336,14 @@ export default function Leads() {
           >
             <Download className="w-4 h-4" />
             تصدير CSV
+          </button>
+          <button
+            onClick={() => setShowBulkImportDialog(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "oklch(0.65 0.18 75 / 0.1)", color: "oklch(0.85 0.16 75)", border: "1px solid oklch(0.65 0.18 75 / 0.25)" }}
+          >
+            <Upload className="w-4 h-4" />
+            رفع جماعي
           </button>
           <Link href="/leads/add">
             <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-all"

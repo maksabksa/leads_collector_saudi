@@ -38,11 +38,9 @@ const adminNavItems = [
   { path: "/users", label: "إدارة المستخدمين", icon: Shield },
   // AI مدمج: إعدادات AI + قاعدة المعرفة في صفحة واحدة
   { path: "/ai-settings", label: "ذكاء اصطناعي AI", icon: Brain },
-  { path: "/interest-keywords", label: "كشف الاهتمام", icon: Zap },
-  // إعدادات البيانات تشمل شرائح العملاء والرفع الجماعي
+  // إعدادات البيانات تشمل كشف الاهتمام + شرائح العملاء (مدمجة)
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
   { path: "/segments", label: "شرائح العملاء", icon: Layers },
-  { path: "/bulk-import", label: "رفع جماعي", icon: Upload },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
 ];
 
