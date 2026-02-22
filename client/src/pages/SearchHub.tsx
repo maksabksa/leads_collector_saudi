@@ -472,29 +472,18 @@ export default function SearchHub() {
     onError: (e) => toast.error("خطأ في البحث", { description: e.message }),
   });
 
-  // ===== Instagram =====
-  const [igHashtag, setIgHashtag] = useState("");
-  const [igBusinessType, setIgBusinessType] = useState("");
+  // ===== Instagram - بحث يدوي موجَّه =====
+  const [igKeyword, setIgKeyword] = useState("");
   const [igCity, setIgCity] = useState("");
   const [igCountry, setIgCountry] = useState("السعودية");
-  const [igSearchId, setIgSearchId] = useState<number | null>(null);
-  const getIgAccounts = trpc.instagram.getAccounts.useQuery(
-    { searchId: igSearchId! },
-    { enabled: igSearchId !== null }
-  ) as any;
-  const startIgSearch = trpc.instagram.startSearch.useMutation({
+  const [igHashtags, setIgHashtags] = useState<string[]>([]);
+  const [igManualResults, setIgManualResults] = useState<any[]>([]);
+  const suggestIgHashtags = trpc.socialSearch.suggestSocialHashtags.useMutation({
     onSuccess: (data) => {
-      setIgSearchId(data.searchId);
-      toast.success("بدأ البحث في إنستغرام");
+      setIgHashtags(data.hashtags);
+      toast.success("تم اقتراح الهاشتاقات");
     },
-    onError: (e) => toast.error("خطأ في البحث", { description: e.message }),
-  });
-  const generateIgStrategy = trpc.socialSearch.suggestSocialHashtags.useMutation({
-    onSuccess: (data: any) => {
-      toast.success("تم اقتراح هاشتاقات للبحث");
-      if (data.hashtags?.length > 0) setIgHashtag(data.hashtags[0].replace("#", ""));
-    },
-    onError: (e: any) => toast.error("خطأ", { description: e.message }),
+    onError: (e) => toast.error("خطأ", { description: e.message }),
   });
 
   // ===== TikTok - بحث يدوي موجَّه =====
@@ -586,18 +575,21 @@ export default function SearchHub() {
     createLead.mutate({
       companyName: result.name,
       city: result.city || googleCity || mapsCity || igCity || tiktokCity || snapCity || telegramCity || "غير محدد",
-      businessType: result.businessType || googleQuery || mapsQuery || igBusinessType || tiktokKeyword || snapKeyword || telegramKeyword || "غير محدد",
+      businessType: result.businessType || googleQuery || mapsQuery || igKeyword || tiktokKeyword || snapKeyword || telegramKeyword || "غير محدد",
       website: result.website || "",
       notes: `مصدر: ${result.source || "بحث"} | ${result.address || result.bio || result.username || ""}`.trim(),
     });
   };
 
   // ===== TikTok Search URL =====
+   const igSearchUrl = useMemo(() => {
+    const q = encodeURIComponent(`${igKeyword} ${igCity} ${igCountry}`);
+    return `https://www.instagram.com/explore/search/keyword/?q=${q}`;
+  }, [igKeyword, igCity, igCountry]);
   const tiktokSearchUrl = useMemo(() => {
     const q = encodeURIComponent(`${tiktokKeyword} ${tiktokCity}`);
     return `https://www.tiktok.com/search?q=${q}`;
   }, [tiktokKeyword, tiktokCity]);
-
   // ===== Snapchat Search URL =====
   const snapSearchUrl = useMemo(() => {
     const q = encodeURIComponent(`${snapKeyword} ${snapCity}`);
@@ -789,75 +781,68 @@ export default function SearchHub() {
           </TabsContent>
 
           {/* ===== إنستغرام ===== */}
-          <TabsContent value="instagram" className="mt-6 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Instagram className="w-4 h-4 text-pink-400" />
-                  بحث إنستغرام
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">يبحث في إنستغرام عبر الهاشتاقات ويستخرج الحسابات التجارية النشطة</p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <Label className="text-xs mb-1 block">نوع النشاط</Label>
-                    <Input value={igBusinessType} onChange={e => setIgBusinessType(e.target.value)} placeholder="مطعم، صالون..." />
-                  </div>
-                  <div>
-                    <Label className="text-xs mb-1 block">الهاشتاق</Label>
-                    <Input value={igHashtag} onChange={e => setIgHashtag(e.target.value)} placeholder="مطاعم_الرياض" />
-                  </div>
-                  <div>
-                    <Label className="text-xs mb-1 block">المدينة</Label>
-                    <Input value={igCity} onChange={e => setIgCity(e.target.value)} placeholder="الرياض" list="cities-ig" />
-                    <datalist id="cities-ig">{SAUDI_CITIES.map(c => <option key={c} value={c} />)}</datalist>
-                  </div>
-                </div>
-
-                {/* دليل البحث */}
-                <div className="bg-pink-500/5 border border-pink-500/20 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-medium text-pink-400 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> دليل البحث في إنستغرام</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <div className="flex items-start gap-1.5"><span className="text-pink-400 font-bold">1.</span> استخدم هاشتاقات المدينة: #مطاعم_الرياض #صالونات_جدة</div>
-                    <div className="flex items-start gap-1.5"><span className="text-pink-400 font-bold">2.</span> الحسابات ذات Bio يحتوي على "واتساب" أو "للتواصل" هي الأكثر استجابة</div>
-                    <div className="flex items-start gap-1.5"><span className="text-pink-400 font-bold">3.</span> ابحث عن الحسابات التي نشرت خلال آخر 7 أيام (نشاط حديث)</div>
-                    <div className="flex items-start gap-1.5"><span className="text-pink-400 font-bold">4.</span> الحسابات بين 1K-50K متابع هي الأكثر قابلية للتحويل</div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => generateIgStrategy.mutate({ keyword: igBusinessType, city: igCity, platform: "all" })}
-                    disabled={generateIgStrategy.isPending || !igBusinessType}
-                    className="text-xs"
-                  >
-                    {generateIgStrategy.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Bot className="w-3 h-3 mr-1" />}
-                    AI يقترح هاشتاق
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={() => startIgSearch.mutate({ hashtag: igHashtag })}
-                    disabled={startIgSearch.isPending || !igHashtag}
-                  >
-                    {startIgSearch.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Instagram className="w-4 h-4 mr-2" />}
-                    بحث في إنستغرام
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            {getIgAccounts.data?.accounts && getIgAccounts.data.accounts.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">{getIgAccounts.data.accounts.length} حساب</p>
-                {getIgAccounts.data.accounts.map((r: any, i: number) => (
-                  <ResultCard key={i} result={{ ...r, source: "Instagram" }} onAdd={handleAddLead} isDuplicate={duplicateKeys.includes(r.phone || r.name)} />
-                ))}
-              </div>
-            )}
+          <TabsContent value="instagram" className="mt-6">
+            <ManualSearchGuide
+              platform="Instagram"
+              icon={Instagram}
+              color="text-pink-400"
+              bgColor="border-pink-500/20 bg-pink-500/5"
+              keyword={igKeyword}
+              setKeyword={setIgKeyword}
+              city={igCity}
+              setCity={setIgCity}
+              country={igCountry}
+              setCountry={setIgCountry}
+              searchUrl={igSearchUrl}
+              steps={[
+                {
+                  icon: Keyboard,
+                  title: "أدخل كلمة البحث والمدينة",
+                  desc: "مثال: \"مطعم الرياض\" أو \"صالون جدة\" — كن محدداً للحصول على نتائج أفضل"
+                },
+                {
+                  icon: ExternalLink,
+                  title: "افتح Instagram مباشرة",
+                  desc: "اضغط الزر الأزرق — سيفتح Instagram في تبويب جديد بكلمة البحث جاهزة تلقائياً"
+                },
+                {
+                  icon: Filter,
+                  title: "فلتر النتائج",
+                  desc: "اختر تبويب \"حسابات\" أو ابحث بالهاشتاق مثل #مطاعم_الرياض للحسابات التجارية"
+                },
+                {
+                  icon: Eye,
+                  title: "تصفّح الحسابات التجارية",
+                  desc: "ابحث عن: Bio يحتوي رقم هاتف أو واتساب، منشورات منتظمة، 1K-50K متابع"
+                },
+                {
+                  icon: Copy,
+                  title: "انسخ البيانات",
+                  desc: "انسخ: اسم الحساب، @username، رقم الهاتف من البايو، عدد المتابعين"
+                },
+                {
+                  icon: Plus,
+                  title: "أضف في النموذج أدناه",
+                  desc: "الصق البيانات في نموذج الإضافة اليدوي — النظام سيتحقق تلقائياً من التكرار"
+                }
+              ]}
+              tips={[
+                "ابحث بالعربية والإنجليزية: \"مطعم الرياض\" و\"restaurant Riyadh\" للحصول على نتائج أوسع",
+                "الحسابات ذات Bio يحتوي على 'واتساب' أو 'للتواصل' هي الأكثر استجابة",
+                "ابحث عن الحسابات التي نشرت خلال آخر 7 أيام (نشاط حديث)",
+                "الحسابات بين 1K-50K متابع هي الأكثر قابلية للتحويل",
+                "ابحث بالهاشتاق مثل #الرياض_بزنس أو #جدة_تجارة للعثور على أصحاب الأعمال مباشرة",
+                "الحسابات التجارية (Business Account) تظهر زر التواصل مباشرة في البروفايل"
+              ]}
+              hashtags={igHashtags}
+              onSuggestHashtags={() => suggestIgHashtags.mutate({ keyword: igKeyword, city: igCity, platform: "all" })}
+              isSuggestingHashtags={suggestIgHashtags.isPending}
+              manualResults={igManualResults}
+              setManualResults={setIgManualResults}
+              onAdd={handleAddLead}
+              duplicateKeys={duplicateKeys}
+            />
           </TabsContent>
-
           {/* ===== TikTok - بحث يدوي موجَّه ===== */}
           <TabsContent value="tiktok" className="mt-6">
             <ManualSearchGuide
