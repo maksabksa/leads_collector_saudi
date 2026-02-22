@@ -964,6 +964,34 @@ const searchRouter = router({
       return { results, url: input.url, count: results.length };
     }),
   // Check if a place already exists as a lead (by name + phone)
+  // فحص تكرار متعدد دفعة واحدة لفلترة نتائج البحث
+  checkBulkDuplicates: protectedProcedure
+    .input(z.object({
+      items: z.array(z.object({
+        name: z.string(),
+        phone: z.string().optional(),
+      }))
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { duplicates: [] };
+      const { leads } = await import("../drizzle/schema");
+      const { or, eq, like } = await import("drizzle-orm");
+      const duplicateKeys: string[] = [];
+      for (const item of input.items) {
+        const conditions = [like(leads.companyName, `%${item.name}%`)];
+        if (item.phone) conditions.push(eq(leads.verifiedPhone, item.phone));
+        const existing = await db.select({ id: leads.id })
+          .from(leads)
+          .where(or(...conditions))
+          .limit(1);
+        if (existing.length > 0) {
+          duplicateKeys.push(item.phone || item.name);
+        }
+      }
+      return { duplicates: duplicateKeys };
+    }),
+
   checkDuplicate: protectedProcedure
     .input(z.object({ companyName: z.string(), phone: z.string().optional() }))
     .query(async ({ input }) => {
