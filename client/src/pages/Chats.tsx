@@ -360,6 +360,10 @@ export default function Chats() {
   const filteredChats = useMemo(() => {
     let list = chats as Chat[];
     if (filterMode === "unread") list = list.filter(c => c.unreadCount > 0);
+    // فلتر حسب الحساب (الرقم المُرسِل) - يعمل فقط عند تحديد حساب معين غير "all"
+    if (selectedAccountId !== "all") {
+      list = list.filter(c => c.accountId === selectedAccountId);
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(c =>
@@ -367,7 +371,7 @@ export default function Chats() {
       );
     }
     return list;
-  }, [chats, filterMode, searchQuery]);
+  }, [chats, filterMode, searchQuery, selectedAccountId]);
 
   // ===== ترتيب وتجميع الرسائل =====
   const sortedMessages = useMemo(() =>
@@ -579,6 +583,7 @@ export default function Chats() {
                 style={{ background: "#202c33" }}
               />
             </div>
+            {/* فلتر الحالة */}
             <div className="flex gap-1">
               {(["all", "unread", "archived"] as const).map(mode => (
                 <button
@@ -593,6 +598,49 @@ export default function Chats() {
                 </button>
               ))}
             </div>
+            {/* فلتر حساب الواتساب (الرقم المُرسِل) - يظهر دائماً لمعرفة أي رقم يتعامل مع أكثر العملاء */}
+            {(waAccounts as any[]).length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-[#8696a0] px-1">فلتر حسب الرقم المُرسِل:</p>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setSelectedAccountId("all")}
+                    className="text-[11px] px-2 py-0.5 rounded-full border transition-all"
+                    style={selectedAccountId === "all"
+                      ? { background: "#25D366", borderColor: "#25D366", color: "white" }
+                      : { background: "transparent", borderColor: "rgba(255,255,255,0.15)", color: "#8696a0" }
+                    }
+                  >
+                    كل الأرقام
+                  </button>
+                  {(waAccounts as any[]).map((acc) => {
+                    const accChats = (chats as Chat[]).filter(c => c.accountId === acc.accountId);
+                    const accUnread = accChats.reduce((s, c) => s + c.unreadCount, 0);
+                    const color = getAccountColor(acc.accountId);
+                    return (
+                      <button
+                        key={acc.accountId}
+                        onClick={() => setSelectedAccountId(acc.accountId)}
+                        className="text-[11px] px-2 py-0.5 rounded-full border transition-all flex items-center gap-1"
+                        style={selectedAccountId === acc.accountId
+                          ? { background: color.light, borderColor: color.border, color: color.text }
+                          : { background: "transparent", borderColor: "rgba(255,255,255,0.1)", color: "#8696a0" }
+                        }
+                      >
+                        <Smartphone className="w-2.5 h-2.5" />
+                        <span className="truncate max-w-[80px]">{acc.label}</span>
+                        {accUnread > 0 && (
+                          <span className="min-w-[14px] h-3.5 rounded-full bg-[#25D366] text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+                            {accUnread}
+                          </span>
+                        )}
+                        <span className="text-[9px] opacity-60">({accChats.length})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           {/* قائمة المحادثات - سكرول مستقل */}
           <div className="flex-1 overflow-y-auto">

@@ -28,6 +28,7 @@ import Segments from "./pages/Segments";
 import DataSettings from "./pages/DataSettings";
 import BulkImport from "./pages/BulkImport";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import WhatsAppReport from "./pages/WhatsAppReport";
 function Router() {
   return (
     <Layout>
@@ -55,6 +56,7 @@ function Router() {
           <Route path="/data-settings" component={DataSettings} />
         <Route path="/bulk-import" component={BulkImport} />
         <Route path="/knowledge-base" component={KnowledgeBase} />
+        <Route path="/whatsapp-report" component={WhatsAppReport} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

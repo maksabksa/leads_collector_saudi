@@ -705,4 +705,163 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         .where(eq(whatsappChats.isArchived, false));
       return { total: Number(result[0]?.total ?? 0) };
     }),
+
+  // ===== إحصائيات الإرسال اليومي لكل رقم واتساب =====
+  getDailyStats: protectedProcedure
+    .input(z.object({
+      days: z.number().min(1).max(30).default(7), // عدد الأيام للتقرير
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { accounts: [], dailyBreakdown: [], totals: { sent: 0, received: 0, chats: 0 } };
+
+      const accounts = await db.select().from(whatsappAccounts);
+      const accountMap = new Map(accounts.map(a => [a.accountId, a]));
+
+      // حساب تاريخ البداية
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - input.days);
+      startDate.setHours(0, 0, 0, 0);
+
+      // إحصائيات كل حساب (إجمالي)
+      const accountStats = await db
+        .select({
+          accountId: whatsappChatMessages.accountId,
+          direction: whatsappChatMessages.direction,
+          count: sql<number>`COUNT(*)`,
+        })
+        .from(whatsappChatMessages)
+        .where(sql`${whatsappChatMessages.sentAt} >= ${startDate}`)
+        .groupBy(whatsappChatMessages.accountId, whatsappChatMessages.direction);
+
+      // تجميع الإحصائيات لكل حساب
+      const accountStatsMap = new Map<string, { sent: number; received: number; label: string; phoneNumber: string }>();
+      for (const row of accountStats) {
+        const acc = accountMap.get(row.accountId);
+        const label = acc?.label ?? row.accountId;
+        const phoneNumber = acc?.phoneNumber ?? row.accountId;
+        if (!accountStatsMap.has(row.accountId)) {
+          accountStatsMap.set(row.accountId, { sent: 0, received: 0, label, phoneNumber });
+        }
+        const stat = accountStatsMap.get(row.accountId)!;
+        if (row.direction === 'outgoing') stat.sent += Number(row.count);
+        else stat.received += Number(row.count);
+      }
+
+      // إحصائيات يومية (آخر N يوم)
+      const dailyStats = await db
+        .select({
+          accountId: whatsappChatMessages.accountId,
+          direction: whatsappChatMessages.direction,
+          day: sql<string>`DATE(${whatsappChatMessages.sentAt})`,
+          count: sql<number>`COUNT(*)`,
+        })
+        .from(whatsappChatMessages)
+        .where(sql`${whatsappChatMessages.sentAt} >= ${startDate}`)
+        .groupBy(
+          whatsappChatMessages.accountId,
+          whatsappChatMessages.direction,
+          sql`DATE(${whatsappChatMessages.sentAt})`
+        )
+        .orderBy(sql`DATE(${whatsappChatMessages.sentAt})`);
+
+      // تجميع البيانات اليومية
+      const dayMap = new Map<string, { day: string; sent: number; received: number; byAccount: Record<string, { sent: number; received: number }> }>();
+      for (const row of dailyStats) {
+        const day = row.day;
+        if (!dayMap.has(day)) {
+          dayMap.set(day, { day, sent: 0, received: 0, byAccount: {} });
+        }
+        const dayData = dayMap.get(day)!;
+        if (!dayData.byAccount[row.accountId]) {
+          dayData.byAccount[row.accountId] = { sent: 0, received: 0 };
+        }
+        if (row.direction === 'outgoing') {
+          dayData.sent += Number(row.count);
+          dayData.byAccount[row.accountId].sent += Number(row.count);
+        } else {
+          dayData.received += Number(row.count);
+          dayData.byAccount[row.accountId].received += Number(row.count);
+        }
+      }
+
+      // إحصائيات المحادثات لكل حساب
+      const chatStats = await db
+        .select({
+          accountId: whatsappChats.accountId,
+          total: sql<number>`COUNT(*)`,
+          active: sql<number>`SUM(CASE WHEN ${whatsappChats.isArchived} = 0 THEN 1 ELSE 0 END)`,
+          unread: sql<number>`SUM(${whatsappChats.unreadCount})`,
+        })
+        .from(whatsappChats)
+        .groupBy(whatsappChats.accountId);
+
+      const chatStatsMap = new Map(chatStats.map(r => [r.accountId, r]));
+
+      // بناء قائمة الحسابات مع كل إحصائياتها
+      const allAccountIds = new Set([
+        ...Array.from(accountStatsMap.keys()),
+        ...accounts.map(a => a.accountId),
+      ]);
+
+      const accountsResult = Array.from(allAccountIds).map(accountId => {
+        const acc = accountMap.get(accountId);
+        const stats = accountStatsMap.get(accountId) ?? { sent: 0, received: 0, label: acc?.label ?? accountId, phoneNumber: acc?.phoneNumber ?? accountId };
+        const chats = chatStatsMap.get(accountId);
+        const replyRate = stats.received > 0 ? Math.round((stats.sent / stats.received) * 100) : 0;
+        return {
+          accountId,
+          label: stats.label,
+          phoneNumber: stats.phoneNumber,
+          sent: stats.sent,
+          received: stats.received,
+          replyRate,
+          totalChats: Number(chats?.total ?? 0),
+          activeChats: Number(chats?.active ?? 0),
+          unreadMessages: Number(chats?.unread ?? 0),
+          isConnected: acc !== undefined,
+        };
+      });
+
+      const totals = {
+        sent: accountsResult.reduce((s, a) => s + a.sent, 0),
+        received: accountsResult.reduce((s, a) => s + a.received, 0),
+        chats: accountsResult.reduce((s, a) => s + a.totalChats, 0),
+      };
+
+      return {
+        accounts: accountsResult,
+        dailyBreakdown: Array.from(dayMap.values()).sort((a, b) => a.day.localeCompare(b.day)),
+        totals,
+        periodDays: input.days,
+      };
+    }),
+
+  // إحصائيات سريعة لكل حساب (للفلتر في قائمة المحادثات)
+  getAccountQuickStats: protectedProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+
+      const accounts = await db.select().from(whatsappAccounts);
+      const chatStats = await db
+        .select({
+          accountId: whatsappChats.accountId,
+          total: sql<number>`COUNT(*)`,
+          unread: sql<number>`SUM(${whatsappChats.unreadCount})`,
+        })
+        .from(whatsappChats)
+        .where(eq(whatsappChats.isArchived, false))
+        .groupBy(whatsappChats.accountId);
+
+      const statsMap = new Map(chatStats.map(r => [r.accountId, r]));
+
+      return accounts.map(acc => ({
+        accountId: acc.accountId,
+        label: acc.label,
+        phoneNumber: acc.phoneNumber,
+        totalChats: Number(statsMap.get(acc.accountId)?.total ?? 0),
+        unreadChats: Number(statsMap.get(acc.accountId)?.unread ?? 0),
+      }));
+    }),
 });

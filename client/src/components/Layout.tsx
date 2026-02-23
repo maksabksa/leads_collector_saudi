@@ -20,6 +20,7 @@ import {
   Settings2,
   FileSpreadsheet,
   Upload,
+  TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -42,6 +43,7 @@ const adminNavItems = [
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
   { path: "/segments", label: "شرائح العملاء", icon: Layers },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
+  { path: "/whatsapp-report", label: "تقرير الإرسال", icon: TrendingUp },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
