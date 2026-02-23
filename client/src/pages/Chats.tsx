@@ -768,7 +768,7 @@ export default function Chats() {
 
               {/* ===== لوحة AI المحسّنة ===== */}
               {showAiPanel && (
-                <div className="mb-3 rounded-2xl border overflow-hidden" style={{ background: "#111b21", borderColor: "rgba(37,211,102,0.4)" }}>
+                <div className="mb-3 rounded-2xl border flex flex-col" style={{ background: "#111b21", borderColor: "rgba(37,211,102,0.4)", maxHeight: "55vh", overflow: "hidden" }}>
                   {/* رأس لوحة AI */}
                   <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "rgba(37,211,102,0.1)" }}>
                     <div className="flex items-center gap-2">
@@ -797,6 +797,8 @@ export default function Chats() {
                     </div>
                   </div>
 
+                  {/* محتوى قابل للتمرير */}
+                  <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
                   {/* تحليل النية */}
                   {aiIntent && (
                     <div className="px-4 py-2 flex flex-wrap gap-1.5 border-b border-white/5">
@@ -879,9 +881,9 @@ export default function Chats() {
                       </Button>
                     </div>
                   </div>
+                  </div>{/* إغلاق div التمرير */}
                 </div>
               )}
-
               {/* معاينة الوسائط */}
               {pendingMedia && (
                 <div className="flex items-center gap-2 mb-2 p-2 rounded-xl border" style={{ background: "#182229", borderColor: "rgba(255,255,255,0.1)" }}>
