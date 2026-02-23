@@ -110,9 +110,11 @@ async function restoreWhatsAppSessions() {
               const { sendWhatsAppMessage } = await import("../whatsappAutomation");
               const db3 = await getDb();
               if (!db3) return;
+
               // جلب الإعدادات العامة
               const [settings] = await db3.select().from(aiSettings).limit(1);
               const globalEnabled = settings?.globalAutoReplyEnabled ?? false;
+
               // جلب حالة المحادثة
               const { whatsappChats: waChats } = await import("../../drizzle/schema");
               const { and: and2, eq: eq2 } = await import("drizzle-orm");
@@ -120,9 +122,77 @@ async function restoreWhatsAppSessions() {
                 and2(eq2(waChats.accountId, accountId), eq2(waChats.phone, phone))
               ).limit(1);
               const chatAutoReply = freshChat?.aiAutoReplyEnabled ?? false;
-              if (!globalEnabled && !chatAutoReply) return;
+
+              // ===== إصلاح المنطق: يجب أن يكون كلاهما مفعّلاً للرد =====
+              // globalEnabled = مفتاح الرد العام
+              // chatAutoReply = مفتاح الرد لهذه المحادثة بالذات
+              // إذا كان أي منهما مُعطَّلاً → لا ترد
+              if (!globalEnabled || !chatAutoReply) {
+                console.log(`[AI AutoReply] ⏸ متوقف - globalEnabled=${globalEnabled}, chatAutoReply=${chatAutoReply}`);
+                return;
+              }
+
+              // ===== فحص الكلمات المفتاحية لبناء المحادثة =====
+              const conversationKeywords = (settings as any)?.conversationKeywords;
+              const kwList: Array<{keyword: string, response: string, isActive: boolean}> =
+                Array.isArray(conversationKeywords) ? conversationKeywords
+                : (typeof conversationKeywords === "string" ? JSON.parse(conversationKeywords || "[]") : []);
+              const msgLower = message.toLowerCase();
+              for (const kw of kwList) {
+                if (kw.isActive && msgLower.includes(kw.keyword.toLowerCase())) {
+                  // إرسال رد الكلمة المفتاحية
+                  await sendWhatsAppMessage(phone, kw.response, accountId);
+                  const { whatsappChatMessages: waChatMsgs2 } = await import("../../drizzle/schema");
+                  if (freshChat) {
+                    await db3.insert(waChatMsgs2).values({
+                      chatId: freshChat.id, accountId, direction: "outgoing",
+                      message: kw.response, status: "sent",
+                    });
+                    await db3.update(waChats).set({
+                      lastMessage: kw.response, lastMessageAt: new Date(),
+                    }).where(eq2(waChats.id, freshChat.id));
+                  }
+                  console.log(`[AI AutoReply] 🔑 رد بكلمة مفتاحية "${kw.keyword}" أُرسل إلى ${phone}`);
+                  return; // لا تكمل لـ AI بعد رد الكلمة المفتاحية
+                }
+              }
+
+              // ===== فحص كلمات التصعيد الفوري =====
+              const escalationEnabled = (settings as any)?.escalationEnabled ?? false;
+              const escalationPhone = (settings as any)?.escalationPhone;
+              const escalationMessage = (settings as any)?.escalationMessage || "يرجى التواصل مع أحد ممثلينا لمساعدتك بشكل أفضل.";
+              const escalationKeywordsRaw = (settings as any)?.escalationKeywords;
+              const escalationKws: string[] = Array.isArray(escalationKeywordsRaw) ? escalationKeywordsRaw
+                : (typeof escalationKeywordsRaw === "string" ? JSON.parse(escalationKeywordsRaw || "[]") : []);
+
+              if (escalationEnabled && escalationKws.length > 0) {
+                const hasEscalationKw = escalationKws.some(kw => msgLower.includes(kw.toLowerCase()));
+                if (hasEscalationKw) {
+                  // إرسال رسالة التصعيد للعميل
+                  await sendWhatsAppMessage(phone, escalationMessage, accountId);
+                  const { whatsappChatMessages: waChatMsgs3 } = await import("../../drizzle/schema");
+                  if (freshChat) {
+                    await db3.insert(waChatMsgs3).values({
+                      chatId: freshChat.id, accountId, direction: "outgoing",
+                      message: escalationMessage, status: "sent",
+                    });
+                    await db3.update(waChats).set({
+                      lastMessage: escalationMessage, lastMessageAt: new Date(),
+                    }).where(eq2(waChats.id, freshChat.id));
+                  }
+                  // إرسال إشعار لرقم التصعيد
+                  if (escalationPhone) {
+                    const escalationNotif = `🚨 تصعيد من العميل ${freshChat?.contactName || phone}:\n"${message}"\n\nالرجاء التواصل معه مباشرة.`;
+                    await sendWhatsAppMessage(escalationPhone, escalationNotif, accountId);
+                  }
+                  console.log(`[AI AutoReply] 🚨 تصعيد فوري أُرسل لـ ${escalationPhone} بسبب كلمة مفتاحية`);
+                  return;
+                }
+              }
+
               // جلب شخصية AI
               const [personality] = await db3.select().from(aiPersonality).limit(1);
+
               // البحث في قاعدة المعرفة
               const keywords = message.split(/\s+/).filter((w: string) => w.length > 2).slice(0, 5);
               const ragContext: string[] = [];
@@ -149,6 +219,7 @@ async function restoreWhatsAppSessions() {
                   ragContext.push(`[مثال] عندما يقول العميل: "${ex.customerMessage}" → الرد: "${ex.idealResponse}"`);
                 }
               }
+
               // بناء system prompt
               const systemPrompt = [
                 personality?.systemPrompt || settings?.systemPrompt || "أنت مساعد مبيعات سعودي محترف يرد على رسائل العملاء بشكل ودي واحترافي.",
@@ -158,13 +229,45 @@ async function restoreWhatsAppSessions() {
                 ragContext.length > 0 ? `\n\n=== معلومات من قاعدة المعرفة ===\n${ragContext.join("\n")}` : "",
                 "\n\nالتعليمات: رد باللغة العربية بشكل مختصر ومفيد. لا تذكر أنك AI. رد مباشرة على استفسار العميل.",
               ].filter(Boolean).join("");
-              const aiResponse = await invokeLLM({
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: `رسالة العميل${freshChat?.contactName ? ` (${freshChat.contactName})` : ""}: "${message}"` },
-                ],
-              });
-              const aiReply = ((aiResponse.choices[0]?.message?.content as string) || "").trim();
+
+              let aiReply = "";
+              let aiFailedToRespond = false;
+
+              try {
+                const aiResponse = await invokeLLM({
+                  messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `رسالة العميل${freshChat?.contactName ? ` (${freshChat.contactName})` : ""}: "${message}"` },
+                  ],
+                });
+                aiReply = ((aiResponse.choices[0]?.message?.content as string) || "").trim();
+                if (!aiReply) aiFailedToRespond = true;
+              } catch (llmErr) {
+                console.error("[AI AutoReply] فشل LLM:", llmErr);
+                aiFailedToRespond = true;
+              }
+
+              // ===== تصعيد عند عجز AI =====
+              if (aiFailedToRespond && escalationEnabled && escalationPhone) {
+                const escalationNotif = `⚠️ عجز AI عن الرد على العميل ${freshChat?.contactName || phone}:\n"${message}"\n\nالرجاء الرد يدوياً.`;
+                await sendWhatsAppMessage(escalationPhone, escalationNotif, accountId);
+                // إرسال رسالة للعميل
+                const clientMsg = escalationMessage;
+                await sendWhatsAppMessage(phone, clientMsg, accountId);
+                const { whatsappChatMessages: waChatMsgs4 } = await import("../../drizzle/schema");
+                if (freshChat) {
+                  await db3.insert(waChatMsgs4).values({
+                    chatId: freshChat.id, accountId, direction: "outgoing",
+                    message: clientMsg, status: "sent",
+                  });
+                  await db3.update(waChats).set({
+                    lastMessage: clientMsg, lastMessageAt: new Date(),
+                  }).where(eq2(waChats.id, freshChat.id));
+                }
+                console.log(`[AI AutoReply] ⚠️ تصعيد عند عجز AI - أُرسل إشعار لـ ${escalationPhone}`);
+                return;
+              }
+
               if (aiReply && freshChat) {
                 const { whatsappChatMessages: waChatMsgs } = await import("../../drizzle/schema");
                 // إرسال الرد عبر واتساب

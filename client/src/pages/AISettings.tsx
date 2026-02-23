@@ -37,6 +37,11 @@ import {
   Globe,
   BarChart2,
   Pencil,
+  AlertTriangle,
+  Phone,
+  Plus,
+  Trash2,
+  Hash,
 } from "lucide-react";
 
 // ===== مكون بطاقة القسم =====
@@ -132,6 +137,16 @@ export default function AISettings() {
   const [brandTone, setBrandTone] = useState<"professional" | "friendly" | "formal" | "casual">("professional");
   const [countryContext, setCountryContext] = useState<"saudi" | "gulf" | "arabic" | "international">("saudi");
   const [dialect, setDialect] = useState<"gulf" | "egyptian" | "levantine" | "msa">("gulf");
+  // ===== إعدادات التصعيد =====
+  const [escalationEnabled, setEscalationEnabled] = useState(false);
+  const [escalationPhone, setEscalationPhone] = useState("");
+  const [escalationMessage, setEscalationMessage] = useState("يرجى الانتظار، سيتواصل معك أحد ممثلينا قريباً.");
+  const [escalationKeywords, setEscalationKeywords] = useState<string[]>([]);
+  const [newEscalationKw, setNewEscalationKw] = useState("");
+  // ===== الكلمات المفتاحية للمحادثة =====
+  const [conversationKeywords, setConversationKeywords] = useState<{keyword: string, response: string, isActive: boolean}[]>([]);
+  const [newKwKeyword, setNewKwKeyword] = useState("");
+  const [newKwResponse, setNewKwResponse] = useState("");
   const [testResult, setTestResult] = useState<{
     success: boolean;
     reply?: string;
@@ -161,6 +176,14 @@ export default function AISettings() {
       setBrandTone((settings as any).brandTone || "professional");
       setCountryContext((settings as any).countryContext || "saudi");
       setDialect((settings as any).dialect || "gulf");
+      // تحميل إعدادات التصعيد
+      setEscalationEnabled((settings as any).escalationEnabled ?? false);
+      setEscalationPhone((settings as any).escalationPhone || "");
+      setEscalationMessage((settings as any).escalationMessage || "يرجى الانتظار، سيتواصل معك أحد ممثلينا قريباً.");
+      const rawEscKws = (settings as any).escalationKeywords;
+      setEscalationKeywords(Array.isArray(rawEscKws) ? rawEscKws : (typeof rawEscKws === "string" ? JSON.parse(rawEscKws || "[]") : []));
+      const rawConvKws = (settings as any).conversationKeywords;
+      setConversationKeywords(Array.isArray(rawConvKws) ? rawConvKws : (typeof rawConvKws === "string" ? JSON.parse(rawConvKws || "[]") : []));
     }
   }, [settings]);
 
@@ -223,6 +246,11 @@ export default function AISettings() {
       brandTone,
       countryContext,
       dialect,
+      escalationEnabled,
+      escalationPhone: escalationPhone || undefined,
+      escalationMessage: escalationMessage || undefined,
+      escalationKeywords,
+      conversationKeywords,
     });
   };
 
@@ -834,6 +862,147 @@ export default function AISettings() {
         )}
       </Section>
 
+      {/* ===== القسم 6: التصعيد عند عجز AI ===== */}
+      <Section
+        icon={AlertTriangle}
+        title="التصعيد عند عجز AI"
+        subtitle="عند عجز AI عن الرد أو عند كلمات مفتاحية معينة، يُرسل إشعار لرقم واتساب محدد"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg border border-border">
+            <div>
+              <p className="font-medium text-sm">تفعيل نظام التصعيد</p>
+              <p className="text-xs text-muted-foreground">عند تفعيله، يُرسل إشعار لرقم واتساب عند عجز AI</p>
+            </div>
+            <Switch checked={escalationEnabled} onCheckedChange={setEscalationEnabled} />
+          </div>
+          {escalationEnabled && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium flex items-center gap-2 mb-1.5">
+                  <Phone className="w-4 h-4 text-primary" />
+                  رقم واتساب للتصعيد
+                </label>
+                <Input
+                  value={escalationPhone}
+                  onChange={e => setEscalationPhone(e.target.value)}
+                  placeholder="+966501234567"
+                  dir="ltr"
+                  className="text-left"
+                />
+                <p className="text-xs text-muted-foreground mt-1">الرقم الذي سيستقبل إشعارات التصعيد</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium flex items-center gap-2 mb-1.5">
+                  <MessageSquare className="w-4 h-4 text-primary" />
+                  رسالة للعميل عند التصعيد
+                </label>
+                <Textarea
+                  value={escalationMessage}
+                  onChange={e => setEscalationMessage(e.target.value)}
+                  placeholder="يرجى الانتظار، سيتواصل معك أحد ممثلينا قريباً."
+                  rows={2}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium flex items-center gap-2 mb-1.5">
+                  <Hash className="w-4 h-4 text-primary" />
+                  كلمات تُفعّل التصعيد الفوري
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">عند وجود هذه الكلمات في رسالة العميل، يُصعَّد فوراً دون انتظار AI</p>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={newEscalationKw}
+                    onChange={e => setNewEscalationKw(e.target.value)}
+                    placeholder="مثال: مدير، شكوى، إلغاء"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && newEscalationKw.trim()) {
+                        setEscalationKeywords(prev => [...prev, newEscalationKw.trim()]);
+                        setNewEscalationKw("");
+                      }
+                    }}
+                  />
+                  <Button variant="outline" size="sm" onClick={() => {
+                    if (newEscalationKw.trim()) {
+                      setEscalationKeywords(prev => [...prev, newEscalationKw.trim()]);
+                      setNewEscalationKw("");
+                    }
+                  }}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {escalationKeywords.map((kw, i) => (
+                    <span key={i} className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                      {kw}
+                      <button onClick={() => setEscalationKeywords(prev => prev.filter((_, j) => j !== i))} className="hover:text-red-300">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {escalationKeywords.length === 0 && <p className="text-xs text-muted-foreground">لا توجد كلمات مفتاحية للتصعيد</p>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+      {/* ===== القسم 7: الكلمات المفتاحية لبناء المحادثة ===== */}
+      <Section
+        icon={Hash}
+        title="الكلمات المفتاحية لبناء المحادثة"
+        subtitle="عند وجود كلمة مفتاحية في رسالة العميل، يُرسل رد محدد مسبقاً تلقائياً"
+      >
+        <div className="space-y-4">
+          <div className="p-3 bg-muted/20 rounded-lg border border-border space-y-2">
+            <p className="text-sm font-medium">إضافة كلمة مفتاحية جديدة</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">الكلمة المفتاحية</label>
+                <Input value={newKwKeyword} onChange={e => setNewKwKeyword(e.target.value)} placeholder="مثال: سعر، توصيل، ضمان" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">الرد التلقائي</label>
+                <Input value={newKwResponse} onChange={e => setNewKwResponse(e.target.value)} placeholder="الرد الذي سيُرسل للعميل" />
+              </div>
+            </div>
+            <Button variant="outline" size="sm" className="w-full" onClick={() => {
+              if (newKwKeyword.trim() && newKwResponse.trim()) {
+                setConversationKeywords(prev => [...prev, { keyword: newKwKeyword.trim(), response: newKwResponse.trim(), isActive: true }]);
+                setNewKwKeyword("");
+                setNewKwResponse("");
+              }
+            }}>
+              <Plus className="w-4 h-4 ml-2" />
+              إضافة كلمة مفتاحية
+            </Button>
+          </div>
+          {conversationKeywords.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" />
+              <p className="text-sm">لا توجد كلمات مفتاحية بعد</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {conversationKeywords.map((kw, i) => (
+                <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-muted/10">
+                  <Switch
+                    checked={kw.isActive}
+                    onCheckedChange={v => setConversationKeywords(prev => prev.map((k, j) => j === i ? {...k, isActive: v} : k))}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-primary">{kw.keyword}</p>
+                    <p className="text-xs text-muted-foreground truncate">{kw.response}</p>
+                  </div>
+                  <button onClick={() => setConversationKeywords(prev => prev.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 flex-shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Section>
       {/* زر الحفظ في الأسفل */}
       <div className="flex justify-end pb-4">
         <Button onClick={handleSave} disabled={saveSettings.isPending} size="lg">

@@ -311,6 +311,13 @@ export const aiSettings = mysqlTable("ai_settings", {
   systemPrompt: text("systemPrompt"), // global system prompt for all AI replies
   businessContext: text("businessContext"), // business description for AI
   globalAutoReplyEnabled: boolean("globalAutoReplyEnabled").default(false).notNull(), // master switch
+  // إعدادات التصعيد البشري
+  escalationEnabled: boolean("escalationEnabled").default(false).notNull(), // تفعيل التصعيد عند عجز AI
+  escalationPhone: varchar("escalationPhone", { length: 50 }), // رقم واتساب للتصعيد
+  escalationMessage: text("escalationMessage"), // رسالة التصعيد للعميل
+  escalationKeywords: json("escalationKeywords").$type<string[]>().default([]), // كلمات تُفعّل التصعيد الفوري
+  // الكلمات المفتاحية لبناء المحادثة
+  conversationKeywords: json("conversationKeywords").$type<{keyword: string, response: string, isActive: boolean}[]>().default([]),
   temperature: float("temperature").default(0.7).notNull(),
   maxTokens: int("maxTokens").default(500).notNull(),
   // تحكم في أسلوب التحليل

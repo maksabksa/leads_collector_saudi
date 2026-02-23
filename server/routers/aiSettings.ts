@@ -148,6 +148,17 @@ export const aiSettingsRouter = router({
         systemPrompt: z.string().optional(),
         businessContext: z.string().optional(),
         globalAutoReplyEnabled: z.boolean().optional(),
+        // إعدادات التصعيد
+        escalationEnabled: z.boolean().optional(),
+        escalationPhone: z.string().optional(),
+        escalationMessage: z.string().optional(),
+        escalationKeywords: z.array(z.string()).optional(),
+        // الكلمات المفتاحية لبناء المحادثة
+        conversationKeywords: z.array(z.object({
+          keyword: z.string(),
+          response: z.string(),
+          isActive: z.boolean(),
+        })).optional(),
         temperature: z.number().min(0).max(2).default(0.7),
         maxTokens: z.number().min(50).max(4000).default(500),
         analysisStyle: z.enum(["balanced", "aggressive", "conservative", "detailed"]).optional(),
@@ -184,6 +195,12 @@ export const aiSettingsRouter = router({
       if (input.globalAutoReplyEnabled !== undefined) {
         updateData.globalAutoReplyEnabled = input.globalAutoReplyEnabled;
       }
+      // تحديث إعدادات التصعيد
+      if (input.escalationEnabled !== undefined) updateData.escalationEnabled = input.escalationEnabled;
+      if (input.escalationPhone !== undefined) updateData.escalationPhone = input.escalationPhone || null;
+      if (input.escalationMessage !== undefined) updateData.escalationMessage = input.escalationMessage || null;
+      if (input.escalationKeywords !== undefined) updateData.escalationKeywords = JSON.stringify(input.escalationKeywords);
+      if (input.conversationKeywords !== undefined) updateData.conversationKeywords = JSON.stringify(input.conversationKeywords);
 
       // تحديث API Key فقط إذا أُرسل قيمة جديدة (غير فارغة)
       if (input.openaiApiKey && input.openaiApiKey.startsWith("sk-")) {

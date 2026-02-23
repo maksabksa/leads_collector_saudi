@@ -69,7 +69,6 @@ const menuGroups = [
     group: "البيانات",
     items: [
       { icon: Upload, label: "رفع جماعي", path: "/bulk-import" },
-      { icon: Layers, label: "الشرائح", path: "/segments" },
       { icon: Database, label: "إعدادات البيانات", path: "/data-settings" },
     ]
   },

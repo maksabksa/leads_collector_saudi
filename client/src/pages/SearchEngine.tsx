@@ -632,7 +632,7 @@ export default function SearchEngine() {
                   <Select value={String(targetCount)} onValueChange={(v) => setTargetCount(Number(v))}>
                     <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-zinc-800 border-zinc-700">
-                      {[25, 50, 100, 150, 200, 300, 400].map(n => (
+                      {[10, 25, 50, 100, 150, 200, 300, 400, 500, 750, 1000].map(n => (
                         <SelectItem key={n} value={String(n)} className="text-white hover:bg-zinc-700">{n} عميل</SelectItem>
                       ))}
                     </SelectContent>
