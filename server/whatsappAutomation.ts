@@ -152,6 +152,26 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
       try {
         // تجاهل الرسائل الصادرة من الحساب نفسه
         if (msg.fromMe) return;
+        // تجاهل رسائل جروبات الواتساب (@g.us)
+        if (msg.from && msg.from.includes("@g.us")) {
+          console.log(`[${accountId}] تجاهل رسالة جروب واتساب: ${msg.from}`);
+          return;
+        }
+        // تجاهل القصص والحالات (status@broadcast)
+        if (msg.from && (msg.from.includes("status@broadcast") || msg.from === "status@broadcast")) {
+          console.log(`[${accountId}] تجاهل قصة/حالة: ${msg.from}`);
+          return;
+        }
+        // تجاهل قوائم البث (@broadcast)
+        if (msg.from && msg.from.includes("@broadcast") && !msg.from.includes("status@broadcast")) {
+          console.log(`[${accountId}] تجاهل رسالة broadcast: ${msg.from}`);
+          return;
+        }
+        // تجاهل رسائل الفيسبوك/الميتا (تبدأ بـ fb: أو meta:)
+        if (msg.from && (msg.from.startsWith("fb:") || msg.from.startsWith("meta:") || msg.from.includes("@facebook"))) {
+          console.log(`[${accountId}] تجاهل رسالة فيسبوك/ميتا: ${msg.from}`);
+          return;
+        }
         // استخراج رقم المرسل
         const rawPhone = msg.from.replace("@c.us", "").replace("@s.whatsapp.net", "");
         // محاولة جلب اسم جهة الاتصال

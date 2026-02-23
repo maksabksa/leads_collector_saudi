@@ -132,15 +132,19 @@ function ChatCard({ chat, isActive, onClick }: { chat: Chat; isActive: boolean; 
 function MessageBubble({ msg, showSenderBadge }: { msg: ChatMessage; showSenderBadge: boolean }) {
   const isOut = msg.direction === "outgoing";
   const time = new Date(msg.sentAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+  const date = new Date(msg.sentAt).toLocaleDateString("ar-SA", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
   return (
     <div className={`flex mb-1 ${isOut ? "justify-end" : "justify-start"} px-3`}>
       <div className="max-w-[72%] relative">
         {isOut && showSenderBadge && msg.senderAccountLabel && (
           <div className="flex justify-end mb-1">
-            <span className="text-[10px] text-[#8696a0] flex items-center gap-1">
+            <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: "rgba(37,211,102,0.15)", color: "#25D366", border: "1px solid rgba(37,211,102,0.3)" }}>
               <Smartphone className="w-2.5 h-2.5" />
-              {msg.senderAccountLabel}
+              <span className="font-medium">{msg.senderAccountLabel}</span>
+              {msg.senderPhoneNumber && msg.senderPhoneNumber !== msg.senderAccountLabel && (
+                <span className="text-[#8696a0]">· {msg.senderPhoneNumber}</span>
+              )}
             </span>
           </div>
         )}
@@ -189,7 +193,7 @@ function MessageBubble({ msg, showSenderBadge }: { msg: ChatMessage; showSenderB
           )}
           {msg.message && <p className="text-sm leading-relaxed whitespace-pre-wrap text-white">{msg.message}</p>}
           <div className={`flex items-center gap-1 mt-1 ${isOut ? "justify-end" : "justify-start"}`}>
-            <span className="text-[11px] text-[#8696a0]">{time}</span>
+            <span className="text-[11px] text-[#8696a0]" title={`${date} • ${time}`}>{time}</span>
             {isOut && (
               <span className="text-[11px]">
                 {msg.status === "sent" && <Check className="w-3 h-3 text-[#8696a0] inline" />}
@@ -699,6 +703,7 @@ export default function Chats() {
                       </div>
                       {group.msgs.map((msg, idx) => {
                         const prevMsg = idx > 0 ? group.msgs[idx - 1] : null;
+                        // عرض badge الرقم عند تعدد الأرقام: في أول رسالة أو عند تغيير الحساب
                         const showBadge = msg.direction === "outgoing" && hasMultipleAccounts &&
                           (!prevMsg || prevMsg.accountId !== msg.accountId || prevMsg.direction !== "outgoing");
                         return <MessageBubble key={msg.id} msg={msg} showSenderBadge={showBadge} />;
