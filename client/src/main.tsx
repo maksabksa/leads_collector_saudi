@@ -8,7 +8,27 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // إعادة المحاولة مرتين فقط عند فشل الطلب
+      retry: (failureCount, error) => {
+        // لا تُعيد المحاولة عند خطأ UNAUTHORIZED
+        if (error instanceof TRPCClientError) {
+          if (error.message === UNAUTHED_ERR_MSG) return false;
+          if ((error as any).data?.code === 'UNAUTHORIZED') return false;
+        }
+        // إعادة المحاولة مرتين فقط لأخطاء الشبكة
+        return failureCount < 2;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      staleTime: 1000 * 60 * 5,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -25,6 +45,11 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
+    // تجاهل خطأ "Failed to fetch" في السجل (خطأ شبكة مؤقت)
+    if (error instanceof TRPCClientError && error.message === 'Failed to fetch') {
+      console.warn('[API] خطأ شبكة مؤقت - جاري إعادة المحاولة...');
+      return;
+    }
     console.error("[API Query Error]", error);
   }
 });
