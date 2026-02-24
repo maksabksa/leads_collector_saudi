@@ -72,6 +72,65 @@ function getDisplayName(chat: Chat): string {
   return chat.phone;
 }
 
+// ===== Virtual Chat List للأداء مع المحادثات الكثيرة =====
+const CHAT_ITEM_HEIGHT = 72; // ارتفاع كل عنصر بالـ px
+const OVERSCAN = 5; // عدد العناصر الإضافية فوق وتحت المنطقة المرئية
+function VirtualChatList({
+  chats, selectedChatId, bulkMode, selectedChats, searchQuery, onSelectChat, onToggleSelect
+}: {
+  chats: Chat[]; selectedChatId: number | null; bulkMode: boolean;
+  selectedChats: Set<number>; searchQuery: string;
+  onSelectChat: (id: number) => void; onToggleSelect: (id: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(600);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setContainerHeight(el.clientHeight);
+    const ro = new ResizeObserver(() => setContainerHeight(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const totalHeight = chats.length * CHAT_ITEM_HEIGHT;
+  const startIdx = Math.max(0, Math.floor(scrollTop / CHAT_ITEM_HEIGHT) - OVERSCAN);
+  const visibleCount = Math.ceil(containerHeight / CHAT_ITEM_HEIGHT) + OVERSCAN * 2;
+  const endIdx = Math.min(chats.length, startIdx + visibleCount);
+  const visibleChats = chats.slice(startIdx, endIdx);
+  if (chats.length === 0) return (
+    <div className="flex-1 flex items-center justify-center text-[#8696a0]">
+      <div className="text-center py-12">
+        <MessageCircle className="w-10 h-10 mx-auto mb-2 opacity-20" />
+        <p className="text-xs">{searchQuery ? "لا نتائج" : "لا توجد محادثات"}</p>
+      </div>
+    </div>
+  );
+  return (
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-y-auto"
+      onScroll={e => setScrollTop((e.target as HTMLDivElement).scrollTop)}
+      style={{ position: "relative" }}
+    >
+      <div style={{ height: totalHeight, position: "relative" }}>
+        {visibleChats.map((chat, i) => (
+          <div key={chat.id} style={{ position: "absolute", top: (startIdx + i) * CHAT_ITEM_HEIGHT, width: "100%", height: CHAT_ITEM_HEIGHT }}>
+            <ChatCard
+              chat={chat}
+              isActive={chat.id === selectedChatId}
+              onClick={() => onSelectChat(chat.id)}
+              bulkMode={bulkMode}
+              isSelected={selectedChats.has(chat.id)}
+              onToggleSelect={onToggleSelect}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ===== مكوّن بطاقة المحادثة =====
 function ChatCard({ chat, isActive, onClick, bulkMode, isSelected, onToggleSelect }: {
   chat: Chat; isActive: boolean; onClick: () => void;
@@ -584,17 +643,36 @@ export default function Chats() {
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
   // ===== Mutations الذكاء الاصطناعي الصوتي =====
-  const textToSpeech = trpc.waSettings.textToSpeech.useMutation({
-    onSuccess: (data) => {
-      setIsSpeaking(true);
-      const audio = new Audio(`data:${data.mimeType};base64,${data.audioBase64}`);
-      voiceAudioRef.current = audio;
-      audio.playbackRate = ttsSpeed;
-      audio.play();
-      audio.onended = () => setIsSpeaking(false);
-    },
-    onError: (e) => { setIsSpeaking(false); toast.error("خطأ TTS", { description: e.message }); },
-  });
+  // ===== TTS باستخدام Web Speech API المدمج في المتصفح =====
+  const textToSpeech = { isPending: false }; // placeholder لتجنب أخطاء TypeScript
+  const speakWithWebSpeech = useCallback((text: string) => {
+    if (!('speechSynthesis' in window)) {
+      toast.error("متصفحك لا يدعم تحويل النص لصوت");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "ar-SA";
+    utterance.rate = Math.max(0.5, Math.min(2.0, ttsSpeed));
+    utterance.pitch = 1.0;
+    // اختيار أفضل صوت عربي متاح
+    const loadAndSpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const arabicVoice = voices.find(v => v.lang === "ar-SA") ||
+        voices.find(v => v.lang.startsWith("ar")) ||
+        voices.find(v => v.lang.startsWith("en"));
+      if (arabicVoice) utterance.voice = arabicVoice;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => { setIsSpeaking(false); toast.error("خطأ في تشغيل الصوت"); };
+      window.speechSynthesis.speak(utterance);
+    };
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => { loadAndSpeak(); window.speechSynthesis.onvoiceschanged = null; };
+    } else {
+      loadAndSpeak();
+    }
+  }, [ttsSpeed, setIsSpeaking]);
   const transcribeVoice = trpc.waSettings.transcribeVoice.useMutation({
     onSuccess: (data) => {
       if (data.text) setNewMessage(prev => prev ? `${prev} ${data.text}` : data.text);
@@ -638,8 +716,8 @@ export default function Chats() {
       setIsSpeaking(false);
       return;
     }
-    textToSpeech.mutate({ text, voice: ttsVoice, speed: ttsSpeed });
-  }, [isSpeaking, textToSpeech, ttsVoice, ttsSpeed]);
+    speakWithWebSpeech(text);
+  }, [isSpeaking, speakWithWebSpeech]);
   // ===== المحادثة المختارة =====
   const selectedChat = useMemo(() => (chats as Chat[]).find(c => c.id === selectedChatId), [chats, selectedChatId]);
 
@@ -692,6 +770,21 @@ export default function Chats() {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [sortedMessages.length, selectedChatId]);
+  // ===== SSE: تحديث فوري عند وصول رسائل جديدة =====
+  useEffect(() => {
+    const es = new EventSource("/api/sse/chat-updates");
+    es.addEventListener("chat-update", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as { chatId: number; accountId: string };
+        // تحديث قائمة المحادثات فوراً
+        refetchChats();
+        // إذا كانت المحادثة المفتوحة هي نفسها، حدّث الرسائل فوراً
+        if (selectedChatId === data.chatId) refetchMessages();
+      } catch {}
+    });
+    es.onerror = () => { /* سيعيد الاتصال تلقائياً */ };
+    return () => es.close();
+  }, [selectedChatId, refetchChats, refetchMessages]);
 
   // ===== تعليم كمقروء =====
   useEffect(() => {
@@ -967,31 +1060,20 @@ export default function Chats() {
               </div>
             )}
           </div>
-          {/* قائمة المحادثات - سكرول مستقل */}
-          <div className="flex-1 overflow-y-auto">
-            {filteredChats.length === 0 ? (
-              <div className="text-center py-12 text-[#8696a0]">
-                <MessageCircle className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                <p className="text-xs">{searchQuery ? "لا نتائج" : "لا توجد محادثات"}</p>
-              </div>
-            ) : (
-              (filteredChats as Chat[]).map(chat => (
-                <ChatCard
-                  key={chat.id}
-                  chat={chat}
-                  isActive={chat.id === selectedChatId}
-                  onClick={() => { setSelectedChatId(chat.id); setShowAiPanel(false); }}
-                  bulkMode={bulkMode}
-                  isSelected={selectedChats.has(chat.id)}
-                  onToggleSelect={(id) => setSelectedChats(prev => {
-                    const next = new Set(prev);
-                    if (next.has(id)) next.delete(id); else next.add(id);
-                    return next;
-                  })}
-                />
-              ))
-            )}
-          </div>
+          {/* قائمة المحادثات - virtual scrolling للأداء */}
+          <VirtualChatList
+            chats={filteredChats as Chat[]}
+            selectedChatId={selectedChatId}
+            bulkMode={bulkMode}
+            selectedChats={selectedChats}
+            searchQuery={searchQuery}
+            onSelectChat={(id) => { setSelectedChatId(id); setShowAiPanel(false); }}
+            onToggleSelect={(id) => setSelectedChats(prev => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id); else next.add(id);
+              return next;
+            })}
+          />
         </div>
 
         {/* ===== منطقة الشات ===== */}

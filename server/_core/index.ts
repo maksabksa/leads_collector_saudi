@@ -1,5 +1,16 @@
 import "dotenv/config";
 import express from "express";
+// ===== SSE clients store =====
+const sseClients = new Set<import("http").ServerResponse>();
+export function broadcastSSE(event: string, data: unknown) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  Array.from(sseClients).forEach(res => {
+    try { res.write(payload); } catch { sseClients.delete(res); }
+  });
+}
+export function broadcastChatUpdate(chatId: number, accountId: string) {
+  broadcastSSE("chat-update", { chatId, accountId, ts: Date.now() });
+}
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -98,8 +109,9 @@ async function restoreWhatsAppSessions() {
           mediaFilename: resolvedFilename,
           status: "read",
         });
-
-        // ===== الرد التلقائي بالـ AI =====
+        // ===== إشعار SSE للـ frontend بوصول رسالة جديدة =====
+        broadcastChatUpdate(chat.id, accountId);
+        // ===== الرد التلقائي بالـ AI ======
         if (message && message.trim()) {
           // نفذ بشكل غير متزامن حتى لا يؤخر حفظ الرسالة الواردة
           setImmediate(async () => {
@@ -323,6 +335,22 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // ===== SSE endpoint للتحديث الفوري =====
+  app.get("/api/sse/chat-updates", (_req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.flushHeaders();
+    sseClients.add(res);
+    const pingInterval = setInterval(() => {
+      try { res.write("event: ping\ndata: {}\n\n"); } catch { clearInterval(pingInterval); }
+    }, 25000);
+    _req.on("close", () => {
+      clearInterval(pingInterval);
+      sseClients.delete(res);
+    });
+  });
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
