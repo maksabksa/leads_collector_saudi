@@ -112,7 +112,10 @@ async function restoreWhatsAppSessions() {
         // ===== إشعار SSE للـ frontend بوصول رسالة جديدة =====
         broadcastChatUpdate(chat.id, accountId);
         // ===== الرد التلقائي بالـ AI ======
-        if (message && message.trim()) {
+        // يرد على الرسائل النصية والصوتية (voice/audio)
+        const isVoiceMessage = (resolvedMediaType === "audio" && !!uploadedMediaUrl) || (!message?.trim() && resolvedMediaType === "audio");
+        const hasTextOrVoice = (message && message.trim()) || isVoiceMessage;
+        if (hasTextOrVoice) {
           // نفذ بشكل غير متزامن حتى لا يؤخر حفظ الرسالة الواردة
           setImmediate(async () => {
             try {
@@ -148,12 +151,30 @@ async function restoreWhatsAppSessions() {
                 console.log(`[AI AutoReply] ✅ رد مخصص لمحادثة واحدة - globalEnabled=false لكن chatAutoReply=true`);
               }
 
+              // ===== تحويل الرسالة الصوتية لنص (Whisper) =====
+              let effectiveMessage = message || "";
+              if (isVoiceMessage && uploadedMediaUrl) {
+                try {
+                  const { transcribeAudio } = await import("./voiceTranscription");
+                  const transcribeResult = await transcribeAudio({ audioUrl: uploadedMediaUrl, language: "ar" });
+                  if ("text" in transcribeResult && transcribeResult.text?.trim()) {
+                    effectiveMessage = transcribeResult.text.trim();
+                    console.log(`[AI AutoReply] 🎤 تحويل صوتي: "${effectiveMessage}"`);
+                  } else {
+                    console.log(`[AI AutoReply] ⚠️ فشل تحويل الصوت - سيرد برسالة افتراضية`);
+                    effectiveMessage = "سمعت رسالتك الصوتية"; // fallback
+                  }
+                } catch (transcribeErr) {
+                  console.error("[AI AutoReply] خطأ تحويل الصوت:", transcribeErr);
+                  effectiveMessage = "سمعت رسالتك الصوتية";
+                }
+              }
               // ===== فحص الكلمات المفتاحية لبناء المحادثة =====
               const conversationKeywords = (settings as any)?.conversationKeywords;
               const kwList: Array<{keyword: string, response: string, isActive: boolean}> =
                 Array.isArray(conversationKeywords) ? conversationKeywords
                 : (typeof conversationKeywords === "string" ? JSON.parse(conversationKeywords || "[]") : []);
-              const msgLower = message.toLowerCase();
+              const msgLower = effectiveMessage.toLowerCase();
               for (const kw of kwList) {
                 if (kw.isActive && msgLower.includes(kw.keyword.toLowerCase())) {
                   // إرسال رد الكلمة المفتاحية
@@ -198,7 +219,7 @@ async function restoreWhatsAppSessions() {
                   }
                   // إرسال إشعار لرقم التصعيد
                   if (escalationPhone) {
-                    const escalationNotif = `🚨 تصعيد من العميل ${freshChat?.contactName || phone}:\n"${message}"\n\nالرجاء التواصل معه مباشرة.`;
+                    const escalationNotif = `🚨 تصعيد من العميل ${freshChat?.contactName || phone}:\n"${effectiveMessage}"${isVoiceMessage ? " (رسالة صوتية)" : ""}\n\nالرجاء التواصل معه مباشرة.`;
                     await sendWhatsAppMessage(escalationPhone, escalationNotif, accountId);
                   }
                   console.log(`[AI AutoReply] 🚨 تصعيد فوري أُرسل لـ ${escalationPhone} بسبب كلمة مفتاحية`);
@@ -210,7 +231,7 @@ async function restoreWhatsAppSessions() {
               const [personality] = await db3.select().from(aiPersonality).limit(1);
 
               // البحث في قاعدة المعرفة
-              const keywords = message.split(/\s+/).filter((w: string) => w.length > 2).slice(0, 5);
+              const keywords = effectiveMessage.split(/\s+/).filter((w: string) => w.length > 2).slice(0, 5);
               const ragContext: string[] = [];
               for (const keyword of keywords) {
                 const docs = await db3.select({ content: ragDocuments.content, title: ragDocuments.title, docType: ragDocuments.docType })
@@ -253,7 +274,7 @@ async function restoreWhatsAppSessions() {
                 const aiResponse = await invokeLLM({
                   messages: [
                     { role: "system", content: systemPrompt },
-                    { role: "user", content: `رسالة العميل${freshChat?.contactName ? ` (${freshChat.contactName})` : ""}: "${message}"` },
+                    { role: "user", content: `رسالة العميل${freshChat?.contactName ? ` (${freshChat.contactName})` : ""}${isVoiceMessage ? " (رسالة صوتية تم تحويلها لنص)" : ""}: "${effectiveMessage}"` },
                   ],
                 });
                 aiReply = ((aiResponse.choices[0]?.message?.content as string) || "").trim();
@@ -265,7 +286,7 @@ async function restoreWhatsAppSessions() {
 
               // ===== تصعيد عند عجز AI =====
               if (aiFailedToRespond && escalationEnabled && escalationPhone) {
-                const escalationNotif = `⚠️ عجز AI عن الرد على العميل ${freshChat?.contactName || phone}:\n"${message}"\n\nالرجاء الرد يدوياً.`;
+                const escalationNotif = `⚠️ عجز AI عن الرد على العميل ${freshChat?.contactName || phone}:\n"${effectiveMessage}"${isVoiceMessage ? " (رسالة صوتية)" : ""}\n\nالرجاء الرد يدوياً.`;
                 await sendWhatsAppMessage(escalationPhone, escalationNotif, accountId);
                 // إرسال رسالة للعميل
                 const clientMsg = escalationMessage;
