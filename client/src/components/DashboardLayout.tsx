@@ -54,7 +54,7 @@ const menuGroups = [
       { icon: UserPlus, label: "إضافة عميل", path: "/leads/add", badge: null },
       { icon: Upload, label: "رفع جماعي", path: "/bulk-import", badge: null },
       { icon: MapPin, label: "المناطق", path: "/zones", badge: null },
-      { icon: Database, label: "إعدادات البيانات", path: "/data-settings", badge: null },
+
     ]
   },
   {
@@ -93,6 +93,7 @@ const menuGroups = [
     group: "التحليلات والأداء",
     icon: BarChart,
     items: [
+      { icon: BarChart2, label: "التقارير الموحدة", path: "/reports", badge: "جديد" },
       { icon: UserCheck, label: "أداء الموظفين", path: "/employee-performance", badge: null },
       { icon: Activity, label: "تحليل المحادثات", path: "/chats", badge: null },
     ]
@@ -101,15 +102,16 @@ const menuGroups = [
     group: "الذكاء الاصطناعي",
     icon: Bot,
     items: [
-      { icon: Bot, label: "إعدادات الذكاء", path: "/ai-settings", badge: null },
+
       { icon: Key, label: "كلمات الاهتمام", path: "/interest-keywords", badge: null },
       { icon: FileText, label: "قاعدة المعرفة", path: "/knowledge-base", badge: null },
     ]
   },
   {
-    group: "الإدارة",
+    group: "الإعدادات والإدارة",
     icon: Settings,
     items: [
+      { icon: Settings, label: "الإعدادات الموحدة", path: "/settings", badge: null },
       { icon: Users, label: "إدارة المستخدمين", path: "/users", badge: null },
     ]
   },

@@ -7,7 +7,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, like, and, sql } from "drizzle-orm";
-import { ragDocuments, ragChunks, ragConversationExamples, aiPersonality } from "../../drizzle/schema";
+import { ragDocuments, ragChunks, ragConversationExamples, aiPersonality, googleSheetsConnections } from "../../drizzle/schema";
 import { invokeLLM } from "../_core/llm";
 
 // ===== مساعد: تقسيم النص إلى chunks =====
@@ -423,6 +423,92 @@ export const ragKnowledgeRouter = router({
 
       const content = response.choices[0]?.message?.content || "";
       return { content, title: input.topic };
+    }),
+
+  // ===== Google Sheets: قائمة الاتصالات =====
+  listGoogleSheets: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    return db.select().from(googleSheetsConnections).orderBy(desc(googleSheetsConnections.createdAt));
+  }),
+
+  addGoogleSheet: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      sheetUrl: z.string().url(),
+      tabName: z.string().optional(),
+      purpose: z.enum(["rag_training", "leads_import", "products", "faq"]).default("rag_training"),
+      autoSync: z.boolean().default(false),
+      syncInterval: z.number().default(60),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const match = input.sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const sheetId = match ? match[1] : input.sheetUrl;
+      const [result] = await db.insert(googleSheetsConnections).values({
+        name: input.name,
+        sheetUrl: input.sheetUrl,
+        sheetId,
+        tabName: input.tabName,
+        purpose: input.purpose,
+        autoSync: input.autoSync,
+        syncInterval: input.syncInterval,
+      });
+      return { id: (result as any).insertId, success: true };
+    }),
+
+  syncGoogleSheet: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [conn] = await db.select().from(googleSheetsConnections).where(eq(googleSheetsConnections.id, input.id)).limit(1);
+      if (!conn) throw new TRPCError({ code: "NOT_FOUND", message: "الاتصال غير موجود" });
+      try {
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${conn.sheetId}/export?format=csv${conn.tabName ? `&sheet=${encodeURIComponent(conn.tabName)}` : ''}`;
+        const response = await fetch(csvUrl);
+        if (!response.ok) throw new Error(`فشل جلب البيانات: ${response.status}`);
+        const csvText = await response.text();
+        const rows = csvText.split('\n').filter((r: string) => r.trim());
+        const headers = rows[0]?.split(',').map((h: string) => h.trim().replace(/"/g, '')) || [];
+        const dataRows = rows.slice(1);
+        let importedCount = 0;
+        for (const row of dataRows.slice(0, 100)) {
+          const cells = row.split(',').map((c: string) => c.trim().replace(/"/g, ''));
+          const rowData = headers.reduce((acc: Record<string, string>, h: string, i: number) => ({ ...acc, [h]: cells[i] || '' }), {});
+          const title = rowData['العنوان'] || rowData['title'] || rowData['اسم المنتج'] || rowData['السؤال'] || `صف ${importedCount + 1}`;
+          const content = Object.entries(rowData).map(([k, v]) => v ? `${k}: ${v}` : '').filter(Boolean).join('\n');
+          if (content.trim()) {
+            await db.insert(ragDocuments).values({
+              title: title.substring(0, 300),
+              content,
+              category: conn.purpose,
+              docType: conn.purpose === 'faq' ? 'faq' : conn.purpose === 'products' ? 'product' : 'text',
+              createdBy: 'google_sheets',
+            });
+            importedCount++;
+          }
+        }
+        await db.update(googleSheetsConnections)
+          .set({ lastSyncAt: new Date(), lastSyncStatus: 'success', rowsImported: importedCount })
+          .where(eq(googleSheetsConnections.id, input.id));
+        return { success: true, rowsImported: importedCount };
+      } catch (err: any) {
+        await db.update(googleSheetsConnections)
+          .set({ lastSyncAt: new Date(), lastSyncStatus: 'failed', lastSyncError: err.message })
+          .where(eq(googleSheetsConnections.id, input.id));
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
+  deleteGoogleSheet: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(googleSheetsConnections).where(eq(googleSheetsConnections.id, input.id));
+      return { success: true };
     }),
 
   // ===== تحليل جودة قاعدة المعرفة =====

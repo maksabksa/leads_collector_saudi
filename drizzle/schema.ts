@@ -759,3 +759,24 @@ export const activationMessages = mysqlTable("activation_messages", {
 });
 export type ActivationMessage = typeof activationMessages.$inferSelect;
 export type InsertActivationMessage = typeof activationMessages.$inferInsert;
+
+export const googleSheetsConnections = mysqlTable("google_sheets_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),                         // اسم الاتصال
+  sheetUrl: text("sheetUrl").notNull(),                                      // رابط Google Sheet
+  sheetId: varchar("sheetId", { length: 255 }).notNull(),                   // معرف الـ Sheet
+  tabName: varchar("tabName", { length: 255 }),                             // اسم التبويب (اختياري)
+  columnMapping: json("columnMapping").$type<Record<string, string>>(),     // تعيين الأعمدة
+  purpose: mysqlEnum("purpose", ["rag_training", "leads_import", "products", "faq"]).default("rag_training").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  autoSync: boolean("autoSync").default(false).notNull(),                   // مزامنة تلقائية
+  syncInterval: int("syncInterval").default(60).notNull(),                  // كل كم دقيقة
+  lastSyncAt: timestamp("lastSyncAt"),
+  lastSyncStatus: mysqlEnum("lastSyncStatus", ["success", "failed", "pending"]).default("pending"),
+  lastSyncError: text("lastSyncError"),
+  rowsImported: int("rowsImported").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type GoogleSheetsConnection = typeof googleSheetsConnections.$inferSelect;
+export type InsertGoogleSheetsConnection = typeof googleSheetsConnections.$inferInsert;

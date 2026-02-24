@@ -9,7 +9,7 @@ import {
   BookOpen, Plus, Search, Trash2, Edit2, Save, X, Bot, Sparkles,
   MessageSquare, FileText, RefreshCw, ChevronDown, ChevronUp,
   Star, CheckCircle, AlertCircle, Brain, Settings, Layers,
-  BarChart2, Zap, Shield, Info,
+  BarChart2, Zap, Shield, Info, Table2, Link, ExternalLink, Download,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -141,6 +141,179 @@ function ExampleCard({
         </div>
         {example.context && <p className="text-xs text-[#8696a0] italic">{example.context}</p>}
       </div>
+    </div>
+  );
+}
+
+// ===== مكوّن Google Sheets =====
+function GoogleSheetsTab() {
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    name: "", sheetUrl: "", tabName: "",
+    purpose: "rag_training" as "rag_training" | "leads_import" | "products" | "faq",
+    autoSync: false, syncInterval: 60,
+  });
+
+  const { data: sheets = [], refetch } = trpc.ragKnowledge.listGoogleSheets.useQuery();
+  const addSheet = trpc.ragKnowledge.addGoogleSheet.useMutation({
+    onSuccess: () => { toast.success("تم إضافة الاتصال"); setShowForm(false); setForm({ name: "", sheetUrl: "", tabName: "", purpose: "rag_training", autoSync: false, syncInterval: 60 }); refetch(); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const syncSheet = trpc.ragKnowledge.syncGoogleSheet.useMutation({
+    onSuccess: (data) => { toast.success(`تم استيراد ${data.rowsImported} صف بنجاح`); refetch(); },
+    onError: (e) => toast.error("فشل المزامنة", { description: e.message }),
+  });
+  const deleteSheet = trpc.ragKnowledge.deleteGoogleSheet.useMutation({
+    onSuccess: () => { toast.success("تم حذف الاتصال"); refetch(); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+
+  const PURPOSE_LABELS: Record<string, string> = {
+    rag_training: "تدريب AI", leads_import: "استيراد عملاء", products: "منتجات", faq: "أسئلة وأجوبة",
+  };
+  const PURPOSE_COLORS: Record<string, string> = {
+    rag_training: "text-purple-400 bg-purple-500/10", leads_import: "text-blue-400 bg-blue-500/10",
+    products: "text-orange-400 bg-orange-500/10", faq: "text-green-400 bg-green-500/10",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* رأس القسم */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-white font-semibold text-base">ربط Google Sheets</h2>
+          <p className="text-xs text-[#8696a0] mt-0.5">استيراد بيانات من جداول Google Sheets لتدريب AI أو استيراد العملاء</p>
+        </div>
+        <Button onClick={() => setShowForm(true)} className="gap-1.5 text-white" style={{ background: "#25D366" }}>
+          <Plus className="w-4 h-4" />
+          ربط جدول جديد
+        </Button>
+      </div>
+
+      {/* تعليمات */}
+      <div className="rounded-xl p-4 border" style={{ background: "rgba(37,211,102,0.05)", borderColor: "rgba(37,211,102,0.2)" }}>
+        <div className="flex items-start gap-3">
+          <Info className="w-4 h-4 text-[#25D366] mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-[#8696a0] space-y-1">
+            <p className="text-white font-medium">كيفية الاستخدام:</p>
+            <p>1. افتح Google Sheet وتأكد من أنه <strong className="text-white">عام (Public)</strong> أو شارك الرابط</p>
+            <p>2. انسخ رابط الجدول وأضفه هنا</p>
+            <p>3. اضغط "مزامنة" لاستيراد البيانات مباشرة إلى قاعدة المعرفة</p>
+          </div>
+        </div>
+      </div>
+
+      {/* نموذج إضافة */}
+      {showForm && (
+        <div className="rounded-xl border p-5 space-y-4" style={{ background: "#1e2a32", borderColor: "rgba(37,211,102,0.3)" }}>
+          <h3 className="text-white font-medium">ربط جدول Google Sheets جديد</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-[#8696a0] mb-1 block">اسم الاتصال *</label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="مثال: قائمة المنتجات" className="border-0 text-white text-sm h-9" style={{ background: "#202c33" }} />
+            </div>
+            <div>
+              <label className="text-xs text-[#8696a0] mb-1 block">الغرض</label>
+              <select value={form.purpose} onChange={e => setForm(p => ({ ...p, purpose: e.target.value as any }))}
+                className="w-full h-9 rounded-md px-3 text-sm text-white border-0" style={{ background: "#202c33" }}>
+                <option value="rag_training">تدريب AI</option>
+                <option value="leads_import">استيراد عملاء</option>
+                <option value="products">منتجات</option>
+                <option value="faq">أسئلة وأجوبة</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-[#8696a0] mb-1 block">رابط Google Sheet *</label>
+            <Input value={form.sheetUrl} onChange={e => setForm(p => ({ ...p, sheetUrl: e.target.value }))}
+              placeholder="https://docs.google.com/spreadsheets/d/..." className="border-0 text-white text-sm h-9" style={{ background: "#202c33" }} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-[#8696a0] mb-1 block">اسم التبويب (اختياري)</label>
+              <Input value={form.tabName} onChange={e => setForm(p => ({ ...p, tabName: e.target.value }))}
+                placeholder="Sheet1" className="border-0 text-white text-sm h-9" style={{ background: "#202c33" }} />
+            </div>
+            <div className="flex items-end gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.autoSync} onChange={e => setForm(p => ({ ...p, autoSync: e.target.checked }))}
+                  className="w-4 h-4 rounded" />
+                <span className="text-sm text-white">مزامنة تلقائية</span>
+              </label>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => addSheet.mutate(form)} disabled={!form.name || !form.sheetUrl || addSheet.isPending}
+              className="gap-1.5 text-white" style={{ background: "#25D366" }}>
+              <Link className="w-4 h-4" />
+              {addSheet.isPending ? "جاري الربط..." : "ربط الجدول"}
+            </Button>
+            <Button variant="ghost" onClick={() => setShowForm(false)} className="text-[#8696a0] hover:text-white">إلغاء</Button>
+          </div>
+        </div>
+      )}
+
+      {/* قائمة الاتصالات */}
+      {sheets.length === 0 && !showForm ? (
+        <div className="text-center py-16">
+          <Table2 className="w-12 h-12 text-[#8696a0] mx-auto mb-3" />
+          <p className="text-white font-medium">لا توجد جداول مربوطة</p>
+          <p className="text-sm text-[#8696a0] mt-1">اربط Google Sheet لاستيراد البيانات تلقائياً</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {sheets.map((sheet: any) => (
+            <div key={sheet.id} className="rounded-xl border p-4" style={{ background: "#1e2a32", borderColor: "rgba(255,255,255,0.08)" }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(37,211,102,0.1)" }}>
+                    <Table2 className="w-5 h-5 text-[#25D366]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-white font-medium text-sm">{sheet.name}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${PURPOSE_COLORS[sheet.purpose] || 'text-gray-400 bg-gray-500/10'}`}>
+                        {PURPOSE_LABELS[sheet.purpose] || sheet.purpose}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <a href={sheet.sheetUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-[#25D366] hover:underline flex items-center gap-1">
+                        <ExternalLink className="w-3 h-3" />
+                        فتح الجدول
+                      </a>
+                      {sheet.tabName && <span className="text-xs text-[#8696a0]">تبويب: {sheet.tabName}</span>}
+                      {sheet.lastSyncAt && (
+                        <span className="text-xs text-[#8696a0]">
+                          آخر مزامنة: {new Date(sheet.lastSyncAt).toLocaleDateString('ar-SA')}
+                        </span>
+                      )}
+                      {sheet.rowsImported > 0 && (
+                        <span className="text-xs text-green-400">{sheet.rowsImported} صف مستورد</span>
+                      )}
+                    </div>
+                    {sheet.lastSyncStatus === 'failed' && (
+                      <p className="text-xs text-red-400 mt-1">{sheet.lastSyncError}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => syncSheet.mutate({ id: sheet.id })}
+                    disabled={syncSheet.isPending} className="h-8 gap-1.5 text-xs border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10">
+                    <Download className="w-3.5 h-3.5" />
+                    {syncSheet.isPending ? "جاري..." : "مزامنة"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => deleteSheet.mutate({ id: sheet.id })}
+                    className="h-8 w-8 p-0 text-[#8696a0] hover:text-red-400">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -348,6 +521,10 @@ export default function KnowledgeBase() {
                   <MessageSquare className="w-3.5 h-3.5" />
                   أمثلة المحادثات ({examples.length})
                 </TabsTrigger>
+                <TabsTrigger value="google-sheets" className="text-xs gap-1.5 data-[state=active]:text-white data-[state=active]:bg-[#2a3942]">
+                  <Table2 className="w-3.5 h-3.5" />
+                  Google Sheets
+                </TabsTrigger>
               </TabsList>
 
               <div className="flex items-center gap-2">
@@ -445,6 +622,9 @@ export default function KnowledgeBase() {
                 ))}
               </div>
             )}
+          </TabsContent>
+          <TabsContent value="google-sheets" className="flex-1 overflow-y-auto p-6 m-0">
+            <GoogleSheetsTab />
           </TabsContent>
         </Tabs>
       </div>

@@ -3,14 +3,21 @@ import { getDb } from "../db";
 import { z } from "zod";
 import { invokeLLM } from "../_core/llm";
 
+// دالة مساعدة لحساب التاريخ قبل X يوم بصيغة MySQL
+function daysAgoStr(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ');
+}
+
 export const digitalMarketingRouter = router({
   // إحصائيات عامة للتسويق الرقمي
   getOverviewStats: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) return null;
     const mysql = db as any;
-    
-    // إحصائيات العملاء
+
     const [leadsStats] = await mysql.execute(`
       SELECT 
         COUNT(*) as totalLeads,
@@ -24,8 +31,7 @@ export const digitalMarketingRouter = router({
         SUM(CASE WHEN hasWhatsapp = 1 THEN 1 ELSE 0 END) as hasWhatsapp
       FROM leads
     `);
-    
-    // إحصائيات المحادثات
+
     const [chatsStats] = await mysql.execute(`
       SELECT 
         COUNT(*) as totalChats,
@@ -34,17 +40,16 @@ export const digitalMarketingRouter = router({
         SUM(CASE WHEN closedAt IS NOT NULL THEN 1 ELSE 0 END) as closedDeals
       FROM whatsapp_chats
     `);
-    
-    // إحصائيات الرسائل آخر 30 يوم
+
+    // تمرير التاريخ كـ parameter
     const [msgsStats] = await mysql.execute(`
       SELECT 
         COUNT(*) as totalMessages,
         COUNT(DISTINCT phone) as uniqueContacts
       FROM whatsapp_chat_messages
-      WHERE sentAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    `);
-    
-    // أنواع الأعمال
+      WHERE sentAt >= ?
+    `, [daysAgoStr(30)]);
+
     const [businessTypes] = await mysql.execute(`
       SELECT businessType, COUNT(*) as count 
       FROM leads 
@@ -53,8 +58,7 @@ export const digitalMarketingRouter = router({
       ORDER BY count DESC 
       LIMIT 10
     `);
-    
-    // توزيع المناطق
+
     const [zones] = await mysql.execute(`
       SELECT zoneName, COUNT(*) as count 
       FROM leads 
@@ -63,11 +67,11 @@ export const digitalMarketingRouter = router({
       ORDER BY count DESC 
       LIMIT 10
     `);
-    
+
     return {
-      leads: leadsStats[0],
-      chats: chatsStats[0],
-      messages: msgsStats[0],
+      leads: (leadsStats as any[])[0],
+      chats: (chatsStats as any[])[0],
+      messages: (msgsStats as any[])[0],
       businessTypes,
       zones,
     };
@@ -78,21 +82,21 @@ export const digitalMarketingRouter = router({
     const db = await getDb();
     if (!db) return [];
     const mysql = db as any;
-    
+
     const [rows] = await mysql.execute(`
       SELECT 
-        DATE(sentAt) as date,
+        DATE(sentAt) as msgDate,
         COUNT(*) as total,
-        SUM(CASE WHEN messageType = 'ai_reply' OR messageType = 'auto_reply' THEN 1 ELSE 0 END) as aiMessages,
+        SUM(CASE WHEN isAutoReply = 1 THEN 1 ELSE 0 END) as aiMessages,
         COUNT(DISTINCT phone) as uniqueContacts
       FROM whatsapp_chat_messages
-      WHERE sentAt >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+      WHERE sentAt >= ?
       GROUP BY DATE(sentAt)
-      ORDER BY date ASC
-    `);
-    
-    return rows.map((r: any) => ({
-      date: r.date ? new Date(r.date).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
+      ORDER BY msgDate ASC
+    `, [daysAgoStr(14)]);
+
+    return (rows as any[]).map((r: any) => ({
+      date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
       total: Number(r.total),
       aiMessages: Number(r.aiMessages),
       uniqueContacts: Number(r.uniqueContacts),
@@ -104,7 +108,7 @@ export const digitalMarketingRouter = router({
     const db = await getDb();
     if (!db) return null;
     const mysql = db as any;
-    
+
     const [gaps] = await mysql.execute(`
       SELECT 
         SUM(CASE WHEN website IS NULL OR website = '' THEN 1 ELSE 0 END) as noWebsite,
@@ -117,8 +121,8 @@ export const digitalMarketingRouter = router({
         COUNT(*) as total
       FROM leads
     `);
-    
-    return gaps[0];
+
+    return (gaps as any[])[0];
   }),
 
   // أفضل العملاء بالأولوية
@@ -128,7 +132,7 @@ export const digitalMarketingRouter = router({
       const db = await getDb();
       if (!db) return [];
       const mysql = db as any;
-      
+
       const [rows] = await mysql.execute(`
         SELECT 
           id, companyName, businessType, city, district,
@@ -140,7 +144,7 @@ export const digitalMarketingRouter = router({
         ORDER BY leadPriorityScore DESC
         LIMIT ?
       `, [input.limit]);
-      
+
       return rows;
     }),
 
@@ -154,10 +158,8 @@ export const digitalMarketingRouter = router({
       const db = await getDb();
       if (!db) throw new Error("DB not available");
       const mysql = db as any;
-      
-      // جلب بيانات ملخصة
-      const filter = input.businessType ? `WHERE businessType = '${input.businessType}'` : '';
-      const [summary] = await mysql.execute(`
+
+      let summaryQuery = `
         SELECT 
           COUNT(*) as total,
           AVG(leadPriorityScore) as avgScore,
@@ -165,17 +167,25 @@ export const digitalMarketingRouter = router({
           SUM(CASE WHEN instagramUrl IS NOT NULL AND instagramUrl != '' THEN 1 ELSE 0 END) as hasInstagram,
           SUM(CASE WHEN hasWhatsapp = 1 THEN 1 ELSE 0 END) as hasWhatsapp,
           GROUP_CONCAT(DISTINCT businessType SEPARATOR ', ') as types
-        FROM leads ${filter}
-      `);
-      
-      const data = summary[0];
+        FROM leads
+      `;
+      const params: any[] = [];
+      if (input.businessType) {
+        summaryQuery += ' WHERE businessType = ?';
+        params.push(input.businessType);
+      }
+
+      const [summary] = await mysql.execute(summaryQuery, params);
+      const data = (summary as any[])[0];
+      const total = Number(data.total) || 1;
+
       const prompt = `أنت خبير تسويق رقمي متخصص في السوق السعودي.
 بناءً على البيانات التالية لعملاء محتملين:
-- إجمالي العملاء: ${data.total}
-- متوسط درجة الأولوية: ${Number(data.avgScore).toFixed(1)}/10
-- لديهم موقع إلكتروني: ${data.hasWebsite} (${Math.round(data.hasWebsite/data.total*100)}%)
-- لديهم إنستغرام: ${data.hasInstagram} (${Math.round(data.hasInstagram/data.total*100)}%)
-- لديهم واتساب: ${data.hasWhatsapp} (${Math.round(data.hasWhatsapp/data.total*100)}%)
+- إجمالي العملاء: ${total}
+- متوسط درجة الأولوية: ${Number(data.avgScore || 0).toFixed(1)}/10
+- لديهم موقع إلكتروني: ${data.hasWebsite} (${Math.round(Number(data.hasWebsite)/total*100)}%)
+- لديهم إنستغرام: ${data.hasInstagram} (${Math.round(Number(data.hasInstagram)/total*100)}%)
+- لديهم واتساب: ${data.hasWhatsapp} (${Math.round(Number(data.hasWhatsapp)/total*100)}%)
 - أنواع الأعمال: ${data.types}
 ${input.businessType ? `- التركيز على: ${input.businessType}` : ''}
 ${input.zone ? `- المنطقة: ${input.zone}` : ''}
@@ -195,7 +205,7 @@ ${input.zone ? `- المنطقة: ${input.zone}` : ''}
           { role: "user", content: prompt },
         ],
       });
-      
+
       return {
         insight: response.choices[0]?.message?.content ?? "لم يتمكن النظام من توليد التحليل",
         dataUsed: data,
@@ -207,21 +217,21 @@ ${input.zone ? `- المنطقة: ${input.zone}` : ''}
     const db = await getDb();
     if (!db) return [];
     const mysql = db as any;
-    
+
     const [campaigns] = await mysql.execute(`
       SELECT 
-        DATE(createdAt) as date,
+        DATE(createdAt) as msgDate,
         COUNT(*) as sent,
         SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as delivered,
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
       FROM whatsapp_messages
-      WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      WHERE createdAt >= ?
       GROUP BY DATE(createdAt)
-      ORDER BY date ASC
-    `).catch(() => [[]]);
-    
+      ORDER BY msgDate ASC
+    `, [daysAgoStr(30)]).catch(() => [[]]);
+
     return (campaigns as any[]).map((r: any) => ({
-      date: r.date ? new Date(r.date).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
+      date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
       sent: Number(r.sent),
       delivered: Number(r.delivered),
       failed: Number(r.failed),
