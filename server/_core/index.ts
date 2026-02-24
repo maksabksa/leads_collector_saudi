@@ -156,17 +156,22 @@ async function restoreWhatsAppSessions() {
               if (isVoiceMessage && uploadedMediaUrl) {
                 try {
                   const { transcribeAudio } = await import("./voiceTranscription");
+                  console.log(`[AI AutoReply] 🎤 بدء تحويل صوتي - URL: ${uploadedMediaUrl?.substring(0, 80)}... mimetype: ${mimetype}`);
                   const transcribeResult = await transcribeAudio({ audioUrl: uploadedMediaUrl, language: "ar" });
                   if ("text" in transcribeResult && transcribeResult.text?.trim()) {
                     effectiveMessage = transcribeResult.text.trim();
                     console.log(`[AI AutoReply] 🎤 تحويل صوتي: "${effectiveMessage}"`);
                   } else {
-                    console.log(`[AI AutoReply] ⚠️ فشل تحويل الصوت - سيرد برسالة افتراضية`);
-                    effectiveMessage = "سمعت رسالتك الصوتية"; // fallback
+                    // لوغ تفصيلي لمعرفة سبب الفشل
+                    const errResult = transcribeResult as any;
+                    console.log(`[AI AutoReply] ⚠️ فشل تحويل الصوت - سبب: ${errResult.error || JSON.stringify(transcribeResult)}`);
+                    // بدلاً من إرسال رسالة محيرة، لا ترد على الرسائل الصوتية إذا فشل التحويل
+                    return;
                   }
                 } catch (transcribeErr) {
                   console.error("[AI AutoReply] خطأ تحويل الصوت:", transcribeErr);
-                  effectiveMessage = "سمعت رسالتك الصوتية";
+                  // لا ترد على الرسائل الصوتية إذا فشل التحويل بدلاً من إرسال رسالة محيرة
+                  return;
                 }
               }
               // ===== فحص الكلمات المفتاحية لبناء المحادثة =====

@@ -104,7 +104,15 @@ export async function transcribeAudio(
       }
       
       audioBuffer = Buffer.from(await response.arrayBuffer());
-      mimeType = response.headers.get('content-type') || 'audio/mpeg';
+      // S3 قد يرجع application/octet-stream بدلاً من النوع الحقيقي - نستخدم النوع الأصلي من واتساب
+      const rawContentType = response.headers.get('content-type') || '';
+      mimeType = (rawContentType && !rawContentType.includes('application/octet-stream')) 
+        ? rawContentType 
+        : (options.audioUrl.includes('.ogg') ? 'audio/ogg' : 
+           options.audioUrl.includes('.mp3') ? 'audio/mpeg' :
+           options.audioUrl.includes('.m4a') ? 'audio/m4a' :
+           options.audioUrl.includes('.webm') ? 'audio/webm' :
+           'audio/ogg'); // افتراضي ogg لرسائل واتساب
       
       // Check file size (16MB limit)
       const sizeMB = audioBuffer.length / (1024 * 1024);
@@ -198,6 +206,8 @@ export async function transcribeAudio(
  * Helper function to get file extension from MIME type
  */
 function getFileExtension(mimeType: string): string {
+  // تنظيف الـ mimetype من المعلمات الإضافية مثل "audio/ogg; codecs=opus" أو "audio/ogg;codecs=opus"
+  const baseMime = mimeType.split(';')[0].trim().toLowerCase();
   const mimeToExt: Record<string, string> = {
     'audio/webm': 'webm',
     'audio/mp3': 'mp3',
@@ -207,9 +217,13 @@ function getFileExtension(mimeType: string): string {
     'audio/ogg': 'ogg',
     'audio/m4a': 'm4a',
     'audio/mp4': 'm4a',
+    'audio/aac': 'aac',
+    'audio/flac': 'flac',
+    'audio/opus': 'ogg',
+    'audio/x-m4a': 'm4a',
   };
   
-  return mimeToExt[mimeType] || 'audio';
+  return mimeToExt[baseMime] || 'ogg'; // افتراضي ogg لرسائل واتساب الصوتية (audio/ogg;codecs=opus)
 }
 
 /**
