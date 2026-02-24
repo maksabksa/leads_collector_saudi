@@ -1,7 +1,14 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { z } from "zod";
+import { sql, and } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
+import {
+  leads,
+  whatsappChats,
+  whatsappChatMessages,
+  campaigns,
+} from "../../drizzle/schema";
 
 // دالة مساعدة لحساب التاريخ قبل X يوم بصيغة MySQL
 function daysAgoStr(days: number): string {
@@ -16,62 +23,60 @@ export const digitalMarketingRouter = router({
   getOverviewStats: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) return null;
-    const mysql = db as any;
 
-    const [leadsStats] = await mysql.execute(`
-      SELECT 
-        COUNT(*) as totalLeads,
-        SUM(CASE WHEN analysisStatus='completed' THEN 1 ELSE 0 END) as analyzedLeads,
-        SUM(CASE WHEN leadPriorityScore >= 8 THEN 1 ELSE 0 END) as hotLeads,
-        SUM(CASE WHEN leadPriorityScore >= 6 AND leadPriorityScore < 8 THEN 1 ELSE 0 END) as warmLeads,
-        SUM(CASE WHEN leadPriorityScore < 6 OR leadPriorityScore IS NULL THEN 1 ELSE 0 END) as coldLeads,
-        AVG(leadPriorityScore) as avgScore,
-        SUM(CASE WHEN website IS NOT NULL AND website != '' THEN 1 ELSE 0 END) as hasWebsite,
-        SUM(CASE WHEN instagramUrl IS NOT NULL AND instagramUrl != '' THEN 1 ELSE 0 END) as hasInstagram,
-        SUM(CASE WHEN hasWhatsapp = 1 THEN 1 ELSE 0 END) as hasWhatsapp
-      FROM leads
-    `);
+    // إحصائيات العملاء
+    const [leadsStats] = await db.select({
+      totalLeads: sql<number>`COUNT(*)`,
+      analyzedLeads: sql<number>`SUM(CASE WHEN ${leads.analysisStatus}='completed' THEN 1 ELSE 0 END)`,
+      hotLeads: sql<number>`SUM(CASE WHEN ${leads.leadPriorityScore} >= 8 THEN 1 ELSE 0 END)`,
+      warmLeads: sql<number>`SUM(CASE WHEN ${leads.leadPriorityScore} >= 6 AND ${leads.leadPriorityScore} < 8 THEN 1 ELSE 0 END)`,
+      coldLeads: sql<number>`SUM(CASE WHEN ${leads.leadPriorityScore} < 6 OR ${leads.leadPriorityScore} IS NULL THEN 1 ELSE 0 END)`,
+      avgScore: sql<number>`AVG(${leads.leadPriorityScore})`,
+      hasWebsite: sql<number>`SUM(CASE WHEN ${leads.website} IS NOT NULL AND ${leads.website} != '' THEN 1 ELSE 0 END)`,
+      hasInstagram: sql<number>`SUM(CASE WHEN ${leads.instagramUrl} IS NOT NULL AND ${leads.instagramUrl} != '' THEN 1 ELSE 0 END)`,
+      hasWhatsapp: sql<number>`SUM(CASE WHEN ${leads.hasWhatsapp} = 1 THEN 1 ELSE 0 END)`,
+    }).from(leads);
 
-    const [chatsStats] = await mysql.execute(`
-      SELECT 
-        COUNT(*) as totalChats,
-        SUM(unreadCount) as totalUnread,
-        SUM(CASE WHEN aiAutoReplyEnabled = 1 THEN 1 ELSE 0 END) as aiEnabled,
-        SUM(CASE WHEN closedAt IS NOT NULL THEN 1 ELSE 0 END) as closedDeals
-      FROM whatsapp_chats
-    `);
+    // إحصائيات المحادثات
+    const [chatsStats] = await db.select({
+      totalChats: sql<number>`COUNT(*)`,
+      totalUnread: sql<number>`SUM(${whatsappChats.unreadCount})`,
+      aiEnabled: sql<number>`SUM(CASE WHEN ${whatsappChats.aiAutoReplyEnabled} = 1 THEN 1 ELSE 0 END)`,
+      closedDeals: sql<number>`SUM(CASE WHEN ${whatsappChats.closedAt} IS NOT NULL THEN 1 ELSE 0 END)`,
+    }).from(whatsappChats);
 
-    // تمرير التاريخ كـ parameter
-    const [msgsStats] = await mysql.execute(`
-      SELECT 
-        COUNT(*) as totalMessages,
-        COUNT(DISTINCT chatId) as uniqueContacts
-      FROM whatsapp_chat_messages
-      WHERE sentAt >= ?
-    `, [daysAgoStr(30)]);
+    // إحصائيات الرسائل (آخر 30 يوم)
+    const startDate30 = daysAgoStr(30);
+    const [msgsStats] = await db.select({
+      totalMessages: sql<number>`COUNT(*)`,
+      uniqueContacts: sql<number>`COUNT(DISTINCT ${whatsappChatMessages.chatId})`,
+    }).from(whatsappChatMessages)
+      .where(sql`${whatsappChatMessages.sentAt} >= ${startDate30}`);
 
-    const [businessTypes] = await mysql.execute(`
-      SELECT businessType, COUNT(*) as count 
-      FROM leads 
-      WHERE businessType IS NOT NULL AND businessType != ''
-      GROUP BY businessType 
-      ORDER BY count DESC 
-      LIMIT 10
-    `);
+    // أنواع الأعمال الأكثر شيوعاً
+    const businessTypes = await db.select({
+      businessType: leads.businessType,
+      count: sql<number>`COUNT(*)`,
+    }).from(leads)
+      .where(sql`${leads.businessType} IS NOT NULL AND ${leads.businessType} != ''`)
+      .groupBy(leads.businessType)
+      .orderBy(sql`COUNT(*) DESC`)
+      .limit(10);
 
-    const [zones] = await mysql.execute(`
-      SELECT zoneName, COUNT(*) as count 
-      FROM leads 
-      WHERE zoneName IS NOT NULL AND zoneName != ''
-      GROUP BY zoneName 
-      ORDER BY count DESC 
-      LIMIT 10
-    `);
+    // المناطق الأكثر شيوعاً
+    const zones = await db.select({
+      zoneName: leads.zoneName,
+      count: sql<number>`COUNT(*)`,
+    }).from(leads)
+      .where(sql`${leads.zoneName} IS NOT NULL AND ${leads.zoneName} != ''`)
+      .groupBy(leads.zoneName)
+      .orderBy(sql`COUNT(*) DESC`)
+      .limit(10);
 
     return {
-      leads: (leadsStats as any[])[0],
-      chats: (chatsStats as any[])[0],
-      messages: (msgsStats as any[])[0],
+      leads: leadsStats,
+      chats: chatsStats,
+      messages: msgsStats,
       businessTypes,
       zones,
     };
@@ -81,21 +86,19 @@ export const digitalMarketingRouter = router({
   getDailyMessageStats: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-    const mysql = db as any;
 
-    const [rows] = await mysql.execute(`
-      SELECT 
-        DATE(sentAt) as msgDate,
-        COUNT(*) as total,
-        SUM(CASE WHEN isAutoReply = 1 THEN 1 ELSE 0 END) as aiMessages,
-        COUNT(DISTINCT chatId) as uniqueContacts
-      FROM whatsapp_chat_messages
-      WHERE sentAt >= ?
-      GROUP BY DATE(sentAt)
-      ORDER BY msgDate ASC
-    `, [daysAgoStr(14)]);
+    const startDate14 = daysAgoStr(14);
+    const rows = await db.select({
+      msgDate: sql<string>`DATE(${whatsappChatMessages.sentAt})`,
+      total: sql<number>`COUNT(*)`,
+      aiMessages: sql<number>`SUM(CASE WHEN ${whatsappChatMessages.isAutoReply} = 1 THEN 1 ELSE 0 END)`,
+      uniqueContacts: sql<number>`COUNT(DISTINCT ${whatsappChatMessages.chatId})`,
+    }).from(whatsappChatMessages)
+      .where(sql`${whatsappChatMessages.sentAt} >= ${startDate14}`)
+      .groupBy(sql`DATE(${whatsappChatMessages.sentAt})`)
+      .orderBy(sql`DATE(${whatsappChatMessages.sentAt}) ASC`);
 
-    return (rows as any[]).map((r: any) => ({
+    return rows.map((r) => ({
       date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
       total: Number(r.total),
       aiMessages: Number(r.aiMessages),
@@ -107,22 +110,19 @@ export const digitalMarketingRouter = router({
   getMarketingGaps: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) return null;
-    const mysql = db as any;
 
-    const [gaps] = await mysql.execute(`
-      SELECT 
-        SUM(CASE WHEN website IS NULL OR website = '' THEN 1 ELSE 0 END) as noWebsite,
-        SUM(CASE WHEN instagramUrl IS NULL OR instagramUrl = '' THEN 1 ELSE 0 END) as noInstagram,
-        SUM(CASE WHEN twitterUrl IS NULL OR twitterUrl = '' THEN 1 ELSE 0 END) as noTwitter,
-        SUM(CASE WHEN snapchatUrl IS NULL OR snapchatUrl = '' THEN 1 ELSE 0 END) as noSnapchat,
-        SUM(CASE WHEN tiktokUrl IS NULL OR tiktokUrl = '' THEN 1 ELSE 0 END) as noTiktok,
-        SUM(CASE WHEN facebookUrl IS NULL OR facebookUrl = '' THEN 1 ELSE 0 END) as noFacebook,
-        SUM(CASE WHEN hasWhatsapp = 0 OR hasWhatsapp IS NULL THEN 1 ELSE 0 END) as noWhatsapp,
-        COUNT(*) as total
-      FROM leads
-    `);
+    const [gaps] = await db.select({
+      noWebsite: sql<number>`SUM(CASE WHEN ${leads.website} IS NULL OR ${leads.website} = '' THEN 1 ELSE 0 END)`,
+      noInstagram: sql<number>`SUM(CASE WHEN ${leads.instagramUrl} IS NULL OR ${leads.instagramUrl} = '' THEN 1 ELSE 0 END)`,
+      noTwitter: sql<number>`SUM(CASE WHEN ${leads.twitterUrl} IS NULL OR ${leads.twitterUrl} = '' THEN 1 ELSE 0 END)`,
+      noSnapchat: sql<number>`SUM(CASE WHEN ${leads.snapchatUrl} IS NULL OR ${leads.snapchatUrl} = '' THEN 1 ELSE 0 END)`,
+      noTiktok: sql<number>`SUM(CASE WHEN ${leads.tiktokUrl} IS NULL OR ${leads.tiktokUrl} = '' THEN 1 ELSE 0 END)`,
+      noFacebook: sql<number>`SUM(CASE WHEN ${leads.facebookUrl} IS NULL OR ${leads.facebookUrl} = '' THEN 1 ELSE 0 END)`,
+      noWhatsapp: sql<number>`SUM(CASE WHEN ${leads.hasWhatsapp} = 0 OR ${leads.hasWhatsapp} IS NULL THEN 1 ELSE 0 END)`,
+      total: sql<number>`COUNT(*)`,
+    }).from(leads);
 
-    return (gaps as any[])[0];
+    return gaps;
   }),
 
   // أفضل العملاء بالأولوية
@@ -131,21 +131,26 @@ export const digitalMarketingRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return [];
-      const mysql = db as any;
 
-      const [rows] = await mysql.execute(`
-        SELECT 
-          id, companyName, businessType, city, district,
-          leadPriorityScore, biggestMarketingGap, suggestedSalesEntryAngle,
-          website, instagramUrl, hasWhatsapp, analysisStatus,
-          stage, priority
-        FROM leads
-        WHERE leadPriorityScore IS NOT NULL
-        ORDER BY leadPriorityScore DESC
-        LIMIT ?
-      `, [input.limit]);
-
-      return rows;
+      return db.select({
+        id: leads.id,
+        companyName: leads.companyName,
+        businessType: leads.businessType,
+        city: leads.city,
+        district: leads.district,
+        leadPriorityScore: leads.leadPriorityScore,
+        biggestMarketingGap: leads.biggestMarketingGap,
+        suggestedSalesEntryAngle: leads.suggestedSalesEntryAngle,
+        website: leads.website,
+        instagramUrl: leads.instagramUrl,
+        hasWhatsapp: leads.hasWhatsapp,
+        analysisStatus: leads.analysisStatus,
+        stage: leads.stage,
+        priority: leads.priority,
+      }).from(leads)
+        .where(sql`${leads.leadPriorityScore} IS NOT NULL`)
+        .orderBy(sql`${leads.leadPriorityScore} DESC`)
+        .limit(input.limit);
     }),
 
   // تحليل AI شامل للسوق
@@ -157,28 +162,23 @@ export const digitalMarketingRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB not available");
-      const mysql = db as any;
 
-      let summaryQuery = `
-        SELECT 
-          COUNT(*) as total,
-          AVG(leadPriorityScore) as avgScore,
-          SUM(CASE WHEN website IS NOT NULL AND website != '' THEN 1 ELSE 0 END) as hasWebsite,
-          SUM(CASE WHEN instagramUrl IS NOT NULL AND instagramUrl != '' THEN 1 ELSE 0 END) as hasInstagram,
-          SUM(CASE WHEN hasWhatsapp = 1 THEN 1 ELSE 0 END) as hasWhatsapp,
-          GROUP_CONCAT(DISTINCT businessType SEPARATOR ', ') as types
-        FROM leads
-      `;
-      const params: any[] = [];
+      const conditions: ReturnType<typeof sql>[] = [];
       if (input.businessType) {
-        summaryQuery += ' WHERE businessType = ?';
-        params.push(input.businessType);
+        conditions.push(sql`${leads.businessType} = ${input.businessType}`);
       }
 
-      const [summary] = await mysql.execute(summaryQuery, params);
-      const data = (summary as any[])[0];
-      const total = Number(data.total) || 1;
+      const [data] = await db.select({
+        total: sql<number>`COUNT(*)`,
+        avgScore: sql<number>`AVG(${leads.leadPriorityScore})`,
+        hasWebsite: sql<number>`SUM(CASE WHEN ${leads.website} IS NOT NULL AND ${leads.website} != '' THEN 1 ELSE 0 END)`,
+        hasInstagram: sql<number>`SUM(CASE WHEN ${leads.instagramUrl} IS NOT NULL AND ${leads.instagramUrl} != '' THEN 1 ELSE 0 END)`,
+        hasWhatsapp: sql<number>`SUM(CASE WHEN ${leads.hasWhatsapp} = 1 THEN 1 ELSE 0 END)`,
+        types: sql<string>`GROUP_CONCAT(DISTINCT ${leads.businessType} SEPARATOR ', ')`,
+      }).from(leads)
+        .where(conditions.length > 0 ? and(...conditions as any) : undefined);
 
+      const total = Number(data.total) || 1;
       const prompt = `أنت خبير تسويق رقمي متخصص في السوق السعودي.
 بناءً على البيانات التالية لعملاء محتملين:
 - إجمالي العملاء: ${total}
@@ -216,25 +216,27 @@ ${input.zone ? `- المنطقة: ${input.zone}` : ''}
   getCampaignStats: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-    const mysql = db as any;
 
-    const [campaigns] = await mysql.execute(`
-      SELECT 
-        DATE(createdAt) as msgDate,
-        COUNT(*) as sent,
-        SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as delivered,
-        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
-      FROM whatsapp_messages
-      WHERE createdAt >= ?
-      GROUP BY DATE(createdAt)
-      ORDER BY msgDate ASC
-    `, [daysAgoStr(30)]).catch(() => [[]]);
+    const startDate30 = daysAgoStr(30);
+    try {
+      const rows = await db.select({
+        msgDate: sql<string>`DATE(${campaigns.createdAt})`,
+        sent: sql<number>`COUNT(*)`,
+        delivered: sql<number>`SUM(CASE WHEN ${campaigns.status} = 'sent' THEN 1 ELSE 0 END)`,
+        failed: sql<number>`SUM(CASE WHEN ${campaigns.status} = 'failed' THEN 1 ELSE 0 END)`,
+      }).from(campaigns)
+        .where(sql`${campaigns.createdAt} >= ${startDate30}`)
+        .groupBy(sql`DATE(${campaigns.createdAt})`)
+        .orderBy(sql`DATE(${campaigns.createdAt}) ASC`);
 
-    return (campaigns as any[]).map((r: any) => ({
-      date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
-      sent: Number(r.sent),
-      delivered: Number(r.delivered),
-      failed: Number(r.failed),
-    }));
+      return rows.map((r) => ({
+        date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
+        sent: Number(r.sent),
+        delivered: Number(r.delivered),
+        failed: Number(r.failed),
+      }));
+    } catch {
+      return [];
+    }
   }),
 });
