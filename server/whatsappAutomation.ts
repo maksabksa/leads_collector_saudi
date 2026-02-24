@@ -126,12 +126,14 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
       session.status = "connected";
       session.qrDataUrl = null;
       session.isInitializing = false;
+      console.log(`[${accountId}] ✅ متصل (ready)`);
     });
 
     session.client.on("authenticated", () => {
       session.status = "connected";
       session.qrDataUrl = null;
       session.isInitializing = false;
+      console.log(`[${accountId}] ✅ متصل (authenticated)`);
     });
 
     session.client.on("auth_failure", (msg: string) => {
@@ -220,6 +222,28 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
       }
       session.isInitializing = false;
     });
+
+    // فحص دوري كل 5 ثوانٍ لاكتشاف الاتصال إذا فات حدث ready/authenticated
+    const statusChecker = setInterval(() => {
+      try {
+        if (!session.client) { clearInterval(statusChecker); return; }
+        if (session.status === 'connected') { clearInterval(statusChecker); return; }
+        const clientAny = session.client as any;
+        if (clientAny.pupPage && !clientAny.pupPage.isClosed()) {
+          clientAny.getState?.().then((state: string) => {
+            if (state === 'CONNECTED' && session.status !== 'connected') {
+              session.status = 'connected';
+              session.qrDataUrl = null;
+              session.isInitializing = false;
+              clearInterval(statusChecker);
+              console.log(`[${accountId}] ✅ تم اكتشاف الاتصال عبر الفحص الدوري`);
+            }
+          }).catch(() => {});
+        }
+      } catch { /* تجاهل */ }
+    }, 5000);
+    // إيقاف الفحص بعد 3 دقائق
+    setTimeout(() => clearInterval(statusChecker), 180000);
 
     // لا ننتظر - نبدأ في الخلفية ونرجع فوراً
     // الـ UI يتابع الحالة عبر allStatus query كل 2 ثانية

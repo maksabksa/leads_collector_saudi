@@ -729,3 +729,33 @@ export const weeklyReports = mysqlTable("weekly_reports", {
 });
 export type WeeklyReport = typeof weeklyReports.$inferSelect;
 export type InsertWeeklyReport = typeof weeklyReports.$inferInsert;
+
+// ===== ACTIVATION SETTINGS (إعدادات تنشيط التواصل) =====
+export const activationSettings = mysqlTable("activation_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  isActive: boolean("isActive").default(false).notNull(),           // هل التنشيط مفعّل؟
+  minDelaySeconds: int("minDelaySeconds").default(60).notNull(),    // أقل تأخير بين الرسائل (ثانية)
+  maxDelaySeconds: int("maxDelaySeconds").default(300).notNull(),   // أقصى تأخير بين الرسائل (ثانية)
+  messagesPerDay: int("messagesPerDay").default(20).notNull(),      // عدد الرسائل اليومية لكل رقم
+  startHour: int("startHour").default(9).notNull(),                 // ساعة بداية الإرسال (9 صباحاً)
+  endHour: int("endHour").default(22).notNull(),                    // ساعة نهاية الإرسال (10 مساءً)
+  useAI: boolean("useAI").default(false).notNull(),                 // استخدام AI لتوليد رسائل متنوعة
+  messageStyle: varchar("messageStyle", { length: 50 }).default("casual").notNull(), // casual/business/mixed
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ActivationSettings = typeof activationSettings.$inferSelect;
+export type InsertActivationSettings = typeof activationSettings.$inferInsert;
+
+// ===== ACTIVATION MESSAGES LOG (سجل رسائل التنشيط) =====
+export const activationMessages = mysqlTable("activation_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  fromAccountId: varchar("fromAccountId", { length: 64 }).notNull(),  // الرقم المرسِل
+  toAccountId: varchar("toAccountId", { length: 64 }).notNull(),      // الرقم المستقبِل
+  message: text("message").notNull(),                                   // نص الرسالة
+  status: mysqlEnum("status", ["sent", "failed", "pending"]).default("pending").notNull(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+  errorMessage: text("errorMessage"),
+});
+export type ActivationMessage = typeof activationMessages.$inferSelect;
+export type InsertActivationMessage = typeof activationMessages.$inferInsert;

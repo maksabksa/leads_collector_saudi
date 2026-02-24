@@ -5,7 +5,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
-import { eq, desc, and, like, sql } from "drizzle-orm";
+import { eq, desc, and, like, sql, gte } from "drizzle-orm";
 import {
   whatsappSettings,
   autoReplyRules,
@@ -720,10 +720,11 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       const accountMap = new Map(accounts.map(a => [a.accountId, a]));
 
       // حساب تاريخ البداية
-      const startDate = new Date();
+       const startDate = new Date();
       startDate.setDate(startDate.getDate() - input.days);
       startDate.setHours(0, 0, 0, 0);
-
+      // تحويل التاريخ إلى صيغة MySQL الصحيحة
+      const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
       // إحصائيات كل حساب (إجمالي)
       const accountStats = await db
         .select({
@@ -732,10 +733,9 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
           count: sql<number>`COUNT(*)`,
         })
         .from(whatsappChatMessages)
-        .where(sql`${whatsappChatMessages.sentAt} >= ${startDate}`)
+        .where(sql`${whatsappChatMessages.sentAt} >= ${startDateStr}`)
         .groupBy(whatsappChatMessages.accountId, whatsappChatMessages.direction);
-
-      // تجميع الإحصائيات لكل حساب
+      // تجميع الإحصائيات لكل حسابب
       const accountStatsMap = new Map<string, { sent: number; received: number; label: string; phoneNumber: string }>();
       for (const row of accountStats) {
         const acc = accountMap.get(row.accountId);
@@ -758,7 +758,7 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
           count: sql<number>`COUNT(*)`,
         })
         .from(whatsappChatMessages)
-        .where(sql`${whatsappChatMessages.sentAt} >= ${startDate}`)
+        .where(sql`${whatsappChatMessages.sentAt} >= ${startDateStr}`)
         .groupBy(
           whatsappChatMessages.accountId,
           whatsappChatMessages.direction,

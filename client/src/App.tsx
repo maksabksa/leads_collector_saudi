@@ -34,6 +34,7 @@ import EmployeePerformance from "./pages/EmployeePerformance";
 import DigitalMarketing from "./pages/DigitalMarketing";
 import Reminders from "./pages/Reminders";
 import WeeklyReports from "./pages/WeeklyReports";
+import Activation from "./pages/Activation";
 
 function Router() {
   return (
@@ -68,6 +69,7 @@ function Router() {
         <Route path="/digital-marketing" component={DigitalMarketing} />
         <Route path="/reminders" component={Reminders} />
         <Route path="/weekly-reports" component={WeeklyReports} />
+        <Route path="/activation" component={Activation} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

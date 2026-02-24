@@ -86,6 +86,7 @@ const menuGroups = [
     items: [
       { icon: Bell, label: "نظام التذكيرات", path: "/reminders", badge: "جديد" },
       { icon: FileText, label: "التقارير الأسبوعية", path: "/weekly-reports", badge: null },
+      { icon: Zap, label: "تنشيط التواصل", path: "/activation", badge: "جديد" },
     ]
   },
   {

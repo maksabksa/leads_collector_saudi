@@ -2101,6 +2101,7 @@ import { interestKeywordsRouter } from "./routers/interestKeywords";
 import { campaignsRouter } from "./routers/campaigns";
 import { remindersRouter } from "./routers/reminders";
 import { weeklyReportsRouter } from "./routers/weeklyReports";
+import { activationRouter } from "./routers/activation";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2135,5 +2136,6 @@ export const appRouter = router({
   campaigns: campaignsRouter,
   reminders: remindersRouter,
   weeklyReports: weeklyReportsRouter,
+  activation: activationRouter,
 });
 export type AppRouter = typeof appRouter;
