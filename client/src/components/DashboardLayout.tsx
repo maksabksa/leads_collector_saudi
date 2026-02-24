@@ -81,6 +81,14 @@ const menuGroups = [
     ]
   },
   {
+    group: "التذكيرات والمتابعة",
+    icon: Bell,
+    items: [
+      { icon: Bell, label: "نظام التذكيرات", path: "/reminders", badge: "جديد" },
+      { icon: FileText, label: "التقارير الأسبوعية", path: "/weekly-reports", badge: null },
+    ]
+  },
+  {
     group: "التحليلات والأداء",
     icon: BarChart,
     items: [

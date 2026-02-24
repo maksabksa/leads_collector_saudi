@@ -113,6 +113,164 @@ function GapBar({ label, count, total, icon: Icon, color }: {
   );
 }
 
+// ===== مكون تبويب الحملات =====
+function CampaignsTab() {
+  const { data: stats, isLoading } = trpc.campaigns.stats.useQuery();
+  const { data: campaigns, refetch } = trpc.campaigns.list.useQuery();
+  const createCampaign = trpc.campaigns.create.useMutation({
+    onSuccess: () => { toast.success("تم إنشاء الحملة"); refetch(); },
+    onError: (e) => toast.error("خطأ: " + e.message),
+  });
+  const deleteCampaign = trpc.campaigns.delete.useMutation({
+    onSuccess: () => { toast.success("تم حذف الحملة"); refetch(); },
+    onError: (e) => toast.error("خطأ: " + e.message),
+  });
+
+  const [showForm, setShowForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+
+  const statusLabels: Record<string, { label: string; color: string }> = {
+    draft: { label: "مسودة", color: "bg-gray-500/10 text-gray-400" },
+    running: { label: "جارية", color: "bg-blue-500/10 text-blue-400" },
+    completed: { label: "مكتملة", color: "bg-green-500/10 text-green-400" },
+    paused: { label: "موقوفة", color: "bg-yellow-500/10 text-yellow-400" },
+    failed: { label: "فشلت", color: "bg-red-500/10 text-red-400" },
+  };
+
+  if (isLoading) return <div className="flex items-center justify-center h-32"><RefreshCw className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
+
+  const s = stats as any;
+  const chartData = (s?.chartData ?? []) as any[];
+
+  return (
+    <div className="space-y-4">
+      {/* بطاقات الإحصاء */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">إجمالي الحملات</p>
+          <p className="text-2xl font-bold">{s?.total ?? 0}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">الحملات المكتملة</p>
+          <p className="text-2xl font-bold text-green-400">{s?.completed ?? 0}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">إجمالي الرسائل المرسلة</p>
+          <p className="text-2xl font-bold text-blue-400">{s?.totalSent ?? 0}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">متوسط معدل الاستجابة</p>
+          <p className="text-2xl font-bold text-purple-400">{s?.avgResponseRate ?? 0}%</p>
+        </CardContent></Card>
+      </div>
+
+      {/* رسم بياني */}
+      {chartData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-primary" />
+              أداء الحملات (آخر 10 حملات)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <RechartsBar data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
+                <Legend formatter={(v) => <span style={{ fontSize: 11 }}>{v}</span>} />
+                <Bar dataKey="sent" name="مرسلة" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="replied" name="ردود" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="failed" name="فشلت" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              </RechartsBar>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* قائمة الحملات */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-primary" />
+              قائمة الحملات
+            </CardTitle>
+            <Button size="sm" onClick={() => setShowForm(!showForm)} className="gap-1">
+              <Zap className="w-3 h-3" />
+              حملة جديدة
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {showForm && (
+            <div className="rounded-lg border border-dashed border-primary/30 p-3 space-y-2 bg-primary/5">
+              <input
+                className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm"
+                placeholder="اسم الحملة..."
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+              <input
+                className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm"
+                placeholder="وصف الحملة (اختياري)..."
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => {
+                  if (!newName.trim()) return toast.error("أدخل اسم الحملة");
+                  createCampaign.mutate({ name: newName, description: newDesc || undefined });
+                  setNewName(""); setNewDesc(""); setShowForm(false);
+                }} disabled={createCampaign.isPending}>
+                  {createCampaign.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : "إنشاء"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>إلغاء</Button>
+              </div>
+            </div>
+          )}
+          {!campaigns || campaigns.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Megaphone className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">لا توجد حملات بعد. أنشئ أول حملة!</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {campaigns.map((c: any) => {
+                const st = statusLabels[c.status] ?? statusLabels.draft;
+                const rr = c.totalSent > 0 ? Math.round(c.totalReplied / c.totalSent * 100) : 0;
+                return (
+                  <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm truncate">{c.name}</span>
+                        <Badge className={`text-xs px-1.5 py-0 ${st.color}`}>{st.label}</Badge>
+                      </div>
+                      {c.description && <p className="text-xs text-muted-foreground truncate">{c.description}</p>}
+                      <div className="flex items-center gap-4 mt-1.5">
+                        <span className="text-xs text-muted-foreground">مرسلة: <span className="text-foreground font-medium">{c.totalSent}</span></span>
+                        <span className="text-xs text-muted-foreground">ردود: <span className="text-green-400 font-medium">{c.totalReplied}</span></span>
+                        <span className="text-xs text-muted-foreground">معدل: <span className="text-purple-400 font-medium">{rr}%</span></span>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-7 w-7 p-0"
+                      onClick={() => deleteCampaign.mutate({ id: c.id })}>
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function DigitalMarketing() {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [aiInsight, setAiInsight] = useState<string>("");
@@ -243,10 +401,11 @@ export default function DigitalMarketing() {
 
       {/* تبويبات التحليل */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid grid-cols-4 w-full max-w-xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
           <TabsTrigger value="gaps">الفجوات الرقمية</TabsTrigger>
           <TabsTrigger value="performance">الأداء</TabsTrigger>
+          <TabsTrigger value="campaigns">الحملات</TabsTrigger>
           <TabsTrigger value="ai">تحليل AI</TabsTrigger>
         </TabsList>
 
@@ -583,6 +742,11 @@ export default function DigitalMarketing() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* تبويب الحملات */}
+        <TabsContent value="campaigns" className="space-y-4">
+          <CampaignsTab />
         </TabsContent>
 
         {/* تبويب تحليل AI */}

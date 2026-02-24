@@ -2098,7 +2098,9 @@ import { ragKnowledgeRouter } from "./routers/ragKnowledge";
 import { whatsappAccountsRouter } from "./routers/whatsappAccounts";
 import { segmentsRouter } from "./routers/segments";
 import { interestKeywordsRouter } from "./routers/interestKeywords";
-
+import { campaignsRouter } from "./routers/campaigns";
+import { remindersRouter } from "./routers/reminders";
+import { weeklyReportsRouter } from "./routers/weeklyReports";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2130,5 +2132,8 @@ export const appRouter = router({
   socialSearch: socialSearchRouter,
   numberHealth: numberHealthRouter,
   digitalMarketing: digitalMarketingRouter,
+  campaigns: campaignsRouter,
+  reminders: remindersRouter,
+  weeklyReports: weeklyReportsRouter,
 });
 export type AppRouter = typeof appRouter;

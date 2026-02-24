@@ -660,3 +660,72 @@ export const leadJourney = mysqlTable("lead_journey", {
 });
 export type LeadJourney = typeof leadJourney.$inferSelect;
 export type InsertLeadJourney = typeof leadJourney.$inferInsert;
+
+// ===== CAMPAIGNS TABLE (حملات الإرسال) =====
+export const campaigns = mysqlTable("campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  accountId: varchar("accountId", { length: 64 }),
+  totalSent: int("totalSent").default(0).notNull(),
+  totalDelivered: int("totalDelivered").default(0).notNull(),
+  totalReplied: int("totalReplied").default(0).notNull(),
+  totalFailed: int("totalFailed").default(0).notNull(),
+  responseRate: float("responseRate").default(0), // نسبة الاستجابة %
+  status: mysqlEnum("status", ["draft", "running", "completed", "paused", "failed"]).default("draft").notNull(),
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Campaign = typeof campaigns.$inferSelect;
+export type InsertCampaign = typeof campaigns.$inferInsert;
+
+// ===== REMINDERS TABLE (التذكيرات) =====
+export const reminders = mysqlTable("reminders", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  leadName: varchar("leadName", { length: 200 }).notNull(),
+  leadPhone: varchar("leadPhone", { length: 30 }),
+  leadCity: varchar("leadCity", { length: 100 }),
+  leadBusinessType: varchar("leadBusinessType", { length: 200 }),
+  reminderType: mysqlEnum("reminderType", ["follow_up", "call", "message", "meeting", "custom"]).default("follow_up").notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  notes: text("notes"),
+  dueDate: timestamp("dueDate").notNull(),
+  status: mysqlEnum("status", ["pending", "done", "snoozed", "cancelled"]).default("pending").notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  assignedTo: varchar("assignedTo", { length: 100 }), // اسم الموظف
+  createdBy: int("createdBy"),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Reminder = typeof reminders.$inferSelect;
+export type InsertReminder = typeof reminders.$inferInsert;
+
+// ===== WEEKLY REPORTS TABLE (التقارير الأسبوعية) =====
+export const weeklyReports = mysqlTable("weekly_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  weekStart: timestamp("weekStart").notNull(),
+  weekEnd: timestamp("weekEnd").notNull(),
+  totalLeads: int("totalLeads").default(0).notNull(),
+  newLeads: int("newLeads").default(0).notNull(),
+  analyzedLeads: int("analyzedLeads").default(0).notNull(),
+  messagesSent: int("messagesSent").default(0).notNull(),
+  messagesReceived: int("messagesReceived").default(0).notNull(),
+  responseRate: float("responseRate").default(0),
+  hotLeads: int("hotLeads").default(0).notNull(),
+  completedReminders: int("completedReminders").default(0).notNull(),
+  pendingReminders: int("pendingReminders").default(0).notNull(),
+  topCities: json("topCities").$type<{city: string; count: number}[]>(),
+  topBusinessTypes: json("topBusinessTypes").$type<{type: string; count: number}[]>(),
+  summaryText: text("summaryText"), // ملخص AI
+  pdfUrl: text("pdfUrl"), // رابط PDF المولّد
+  sentViaWhatsapp: boolean("sentViaWhatsapp").default(false).notNull(),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type WeeklyReport = typeof weeklyReports.$inferSelect;
+export type InsertWeeklyReport = typeof weeklyReports.$inferInsert;

@@ -113,6 +113,13 @@
       "when": 1771896205729,
       "tag": "0015_foamy_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1771921109375,
+      "tag": "0016_lying_stick",
+      "breakpoints": true
     }
   ]
 }

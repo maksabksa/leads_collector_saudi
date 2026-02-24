@@ -32,6 +32,8 @@ import WhatsAppReport from "./pages/WhatsAppReport";
 import NumberHealth from "./pages/NumberHealth";
 import EmployeePerformance from "./pages/EmployeePerformance";
 import DigitalMarketing from "./pages/DigitalMarketing";
+import Reminders from "./pages/Reminders";
+import WeeklyReports from "./pages/WeeklyReports";
 
 function Router() {
   return (
@@ -64,6 +66,8 @@ function Router() {
         <Route path="/number-health" component={NumberHealth} />
         <Route path="/employee-performance" component={EmployeePerformance} />
         <Route path="/digital-marketing" component={DigitalMarketing} />
+        <Route path="/reminders" component={Reminders} />
+        <Route path="/weekly-reports" component={WeeklyReports} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

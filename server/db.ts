@@ -7,6 +7,9 @@ import {
   websiteAnalyses, InsertWebsiteAnalysis,
   socialAnalyses, InsertSocialAnalysis,
   searchJobs, InsertSearchJob, SearchJob,
+  campaigns, InsertCampaign, Campaign,
+  reminders, InsertReminder, Reminder,
+  weeklyReports, InsertWeeklyReport, WeeklyReport,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -317,4 +320,119 @@ export async function markInstagramAccountAsLead(accountId: number, leadId: numb
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(instagramAccounts).set({ isAddedAsLead: true, leadId }).where(eq(instagramAccounts.id, accountId));
+}
+
+// ===== CAMPAIGNS HELPERS =====
+export async function getCampaigns(): Promise<Campaign[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(campaigns).orderBy(desc(campaigns.createdAt));
+}
+export async function getCampaignById(id: number): Promise<Campaign | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+  return result[0] || null;
+}
+export async function createCampaign(data: InsertCampaign): Promise<Campaign> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(campaigns).values(data);
+  const id = (result as any).insertId as number;
+  return (await getCampaignById(id))!;
+}
+export async function updateCampaign(id: number, data: Partial<InsertCampaign>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(campaigns).set(data).where(eq(campaigns.id, id));
+}
+export async function deleteCampaign(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(campaigns).where(eq(campaigns.id, id));
+}
+
+// ===== REMINDERS HELPERS =====
+export async function getReminders(filters?: { status?: string; leadId?: number }): Promise<Reminder[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filters?.status) conditions.push(eq(reminders.status, filters.status as any));
+  if (filters?.leadId) conditions.push(eq(reminders.leadId, filters.leadId));
+  const query = db.select().from(reminders);
+  if (conditions.length > 0) {
+    return query.where(and(...conditions)).orderBy(asc(reminders.dueDate));
+  }
+  return query.orderBy(asc(reminders.dueDate));
+}
+export async function getReminderById(id: number): Promise<Reminder | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(reminders).where(eq(reminders.id, id)).limit(1);
+  return result[0] || null;
+}
+export async function createReminder(data: InsertReminder): Promise<Reminder> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(reminders).values(data);
+  const id = (result as any).insertId as number;
+  return (await getReminderById(id))!;
+}
+export async function updateReminder(id: number, data: Partial<InsertReminder>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(reminders).set(data).where(eq(reminders.id, id));
+}
+export async function deleteReminder(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(reminders).where(eq(reminders.id, id));
+}
+export async function getOverdueReminders(): Promise<Reminder[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  return db.select().from(reminders)
+    .where(and(
+      eq(reminders.status, "pending"),
+      sql`${reminders.dueDate} <= ${now}`
+    ))
+    .orderBy(asc(reminders.dueDate));
+}
+export async function getUpcomingReminders(daysAhead = 3): Promise<Reminder[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  const future = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+  return db.select().from(reminders)
+    .where(and(
+      eq(reminders.status, "pending"),
+      sql`${reminders.dueDate} BETWEEN ${now} AND ${future}`
+    ))
+    .orderBy(asc(reminders.dueDate));
+}
+
+// ===== WEEKLY REPORTS HELPERS =====
+export async function getWeeklyReports(): Promise<WeeklyReport[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(weeklyReports).orderBy(desc(weeklyReports.createdAt)).limit(20);
+}
+export async function getWeeklyReportById(id: number): Promise<WeeklyReport | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(weeklyReports).where(eq(weeklyReports.id, id)).limit(1);
+  return result[0] || null;
+}
+export async function createWeeklyReport(data: InsertWeeklyReport): Promise<WeeklyReport> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(weeklyReports).values(data);
+  const id = (result as any).insertId as number;
+  return (await getWeeklyReportById(id))!;
+}
+export async function updateWeeklyReport(id: number, data: Partial<InsertWeeklyReport>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(weeklyReports).set(data).where(eq(weeklyReports.id, id));
 }
