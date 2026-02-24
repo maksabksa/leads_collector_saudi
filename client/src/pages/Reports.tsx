@@ -8,10 +8,19 @@ import {
   FileText, MessageSquare, Users, TrendingUp, Calendar, Send,
   RefreshCw, ArrowUpRight, ArrowDownRight, Activity, Inbox,
   BarChart2, Zap, Star, CheckCircle, Clock, Bot, Sparkles,
+  Shield, ShieldAlert, ShieldCheck, ShieldX, AlertTriangle,
+  Download, Phone, Smartphone, CheckCheck, MessageCircle,
+  Award, Target, ChevronDown, Ban, Flag, History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 const COLORS = ["#25D366", "#128C7E", "#34B7F1", "#9B59B6", "#E67E22", "#E74C3C"];
@@ -40,14 +49,450 @@ function StatCard({ title, value, icon: Icon, color, trend }: {
   );
 }
 
-// ===== تقرير واتساب =====
+// ===== أنواع NumberHealth =====
+const NH_STATUS: Record<string, { label: string; textColor: string }> = {
+  safe: { label: "آمن", textColor: "text-emerald-400" },
+  watch: { label: "مراقبة", textColor: "text-yellow-400" },
+  warning: { label: "تحذير", textColor: "text-orange-400" },
+  danger: { label: "خطر", textColor: "text-red-400" },
+};
+// ===== بطاقة رقم واتساب (صحة الأرقام) =====
+function NumberAccountCard({ account, onRefresh }: { account: any; onRefresh: () => void }) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [showEvents, setShowEvents] = useState(false);
+  const [maxDaily, setMaxDaily] = useState<number>(account.maxDailyMessages);
+  const [minInterval, setMinInterval] = useState<number>(account.minIntervalSeconds);
+  const updateScore = trpc.numberHealth.updateScore.useMutation({
+    onSuccess: () => { toast.success("تم تحديث السكور"); onRefresh(); },
+  });
+  const reportEvent = trpc.numberHealth.reportEvent.useMutation({
+    onSuccess: () => { toast.success("تم تسجيل الحدث"); onRefresh(); },
+  });
+  const updateSettings = trpc.numberHealth.updateSettings.useMutation({
+    onSuccess: () => { toast.success("تم حفظ الإعدادات"); setShowSettings(false); onRefresh(); },
+  });
+  const { data: events } = trpc.numberHealth.getEvents.useQuery(
+    { accountId: account.accountId, limit: 20 },
+    { enabled: showEvents }
+  );
+  const status = account.healthStatus as string;
+  const cfg = NH_STATUS[status] ?? NH_STATUS.safe;
+  const dailyPercent = account.maxDailyMessages > 0
+    ? Math.min(100, Math.round((account.dailySentCount / account.maxDailyMessages) * 100))
+    : 0;
+  return (
+    <Card className={`border-2 ${
+      status === "danger" ? "border-red-500/40" :
+      status === "warning" ? "border-orange-500/40" :
+      status === "watch" ? "border-yellow-500/40" :
+      "border-emerald-500/30"
+    }`} style={{ background: "rgba(255,255,255,0.03)" }}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-bold text-base truncate text-white">{account.label}</h3>
+              <Badge className={`shrink-0 text-xs border ${
+                status === "safe" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
+                status === "watch" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                status === "warning" ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+                "bg-red-500/20 text-red-400 border-red-500/30"
+              }`}>{cfg.label}</Badge>
+            </div>
+            <p className="text-sm text-[#8696a0] mb-3 font-mono">{account.phoneNumber}</p>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+                <p className="text-lg font-bold text-blue-400">{account.dailySentCount}</p>
+                <p className="text-xs text-[#8696a0]">مُرسَل اليوم</p>
+              </div>
+              <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+                <p className="text-lg font-bold text-red-400">{account.reportCount}</p>
+                <p className="text-xs text-[#8696a0]">إبلاغات</p>
+              </div>
+              <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+                <p className="text-lg font-bold text-orange-400">{account.blockCount}</p>
+                <p className="text-xs text-[#8696a0]">حظر</p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-[#8696a0]">
+                <span>الإرسال اليومي</span>
+                <span>{account.dailySentCount} / {account.maxDailyMessages}</span>
+              </div>
+              <Progress value={dailyPercent} className={`h-2 ${
+                dailyPercent > 90 ? "[&>div]:bg-red-500" :
+                dailyPercent > 75 ? "[&>div]:bg-orange-500" :
+                "[&>div]:bg-emerald-500"
+              }`} />
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 ${
+              status === "safe" ? "border-emerald-500 bg-emerald-950/50" :
+              status === "watch" ? "border-yellow-500 bg-yellow-950/50" :
+              status === "warning" ? "border-orange-500 bg-orange-950/50" :
+              "border-red-600 bg-red-950/50"
+            }`}>
+              <span className={`text-xl font-bold ${cfg.textColor}`}>{account.healthScore}</span>
+            </div>
+            <span className="text-xs text-[#8696a0]">السكور</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/10">
+          <Button size="sm" variant="outline" className="text-xs border-white/10 text-white hover:bg-white/5"
+            onClick={() => updateScore.mutate({ accountId: account.accountId })}
+            disabled={updateScore.isPending}>
+            <RefreshCw className={`w-3 h-3 mr-1 ${updateScore.isPending ? "animate-spin" : ""}`} />
+            تحديث السكور
+          </Button>
+          <Button size="sm" variant="outline" className="text-xs border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+            onClick={() => reportEvent.mutate({ accountId: account.accountId, eventType: "report" })}>
+            <Flag className="w-3 h-3 mr-1" /> إبلاغ
+          </Button>
+          <Button size="sm" variant="outline" className="text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
+            onClick={() => reportEvent.mutate({ accountId: account.accountId, eventType: "block" })}>
+            <Ban className="w-3 h-3 mr-1" /> حظر
+          </Button>
+          <Dialog open={showSettings} onOpenChange={setShowSettings}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" className="text-xs border-white/10 text-white hover:bg-white/5">
+                <Shield className="w-3 h-3 mr-1" /> إعدادات الحماية
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>إعدادات الإرسال — {account.label}</DialogTitle></DialogHeader>
+              <div className="space-y-4 py-2">
+                <div>
+                  <Label>الحد الأقصى للإرسال اليومي</Label>
+                  <Input type="number" min={1} max={1000} value={maxDaily}
+                    onChange={e => setMaxDaily(Number(e.target.value))} className="mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1">الموصى به: 100-200 رسالة/يوم للأرقام الجديدة</p>
+                </div>
+                <div>
+                  <Label>الفاصل الزمني بين الرسائل (ثانية)</Label>
+                  <Input type="number" min={5} max={300} value={minInterval}
+                    onChange={e => setMinInterval(Number(e.target.value))} className="mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1">الموصى به: 30-60 ثانية لتجنب الحظر</p>
+                </div>
+                <Button className="w-full" onClick={() => updateSettings.mutate({
+                  accountId: account.accountId, maxDailyMessages: maxDaily, minIntervalSeconds: minInterval,
+                })} disabled={updateSettings.isPending}>حفظ الإعدادات</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button size="sm" variant="ghost" className="text-xs text-[#8696a0] hover:text-white"
+            onClick={() => setShowEvents(!showEvents)}>
+            <History className="w-3 h-3 mr-1" /> السجل
+          </Button>
+        </div>
+        {showEvents && events && (
+          <div className="mt-3 pt-3 border-t border-white/10 space-y-2 max-h-48 overflow-y-auto">
+            {events.length === 0 ? (
+              <p className="text-xs text-[#8696a0] text-center py-2">لا توجد أحداث مسجلة</p>
+            ) : events.map((ev: any) => (
+              <div key={ev.id} className="flex items-start gap-2 text-xs">
+                <span className={`shrink-0 w-2 h-2 rounded-full mt-1 ${
+                  ev.eventType === "score_drop" || ev.eventType === "report" || ev.eventType === "block" ? "bg-red-400" :
+                  ev.eventType === "score_rise" ? "bg-emerald-400" : "bg-yellow-400"
+                }`} />
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-white">{
+                    ev.eventType === "report" ? "إبلاغ" : ev.eventType === "block" ? "حظر" :
+                    ev.eventType === "no_reply" ? "بدون رد" :
+                    ev.eventType === "score_drop" ? `انخفاض: ${ev.scoreBefore}→${ev.scoreAfter}` :
+                    ev.eventType === "score_rise" ? `ارتفاع: ${ev.scoreBefore}→${ev.scoreAfter}` : ev.eventType
+                  }</span>
+                  {ev.description && <p className="text-[#8696a0] truncate">{ev.description}</p>}
+                </div>
+                <span className="text-[#8696a0] shrink-0">{new Date(ev.createdAt).toLocaleDateString("ar-SA")}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+// ===== تبويب صحة الأرقام =====
+function NumberHealthTab() {
+  const { data: accounts, isLoading, refetch } = trpc.numberHealth.getAll.useQuery();
+  const { data: summary } = trpc.numberHealth.getSummary.useQuery();
+  const { data: backupLogs } = trpc.numberHealth.getBackupLogs.useQuery({ limit: 5 });
+  const updateAll = trpc.numberHealth.updateAllScores.useMutation({
+    onSuccess: (results: any[]) => { toast.success(`تم تحديث ${results.length} رقم`); refetch(); },
+  });
+  const createBackup = trpc.numberHealth.createBackup.useMutation({
+    onSuccess: (data: any) => { toast.success(`تم إنشاء النسخة الاحتياطية — الحجم: ${Math.round(data.size / 1024)} KB`); window.open(data.url, "_blank"); },
+    onError: (err: any) => toast.error("خطأ في النسخ الاحتياطي", { description: err.message }),
+  });
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-40">
+      <RefreshCw className="w-6 h-6 text-[#25D366] animate-spin" />
+    </div>
+  );
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-white font-semibold flex items-center gap-2">
+          <Shield className="w-5 h-5 text-[#25D366]" /> صحة الأرقام الذكي
+        </h2>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="text-xs border-white/10 text-white hover:bg-white/5"
+            onClick={() => createBackup.mutate({})} disabled={createBackup.isPending}>
+            <Download className={`w-3.5 h-3.5 mr-1 ${createBackup.isPending ? "animate-bounce" : ""}`} />
+            نسخة احتياطية
+          </Button>
+          <Button size="sm" className="text-xs bg-[#25D366] hover:bg-[#1fa855] text-white"
+            onClick={() => updateAll.mutate()} disabled={updateAll.isPending}>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${updateAll.isPending ? "animate-spin" : ""}`} />
+            تحديث الكل
+          </Button>
+        </div>
+      </div>
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="col-span-2 md:col-span-1 rounded-xl p-4 text-center" style={{ background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.2)" }}>
+            <p className="text-3xl font-bold text-[#25D366]">{summary.avgScore}</p>
+            <p className="text-xs text-[#8696a0]">متوسط السكور</p>
+          </div>
+          {[
+            { key: "safe", label: "آمن", count: summary.safe, color: "text-emerald-400" },
+            { key: "watch", label: "مراقبة", count: summary.watch, color: "text-yellow-400" },
+            { key: "warning", label: "تحذير", count: summary.warning, color: "text-orange-400" },
+            { key: "danger", label: "خطر", count: summary.danger, color: "text-red-400" },
+          ].map(item => (
+            <div key={item.key} className="rounded-xl p-4 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <p className={`text-3xl font-bold ${item.color}`}>{item.count}</p>
+              <p className="text-xs text-[#8696a0]">{item.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {summary && (summary.danger > 0 || summary.warning > 0) && (
+        <div className={`flex items-center gap-3 p-4 rounded-lg border ${
+          summary.danger > 0 ? "bg-red-950/50 border-red-500/30 text-red-400" : "bg-orange-950/50 border-orange-500/30 text-orange-400"
+        }`}>
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <p className="text-sm font-medium">
+            {summary.danger > 0
+              ? `⚠️ ${summary.danger} رقم في خطر مرتفع — يُنصح بإيقاف الإرسال منها فوراً`
+              : `${summary.warning} رقم يحتاج مراجعة — قلل الإرسال وراقب التطور`}
+          </p>
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {accounts?.map((account: any) => (
+          <NumberAccountCard key={account.accountId} account={account} onRefresh={refetch} />
+        ))}
+        {(!accounts || accounts.length === 0) && (
+          <div className="col-span-2 text-center py-12 text-[#8696a0]">
+            <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>لا توجد أرقام واتساب مسجلة</p>
+          </div>
+        )}
+      </div>
+      {backupLogs && backupLogs.length > 0 && (
+        <div className="rounded-xl border p-5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+          <h3 className="text-white font-medium mb-4 text-sm flex items-center gap-2">
+            <Download className="w-4 h-4" /> آخر النسخ الاحتياطية
+          </h3>
+          <div className="space-y-2">
+            {backupLogs.map((log: any) => (
+              <div key={log.id} className="flex items-center justify-between text-sm py-2 border-b border-white/5 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${
+                    log.status === "success" ? "bg-emerald-500" : log.status === "failed" ? "bg-red-500" : "bg-yellow-500"
+                  }`} />
+                  <span className="text-white">{log.type === "daily" ? "يومية" : log.type === "manual" ? "يدوية" : "أسبوعية"}</span>
+                  {log.fileSize && <span className="text-[#8696a0]">{Math.round(log.fileSize / 1024)} KB</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#8696a0]">{new Date(log.createdAt).toLocaleDateString("ar-SA")}</span>
+                  {log.fileUrl && (
+                    <Button size="sm" variant="ghost" asChild className="h-6 w-6 p-0">
+                      <a href={log.fileUrl} target="_blank" rel="noopener noreferrer"><Download className="w-3 h-3" /></a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// ===== تبويب تقرير الإرسال التفصيلي =====
+function SendingReportTab() {
+  const [days, setDays] = useState(7);
+  const { data, isLoading, refetch } = trpc.waSettings.getDailyStats.useQuery(
+    { days }, { refetchInterval: 30000 }
+  );
+  const accounts = (data?.accounts ?? []) as Array<{
+    accountId: string; label: string; phoneNumber: string;
+    sent: number; received: number; replyRate: number;
+    totalChats: number; activeChats: number; unreadMessages: number; isConnected: boolean;
+  }>;
+  const dailyBreakdown = (data?.dailyBreakdown ?? []) as Array<{ day: string; sent: number; received: number }>;
+  const totals = data?.totals ?? { sent: 0, received: 0, chats: 0 };
+  const chartData = useMemo(() => {
+    return dailyBreakdown.map(day => ({
+      day: new Date(day.day).toLocaleDateString("ar-SA", { day: "2-digit", month: "2-digit" }),
+      مُرسَلة: day.sent,
+      مُستقبَلة: day.received,
+    }));
+  }, [dailyBreakdown]);
+  const pieData = useMemo(() => {
+    return accounts.map((acc, i) => ({
+      name: acc.label,
+      value: acc.sent + acc.received,
+      color: COLORS[i % COLORS.length],
+    })).filter(d => d.value > 0);
+  }, [accounts]);
+  const topAccount = useMemo(() => {
+    if (accounts.length === 0) return null;
+    return accounts.reduce((best, acc) => (acc.sent + acc.received) > (best.sent + best.received) ? acc : best);
+  }, [accounts]);
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-40">
+      <RefreshCw className="w-6 h-6 text-[#25D366] animate-spin" />
+    </div>
+  );
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-white font-semibold flex items-center gap-2">
+          <Send className="w-5 h-5 text-[#25D366]" /> تقرير الإرسال التفصيلي
+        </h2>
+        <div className="flex items-center gap-1 rounded-lg border p-1" style={{ borderColor: "rgba(255,255,255,0.1)", background: "#202c33" }}>
+          {[3, 7, 14, 30].map(d => (
+            <button key={d} onClick={() => setDays(d)}
+              className="text-xs px-3 py-1 rounded-md transition-all"
+              style={days === d ? { background: "#25D366", color: "white" } : { color: "#8696a0" }}>
+              {d} يوم
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard title="إجمالي المُرسَل" value={totals.sent} icon={Send} color="#25D366" />
+        <StatCard title="إجمالي المُستقبَل" value={totals.received} icon={Inbox} color="#34B7F1" />
+        <StatCard title="إجمالي المحادثات" value={totals.chats} icon={MessageSquare} color="#9B59B6" />
+        <StatCard title="عدد الأرقام" value={accounts.length} icon={Smartphone} color="#E67E22" />
+      </div>
+      {chartData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 rounded-xl p-4 border" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+            <h3 className="text-sm font-semibold text-white mb-4">النشاط اليومي (آخر {days} يوم)</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="day" tick={{ fill: "#8696a0", fontSize: 11 }} />
+                <YAxis tick={{ fill: "#8696a0", fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: "#202c33", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "white" }} />
+                <Legend wrapperStyle={{ fontSize: "11px", color: "#8696a0" }} />
+                <Bar dataKey="مُرسَلة" fill="#25D366" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="مُستقبَلة" fill="#34B7F1" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="rounded-xl p-4 border" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+            <h3 className="text-sm font-semibold text-white mb-4">توزيع النشاط بين الأرقام</h3>
+            {pieData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3}>
+                      {pieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "#202c33", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "white" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-1.5 mt-2">
+                  {pieData.map((entry, i) => {
+                    const total = pieData.reduce((s, d) => s + d.value, 0);
+                    const pct = total > 0 ? Math.round((entry.value / total) * 100) : 0;
+                    return (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ background: entry.color }} />
+                          <span className="text-[#8696a0] truncate max-w-[100px]">{entry.name}</span>
+                        </div>
+                        <span className="text-white font-medium">{pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : <div className="flex items-center justify-center h-40 text-[#8696a0] text-sm">لا توجد بيانات كافية</div>}
+          </div>
+        </div>
+      )}
+      {accounts.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <div className="p-4" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <h3 className="text-sm font-semibold text-white">تفاصيل كل رقم</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                  <th className="text-right px-4 py-3 text-[#8696a0] font-medium text-xs">الرقم</th>
+                  <th className="text-center px-4 py-3 text-[#8696a0] font-medium text-xs">مُرسَل</th>
+                  <th className="text-center px-4 py-3 text-[#8696a0] font-medium text-xs">مُستقبَل</th>
+                  <th className="text-center px-4 py-3 text-[#8696a0] font-medium text-xs">معدل الرد</th>
+                  <th className="text-center px-4 py-3 text-[#8696a0] font-medium text-xs">المحادثات</th>
+                  <th className="text-center px-4 py-3 text-[#8696a0] font-medium text-xs">غير مقروء</th>
+                  <th className="text-center px-4 py-3 text-[#8696a0] font-medium text-xs">الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((acc, i) => {
+                  const isTop = topAccount?.accountId === acc.accountId;
+                  return (
+                    <tr key={acc.accountId} className="border-t transition-colors hover:bg-white/5"
+                      style={{ borderColor: "rgba(255,255,255,0.05)", background: isTop ? `${COLORS[i % COLORS.length]}08` : undefined }}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                          <div>
+                            <div className="font-medium text-white text-xs">{acc.label}</div>
+                            <div className="text-[10px] text-[#8696a0]">{acc.phoneNumber}</div>
+                          </div>
+                          {isTop && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${COLORS[i % COLORS.length]}20`, color: COLORS[i % COLORS.length] }}>الأكثر نشاطاً</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-white font-medium">{acc.sent.toLocaleString("ar-SA")}</td>
+                      <td className="px-4 py-3 text-center text-white font-medium">{acc.received.toLocaleString("ar-SA")}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold" style={{ color: acc.replyRate >= 50 ? "#25D366" : acc.replyRate >= 25 ? "#f59e0b" : "#ef4444" }}>{acc.replyRate}%</span>
+                      </td>
+                      <td className="px-4 py-3 text-center text-[#8696a0]">{acc.totalChats}</td>
+                      <td className="px-4 py-3 text-center">{acc.unreadMessages > 0 ? <span className="text-[#25D366] font-medium">{acc.unreadMessages}</span> : <span className="text-[#8696a0]">-</span>}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: acc.isConnected ? "#25D366" : "#6b7280" }} />
+                          <span className="text-xs" style={{ color: acc.isConnected ? "#25D366" : "#6b7280" }}>{acc.isConnected ? "مسجّل" : "غير مسجّل"}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// ===== تبويب واتساب الموحّد (ملخص + إرسال + صحة الأرقام) =====
 function WhatsAppReport() {
+  const [waSubTab, setWaSubTab] = useState("summary");
   const [period, setPeriod] = useState("7");
   const { data, isLoading, refetch } = trpc.waSettings.getDailyStats.useQuery(
-    { days: parseInt(period) },
-    { refetchOnWindowFocus: false }
+    { days: parseInt(period) }, { refetchOnWindowFocus: false }
   );
-
   const chartData = useMemo(() => {
     if (!data?.dailyBreakdown) return [];
     return data.dailyBreakdown.map((d: { day: string; sent: number; received: number }) => ({
@@ -56,93 +501,100 @@ function WhatsAppReport() {
       مُستقبَل: d.received || 0,
     }));
   }, [data]);
-
-  if (isLoading) return (
-    <div className="flex items-center justify-center h-40">
-      <RefreshCw className="w-6 h-6 text-[#25D366] animate-spin" />
-    </div>
-  );
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-white font-semibold">تقرير رسائل واتساب</h2>
-        <div className="flex items-center gap-2">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-36 h-8 text-xs border-white/10 text-white" style={{ background: "#202c33" }}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">آخر 7 أيام</SelectItem>
-              <SelectItem value="14">آخر 14 يوم</SelectItem>
-              <SelectItem value="30">آخر 30 يوم</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={() => void refetch()} className="h-8 gap-1.5 text-xs border-white/10 text-white hover:bg-white/5">
-            <RefreshCw className="w-3.5 h-3.5" />
-            تحديث
-          </Button>
-        </div>
+    <div className="space-y-4">
+      {/* تبويبات فرعية */}
+      <div className="flex gap-1 p-1 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+        {[
+          { id: "summary", label: "ملخص الرسائل", icon: BarChart2 },
+          { id: "sending", label: "تقرير الإرسال", icon: Send },
+          { id: "health", label: "صحة الأرقام", icon: Shield },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setWaSubTab(tab.id)}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all"
+            style={waSubTab === tab.id ? { background: "#25D366", color: "white" } : { color: "#8696a0" }}>
+            <tab.icon className="w-3.5 h-3.5" />
+            {tab.label}
+          </button>
+        ))}
       </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="إجمالي المُرسَل" value={data?.totals?.sent || 0} icon={Send} color="#25D366" />
-        <StatCard title="إجمالي المُستقبَل" value={data?.totals?.received || 0} icon={Inbox} color="#34B7F1" />
-        <StatCard title="إجمالي المحادثات" value={data?.totals?.chats || 0} icon={MessageSquare} color="#9B59B6" />
-        <StatCard title="عدد الحسابات" value={data?.accounts?.length || 0} icon={Users} color="#E67E22" />
-      </div>
-
-      {chartData.length > 0 && (
-        <div className="rounded-xl border p-5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
-          <h3 className="text-white font-medium mb-4 text-sm">الرسائل اليومية</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fill: "#8696a0", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#8696a0", fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: "#1e2a32", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }} />
-              <Legend />
-              <Bar dataKey="مُرسَل" fill="#25D366" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="مُستقبَل" fill="#34B7F1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {data?.accounts && data.accounts.length > 0 && (
-        <div className="rounded-xl border p-5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
-          <h3 className="text-white font-medium mb-4 text-sm">أداء الحسابات</h3>
-          <div className="space-y-3">
-            {data.accounts.map((acc: {
-              accountId: string; label: string; phoneNumber: string;
-              sent: number; received: number; replyRate: number; isConnected: boolean;
-            }, i: number) => (
-              <div key={acc.accountId} className="flex items-center gap-4 p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: COLORS[i % COLORS.length] }}>
-                  {acc.label?.charAt(0) || "؟"}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-white font-medium">{acc.label || acc.accountId}</p>
-                  <p className="text-xs text-[#8696a0]">{acc.phoneNumber}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-[#25D366]">{acc.sent}</p>
-                  <p className="text-xs text-[#8696a0]">مُرسَل</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-[#34B7F1]">{acc.received}</p>
-                  <p className="text-xs text-[#8696a0]">مُستقبَل</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-yellow-400">{acc.replyRate}%</p>
-                  <p className="text-xs text-[#8696a0]">معدل الرد</p>
-                </div>
-                <div className={`w-2 h-2 rounded-full ${acc.isConnected ? "bg-green-400" : "bg-red-400"}`} />
-              </div>
-            ))}
+      {/* ملخص الرسائل */}
+      {waSubTab === "summary" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-white font-semibold">ملخص رسائل واتساب</h2>
+            <div className="flex items-center gap-2">
+              <Select value={period} onValueChange={setPeriod}>
+                <SelectTrigger className="w-36 h-8 text-xs border-white/10 text-white" style={{ background: "#202c33" }}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">آخر 7 أيام</SelectItem>
+                  <SelectItem value="14">آخر 14 يوم</SelectItem>
+                  <SelectItem value="30">آخر 30 يوم</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={() => void refetch()} className="h-8 gap-1.5 text-xs border-white/10 text-white hover:bg-white/5">
+                <RefreshCw className="w-3.5 h-3.5" /> تحديث
+              </Button>
+            </div>
           </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-40"><RefreshCw className="w-6 h-6 text-[#25D366] animate-spin" /></div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard title="إجمالي المُرسَل" value={data?.totals?.sent || 0} icon={Send} color="#25D366" />
+                <StatCard title="إجمالي المُستقبَل" value={data?.totals?.received || 0} icon={Inbox} color="#34B7F1" />
+                <StatCard title="إجمالي المحادثات" value={data?.totals?.chats || 0} icon={MessageSquare} color="#9B59B6" />
+                <StatCard title="عدد الحسابات" value={data?.accounts?.length || 0} icon={Users} color="#E67E22" />
+              </div>
+              {chartData.length > 0 && (
+                <div className="rounded-xl border p-5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+                  <h3 className="text-white font-medium mb-4 text-sm">الرسائل اليومية</h3>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="date" tick={{ fill: "#8696a0", fontSize: 11 }} />
+                      <YAxis tick={{ fill: "#8696a0", fontSize: 11 }} />
+                      <Tooltip contentStyle={{ background: "#1e2a32", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }} />
+                      <Legend />
+                      <Bar dataKey="مُرسَل" fill="#25D366" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="مُستقبَل" fill="#34B7F1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {data?.accounts && data.accounts.length > 0 && (
+                <div className="rounded-xl border p-5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+                  <h3 className="text-white font-medium mb-4 text-sm">أداء الحسابات</h3>
+                  <div className="space-y-3">
+                    {(data.accounts as Array<{ accountId: string; label: string; phoneNumber: string; sent: number; received: number; replyRate: number; isConnected: boolean }>).map((acc, i) => (
+                      <div key={acc.accountId} className="flex items-center gap-4 p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: COLORS[i % COLORS.length] }}>
+                          {acc.label?.charAt(0) || "؟"}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-white font-medium">{acc.label || acc.accountId}</p>
+                          <p className="text-xs text-[#8696a0]">{acc.phoneNumber}</p>
+                        </div>
+                        <div className="text-center"><p className="text-sm font-bold text-[#25D366]">{acc.sent}</p><p className="text-xs text-[#8696a0]">مُرسَل</p></div>
+                        <div className="text-center"><p className="text-sm font-bold text-[#34B7F1]">{acc.received}</p><p className="text-xs text-[#8696a0]">مُستقبَل</p></div>
+                        <div className="text-center"><p className="text-sm font-bold text-yellow-400">{acc.replyRate}%</p><p className="text-xs text-[#8696a0]">معدل الرد</p></div>
+                        <div className={`w-2 h-2 rounded-full ${acc.isConnected ? "bg-green-400" : "bg-red-400"}`} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
+      {/* تقرير الإرسال التفصيلي */}
+      {waSubTab === "sending" && <SendingReportTab />}
+      {/* صحة الأرقام */}
+      {waSubTab === "health" && <NumberHealthTab />}
     </div>
   );
 }
@@ -246,6 +698,15 @@ function LeadsReport() {
   );
 }
 
+// ===== مكونات مساعدة للأداء =====
+function ScoreBar({ value, max = 100, color }: { value: number; max?: number; color: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+    </div>
+  );
+}
 // ===== تقرير الأداء =====
 function PerformanceReport() {
   const [days, setDays] = useState(30);

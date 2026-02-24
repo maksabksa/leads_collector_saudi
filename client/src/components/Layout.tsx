@@ -20,9 +20,6 @@ import {
   Settings2,
   FileSpreadsheet,
   Upload,
-  TrendingUp,
-  ShieldCheck,
-  Award,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -44,9 +41,7 @@ const adminNavItems = [
   // إعدادات البيانات تشمل كشف الاهتمام + شرائح العملاء (مدمجة داخل الصفحة)
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
-  { path: "/whatsapp-report", label: "تقرير الإرسال", icon: TrendingUp },
-  { path: "/number-health", label: "صحة الأرقام الذكي", icon: ShieldCheck },
-  { path: "/employee-performance", label: "أداء الموظفين", icon: Award },
+  // تقرير الإرسال وصحة الأرقام وأداء الموظفين مدمجة داخل صفحة التقارير
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
