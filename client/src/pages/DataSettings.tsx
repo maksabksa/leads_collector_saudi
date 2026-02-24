@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import InterestKeywords from "./InterestKeywords";
+import Segments from "./Segments";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -286,7 +287,7 @@ function CategoryCard({ category }: { category: CategoryConfig }) {
 // ===== الصفحة الرئيسية =====
 export default function DataSettings() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"data" | "interest">("data");
+  const [activeTab, setActiveTab] = useState<"data" | "interest" | "segments">("data");
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -307,12 +308,13 @@ export default function DataSettings() {
         {[
           { id: "data", label: "إعدادات البيانات", icon: Settings2 },
           { id: "interest", label: "كشف الاهتمام", icon: Search },
+          { id: "segments", label: "شرائح العملاء", icon: Layers },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as "data" | "interest")}
+            onClick={() => setActiveTab(tab.id as "data" | "interest" | "segments")}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
-            style={activeTab === tab.id ? {
+            style={activeTab === (tab.id as string) ? {
               background: "oklch(0.65 0.18 200 / 0.15)",
               border: "1px solid oklch(0.65 0.18 200 / 0.3)",
               color: "oklch(0.75 0.18 200)",
@@ -375,6 +377,8 @@ export default function DataSettings() {
       )}
       {/* تبويب كشف الاهتمام */}
       {activeTab === "interest" && <InterestKeywords />}
+      {/* تبويب شرائح العملاء */}
+      {activeTab === "segments" && <Segments />}
     </div>
   );
 }

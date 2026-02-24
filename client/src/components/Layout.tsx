@@ -41,9 +41,8 @@ const adminNavItems = [
   { path: "/users", label: "إدارة المستخدمين", icon: Shield },
   // AI مدمج: إعدادات AI + قاعدة المعرفة في صفحة واحدة
   { path: "/ai-settings", label: "ذكاء اصطناعي AI", icon: Brain },
-  // إعدادات البيانات تشمل كشف الاهتمام + شرائح العملاء (مدمجة)
+  // إعدادات البيانات تشمل كشف الاهتمام + شرائح العملاء (مدمجة داخل الصفحة)
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
-  { path: "/segments", label: "شرائح العملاء", icon: Layers },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
   { path: "/whatsapp-report", label: "تقرير الإرسال", icon: TrendingUp },
   { path: "/number-health", label: "صحة الأرقام الذكي", icon: ShieldCheck },

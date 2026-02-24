@@ -45,7 +45,7 @@ export const digitalMarketingRouter = router({
     const [msgsStats] = await mysql.execute(`
       SELECT 
         COUNT(*) as totalMessages,
-        COUNT(DISTINCT phone) as uniqueContacts
+        COUNT(DISTINCT chatId) as uniqueContacts
       FROM whatsapp_chat_messages
       WHERE sentAt >= ?
     `, [daysAgoStr(30)]);
@@ -88,7 +88,7 @@ export const digitalMarketingRouter = router({
         DATE(sentAt) as msgDate,
         COUNT(*) as total,
         SUM(CASE WHEN isAutoReply = 1 THEN 1 ELSE 0 END) as aiMessages,
-        COUNT(DISTINCT phone) as uniqueContacts
+        COUNT(DISTINCT chatId) as uniqueContacts
       FROM whatsapp_chat_messages
       WHERE sentAt >= ?
       GROUP BY DATE(sentAt)
