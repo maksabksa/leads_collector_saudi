@@ -59,6 +59,12 @@ const statusConfig: Record<string, { label: string; color: string; dotColor: str
     dotColor: "bg-green-500",
     icon: <Wifi className="w-3.5 h-3.5" />,
   },
+  error: {
+    label: "خطأ في الاتصال",
+    color: "text-orange-400 bg-orange-500/10 border-orange-500/30",
+    dotColor: "bg-orange-500 animate-pulse",
+    icon: <AlertTriangle className="w-3.5 h-3.5" />,
+  },
 };
 
 function StatusPill({ status }: { status: string }) {
