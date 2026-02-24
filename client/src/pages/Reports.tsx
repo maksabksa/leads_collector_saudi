@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -439,9 +439,41 @@ function AIReport() {
   );
 }
 
-// ===== التقرير الأسبوعي =====
+// ===== التقرير الأسبوعي + إعدادات الجدولة =====
 function WeeklyReportTab() {
   const { data: reports = [], isLoading, refetch } = trpc.weeklyReports.list.useQuery();
+  const { data: schedule, refetch: refetchSchedule } = trpc.reportScheduler.getSchedule.useQuery();
+  const { data: accounts = [] } = trpc.waAccounts.listAccounts.useQuery();
+
+  // حالة نموذج الجدولة
+  const [schedEnabled, setSchedEnabled] = useState(false);
+  const [schedDay, setSchedDay] = useState("0");
+  const [schedHour, setSchedHour] = useState("8");
+  const [schedMinute, setSchedMinute] = useState("0");
+  const [schedTimezone, setSchedTimezone] = useState("Asia/Riyadh");
+  const [schedPhone, setSchedPhone] = useState("");
+  const [schedAccount, setSchedAccount] = useState("");
+  const [schedIncLeads, setSchedIncLeads] = useState(true);
+  const [schedIncWa, setSchedIncWa] = useState(true);
+  const [schedIncEmp, setSchedIncEmp] = useState(true);
+  const [showScheduler, setShowScheduler] = useState(false);
+
+  // تحميل الإعدادات الحالية
+  useEffect(() => {
+    if (schedule) {
+      setSchedEnabled(schedule.isEnabled);
+      setSchedDay(String(schedule.dayOfWeek));
+      setSchedHour(String(schedule.hour));
+      setSchedMinute(String(schedule.minute));
+      setSchedTimezone(schedule.timezone);
+      setSchedPhone(schedule.recipientPhone || "");
+      setSchedAccount(schedule.whatsappAccountId || "");
+      setSchedIncLeads(schedule.includeLeadsStats);
+      setSchedIncWa(schedule.includeWhatsappStats);
+      setSchedIncEmp(schedule.includeEmployeeStats);
+    }
+  }, [schedule]);
+
   const generateReport = trpc.weeklyReports.generate.useMutation({
     onSuccess: () => { toast.success("تم توليد التقرير الأسبوعي"); void refetch(); },
     onError: (e: { message: string }) => toast.error("خطأ في التوليد", { description: e.message }),
@@ -450,6 +482,43 @@ function WeeklyReportTab() {
     onSuccess: () => toast.success("تم إرسال التقرير عبر واتساب"),
     onError: (e: { message: string }) => toast.error("خطأ في الإرسال", { description: e.message }),
   });
+  const saveSchedule = trpc.reportScheduler.saveSchedule.useMutation({
+    onSuccess: () => { toast.success("تم حفظ إعدادات الجدولة"); void refetchSchedule(); },
+    onError: (e: { message: string }) => toast.error("خطأ في الحفظ", { description: e.message }),
+  });
+  const triggerNow = trpc.reportScheduler.triggerNow.useMutation({
+    onSuccess: (r: { success: boolean; error?: string }) => {
+      if (r.success) toast.success("تم إرسال التقرير التجريبي بنجاح");
+      else toast.error("فشل الإرسال التجريبي", { description: r.error });
+      void refetchSchedule();
+    },
+    onError: (e: { message: string }) => toast.error("خطأ", { description: e.message }),
+  });
+
+  const DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const TIMEZONES = [
+    { value: "Asia/Riyadh", label: "الرياض (UTC+3)" },
+    { value: "Asia/Dubai", label: "دبي (UTC+4)" },
+    { value: "Asia/Kuwait", label: "الكويت (UTC+3)" },
+    { value: "Asia/Qatar", label: "قطر (UTC+3)" },
+    { value: "Africa/Cairo", label: "القاهرة (UTC+2)" },
+    { value: "Europe/London", label: "لندن (UTC+0)" },
+  ];
+
+  const handleSaveSchedule = () => {
+    saveSchedule.mutate({
+      isEnabled: schedEnabled,
+      dayOfWeek: parseInt(schedDay),
+      hour: parseInt(schedHour),
+      minute: parseInt(schedMinute),
+      timezone: schedTimezone,
+      recipientPhone: schedPhone || undefined,
+      whatsappAccountId: schedAccount || undefined,
+      includeLeadsStats: schedIncLeads,
+      includeWhatsappStats: schedIncWa,
+      includeEmployeeStats: schedIncEmp,
+    });
+  };
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-40">
@@ -462,20 +531,204 @@ function WeeklyReportTab() {
     totalLeads?: number; totalMessages?: number; sentViaWhatsapp: boolean;
   };
 
+  type WaAccount = { accountId: string; label: string };
+
   return (
     <div className="space-y-6">
+      {/* رأس الصفحة */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-white font-semibold">التقارير الأسبوعية</h2>
           <p className="text-xs text-[#8696a0] mt-0.5">توليد تقارير شاملة بالذكاء الاصطناعي وإرسالها عبر واتساب</p>
         </div>
-        <Button onClick={() => generateReport.mutate({})} disabled={generateReport.isPending}
-          className="gap-1.5 text-white" style={{ background: "#25D366" }}>
-          <Sparkles className="w-4 h-4" />
-          {generateReport.isPending ? "جاري التوليد..." : "توليد تقرير جديد"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline"
+            onClick={() => setShowScheduler(v => !v)}
+            className={`h-8 gap-1.5 text-xs border-[#25D366]/40 hover:bg-[#25D366]/10 ${
+              schedEnabled && schedule?.isEnabled ? "text-[#25D366]" : "text-[#8696a0]"
+            }`}>
+            <Clock className="w-3.5 h-3.5" />
+            {schedEnabled && schedule?.isEnabled ? "الجدولة مفعّلة" : "إعداد الجدولة"}
+          </Button>
+          <Button onClick={() => generateReport.mutate({})} disabled={generateReport.isPending}
+            className="gap-1.5 text-white h-8 text-xs" style={{ background: "#25D366" }}>
+            <Sparkles className="w-3.5 h-3.5" />
+            {generateReport.isPending ? "جاري التوليد..." : "توليد تقرير"}
+          </Button>
+        </div>
       </div>
 
+      {/* بطاقة إعدادات الجدولة */}
+      {showScheduler && (
+        <div className="rounded-xl border p-5 space-y-5" style={{ background: "rgba(37,211,102,0.04)", borderColor: "rgba(37,211,102,0.2)" }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(37,211,102,0.15)" }}>
+                <Clock className="w-4 h-4 text-[#25D366]" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold text-sm">جدولة الإرسال التلقائي</h3>
+                <p className="text-xs text-[#8696a0]">يُرسل التقرير تلقائياً في اليوم والوقت المحدد</p>
+              </div>
+            </div>
+            {/* مفتاح التفعيل */}
+            <button
+              onClick={() => setSchedEnabled(v => !v)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                schedEnabled ? "bg-[#25D366]" : "bg-[#3b4a54]"
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                schedEnabled ? "translate-x-6" : "translate-x-1"
+              }`} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* يوم الأسبوع */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8696a0] font-medium">يوم الأسبوع</label>
+              <Select value={schedDay} onValueChange={setSchedDay}>
+                <SelectTrigger className="h-9 text-xs bg-[#2a3942] border-[#3b4a54] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#2a3942] border-[#3b4a54]">
+                  {DAYS.map((d, i) => (
+                    <SelectItem key={i} value={String(i)} className="text-white text-xs">{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* الوقت */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8696a0] font-medium">الوقت</label>
+              <div className="flex items-center gap-2">
+                <Select value={schedHour} onValueChange={setSchedHour}>
+                  <SelectTrigger className="h-9 text-xs bg-[#2a3942] border-[#3b4a54] text-white flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#2a3942] border-[#3b4a54] max-h-48 overflow-y-auto">
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={String(i)} className="text-white text-xs">
+                        {String(i).padStart(2, "0")}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-[#8696a0] text-xs">:</span>
+                <Select value={schedMinute} onValueChange={setSchedMinute}>
+                  <SelectTrigger className="h-9 text-xs bg-[#2a3942] border-[#3b4a54] text-white w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#2a3942] border-[#3b4a54]">
+                    {["00", "15", "30", "45"].map(m => (
+                      <SelectItem key={m} value={String(parseInt(m))} className="text-white text-xs">{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* المنطقة الزمنية */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8696a0] font-medium">المنطقة الزمنية</label>
+              <Select value={schedTimezone} onValueChange={setSchedTimezone}>
+                <SelectTrigger className="h-9 text-xs bg-[#2a3942] border-[#3b4a54] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#2a3942] border-[#3b4a54]">
+                  {TIMEZONES.map(tz => (
+                    <SelectItem key={tz.value} value={tz.value} className="text-white text-xs">{tz.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* حساب واتساب */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8696a0] font-medium">حساب واتساب للإرسال</label>
+              <Select value={schedAccount || "__none__"} onValueChange={v => setSchedAccount(v === "__none__" ? "" : v)}>
+                <SelectTrigger className="h-9 text-xs bg-[#2a3942] border-[#3b4a54] text-white">
+                  <SelectValue placeholder="اختر حساباً" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#2a3942] border-[#3b4a54]">
+                  <SelectItem value="__none__" className="text-[#8696a0] text-xs">الحساب الافتراضي</SelectItem>
+                  {(accounts as WaAccount[]).map((acc) => (
+                    <SelectItem key={acc.accountId} value={acc.accountId} className="text-white text-xs">{acc.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* رقم المستقبل */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8696a0] font-medium">رقم واتساب المستقبل (مع رمز الدولة)</label>
+            <input
+              type="text"
+              value={schedPhone}
+              onChange={e => setSchedPhone(e.target.value)}
+              placeholder="مثال: 966501234567"
+              className="w-full h-9 px-3 rounded-lg text-xs text-white placeholder-[#8696a0] border outline-none focus:border-[#25D366]/60"
+              style={{ background: "#2a3942", borderColor: "#3b4a54" }}
+            />
+          </div>
+
+          {/* محتوى التقرير */}
+          <div className="space-y-2">
+            <label className="text-xs text-[#8696a0] font-medium">محتوى التقرير</label>
+            <div className="flex items-center gap-4">
+              {[
+                { key: "leads", label: "إحصائيات العملاء", val: schedIncLeads, set: setSchedIncLeads },
+                { key: "wa", label: "إحصائيات واتساب", val: schedIncWa, set: setSchedIncWa },
+                { key: "emp", label: "أداء الموظفين", val: schedIncEmp, set: setSchedIncEmp },
+              ].map(item => (
+                <label key={item.key} className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={item.val} onChange={e => item.set(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-[#25D366]" />
+                  <span className="text-xs text-white">{item.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* آخر إرسال */}
+          {schedule?.lastSentAt && (
+            <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className={`w-2 h-2 rounded-full ${
+                schedule.lastSentStatus === "success" ? "bg-green-400" :
+                schedule.lastSentStatus === "failed" ? "bg-red-400" : "bg-yellow-400"
+              }`} />
+              <span className="text-xs text-[#8696a0]">
+                آخر إرسال: {new Date(schedule.lastSentAt).toLocaleString("ar-SA")}
+                {schedule.lastSentStatus === "success" && <span className="text-green-400 mr-2">✓ نجاح</span>}
+                {schedule.lastSentStatus === "failed" && <span className="text-red-400 mr-2">✗ فشل: {schedule.lastSentError}</span>}
+              </span>
+              {schedule.totalSent > 0 && (
+                <span className="text-xs text-[#8696a0] mr-auto">إجمالي الإرسال: <span className="text-white">{schedule.totalSent}</span></span>
+              )}
+            </div>
+          )}
+
+          {/* أزرار الحفظ والاختبار */}
+          <div className="flex items-center gap-3 pt-1">
+            <Button onClick={handleSaveSchedule} disabled={saveSchedule.isPending}
+              className="gap-1.5 text-white text-xs h-8 flex-1" style={{ background: "#25D366" }}>
+              <CheckCircle className="w-3.5 h-3.5" />
+              {saveSchedule.isPending ? "جاري الحفظ..." : "حفظ إعدادات الجدولة"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => triggerNow.mutate()}
+              disabled={triggerNow.isPending}
+              className="h-8 gap-1.5 text-xs border-[#8696a0]/40 text-[#8696a0] hover:bg-white/5">
+              <Zap className="w-3.5 h-3.5" />
+              {triggerNow.isPending ? "جاري الإرسال..." : "إرسال تجريبي الآن"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* قائمة التقارير */}
       {(reports as Report[]).length === 0 ? (
         <div className="text-center py-16">
           <FileText className="w-12 h-12 text-[#8696a0] mx-auto mb-3" />

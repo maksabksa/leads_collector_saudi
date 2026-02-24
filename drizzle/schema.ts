@@ -780,3 +780,26 @@ export const googleSheetsConnections = mysqlTable("google_sheets_connections", {
 });
 export type GoogleSheetsConnection = typeof googleSheetsConnections.$inferSelect;
 export type InsertGoogleSheetsConnection = typeof googleSheetsConnections.$inferInsert;
+
+// ===== جدول جدولة التقارير الأسبوعية =====
+export const reportSchedules = mysqlTable("report_schedules", {
+  id: int("id").autoincrement().primaryKey(),
+  isEnabled: boolean("isEnabled").default(false).notNull(),           // هل الجدولة مفعّلة؟
+  dayOfWeek: int("dayOfWeek").default(0).notNull(),                   // 0=الأحد, 1=الاثنين, ..., 6=السبت
+  hour: int("hour").default(8).notNull(),                             // الساعة (0-23)
+  minute: int("minute").default(0).notNull(),                         // الدقيقة (0-59)
+  timezone: varchar("timezone", { length: 100 }).default("Asia/Riyadh").notNull(),
+  whatsappAccountId: varchar("whatsappAccountId", { length: 255 }),   // حساب واتساب للإرسال
+  recipientPhone: varchar("recipientPhone", { length: 50 }),          // رقم المستقبل
+  includeLeadsStats: boolean("includeLeadsStats").default(true).notNull(),
+  includeWhatsappStats: boolean("includeWhatsappStats").default(true).notNull(),
+  includeEmployeeStats: boolean("includeEmployeeStats").default(true).notNull(),
+  lastSentAt: timestamp("lastSentAt"),                                // آخر إرسال
+  lastSentStatus: mysqlEnum("lastSentStatus", ["success", "failed", "pending"]).default("pending"),
+  lastSentError: text("lastSentError"),
+  totalSent: int("totalSent").default(0).notNull(),                   // عدد مرات الإرسال الناجحة
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ReportSchedule = typeof reportSchedules.$inferSelect;
+export type InsertReportSchedule = typeof reportSchedules.$inferInsert;

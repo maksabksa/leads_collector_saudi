@@ -10,6 +10,7 @@ import {
   campaigns, InsertCampaign, Campaign,
   reminders, InsertReminder, Reminder,
   weeklyReports, InsertWeeklyReport, WeeklyReport,
+  reportSchedules, InsertReportSchedule, ReportSchedule,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -435,4 +436,27 @@ export async function updateWeeklyReport(id: number, data: Partial<InsertWeeklyR
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(weeklyReports).set(data).where(eq(weeklyReports.id, id));
+}
+
+// ===== helpers جدولة التقارير =====
+export async function getReportSchedule(): Promise<ReportSchedule | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(reportSchedules).limit(1);
+  return result[0] || null;
+}
+
+export async function upsertReportSchedule(data: Partial<InsertReportSchedule>): Promise<ReportSchedule> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const existing = await getReportSchedule();
+  if (existing) {
+    await db.update(reportSchedules).set({ ...data, updatedAt: new Date() }).where(eq(reportSchedules.id, existing.id));
+    return (await getReportSchedule())!;
+  } else {
+    const result = await db.insert(reportSchedules).values(data as InsertReportSchedule);
+    const id = (result as any).insertId as number;
+    const row = await db.select().from(reportSchedules).where(eq(reportSchedules.id, id)).limit(1);
+    return row[0];
+  }
 }

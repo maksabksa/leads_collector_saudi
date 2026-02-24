@@ -351,6 +351,10 @@ async function startServer() {
     console.log(`Server running on http://localhost:${port}/`);
     // استعادة جلسات واتساب بعد 5 ثوانٍ من بدء الخادم
     setTimeout(restoreWhatsAppSessions, 5000);
+    // تشغيل cron job جدولة التقارير الأسبوعية بعد 10 ثوانٍ
+    setTimeout(() => {
+      import("../routers/reportScheduler").then(m => m.startReportSchedulerCron()).catch(console.error);
+    }, 10000);
   });
 }
 
