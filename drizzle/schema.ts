@@ -329,6 +329,12 @@ export const aiSettings = mysqlTable("ai_settings", {
   // هوية البلد
   countryContext: varchar("countryContext", { length: 50 }).default("saudi"), // saudi | gulf | arabic | international
   dialect: varchar("dialect", { length: 50 }).default("gulf"), // gulf | egyptian | levantine | msa
+  // إعدادات الرد الصوتي
+  voiceReplyEnabled: boolean("voiceReplyEnabled").default(false).notNull(), // تفعيل الرد الصوتي
+  voiceDialect: varchar("voiceDialect", { length: 50 }).default("ar-SA"), // ar-SA | ar-EG | ar-AE | ar-KW
+  voiceGender: mysqlEnum("voiceGender", ["male", "female"]).default("female"), // جنس الصوت
+  voiceSpeed: float("voiceSpeed").default(1.0), // سرعة الكلام 0.5-2.0
+  transcribeIncoming: boolean("transcribeIncoming").default(true).notNull(), // تحويل الصوتيات الواردة لنص
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -384,6 +390,20 @@ export const whatsappAccounts = mysqlTable("whatsapp_accounts", {
   // نوع الحساب: collection=تجميع, sales=سيلز, analysis=تحليل, followup=متابعة
   accountType: mysqlEnum("account_type", ["collection", "sales", "analysis", "followup"]).default("collection").notNull(),
   notes: text("notes"), // optional notes
+  // ===== سكور الرقم الذكي =====
+  healthScore: int("healthScore").default(100).notNull(), // 0-100: صحة الرقم
+  healthStatus: mysqlEnum("healthStatus", ["safe", "watch", "warning", "danger"]).default("safe").notNull(),
+  dailySentCount: int("dailySentCount").default(0).notNull(), // عدد الرسائل المرسلة اليوم
+  dailyReceivedCount: int("dailyReceivedCount").default(0).notNull(), // عدد الرسائل الواردة اليوم
+  totalSentCount: int("totalSentCount").default(0).notNull(), // إجمالي المرسلة
+  totalReceivedCount: int("totalReceivedCount").default(0).notNull(), // إجمالي الواردة
+  reportCount: int("reportCount").default(0).notNull(), // عدد مرات الإبلاغ
+  blockCount: int("blockCount").default(0).notNull(), // عدد مرات الحظر
+  noReplyCount: int("noReplyCount").default(0).notNull(), // رسائل بدون رد
+  maxDailyMessages: int("maxDailyMessages").default(200).notNull(), // الحد الأقصى للإرسال اليومي
+  minIntervalSeconds: int("minIntervalSeconds").default(30).notNull(), // الحد الأدنى للفاصل بين الرسائل (ثانية)
+  lastScoreUpdate: timestamp("lastScoreUpdate"), // آخر تحديث للسكور
+  scoreHistory: json("scoreHistory").$type<{date: string, score: number, reason: string}[]>().default([]),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -559,3 +579,75 @@ export const aiPersonality = mysqlTable("ai_personality", {
 });
 export type AiPersonality = typeof aiPersonality.$inferSelect;
 export type InsertAiPersonality = typeof aiPersonality.$inferInsert;
+
+// ===== BACKUP LOGS TABLE =====
+export const backupLogs = mysqlTable("backup_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["daily", "manual", "weekly"]).default("daily").notNull(),
+  status: mysqlEnum("status", ["pending", "running", "success", "failed"]).default("pending").notNull(),
+  filePath: varchar("filePath", { length: 500 }), // S3 key
+  fileUrl: text("fileUrl"), // S3 URL
+  fileSize: int("fileSize"), // bytes
+  emailSent: boolean("emailSent").default(false).notNull(),
+  emailTo: varchar("emailTo", { length: 320 }),
+  recordCount: json("recordCount").$type<{leads: number, chats: number, messages: number}>(),
+  error: text("error"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+});
+export type BackupLog = typeof backupLogs.$inferSelect;
+export type InsertBackupLog = typeof backupLogs.$inferInsert;
+
+// ===== SCHEDULED BULK SEND TABLE =====
+export const scheduledBulkSends = mysqlTable("scheduled_bulk_sends", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  accountId: varchar("accountId", { length: 64 }).notNull(),
+  message: text("message").notNull(),
+  mediaUrl: text("mediaUrl"),
+  recipients: json("recipients").$type<{phone: string, name?: string}[]>().notNull(),
+  totalCount: int("totalCount").default(0).notNull(),
+  sentCount: int("sentCount").default(0).notNull(),
+  failedCount: int("failedCount").default(0).notNull(),
+  intervalSeconds: int("intervalSeconds").default(30).notNull(), // فاصل بين الرسائل
+  maxPerDay: int("maxPerDay").default(200).notNull(),
+  status: mysqlEnum("status", ["pending", "running", "paused", "completed", "failed"]).default("pending").notNull(),
+  scheduledAt: timestamp("scheduledAt"), // وقت البدء المجدول
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ScheduledBulkSend = typeof scheduledBulkSends.$inferSelect;
+export type InsertScheduledBulkSend = typeof scheduledBulkSends.$inferInsert;
+
+// ===== WHATSAPP NUMBER HEALTH EVENTS TABLE =====
+export const numberHealthEvents = mysqlTable("number_health_events", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: varchar("accountId", { length: 64 }).notNull(),
+  eventType: mysqlEnum("eventType", ["report", "block", "no_reply", "score_drop", "score_rise", "warning_sent"]).notNull(),
+  description: text("description"),
+  scoreBefore: int("scoreBefore"),
+  scoreAfter: int("scoreAfter"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type NumberHealthEvent = typeof numberHealthEvents.$inferSelect;
+export type InsertNumberHealthEvent = typeof numberHealthEvents.$inferInsert;
+
+// ===== LEAD JOURNEY TABLE (تتبع مسار العميل) =====
+export const leadJourney = mysqlTable("lead_journey", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId"),
+  phone: varchar("phone", { length: 30 }).notNull(),
+  eventType: mysqlEnum("eventType", [
+    "created", "message_sent", "message_received",
+    "interest_detected", "transferred_to_employee", "transferred_to_ai",
+    "deal_closed", "deal_lost", "archived"
+  ]).notNull(),
+  description: text("description"),
+  performedBy: varchar("performedBy", { length: 100 }), // اسم الموظف أو 'AI' أو 'system'
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type LeadJourney = typeof leadJourney.$inferSelect;
+export type InsertLeadJourney = typeof leadJourney.$inferInsert;

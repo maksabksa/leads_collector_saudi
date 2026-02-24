@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   Upload,
   TrendingUp,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -44,6 +45,7 @@ const adminNavItems = [
   { path: "/segments", label: "شرائح العملاء", icon: Layers },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
   { path: "/whatsapp-report", label: "تقرير الإرسال", icon: TrendingUp },
+  { path: "/number-health", label: "صحة الأرقام الذكي", icon: ShieldCheck },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

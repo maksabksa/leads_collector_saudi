@@ -373,3 +373,13 @@
 - [x] إخفاء رسائل الفيسبوك/ميتا من المحادثات
 - [x] عرض رقم الواتساب المُرسِل عند تعدد الأرقام (badge أخضر أنيق)
 - [x] إظهار التاريخ الكامل عند hover على وقت الرسالة
+
+## الدفعة السابعة والعشرون - الترقية الشاملة
+- [x] إضافة حقول سكور الأرقام في جدول whatsapp_accounts (healthScore, healthStatus, dailySentCount, etc.)
+- [x] إضافة جداول backup_logs وscheduled_sends في قاعدة البيانات
+- [x] إضافة حقول الصوت في جدول ai_settings (voiceReplyEnabled, voiceDialect, voiceGender, voiceSpeed, transcribeIncoming)
+- [x] بناء numberHealth router (سكور الأرقام + إحصائيات + تحديث يدوي)
+- [x] صفحة /number-health: سكور صحة كل رقم واتساب مع مؤشرات بصرية
+- [x] إضافة قسم الرد الصوتي في إعدادات AI (اللهجة، الجنس، السرعة)
+- [x] إضافة قسم تحويل الصوت لنص في إعدادات AI
+- [x] إضافة رابط "صحة الأرقام" في السايدبار

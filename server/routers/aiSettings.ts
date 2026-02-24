@@ -167,6 +167,12 @@ export const aiSettingsRouter = router({
         brandTone: z.enum(["professional", "friendly", "formal", "casual"]).optional(),
         countryContext: z.enum(["saudi", "gulf", "arabic", "international"]).optional(),
         dialect: z.enum(["gulf", "egyptian", "levantine", "msa"]).optional(),
+        // إعدادات الصوت
+        voiceReplyEnabled: z.boolean().optional(),
+        voiceDialect: z.string().optional(),
+        voiceGender: z.enum(["male", "female"]).optional(),
+        voiceSpeed: z.number().min(0.5).max(2.0).optional(),
+        transcribeIncoming: z.boolean().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -201,6 +207,12 @@ export const aiSettingsRouter = router({
       if (input.escalationMessage !== undefined) updateData.escalationMessage = input.escalationMessage || null;
       if (input.escalationKeywords !== undefined) updateData.escalationKeywords = JSON.stringify(input.escalationKeywords);
       if (input.conversationKeywords !== undefined) updateData.conversationKeywords = JSON.stringify(input.conversationKeywords);
+      // تحديث إعدادات الصوت
+      if (input.voiceReplyEnabled !== undefined) updateData.voiceReplyEnabled = input.voiceReplyEnabled;
+      if (input.voiceDialect !== undefined) updateData.voiceDialect = input.voiceDialect;
+      if (input.voiceGender !== undefined) updateData.voiceGender = input.voiceGender;
+      if (input.voiceSpeed !== undefined) updateData.voiceSpeed = input.voiceSpeed;
+      if (input.transcribeIncoming !== undefined) updateData.transcribeIncoming = input.transcribeIncoming;
 
       // تحديث API Key فقط إذا أُرسل قيمة جديدة (غير فارغة)
       if (input.openaiApiKey && input.openaiApiKey.startsWith("sk-")) {

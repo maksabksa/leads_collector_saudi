@@ -42,6 +42,8 @@ import {
   Plus,
   Trash2,
   Hash,
+  Volume2,
+  Mic,
 } from "lucide-react";
 
 // ===== مكون بطاقة القسم =====
@@ -137,6 +139,12 @@ export default function AISettings() {
   const [brandTone, setBrandTone] = useState<"professional" | "friendly" | "formal" | "casual">("professional");
   const [countryContext, setCountryContext] = useState<"saudi" | "gulf" | "arabic" | "international">("saudi");
   const [dialect, setDialect] = useState<"gulf" | "egyptian" | "levantine" | "msa">("gulf");
+  // ===== إعدادات الصوت =====
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
+  const [voiceDialect, setVoiceDialect] = useState("ar-SA");
+  const [voiceGender, setVoiceGender] = useState<"male" | "female">("female");
+  const [voiceSpeed, setVoiceSpeed] = useState(1.0);
+  const [transcribeIncoming, setTranscribeIncoming] = useState(true);
   // ===== إعدادات التصعيد =====
   const [escalationEnabled, setEscalationEnabled] = useState(false);
   const [escalationPhone, setEscalationPhone] = useState("");
@@ -184,6 +192,12 @@ export default function AISettings() {
       setEscalationKeywords(Array.isArray(rawEscKws) ? rawEscKws : (typeof rawEscKws === "string" ? JSON.parse(rawEscKws || "[]") : []));
       const rawConvKws = (settings as any).conversationKeywords;
       setConversationKeywords(Array.isArray(rawConvKws) ? rawConvKws : (typeof rawConvKws === "string" ? JSON.parse(rawConvKws || "[]") : []));
+      // تحميل إعدادات الصوت
+      setVoiceReplyEnabled((settings as any).voiceReplyEnabled ?? false);
+      setVoiceDialect((settings as any).voiceDialect || "ar-SA");
+      setVoiceGender((settings as any).voiceGender || "female");
+      setVoiceSpeed((settings as any).voiceSpeed ?? 1.0);
+      setTranscribeIncoming((settings as any).transcribeIncoming ?? true);
     }
   }, [settings]);
 
@@ -251,6 +265,11 @@ export default function AISettings() {
       escalationMessage: escalationMessage || undefined,
       escalationKeywords,
       conversationKeywords,
+      voiceReplyEnabled,
+      voiceDialect,
+      voiceGender,
+      voiceSpeed,
+      transcribeIncoming,
     });
   };
 
@@ -1003,6 +1022,101 @@ export default function AISettings() {
           )}
         </div>
       </Section>
+      {/* ===== قسم الرد الصوتي ===== */}
+      <Section icon={Volume2} title="الرد الصوتي باللهجة" subtitle="رد تلقائي برسائل صوتية بلهجة محددة">
+        <div className="space-y-5">
+          {/* تفعيل الرد الصوتي */}
+          <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-background/50">
+            <div className="flex items-center gap-3">
+              <Volume2 className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium text-sm">الرد الصوتي التلقائي</p>
+                <p className="text-xs text-muted-foreground">يرد AI برسائل صوتية بدلاً من نصية</p>
+              </div>
+            </div>
+            <Switch checked={voiceReplyEnabled} onCheckedChange={setVoiceReplyEnabled} />
+          </div>
+
+          {voiceReplyEnabled && (
+            <div className="space-y-4 p-4 rounded-xl border border-border bg-background/30">
+              {/* اللهجة */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">اللهجة</label>
+                <Select value={voiceDialect} onValueChange={setVoiceDialect}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ar-SA">سعودية</SelectItem>
+                    <SelectItem value="ar-EG">مصرية</SelectItem>
+                    <SelectItem value="ar-AE">إماراتية</SelectItem>
+                    <SelectItem value="ar-KW">كويتية</SelectItem>
+                    <SelectItem value="ar-QA">قطرية</SelectItem>
+                    <SelectItem value="ar-MA">مغربية</SelectItem>
+                    <SelectItem value="ar">عربي فصيح</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* الجنس */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">جنس الصوت</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setVoiceGender("female")}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                      voiceGender === "female" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    أنثى
+                  </button>
+                  <button
+                    onClick={() => setVoiceGender("male")}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                      voiceGender === "male" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    ذكر
+                  </button>
+                </div>
+              </div>
+
+              {/* سرعة الصوت */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  سرعة الصوت: <span className="text-primary">{voiceSpeed}x</span>
+                </label>
+                <Slider
+                  min={0.5}
+                  max={2.0}
+                  step={0.1}
+                  value={[voiceSpeed]}
+                  onValueChange={([v]) => setVoiceSpeed(v)}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>0.5x بطيء</span>
+                  <span>1x طبيعي</span>
+                  <span>2x سريع</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* تحويل الصوت لنص */}
+          <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-background/50">
+            <div className="flex items-center gap-3">
+              <Mic className="w-5 h-5 text-blue-400" />
+              <div>
+                <p className="font-medium text-sm">تحويل الرسائل الصوتية لنص</p>
+                <p className="text-xs text-muted-foreground">تحويل رسائل العميل الصوتية تلقائياً ليفهمها AI</p>
+              </div>
+            </div>
+            <Switch checked={transcribeIncoming} onCheckedChange={setTranscribeIncoming} />
+          </div>
+        </div>
+      </Section>
+
       {/* زر الحفظ في الأسفل */}
       <div className="flex justify-end pb-4">
         <Button onClick={handleSave} disabled={saveSettings.isPending} size="lg">
