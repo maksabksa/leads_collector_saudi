@@ -353,6 +353,15 @@ export const whatsappChats = mysqlTable("whatsapp_chats", {
   unreadCount: int("unreadCount").default(0).notNull(),
   isArchived: boolean("isArchived").default(false).notNull(),
   aiAutoReplyEnabled: boolean("aiAutoReplyEnabled").default(true).notNull(), // per-chat AI control
+  // توزيع الموظفين
+  assignedUserId: int("assignedUserId"),           // معرف الموظف المعيّن
+  assignedUserName: varchar("assignedUserName", { length: 100 }), // اسم الموظف
+  handledBy: mysqlEnum("handledBy", ["ai", "human", "mixed"]).default("ai"), // من يتولى المحادثة
+  firstResponseAt: timestamp("firstResponseAt"),  // وقت أول رد
+  closedAt: timestamp("closedAt"),                 // وقت إغلاق المحادثة
+  totalMessages: int("totalMessages").default(0).notNull(), // إجمالي الرسائل
+  sentiment: mysqlEnum("sentiment", ["positive", "neutral", "negative", "unknown"]).default("unknown"), // مشاعر العميل
+  opportunityMissed: boolean("opportunityMissed").default(false).notNull(), // فرصة ضائعة
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

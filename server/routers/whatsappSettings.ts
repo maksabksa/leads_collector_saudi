@@ -12,6 +12,7 @@ import {
   whatsappChats,
   whatsappChatMessages,
   whatsappAccounts,
+  users,
 } from "../../drizzle/schema";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -863,5 +864,245 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         totalChats: Number(statsMap.get(acc.accountId)?.total ?? 0),
         unreadChats: Number(statsMap.get(acc.accountId)?.unread ?? 0),
       }));
+    }),
+
+  // تحديث حالة الرسالة (علامات القراءة)
+  updateMessageStatus: protectedProcedure
+    .input(z.object({
+      messageId: z.number(),
+      status: z.enum(["sent", "delivered", "read", "failed"]),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(whatsappChatMessages)
+        .set({ status: input.status })
+        .where(eq(whatsappChatMessages.id, input.messageId));
+      return { success: true };
+    }),
+
+  // تعيين موظف لمحادثة
+  assignChatToEmployee: protectedProcedure
+    .input(z.object({
+      chatId: z.number(),
+      userId: z.number().nullable(),
+      userName: z.string().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(whatsappChats)
+        .set({
+          assignedUserId: input.userId,
+          assignedUserName: input.userName,
+          handledBy: input.userId ? "human" : "ai",
+        })
+        .where(eq(whatsappChats.id, input.chatId));
+      return { success: true };
+    }),
+
+  // جلب الموظفين للتعيين
+  getEmployeeList: protectedProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        defaultWhatsappAccountId: users.defaultWhatsappAccountId,
+      }).from(users);
+    }),
+
+  // تحليل أداء الموظفين
+  getEmployeePerformance: protectedProcedure
+    .input(z.object({ days: z.number().default(30) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
+      const allEmployees = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+      }).from(users);
+      const chatStats = await db.select({
+        assignedUserId: whatsappChats.assignedUserId,
+        totalChats: sql<number>`COUNT(*)`,
+        closedChats: sql<number>`SUM(CASE WHEN ${whatsappChats.closedAt} IS NOT NULL THEN 1 ELSE 0 END)`,
+        missedOpportunities: sql<number>`SUM(CASE WHEN ${whatsappChats.opportunityMissed} = 1 THEN 1 ELSE 0 END)`,
+        positiveChats: sql<number>`SUM(CASE WHEN ${whatsappChats.sentiment} = 'positive' THEN 1 ELSE 0 END)`,
+        negativeChats: sql<number>`SUM(CASE WHEN ${whatsappChats.sentiment} = 'negative' THEN 1 ELSE 0 END)`,
+        avgMessages: sql<number>`AVG(${whatsappChats.totalMessages})`,
+      })
+      .from(whatsappChats)
+      .where(and(
+        sql`${whatsappChats.assignedUserId} IS NOT NULL`,
+        sql`${whatsappChats.createdAt} >= ${since}`,
+      ))
+      .groupBy(whatsappChats.assignedUserId);
+      const statsMap = new Map(chatStats.map(r => [r.assignedUserId, r]));
+      return allEmployees.map(emp => {
+        const stats = statsMap.get(emp.id);
+        const total = Number(stats?.totalChats ?? 0);
+        const closed = Number(stats?.closedChats ?? 0);
+        const missed = Number(stats?.missedOpportunities ?? 0);
+        const positive = Number(stats?.positiveChats ?? 0);
+        const negative = Number(stats?.negativeChats ?? 0);
+        const closeRate = total > 0 ? Math.round((closed / total) * 100) : 0;
+        const missRate = total > 0 ? Math.round((missed / total) * 100) : 0;
+        const performanceScore = total > 0
+          ? Math.min(100, Math.max(0, closeRate - missRate + (positive - negative) * 5))
+          : 0;
+        return {
+          id: emp.id,
+          name: emp.name ?? "موظف",
+          email: emp.email,
+          totalChats: total,
+          closedChats: closed,
+          missedOpportunities: missed,
+          positiveChats: positive,
+          negativeChats: negative,
+          closeRate,
+          missRate,
+          performanceScore,
+          avgMessages: Math.round(Number(stats?.avgMessages ?? 0)),
+        };
+      });
+    }),
+
+  // تحليل محادثة بالذكاء الاصطناعي
+  analyzeChatWithAI: protectedProcedure
+    .input(z.object({ chatId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const messages = await db.select()
+        .from(whatsappChatMessages)
+        .where(eq(whatsappChatMessages.chatId, input.chatId))
+        .orderBy(whatsappChatMessages.sentAt)
+        .limit(50);
+      if (messages.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "لا توجد رسائل" });
+      const conversation = messages.map(m =>
+        `[${m.direction === "outgoing" ? "موظف" : "عميل"}]: ${m.message}`
+      ).join("\n");
+      const result = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `أنت محلل محادثات متخصص. حلل وأخرج JSON:
+{
+  "sentiment": "positive|neutral|negative",
+  "opportunityMissed": true|false,
+  "weakPoints": ["نقطة ضعف"],
+  "strengths": ["نقطة قوة"],
+  "missedOpportunities": ["فرصة ضائعة"],
+  "recommendations": ["توصية"],
+  "summary": "ملخص",
+  "closingProbability": 0
+}`,
+          },
+          { role: "user", content: conversation },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "chat_analysis",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                sentiment: { type: "string" },
+                opportunityMissed: { type: "boolean" },
+                weakPoints: { type: "array", items: { type: "string" } },
+                strengths: { type: "array", items: { type: "string" } },
+                missedOpportunities: { type: "array", items: { type: "string" } },
+                recommendations: { type: "array", items: { type: "string" } },
+                summary: { type: "string" },
+                closingProbability: { type: "number" },
+              },
+              required: ["sentiment", "opportunityMissed", "weakPoints", "strengths", "missedOpportunities", "recommendations", "summary", "closingProbability"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+      const analysis = JSON.parse(result.choices[0].message.content as string);
+      await db.update(whatsappChats)
+        .set({
+          sentiment: analysis.sentiment as "positive" | "neutral" | "negative" | "unknown",
+          opportunityMissed: analysis.opportunityMissed,
+        })
+        .where(eq(whatsappChats.id, input.chatId));
+      return analysis;
+    }),
+
+  // تقرير شامل للمحادثات
+  getConversationReport: protectedProcedure
+    .input(z.object({
+      days: z.number().default(7),
+      accountId: z.string().optional(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
+      const conditions: Parameters<typeof and>[0][] = [sql`${whatsappChats.createdAt} >= ${since}`];
+      if (input.accountId) conditions.push(eq(whatsappChats.accountId, input.accountId));
+      const stats = await db.select({
+        totalChats: sql<number>`COUNT(*)`,
+        closedChats: sql<number>`SUM(CASE WHEN ${whatsappChats.closedAt} IS NOT NULL THEN 1 ELSE 0 END)`,
+        aiHandled: sql<number>`SUM(CASE WHEN ${whatsappChats.handledBy} = 'ai' THEN 1 ELSE 0 END)`,
+        humanHandled: sql<number>`SUM(CASE WHEN ${whatsappChats.handledBy} = 'human' THEN 1 ELSE 0 END)`,
+        missedOpportunities: sql<number>`SUM(CASE WHEN ${whatsappChats.opportunityMissed} = 1 THEN 1 ELSE 0 END)`,
+        positiveChats: sql<number>`SUM(CASE WHEN ${whatsappChats.sentiment} = 'positive' THEN 1 ELSE 0 END)`,
+        neutralChats: sql<number>`SUM(CASE WHEN ${whatsappChats.sentiment} = 'neutral' THEN 1 ELSE 0 END)`,
+        negativeChats: sql<number>`SUM(CASE WHEN ${whatsappChats.sentiment} = 'negative' THEN 1 ELSE 0 END)`,
+        avgMessages: sql<number>`AVG(${whatsappChats.totalMessages})`,
+      })
+      .from(whatsappChats)
+      .where(and(...conditions));
+      const abandoned = await db.select({
+        id: whatsappChats.id,
+        phone: whatsappChats.phone,
+        contactName: whatsappChats.contactName,
+        lastMessageAt: whatsappChats.lastMessageAt,
+        accountId: whatsappChats.accountId,
+      })
+      .from(whatsappChats)
+      .where(and(
+        eq(whatsappChats.isArchived, false),
+        sql`${whatsappChats.lastMessageAt} < DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+        sql`${whatsappChats.closedAt} IS NULL`,
+      ))
+      .limit(20);
+      const s = stats[0];
+      const total = Number(s?.totalChats ?? 0);
+      return {
+        totalChats: total,
+        closedChats: Number(s?.closedChats ?? 0),
+        aiHandled: Number(s?.aiHandled ?? 0),
+        humanHandled: Number(s?.humanHandled ?? 0),
+        missedOpportunities: Number(s?.missedOpportunities ?? 0),
+        positiveChats: Number(s?.positiveChats ?? 0),
+        neutralChats: Number(s?.neutralChats ?? 0),
+        negativeChats: Number(s?.negativeChats ?? 0),
+        avgMessages: Math.round(Number(s?.avgMessages ?? 0)),
+        closeRate: total > 0 ? Math.round((Number(s?.closedChats) / total) * 100) : 0,
+        abandonedChats: abandoned,
+      };
+    }),
+
+  // إغلاق محادثة
+  closeChat: protectedProcedure
+    .input(z.object({ chatId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(whatsappChats)
+        .set({ closedAt: new Date() })
+        .where(eq(whatsappChats.id, input.chatId));
+      return { success: true };
     }),
 });

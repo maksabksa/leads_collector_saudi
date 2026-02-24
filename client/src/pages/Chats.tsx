@@ -9,7 +9,7 @@ import {
   MessageCircle, Search, Send, Archive, Trash2, Phone, ExternalLink,
   CheckCheck, Clock, Bot, RefreshCw, X, Smartphone, MoreVertical,
   Paperclip, FileText, Download, Smile, Mic, MicOff, Sparkles,
-  Copy, Plus, Check, Zap, ChevronDown,
+  Copy, Plus, Check, Zap, ChevronDown, UserPlus, BarChart2, AlertTriangle, TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -315,6 +315,30 @@ export default function Chats() {
   const markAsRead = trpc.waSettings.markChatAsRead.useMutation({ onSuccess: () => refetchChats() });
   const archiveChat = trpc.waSettings.archiveChat.useMutation({ onSuccess: () => { refetchChats(); setSelectedChatId(null); } });
   const deleteChat = trpc.waSettings.deleteChat.useMutation({ onSuccess: () => { refetchChats(); setSelectedChatId(null); } });
+  const assignChat = trpc.waSettings.assignChatToEmployee.useMutation({
+    onSuccess: () => { toast.success("تم تعيين المحادثة"); refetchChats(); setShowAssignModal(false); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const closeChat = trpc.waSettings.closeChat.useMutation({
+    onSuccess: () => { toast.success("تم إغلاق المحادثة"); refetchChats(); },
+    onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+  const analyzeChat = trpc.waSettings.analyzeChatWithAI.useMutation({
+    onSuccess: (data) => {
+      toast.success("تحليل AI", { description: data.summary });
+      setAiAnalysisResult(data);
+      setShowAiAnalysis(true);
+    },
+    onError: (e) => toast.error("خطأ في التحليل", { description: e.message }),
+  });
+  const { data: employeeList = [] } = trpc.waSettings.getEmployeeList.useQuery();
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showAiAnalysis, setShowAiAnalysis] = useState(false);
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<{
+    sentiment: string; opportunityMissed: boolean; weakPoints: string[];
+    strengths: string[]; missedOpportunities: string[]; recommendations: string[];
+    summary: string; closingProbability: number;
+  } | null>(null);
 
   // ===== AI: توليد رد بقاعدة المعرفة RAG =====
   const suggestAiReply = trpc.ragKnowledge.generateRagReply.useMutation({
@@ -711,6 +735,22 @@ export default function Chats() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" style={{ background: "#233138", border: "1px solid rgba(255,255,255,0.1)" }}>
                     <DropdownMenuItem className="text-white hover:bg-white/10 cursor-pointer"
+                      onClick={() => setShowAssignModal(true)}>
+                      <UserPlus className="w-4 h-4 ml-2" />
+                      تعيين لموظف
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-white hover:bg-white/10 cursor-pointer"
+                      onClick={() => analyzeChat.mutate({ chatId: selectedChat.id })}>
+                      <BarChart2 className="w-4 h-4 ml-2" />
+                      {analyzeChat.isPending ? "جاري التحليل..." : "تحليل AI"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-white hover:bg-white/10 cursor-pointer"
+                      onClick={() => closeChat.mutate({ chatId: selectedChat.id })}>
+                      <Check className="w-4 h-4 ml-2" />
+                      إغلاق المحادثة
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem className="text-white hover:bg-white/10 cursor-pointer"
                       onClick={() => archiveChat.mutate({ chatId: selectedChat.id, archived: !selectedChat.isArchived })}>
                       <Archive className="w-4 h-4 ml-2" />
                       {selectedChat.isArchived ? "إلغاء الأرشفة" : "أرشفة"}
@@ -1045,6 +1085,110 @@ export default function Chats() {
                 بدء المحادثة
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Modal تعيين الموظف ===== */}
+      {showAssignModal && selectedChat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.7)" }}>
+          <div className="rounded-xl p-5 w-80 shadow-2xl" style={{ background: "#233138", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-[#25D366]" />
+                تعيين موظف
+              </h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-[#8696a0] hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-[#8696a0] mb-3">محادثة: {selectedChat.contactName || selectedChat.phone}</p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              <button
+                onClick={() => assignChat.mutate({ chatId: selectedChat.id, userId: null, userName: null })}
+                className="w-full text-right px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                style={{ background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.3)" }}
+              >
+                <Bot className="w-4 h-4 text-[#25D366]" />
+                <span className="text-[#25D366]">ذكاء اصطناعي (AI)</span>
+              </button>
+              {(employeeList as Array<{ id: number; name: string | null; email: string | null }>).map(emp => (
+                <button
+                  key={emp.id}
+                  onClick={() => assignChat.mutate({ chatId: selectedChat.id, userId: emp.id, userName: emp.name })}
+                  className="w-full text-right px-3 py-2 rounded-lg text-sm text-white transition-colors hover:bg-white/10 flex items-center gap-2"
+                  style={{ background: "rgba(255,255,255,0.05)" }}
+                >
+                  <div className="w-7 h-7 rounded-full bg-[#25D366]/20 flex items-center justify-center text-[#25D366] text-xs font-bold">
+                    {(emp.name || "م").slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="font-medium">{emp.name || "موظف"}</p>
+                    {emp.email && <p className="text-[10px] text-[#8696a0]">{emp.email}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Modal تحليل AI ===== */}
+      {showAiAnalysis && aiAnalysisResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.7)" }}>
+          <div className="rounded-xl p-5 w-[480px] max-h-[80vh] overflow-y-auto shadow-2xl" style={{ background: "#233138", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-[#25D366]" />
+                تحليل AI للمحادثة
+              </h3>
+              <button onClick={() => setShowAiAnalysis(false)} className="text-[#8696a0] hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* الملخص */}
+            <div className="p-3 rounded-lg mb-3" style={{ background: "rgba(37,211,102,0.08)", border: "1px solid rgba(37,211,102,0.2)" }}>
+              <p className="text-sm text-white">{aiAnalysisResult.summary}</p>
+            </div>
+            {/* المؤشرات */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="p-2 rounded-lg text-center" style={{ background: "rgba(255,255,255,0.05)" }}>
+                <p className="text-xs text-[#8696a0] mb-1">احتمالية الإغلاق</p>
+                <p className="text-2xl font-bold" style={{ color: aiAnalysisResult.closingProbability > 60 ? "#25D366" : aiAnalysisResult.closingProbability > 30 ? "#f59e0b" : "#ef4444" }}>
+                  {aiAnalysisResult.closingProbability}%
+                </p>
+              </div>
+              <div className="p-2 rounded-lg text-center" style={{ background: "rgba(255,255,255,0.05)" }}>
+                <p className="text-xs text-[#8696a0] mb-1">المشاعر</p>
+                <p className="text-lg font-bold" style={{ color: aiAnalysisResult.sentiment === "positive" ? "#25D366" : aiAnalysisResult.sentiment === "negative" ? "#ef4444" : "#f59e0b" }}>
+                  {aiAnalysisResult.sentiment === "positive" ? "إيجابي" : aiAnalysisResult.sentiment === "negative" ? "سلبي" : "محايد"}
+                </p>
+              </div>
+            </div>
+            {aiAnalysisResult.opportunityMissed && (
+              <div className="flex items-center gap-2 p-2 rounded-lg mb-3" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-400">تم تفويت فرصة بيع في هذه المحادثة</p>
+              </div>
+            )}
+            {aiAnalysisResult.weakPoints.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-red-400 mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> نقاط الضعف</p>
+                {aiAnalysisResult.weakPoints.map((p, i) => <p key={i} className="text-xs text-[#8696a0] py-0.5 border-r-2 border-red-400/50 pr-2 mb-1">{p}</p>)}
+              </div>
+            )}
+            {aiAnalysisResult.strengths.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-[#25D366] mb-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> نقاط القوة</p>
+                {aiAnalysisResult.strengths.map((p, i) => <p key={i} className="text-xs text-[#8696a0] py-0.5 border-r-2 border-[#25D366]/50 pr-2 mb-1">{p}</p>)}
+              </div>
+            )}
+            {aiAnalysisResult.recommendations.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-blue-400 mb-1">توصيات</p>
+                {aiAnalysisResult.recommendations.map((r, i) => <p key={i} className="text-xs text-[#8696a0] py-0.5 border-r-2 border-blue-400/50 pr-2 mb-1">{r}</p>)}
+              </div>
+            )}
           </div>
         </div>
       )}
