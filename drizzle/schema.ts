@@ -279,6 +279,7 @@ export const whatsappSettings = mysqlTable("whatsapp_settings", {
   messagesSentToday: int("messagesSentToday").default(0).notNull(),
   totalMessagesSent: int("totalMessagesSent").default(0).notNull(),
   autoReplyEnabled: boolean("autoReplyEnabled").default(false).notNull(),
+  autoArchiveDays: int("autoArchiveDays").default(0).notNull(), // 0 = disabled, >0 = archive after N days of inactivity
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

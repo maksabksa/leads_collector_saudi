@@ -141,6 +141,13 @@
       "when": 1771964813357,
       "tag": "0019_quiet_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1771972905772,
+      "tag": "0020_sudden_galactus",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
-import { eq, desc, and, like, sql, gte } from "drizzle-orm";
+import { eq, desc, and, like, sql, gte, lt, inArray } from "drizzle-orm";
 import {
   whatsappSettings,
   autoReplyRules,
@@ -1104,5 +1104,135 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         .set({ closedAt: new Date() })
         .where(eq(whatsappChats.id, input.chatId));
       return { success: true };
+    }),
+
+  // ===== إعدادات الأرشفة التلقائية =====
+  updateArchiveSettings: protectedProcedure
+    .input(z.object({
+      accountId: z.string().default("default"),
+      autoArchiveDays: z.number().min(0).max(365),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [existing] = await db.select().from(whatsappSettings)
+        .where(eq(whatsappSettings.accountId, input.accountId)).limit(1);
+      if (existing) {
+        await db.update(whatsappSettings)
+          .set({ autoArchiveDays: input.autoArchiveDays })
+          .where(eq(whatsappSettings.accountId, input.accountId));
+      } else {
+        await db.insert(whatsappSettings).values({
+          accountId: input.accountId,
+          accountLabel: "الحساب الرئيسي",
+          messageDelay: 10000,
+          notificationThreshold: 50,
+          autoReplyEnabled: false,
+          autoArchiveDays: input.autoArchiveDays,
+        });
+      }
+      return { success: true };
+    }),
+
+  // تشغيل الأرشفة التلقائية يدوياً
+  runAutoArchive: protectedProcedure
+    .mutation(async () => {
+      const db = await getDb();
+      if (!db) return { archived: 0 };
+      const settings = await db.select().from(whatsappSettings).limit(1);
+      const days = settings[0]?.autoArchiveDays ?? 0;
+      if (days === 0) return { archived: 0, message: "الأرشفة التلقائية معطلة" };
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const result = await db.update(whatsappChats)
+        .set({ isArchived: true })
+        .where(and(
+          eq(whatsappChats.isArchived, false),
+          lt(whatsappChats.updatedAt, cutoff)
+        ));
+      const count = (result[0] as { affectedRows?: number })?.affectedRows ?? 0;
+      return { archived: count, message: `تم أرشفة ${count} محادثة` };
+    }),
+
+  // أرشفة جماعية
+  bulkArchive: protectedProcedure
+    .input(z.object({
+      chatIds: z.array(z.number()),
+      archived: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.chatIds.length === 0) return { updated: 0 };
+      await db.update(whatsappChats)
+        .set({ isArchived: input.archived })
+        .where(inArray(whatsappChats.id, input.chatIds));
+      return { updated: input.chatIds.length };
+    }),
+
+  // ===== تحويل النص إلى صوت (TTS) =====
+  textToSpeech: protectedProcedure
+    .input(z.object({
+      text: z.string().min(1).max(4096),
+      voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).default("nova"),
+      speed: z.number().min(0.25).max(4.0).default(1.0),
+    }))
+    .mutation(async ({ input }) => {
+      const { ENV } = await import("../_core/env");
+      const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
+      const ttsUrl = new URL("v1/audio/speech", baseUrl).toString();
+      const response = await fetch(ttsUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${ENV.forgeApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "tts-1",
+          input: input.text,
+          voice: input.voice,
+          speed: input.speed,
+          response_format: "mp3",
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.text().catch(() => "");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `TTS فشل: ${response.status} ${err}` });
+      }
+      const audioBuffer = await response.arrayBuffer();
+      const base64 = Buffer.from(audioBuffer).toString("base64");
+      return { audioBase64: base64, mimeType: "audio/mp3" };
+    }),
+
+  // ===== تحويل الصوت إلى نص (STT) =====
+  transcribeVoice: protectedProcedure
+    .input(z.object({
+      audioBase64: z.string(),
+      mimeType: z.string().default("audio/webm"),
+      language: z.string().default("ar"),
+    }))
+    .mutation(async ({ input }) => {
+      const { ENV } = await import("../_core/env");
+      const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
+      const sttUrl = new URL("v1/audio/transcriptions", baseUrl).toString();
+      const audioBuffer = Buffer.from(input.audioBase64, "base64");
+      const ext = input.mimeType.includes("mp3") ? "mp3" : input.mimeType.includes("wav") ? "wav" : "webm";
+      const formData = new FormData();
+      const blob = new Blob([new Uint8Array(audioBuffer)], { type: input.mimeType });
+      formData.append("file", blob, `voice.${ext}`);
+      formData.append("model", "whisper-1");
+      formData.append("language", input.language);
+      formData.append("response_format", "json");
+      const response = await fetch(sttUrl, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${ENV.forgeApiKey}`, "Accept-Encoding": "identity" },
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.text().catch(() => "");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `STT فشل: ${response.status} ${err}` });
+      }
+      const result = await response.json() as { text: string };
+      return { text: result.text || "" };
     }),
 });
