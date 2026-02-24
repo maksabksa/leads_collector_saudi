@@ -135,13 +135,17 @@ async function restoreWhatsAppSessions() {
               ).limit(1);
               const chatAutoReply = freshChat?.aiAutoReplyEnabled ?? false;
 
-              // ===== إصلاح المنطق: يجب أن يكون كلاهما مفعّلاً للرد =====
-              // globalEnabled = مفتاح الرد العام
+              // ===== منطق الرد التلقائي =====
+              // globalEnabled = مفتاح الرد العام (يُفعّل/يُوقف الكل)
               // chatAutoReply = مفتاح الرد لهذه المحادثة بالذات
-              // إذا كان أي منهما مُعطَّلاً → لا ترد
-              if (!globalEnabled || !chatAutoReply) {
-                console.log(`[AI AutoReply] ⏸ متوقف - globalEnabled=${globalEnabled}, chatAutoReply=${chatAutoReply}`);
+              // المنطق: يرد إذا كان chatAutoReply مفعّلاً (سواء كان globalEnabled مفعلاً أو لا)
+              // هذا يسمح بتفعيل AI لمحادثة واحدة حتى لو كان الـ AI الإجمالي معطلاً
+              if (!chatAutoReply) {
+                console.log(`[AI AutoReply] ⏸ متوقف - chatAutoReply=${chatAutoReply} (globalEnabled=${globalEnabled})`);
                 return;
+              }
+              if (!globalEnabled) {
+                console.log(`[AI AutoReply] ✅ رد مخصص لمحادثة واحدة - globalEnabled=false لكن chatAutoReply=true`);
               }
 
               // ===== فحص الكلمات المفتاحية لبناء المحادثة =====

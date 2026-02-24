@@ -45,13 +45,12 @@ export const digitalMarketingRouter = router({
       closedDeals: sql<number>`SUM(CASE WHEN ${whatsappChats.closedAt} IS NOT NULL THEN 1 ELSE 0 END)`,
     }).from(whatsappChats);
 
-    // إحصائيات الرسائل (آخر 30 يوم)
+    // إحصائيات الرسائل (آخر 30 يوم) - استخدام execute لتجنب مشكلة Drizzle مع DATE()
     const startDate30 = daysAgoStr(30);
-    const [msgsStats] = await db.select({
-      totalMessages: sql<number>`COUNT(*)`,
-      uniqueContacts: sql<number>`COUNT(DISTINCT ${whatsappChatMessages.chatId})`,
-    }).from(whatsappChatMessages)
-      .where(sql`${whatsappChatMessages.sentAt} >= ${startDate30}`);
+    const [msgsResult] = await db.execute(
+      sql`SELECT COUNT(*) as totalMessages, COUNT(DISTINCT chatId) as uniqueContacts FROM whatsapp_chat_messages WHERE sentAt >= ${startDate30}`
+    );
+    const msgsStats = (msgsResult as unknown as any[])[0] ?? { totalMessages: 0, uniqueContacts: 0 };
 
     // أنواع الأعمال الأكثر شيوعاً
     const businessTypes = await db.select({
@@ -88,16 +87,12 @@ export const digitalMarketingRouter = router({
     if (!db) return [];
 
     const startDate14 = daysAgoStr(14);
-    const rows = await db.select({
-      msgDate: sql<string>`DATE(${whatsappChatMessages.sentAt})`,
-      total: sql<number>`COUNT(*)`,
-      aiMessages: sql<number>`SUM(CASE WHEN ${whatsappChatMessages.isAutoReply} = 1 THEN 1 ELSE 0 END)`,
-      uniqueContacts: sql<number>`COUNT(DISTINCT ${whatsappChatMessages.chatId})`,
-    }).from(whatsappChatMessages)
-      .where(sql`${whatsappChatMessages.sentAt} >= ${startDate14}`)
-      .groupBy(sql`DATE(${whatsappChatMessages.sentAt})`)
-      .orderBy(sql`DATE(${whatsappChatMessages.sentAt}) ASC`);
+    // استخدام db.execute مباشرة لتجنب مشكلة Drizzle مع GROUP BY DATE()
+    const [result] = await db.execute(
+      sql`SELECT DATE(sentAt) as msgDate, COUNT(*) as total, SUM(CASE WHEN isAutoReply = 1 THEN 1 ELSE 0 END) as aiMessages, COUNT(DISTINCT chatId) as uniqueContacts FROM whatsapp_chat_messages WHERE sentAt >= ${startDate14} GROUP BY DATE(sentAt) ORDER BY DATE(sentAt) ASC`
+    );
 
+    const rows = result as unknown as Array<{ msgDate: string; total: number; aiMessages: number; uniqueContacts: number }>
     return rows.map((r) => ({
       date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
       total: Number(r.total),
@@ -219,16 +214,12 @@ ${input.zone ? `- المنطقة: ${input.zone}` : ''}
 
     const startDate30 = daysAgoStr(30);
     try {
-      const rows = await db.select({
-        msgDate: sql<string>`DATE(${campaigns.createdAt})`,
-        sent: sql<number>`COUNT(*)`,
-        delivered: sql<number>`SUM(CASE WHEN ${campaigns.status} = 'sent' THEN 1 ELSE 0 END)`,
-        failed: sql<number>`SUM(CASE WHEN ${campaigns.status} = 'failed' THEN 1 ELSE 0 END)`,
-      }).from(campaigns)
-        .where(sql`${campaigns.createdAt} >= ${startDate30}`)
-        .groupBy(sql`DATE(${campaigns.createdAt})`)
-        .orderBy(sql`DATE(${campaigns.createdAt}) ASC`);
+      // استخدام db.execute مباشرة لتجنب مشكلة Drizzle مع GROUP BY DATE()
+      const [result] = await db.execute(
+        sql`SELECT DATE(createdAt) as msgDate, COUNT(*) as sent, SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as delivered, SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed FROM campaigns WHERE createdAt >= ${startDate30} GROUP BY DATE(createdAt) ORDER BY DATE(createdAt) ASC`
+      );
 
+      const rows = result as unknown as Array<{ msgDate: string; sent: number; delivered: number; failed: number }>
       return rows.map((r) => ({
         date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
         sent: Number(r.sent),

@@ -524,3 +524,10 @@
 - [ ] إصلاح الصوت TTS/STT (لا يعمل حالياً)
 - [ ] إضافة virtual scrolling للمحادثات الكثيرة
 - [ ] إصلاح إعدادات مركز البحث
+
+## الدفعة الثانية والثلاثون - إصلاحات وميزات جديدة
+- [x] إصلاح خطأ Drizzle ORM في getDailyMessageStats وgetCampaignStats (استبدال db.select().groupBy() بـ db.execute() لتجنب مشكلة GROUP BY DATE())
+- [x] إصلاح getOverviewStats: استخدام db.execute() لاستعلام الرسائل بدلاً من db.select()
+- [x] تعديل منطق AI AutoReply: يرد إذا كان chatAutoReply مفعلاً حتى لو كان globalEnabled معطلاً (تفعيل AI لمحادثة واحدة)
+- [x] إضافة إشعار صوتي عند وصول رسائل واتساب جديدة (نغمتان متتاليتان باستخدام Web Audio API)
+- [x] 40 اختبار Vitest تمر بنجاح

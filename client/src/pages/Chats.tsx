@@ -770,6 +770,30 @@ export default function Chats() {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [sortedMessages.length, selectedChatId]);
+  // ===== إشعار صوتي عند وصول رسالة جديدة =====
+  const playNotificationSound = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      // نغمتان متتاليتان مشابهتان لواتساب
+      const playTone = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(freq, startTime);
+        osc.type = "sine";
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      playTone(880, ctx.currentTime, 0.15);
+      playTone(1100, ctx.currentTime + 0.18, 0.2);
+    } catch {}
+  }, []);
   // ===== SSE: تحديث فوري عند وصول رسائل جديدة =====
   useEffect(() => {
     const es = new EventSource("/api/sse/chat-updates");
@@ -780,11 +804,15 @@ export default function Chats() {
         refetchChats();
         // إذا كانت المحادثة المفتوحة هي نفسها، حدّث الرسائل فوراً
         if (selectedChatId === data.chatId) refetchMessages();
+        // إشعار صوتي للرسالة الجديدة (فقط إذا لم تكن المحادثة مفتوحة حالياً)
+        if (selectedChatId !== data.chatId) {
+          playNotificationSound();
+        }
       } catch {}
     });
     es.onerror = () => { /* سيعيد الاتصال تلقائياً */ };
     return () => es.close();
-  }, [selectedChatId, refetchChats, refetchMessages]);
+  }, [selectedChatId, refetchChats, refetchMessages, playNotificationSound]);
 
   // ===== تعليم كمقروء =====
   useEffect(() => {
