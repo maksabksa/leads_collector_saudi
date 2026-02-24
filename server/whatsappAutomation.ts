@@ -221,15 +221,9 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
       session.isInitializing = false;
     });
 
-    // انتظر حتى يظهر QR أو يتصل (حد أقصى 40 ثانية)
-    for (let i = 0; i < 20; i++) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const s = session.status as string;
-      if (s === "qr_pending" || s === "connected") break;
-      if (s === "error") return { status: "error" as WaStatus };
-    }
-
-    return { status: session.status, qr: session.qrDataUrl || undefined };
+    // لا ننتظر - نبدأ في الخلفية ونرجع فوراً
+    // الـ UI يتابع الحالة عبر allStatus query كل 2 ثانية
+    return { status: "initializing" as WaStatus };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     session.status = "error";

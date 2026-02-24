@@ -2091,6 +2091,7 @@ const dataSettingsRouter = router({
 });
 import { whatsappSettingsRouter } from "./routers/whatsappSettings";
 import { numberHealthRouter } from "./routers/numberHealth";
+import { digitalMarketingRouter } from "./routers/digitalMarketing";
 import { socialSearchRouter } from "./routers/socialSearch";
 import { aiSettingsRouter } from "./routers/aiSettings";
 import { ragKnowledgeRouter } from "./routers/ragKnowledge";
@@ -2128,5 +2129,6 @@ export const appRouter = router({
   dataSettings: dataSettingsRouter,
   socialSearch: socialSearchRouter,
   numberHealth: numberHealthRouter,
+  digitalMarketing: digitalMarketingRouter,
 });
 export type AppRouter = typeof appRouter;

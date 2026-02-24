@@ -322,7 +322,7 @@ export default function WhatsApp() {
   // ===== Queries =====
   const { data: allSessionsData, refetch: refetchAllSessions } = trpc.wauto.allStatus.useQuery(
     undefined,
-    { refetchInterval: 4000 }
+    { refetchInterval: 2000 }
   );
   const { data: accounts = [], refetch: refetchAccounts } = trpc.waAccounts.listAccounts.useQuery();
   const { data: pendingAlerts = [], refetch: refetchAlerts } = trpc.waAccounts.listAlerts.useQuery({ status: "pending" });

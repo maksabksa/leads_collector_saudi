@@ -31,6 +31,8 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import WhatsAppReport from "./pages/WhatsAppReport";
 import NumberHealth from "./pages/NumberHealth";
 import EmployeePerformance from "./pages/EmployeePerformance";
+import DigitalMarketing from "./pages/DigitalMarketing";
+
 function Router() {
   return (
     <Layout>
@@ -54,13 +56,14 @@ function Router() {
         <Route path="/ai-settings" component={AISettings} />
         <Route path="/whatsapp-accounts" component={WhatsAppAccounts} />
         <Route path="/interest-keywords" component={InterestKeywords} />
-          <Route path="/segments" component={Segments} />
-          <Route path="/data-settings" component={DataSettings} />
+        <Route path="/segments" component={Segments} />
+        <Route path="/data-settings" component={DataSettings} />
         <Route path="/bulk-import" component={BulkImport} />
         <Route path="/knowledge-base" component={KnowledgeBase} />
         <Route path="/whatsapp-report" component={WhatsAppReport} />
         <Route path="/number-health" component={NumberHealth} />
         <Route path="/employee-performance" component={EmployeePerformance} />
+        <Route path="/digital-marketing" component={DigitalMarketing} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
