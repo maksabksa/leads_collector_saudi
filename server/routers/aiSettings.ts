@@ -169,6 +169,7 @@ export const aiSettingsRouter = router({
         dialect: z.enum(["gulf", "egyptian", "levantine", "msa"]).optional(),
         // إعدادات الصوت
         voiceReplyEnabled: z.boolean().optional(),
+        ttsVoice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional(),
         voiceDialect: z.string().optional(),
         voiceGender: z.enum(["male", "female"]).optional(),
         voiceSpeed: z.number().min(0.5).max(2.0).optional(),
@@ -209,6 +210,7 @@ export const aiSettingsRouter = router({
       if (input.conversationKeywords !== undefined) updateData.conversationKeywords = JSON.stringify(input.conversationKeywords);
       // تحديث إعدادات الصوت
       if (input.voiceReplyEnabled !== undefined) updateData.voiceReplyEnabled = input.voiceReplyEnabled;
+      if (input.ttsVoice !== undefined) updateData.ttsVoice = input.ttsVoice;
       if (input.voiceDialect !== undefined) updateData.voiceDialect = input.voiceDialect;
       if (input.voiceGender !== undefined) updateData.voiceGender = input.voiceGender;
       if (input.voiceSpeed !== undefined) updateData.voiceSpeed = input.voiceSpeed;

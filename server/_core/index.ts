@@ -324,18 +324,60 @@ async function restoreWhatsAppSessions() {
 
               if (aiReply && freshChat) {
                 const { whatsappChatMessages: waChatMsgs } = await import("../../drizzle/schema");
-                // إرسال الرد عبر واتساب
-                await sendWhatsAppMessage(phone, aiReply, accountId);
-                // حفظ الرد في قاعدة البيانات
-                await db3.insert(waChatMsgs).values({
-                  chatId: freshChat.id, accountId, direction: "outgoing",
-                  message: aiReply, status: "sent",
-                });
-                await db3.update(waChats).set({
-                  lastMessage: aiReply,
-                  lastMessageAt: new Date(),
-                }).where(eq2(waChats.id, freshChat.id));
-                console.log(`[AI AutoReply] ✅ رد تلقائي أُرسل إلى ${phone}`);
+                // ===== رد صوتي إذا كانت الرسالة الواردة صوتية والخيار مفعّل =====
+                const voiceReplyEnabled = settings?.voiceReplyEnabled;
+                const ttsVoice = (settings as any)?.ttsVoice || "nova";
+                let sentAsVoice = false;
+                if (isVoiceMessage && voiceReplyEnabled) {
+                  try {
+                    const { textToSpeech } = await import("./tts");
+                    const { storagePut } = await import("../storage");
+                    console.log(`[AI AutoReply] 🔊 تحويل رد AI لصوت (${ttsVoice})...`);
+                    const ttsResult = await textToSpeech({ text: aiReply, voice: ttsVoice, speed: settings?.voiceSpeed || 1.0 });
+                    if ("audioBuffer" in ttsResult) {
+                      // رفع الملف لـ S3
+                      const fileKey = `ai-voice-replies/${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`;
+                      const { url: audioUrl } = await storagePut(fileKey, ttsResult.audioBuffer, "audio/mpeg");
+                      // إرسال الملف الصوتي كمرفق واتساب
+                      const { sendWhatsAppMedia } = await import("../whatsappAutomation");
+                      const audioBase64 = ttsResult.audioBuffer.toString("base64");
+                      const mediaResult = await sendWhatsAppMedia(phone, audioBase64, "audio/mpeg", "reply.mp3", "", accountId);
+                      if (mediaResult.success) {
+                        sentAsVoice = true;
+                        console.log(`[AI AutoReply] 🔊 رد صوتي أُرسل إلى ${phone}`);
+                        // حفظ الرد في قاعدة البيانات مع رابط الصوت
+                        await db3.insert(waChatMsgs).values({
+                          chatId: freshChat.id, accountId, direction: "outgoing",
+                          message: aiReply, mediaUrl: audioUrl, mediaType: "audio", mediaFilename: "reply.mp3",
+                          status: "sent", isAutoReply: true,
+                        });
+                        await db3.update(waChats).set({
+                          lastMessage: "🔊 " + aiReply.substring(0, 50),
+                          lastMessageAt: new Date(),
+                        }).where(eq2(waChats.id, freshChat.id));
+                      } else {
+                        console.log(`[AI AutoReply] ⚠️ فشل إرسال الصوت - سيرد نصياً: ${mediaResult.error}`);
+                      }
+                    } else {
+                      console.log(`[AI AutoReply] ⚠️ فشل TTS: ${ttsResult.error} - ${ttsResult.details}`);
+                    }
+                  } catch (ttsErr) {
+                    console.error("[AI AutoReply] خطأ TTS:", ttsErr);
+                  }
+                }
+                // إرسال نصي إذا لم يُرسل صوتياً
+                if (!sentAsVoice) {
+                  await sendWhatsAppMessage(phone, aiReply, accountId);
+                  await db3.insert(waChatMsgs).values({
+                    chatId: freshChat.id, accountId, direction: "outgoing",
+                    message: aiReply, status: "sent",
+                  });
+                  await db3.update(waChats).set({
+                    lastMessage: aiReply,
+                    lastMessageAt: new Date(),
+                  }).where(eq2(waChats.id, freshChat.id));
+                  console.log(`[AI AutoReply] ✅ رد تلقائي أُرسل إلى ${phone}`);
+                }
               }
             } catch (aiErr) {
               console.error("[AI AutoReply] خطأ في الرد التلقائي:", aiErr);

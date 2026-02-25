@@ -141,6 +141,7 @@ export default function AISettings() {
   const [dialect, setDialect] = useState<"gulf" | "egyptian" | "levantine" | "msa">("gulf");
   // ===== إعدادات الصوت =====
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState<"alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer">("nova");
   const [voiceDialect, setVoiceDialect] = useState("ar-SA");
   const [voiceGender, setVoiceGender] = useState<"male" | "female">("female");
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
@@ -194,6 +195,7 @@ export default function AISettings() {
       setConversationKeywords(Array.isArray(rawConvKws) ? rawConvKws : (typeof rawConvKws === "string" ? JSON.parse(rawConvKws || "[]") : []));
       // تحميل إعدادات الصوت
       setVoiceReplyEnabled((settings as any).voiceReplyEnabled ?? false);
+      setTtsVoice((settings as any).ttsVoice || "nova");
       setVoiceDialect((settings as any).voiceDialect || "ar-SA");
       setVoiceGender((settings as any).voiceGender || "female");
       setVoiceSpeed((settings as any).voiceSpeed ?? 1.0);
@@ -266,6 +268,7 @@ export default function AISettings() {
       escalationKeywords,
       conversationKeywords,
       voiceReplyEnabled,
+      ttsVoice,
       voiceDialect,
       voiceGender,
       voiceSpeed,
@@ -1039,6 +1042,23 @@ export default function AISettings() {
 
           {voiceReplyEnabled && (
             <div className="space-y-4 p-4 rounded-xl border border-border bg-background/30">
+              {/* صوت TTS */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">صوت الذكاء الاصطناعي</label>
+                <Select value={ttsVoice} onValueChange={(v) => setTtsVoice(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nova">👩 Nova — أنثى طبيعي</SelectItem>
+                    <SelectItem value="shimmer">👩 Shimmer — أنثى ناعم</SelectItem>
+                    <SelectItem value="alloy">🧑 Alloy — محايد</SelectItem>
+                    <SelectItem value="echo">👨 Echo — ذكر عميق</SelectItem>
+                    <SelectItem value="fable">👨 Fable — ذكر بريطاني</SelectItem>
+                    <SelectItem value="onyx">👨 Onyx — ذكر قوي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {/* اللهجة */}
               <div>
                 <label className="text-sm font-medium mb-2 block">اللهجة</label>

@@ -332,6 +332,7 @@ export const aiSettings = mysqlTable("ai_settings", {
   dialect: varchar("dialect", { length: 50 }).default("gulf"), // gulf | egyptian | levantine | msa
   // إعدادات الرد الصوتي
   voiceReplyEnabled: boolean("voiceReplyEnabled").default(false).notNull(), // تفعيل الرد الصوتي
+  ttsVoice: varchar("ttsVoice", { length: 20 }).default("nova").notNull(), // صوت TTS: alloy | echo | fable | onyx | nova | shimmer
   voiceDialect: varchar("voiceDialect", { length: 50 }).default("ar-SA"), // ar-SA | ar-EG | ar-AE | ar-KW
   voiceGender: mysqlEnum("voiceGender", ["male", "female"]).default("female"), // جنس الصوت
   voiceSpeed: float("voiceSpeed").default(1.0), // سرعة الكلام 0.5-2.0
