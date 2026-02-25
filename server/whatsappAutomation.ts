@@ -154,6 +154,12 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
       try {
         // تجاهل الرسائل الصادرة من الحساب نفسه
         if (msg.fromMe) return;
+        // منع معالجة نفس الرسالة أكثر من مرة (حماية من تكرار الرد)
+        const msgId = msg.id?._serialized || msg.id?.id || `${msg.from}-${msg.timestamp}`;
+        if (!markMessageProcessed(msgId)) {
+          console.log(`[${accountId}] تجاهل رسالة مكررة: ${msgId}`);
+          return;
+        }
         // تجاهل رسائل جروبات الواتساب (@g.us)
         if (msg.from && msg.from.includes("@g.us")) {
           console.log(`[${accountId}] تجاهل رسالة جروب واتساب: ${msg.from}`);
@@ -374,6 +380,18 @@ export type IncomingMessageHandler = (params: {
 }) => Promise<void>;
 
 let incomingMessageHandler: IncomingMessageHandler | null = null;
+
+// مجموعة لتتبع الرسائل المعالجة مؤخراً لمنع التكرار
+const processedMessageIds = new Set<string>();
+const PROCESSED_MSG_TTL = 30000; // 30 ثانية
+
+function markMessageProcessed(msgId: string): boolean {
+  if (processedMessageIds.has(msgId)) return false; // تم معالجتها مسبقاً
+  processedMessageIds.add(msgId);
+  // حذف الـ ID بعد 30 ثانية لتجنب تراكم الذاكرة
+  setTimeout(() => processedMessageIds.delete(msgId), PROCESSED_MSG_TTL);
+  return true; // أول معالجة
+}
 
 export function setIncomingMessageHandler(handler: IncomingMessageHandler) {
   incomingMessageHandler = handler;

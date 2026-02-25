@@ -565,3 +565,9 @@
 - [x] إصلاح __dirname في tts.ts لـ ES modules
 - [x] استبدال FORGE TTS بـ gTTS (Python) لأن FORGE لا يدعم TTS
 - [x] 40 اختبار Vitest تمر بنجاح
+
+## الدفعة السابعة والثلاثون - إصلاح تكرار إرسال الرسائل
+- [x] فحص سبب إرسال الرسائل 3 مرات: كان الـ message listener يُسجَّل عدة مرات بسبب إعادة تشغيل الـ client
+- [x] إضافة deduplication بناءً على messageId في whatsappAutomation.ts لمنع معالجة نفس الرسالة أكثر من مرة
+- [x] تثبيت gTTS والتحقق من عمله بشكل صحيح
+- [x] 40 اختبار Vitest تمر بنجاح
