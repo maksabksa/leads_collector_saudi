@@ -32,7 +32,11 @@ interface AccountSession {
 }
 
 // Map من accountId إلى جلسته
-const sessions = new Map<string, AccountSession>();
+// نستخدم global variable لتبقى بين HMR reloads وتمنع إعادة إنشاء clients
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _gSessions = global as any;
+if (!_gSessions.__waSessions) _gSessions.__waSessions = new Map<string, AccountSession>();
+const sessions: Map<string, AccountSession> = _gSessions.__waSessions;
 
 // الحساب الافتراضي للتوافق مع الكود القديم
 const DEFAULT_ACCOUNT = "default";
@@ -204,8 +208,9 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
           } catch { /* تجاهل خطأ تحميل الوسائط */ }
         }
 
-        if (incomingMessageHandler) {
-          await incomingMessageHandler({
+        const _handler = getIncomingHandler();
+        if (_handler) {
+          await _handler({
             accountId,
             phone: rawPhone,
             contactName,
@@ -379,10 +384,17 @@ export type IncomingMessageHandler = (params: {
   filename?: string;
 }) => Promise<void>;
 
-let incomingMessageHandler: IncomingMessageHandler | null = null;
+// نستخدم global variable لكل من incomingMessageHandler و processedMessageIds
+// لتبقى بين HMR reloads وتمنع تكرار المعالجة
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _globalAny = global as any;
+if (!_globalAny.__waProcessedMsgIds) _globalAny.__waProcessedMsgIds = new Set<string>();
+const processedMessageIds: Set<string> = _globalAny.__waProcessedMsgIds;
 
-// مجموعة لتتبع الرسائل المعالجة مؤخراً لمنع التكرار
-const processedMessageIds = new Set<string>();
+// incomingMessageHandler كـ global لتبقى بين HMR reloads
+function getIncomingHandler(): IncomingMessageHandler | null {
+  return _globalAny.__waIncomingHandler ?? null;
+}
 const PROCESSED_MSG_TTL = 30000; // 30 ثانية
 
 function markMessageProcessed(msgId: string): boolean {
@@ -394,7 +406,7 @@ function markMessageProcessed(msgId: string): boolean {
 }
 
 export function setIncomingMessageHandler(handler: IncomingMessageHandler) {
-  incomingMessageHandler = handler;
+  _globalAny.__waIncomingHandler = handler;
 }
 
 // إرسال رسالة لرقم واحد عبر حساب معين
