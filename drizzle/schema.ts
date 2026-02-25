@@ -338,6 +338,10 @@ export const aiSettings = mysqlTable("ai_settings", {
   voiceSpeed: float("voiceSpeed").default(1.0), // سرعة الكلام 0.5-2.0
   voiceReplyScope: varchar("voice_reply_scope", { length: 20 }).default("voice_only").notNull(), // voice_only | all_messages
   transcribeIncoming: boolean("transcribeIncoming").default(true).notNull(), // تحويل الصوتيات الواردة لنص
+  // إعدادات Instagram API
+  instagramAccessToken: text("instagramAccessToken"), // Instagram Graph API Access Token
+  instagramAppId: varchar("instagramAppId", { length: 100 }), // Instagram App ID (User ID)
+  instagramApiEnabled: boolean("instagramApiEnabled").default(false).notNull(), // تفعيل Instagram API
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

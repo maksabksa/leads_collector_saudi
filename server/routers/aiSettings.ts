@@ -175,6 +175,10 @@ export const aiSettingsRouter = router({
         voiceSpeed: z.number().min(0.5).max(2.0).optional(),
         voiceReplyScope: z.enum(["voice_only", "all_messages"]).optional(),
         transcribeIncoming: z.boolean().optional(),
+        // إعدادات Instagram API
+        instagramAccessToken: z.string().optional(),
+        instagramAppId: z.string().optional(),
+        instagramApiEnabled: z.boolean().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -217,6 +221,16 @@ export const aiSettingsRouter = router({
       if (input.voiceSpeed !== undefined) updateData.voiceSpeed = input.voiceSpeed;
       if (input.voiceReplyScope !== undefined) updateData.voiceReplyScope = input.voiceReplyScope;
       if (input.transcribeIncoming !== undefined) updateData.transcribeIncoming = input.transcribeIncoming;
+      // تحديث إعدادات Instagram API
+      if (input.instagramApiEnabled !== undefined) updateData.instagramApiEnabled = input.instagramApiEnabled;
+      if (input.instagramAppId !== undefined) updateData.instagramAppId = input.instagramAppId || null;
+      if (input.instagramAccessToken !== undefined) {
+        if (input.instagramAccessToken.length > 10) {
+          updateData.instagramAccessToken = input.instagramAccessToken;
+        } else if (input.instagramAccessToken === "") {
+          updateData.instagramAccessToken = null;
+        }
+      }
 
       // تحديث API Key فقط إذا أُرسل قيمة جديدة (غير فارغة)
       if (input.openaiApiKey && input.openaiApiKey.startsWith("sk-")) {

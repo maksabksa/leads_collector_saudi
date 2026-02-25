@@ -618,3 +618,29 @@
 - [x] إصلاح مشكلة ECONNRESET: إضافة إعادة الاتصال التلقائي في getDb() وإضافة resetDbConnection() في reportScheduler
 - [x] تأكيد: الخطأ كان مؤقتاً بسبب إعادة تشغيل sandbox - الصفحة تعمل بشكل صحيح
 - [x] 40 اختبار Vitest تمر بنجاح
+## الدفعة 40 - إعادة تصميم مركز البحث الاحترافي
+
+- [ ] فحص الكود الحالي لمركز البحث وصفحات البحث الموجودة
+- [ ] إعادة تصميم SearchHub.tsx بواجهة موحدة احترافية مع تبويبات للمصادر (Google Maps, Instagram, Snapchat, TikTok, Telegram)
+- [ ] إضافة البحث من داخل إنستجرام - جلب الحسابات التجارية بالهاشتاق أو الموقع
+- [ ] إضافة فلاتر متقدمة: المدينة، نوع النشاط، عدد المتابعين، التحقق من الواتساب
+- [ ] إضافة معاينة سريعة للنتائج مع زر "إضافة كعميل" مباشرة
+- [ ] إضافة تقدم البحث الحي (live progress) مع إحصائيات
+- [ ] تحسين UX: بحث بالصوت، حفظ عمليات البحث، تصدير النتائج
+
+## الدفعة 41 - Instagram API + AI Fallback + تحسين مركز البحث
+
+- [ ] إضافة INSTAGRAM_ACCESS_TOKEN و INSTAGRAM_APP_ID كـ secrets
+- [ ] تحسين instagram router: AI fallback تلقائي عند غياب API credentials
+- [ ] تحسين واجهة مركز البحث: عرض نتائج إنستجرام بشكل احترافي مع صور الملفات الشخصية
+- [ ] إضافة مؤشر "بحث بالذكاء الاصطناعي" عند استخدام الـ fallback
+- [ ] تشغيل 40 اختبار Vitest بنجاح
+
+## الدفعة 41 (مكتملة) - Instagram API وAI Fallback
+
+- [x] إضافة حقول instagramAccessToken و instagramAppId و instagramApiEnabled في جدول ai_settings
+- [x] تحديث aiSettings router لحفظ وقراءة Instagram credentials
+- [x] إضافة قسم Instagram API في صفحة إعدادات AI (تفعيل، App ID، Access Token، دليل الحصول على Token)
+- [x] تحديث instagram router ليقرأ credentials من قاعدة البيانات أولاً ثم متغيرات البيئة
+- [x] إضافة AI fallback تلقائي: عند عدم وجود credentials، يستخدم الذكاء الاصطناعي لتوليد نتائج محتملة
+- [x] 40 اختبار Vitest تمر بنجاح
