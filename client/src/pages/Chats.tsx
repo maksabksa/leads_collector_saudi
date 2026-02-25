@@ -507,6 +507,7 @@ export default function Chats() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [voiceProcessingChats, setVoiceProcessingChats] = useState<Set<number>>(new Set());
   // ===== حالة AI =====
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
@@ -808,6 +809,23 @@ export default function Chats() {
         if (selectedChatId !== data.chatId) {
           playNotificationSound();
         }
+      } catch {}
+    });
+    // مؤشر معالجة الصوت
+    es.addEventListener("voice-processing", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as { chatId: number; accountId: string; status: "processing" | "done" | "failed" };
+        setVoiceProcessingChats(prev => {
+          const next = new Set(prev);
+          if (data.status === "processing") {
+            next.add(data.chatId);
+          } else {
+            next.delete(data.chatId);
+            // تحديث الرسائل عند اكتمال المعالجة
+            if (data.status === "done" && selectedChatId === data.chatId) refetchMessages();
+          }
+          return next;
+        });
       } catch {}
     });
     es.onerror = () => { /* سيعيد الاتصال تلقائياً */ };
@@ -1216,11 +1234,24 @@ export default function Chats() {
                       })}
                     </div>
                   ))}
+                  {/* مؤشر معالجة الصوت */}
+                  {selectedChatId && voiceProcessingChats.has(selectedChatId) && (
+                    <div className="flex justify-start px-3 mb-2">
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-2xl" style={{ background: "rgba(37,211,102,0.12)", border: "1px solid rgba(37,211,102,0.25)" }}>
+                        <div className="flex gap-1 items-center">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                        <span className="text-xs text-[#25D366] font-medium">جاري تحليل الرسالة الصوتية...</span>
+                        <Bot className="w-3.5 h-3.5 text-[#25D366]" />
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </>
               )}
             </div>
-
             {/* ===== منطقة الإدخال ===== */}
             <div className="px-3 py-2 flex-shrink-0 relative" style={{ background: "#202c33" }}>
 

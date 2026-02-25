@@ -11,6 +11,9 @@ export function broadcastSSE(event: string, data: unknown) {
 export function broadcastChatUpdate(chatId: number, accountId: string) {
   broadcastSSE("chat-update", { chatId, accountId, ts: Date.now() });
 }
+export function broadcastVoiceProcessing(chatId: number, accountId: string, status: "processing" | "done" | "failed") {
+  broadcastSSE("voice-processing", { chatId, accountId, status, ts: Date.now() });
+}
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -157,19 +160,24 @@ async function restoreWhatsAppSessions() {
                 try {
                   const { transcribeAudio } = await import("./voiceTranscription");
                   console.log(`[AI AutoReply] 🎤 بدء تحويل صوتي - URL: ${uploadedMediaUrl?.substring(0, 80)}... mimetype: ${mimetype}`);
+                  // إرسال حالة معالجة الصوت للـ frontend
+                  if (freshChat) broadcastVoiceProcessing(freshChat.id, accountId, "processing");
                   const transcribeResult = await transcribeAudio({ audioUrl: uploadedMediaUrl, language: "ar" });
                   if ("text" in transcribeResult && transcribeResult.text?.trim()) {
                     effectiveMessage = transcribeResult.text.trim();
                     console.log(`[AI AutoReply] 🎤 تحويل صوتي: "${effectiveMessage}"`);
+                    if (freshChat) broadcastVoiceProcessing(freshChat.id, accountId, "done");
                   } else {
                     // لوغ تفصيلي لمعرفة سبب الفشل
                     const errResult = transcribeResult as any;
                     console.log(`[AI AutoReply] ⚠️ فشل تحويل الصوت - سبب: ${errResult.error || JSON.stringify(transcribeResult)}`);
+                    if (freshChat) broadcastVoiceProcessing(freshChat.id, accountId, "failed");
                     // بدلاً من إرسال رسالة محيرة، لا ترد على الرسائل الصوتية إذا فشل التحويل
                     return;
                   }
                 } catch (transcribeErr) {
                   console.error("[AI AutoReply] خطأ تحويل الصوت:", transcribeErr);
+                  if (freshChat) broadcastVoiceProcessing(freshChat.id, accountId, "failed");
                   // لا ترد على الرسائل الصوتية إذا فشل التحويل بدلاً من إرسال رسالة محيرة
                   return;
                 }
@@ -263,13 +271,17 @@ async function restoreWhatsAppSessions() {
               }
 
               // بناء system prompt
+              const voiceInstructions = isVoiceMessage
+                ? "\n\nتنبيه مهم: الرسالة التالية تم تحويلها آلياً من صوت إلى نص وقد تحتوي على أخطاء إملائية بسيطة. افهم المعنى العام ورد بشكل طبيعي كأنك سمعت الصوت مباشرة. لا تذكر أن الرسالة صوتية في ردك."
+                : "";
               const systemPrompt = [
                 personality?.systemPrompt || settings?.systemPrompt || "أنت مساعد مبيعات سعودي محترف يرد على رسائل العملاء بشكل ودي واحترافي.",
                 settings?.businessContext ? `\nمعلومات النشاط التجاري: ${settings.businessContext}` : "",
                 personality?.businessContext ? `\nمعلومات إضافية: ${personality.businessContext}` : "",
                 personality?.rules?.length ? `\nالقواعد: ${(personality.rules as string[]).join(" | ")}` : "",
                 ragContext.length > 0 ? `\n\n=== معلومات من قاعدة المعرفة ===\n${ragContext.join("\n")}` : "",
-                "\n\nالتعليمات: رد باللغة العربية بشكل مختصر ومفيد. لا تذكر أنك AI. رد مباشرة على استفسار العميل.",
+                voiceInstructions,
+                "\n\nالتعليمات: رد باللغة العربية بشكل مختصر ومفيد. لا تذكر أنك ذكاء اصطناعي. لا تذكر أنك مساعد نصي فقط. رد مباشرة على استفسار العميل.",
               ].filter(Boolean).join("");
 
               let aiReply = "";
