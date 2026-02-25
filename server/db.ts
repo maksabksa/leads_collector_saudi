@@ -15,17 +15,32 @@ import {
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _lastConnectTime: number = 0;
 
 export async function getDb() {
+  const now = Date.now();
+  // إعادة الاتصال إذا مر أكثر من 30 دقيقة على آخر اتصال
+  if (_db && (now - _lastConnectTime) > 30 * 60 * 1000) {
+    _db = null; // إعادة الاتصال بشكل دوري
+  }
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL);
+      _lastConnectTime = now;
+      console.log("[Database] Connected successfully");
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
     }
   }
   return _db;
+}
+
+// إعادة ضبط الاتصال عند خطأ ECONNRESET
+export function resetDbConnection() {
+  _db = null;
+  _lastConnectTime = 0;
+  console.log("[Database] Connection reset requested");
 }
 
 // ===== USER HELPERS =====

@@ -191,8 +191,13 @@ export function startReportSchedulerCron() {
         const result = await runScheduledReport();
         console.log("[ReportScheduler] نتيجة الإرسال:", result);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("[ReportScheduler] خطأ في cron:", e);
+      // إعادة ضبط الاتصال عند ECONNRESET
+      if (e?.code === 'ECONNRESET' || e?.cause?.code === 'ECONNRESET') {
+        const { resetDbConnection } = await import("../db");
+        resetDbConnection();
+      }
     }
   }, 60 * 1000); // كل دقيقة
 
