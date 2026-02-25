@@ -6,8 +6,8 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
-import { eq, sql } from "drizzle-orm";
-import { aiSettings, whatsappChats } from "../../drizzle/schema";
+import { eq, sql, desc, count, gte, and } from "drizzle-orm";
+import { aiSettings, whatsappChats, ttsLogs } from "../../drizzle/schema";
 
 // ===== مساعد: استدعاء OpenAI مباشرة =====
 async function callOpenAI({
@@ -443,5 +443,43 @@ export const aiSettingsRouter = router({
         .from(whatsappChats)
         .where(eq(whatsappChats.accountId, input.accountId))
         .orderBy(whatsappChats.lastMessageAt);
+    }),
+
+  // ===== إحصائيات TTS =====
+  getTtsStats: protectedProcedure
+    .input(z.object({ days: z.number().default(7) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { total: 0, success: 0, failed: 0, fallback: 0, successRate: 0, recentLogs: [] };
+
+      const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
+
+      // إجمالي الإحصائيات
+      const [totals] = await db
+        .select({
+          total: count(),
+          success: sql<number>`SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END)`,
+          failed: sql<number>`SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)`,
+          fallback: sql<number>`SUM(CASE WHEN status = 'fallback' THEN 1 ELSE 0 END)`,
+          avgDurationMs: sql<number>`AVG(durationMs)`,
+        })
+        .from(ttsLogs)
+        .where(gte(ttsLogs.createdAt, since));
+
+      // آخر 10 سجلات
+      const recentLogs = await db
+        .select()
+        .from(ttsLogs)
+        .orderBy(desc(ttsLogs.createdAt))
+        .limit(10);
+
+      const total = Number(totals?.total ?? 0);
+      const success = Number(totals?.success ?? 0);
+      const failed = Number(totals?.failed ?? 0);
+      const fallback = Number(totals?.fallback ?? 0);
+      const successRate = total > 0 ? Math.round((success / total) * 100) : 0;
+      const avgDurationMs = Math.round(Number(totals?.avgDurationMs ?? 0));
+
+      return { total, success, failed, fallback, successRate, avgDurationMs, recentLogs, days: input.days };
     }),
 });

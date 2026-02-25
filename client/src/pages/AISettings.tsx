@@ -44,6 +44,10 @@ import {
   Hash,
   Volume2,
   Mic,
+  BarChart3,
+  TrendingUp,
+  Activity,
+  ArrowRight,
 } from "lucide-react";
 
 // ===== مكون بطاقة القسم =====
@@ -169,6 +173,7 @@ export default function AISettings() {
   const { data: chats = [], refetch: refetchChats } = trpc.aiConfig.listChatsWithAIStatus.useQuery({
     accountId: "default",
   });
+  const { data: ttsStats, refetch: refetchTtsStats } = trpc.aiConfig.getTtsStats.useQuery({ days: 7 });
 
   // ===== تحميل الإعدادات =====
   useEffect(() => {
@@ -1170,6 +1175,96 @@ export default function AISettings() {
         </div>
       </Section>
 
+      {/* ===== قسم إحصائيات TTS ===== */}
+      {voiceReplyEnabled && (
+        <Section icon={BarChart3} title="مؤشر حالة الرد الصوتي" subtitle="إحصائيات آخر 7 أيام لمحرك تحويل النص لصوت">
+          <div className="space-y-4">
+            {/* بطاقات الإحصائيات */}
+            <div className="grid grid-cols-4 gap-3">
+              <div className="p-4 rounded-xl border border-border bg-background/50 text-center">
+                <p className="text-2xl font-bold text-foreground">{ttsStats?.total ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">إجمالي المحاولات</p>
+              </div>
+              <div className="p-4 rounded-xl border border-green-500/20 bg-green-500/5 text-center">
+                <p className="text-2xl font-bold text-green-400">{ttsStats?.success ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">ناجحة</p>
+              </div>
+              <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-center">
+                <p className="text-2xl font-bold text-red-400">{ttsStats?.failed ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">فاشلة</p>
+              </div>
+              <div className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 text-center">
+                <p className="text-2xl font-bold text-yellow-400">{ttsStats?.fallback ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">نصي بديل</p>
+              </div>
+            </div>
+            {/* نسبة النجاح */}
+            <div className="p-4 rounded-xl border border-border bg-background/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">نسبة النجاح</span>
+                <span className={`text-sm font-bold ${
+                  (ttsStats?.successRate ?? 0) >= 80 ? 'text-green-400' :
+                  (ttsStats?.successRate ?? 0) >= 50 ? 'text-yellow-400' : 'text-red-400'
+                }`}>{ttsStats?.successRate ?? 0}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-border overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    (ttsStats?.successRate ?? 0) >= 80 ? 'bg-green-500' :
+                    (ttsStats?.successRate ?? 0) >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${ttsStats?.successRate ?? 0}%` }}
+                />
+              </div>
+              {(ttsStats?.avgDurationMs ?? 0) > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  متوسط وقت التحويل: <span className="text-foreground font-medium">{ttsStats?.avgDurationMs}ms</span>
+                </p>
+              )}
+            </div>
+            {/* آخر السجلات */}
+            {(ttsStats?.recentLogs?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">آخر الردود الصوتية</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {(ttsStats?.recentLogs ?? []).map((log: any) => (
+                    <div key={log.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background/30 text-xs">
+                      <div className="flex items-center gap-2">
+                        {log.status === 'success' ? (
+                          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                        ) : log.status === 'fallback' ? (
+                          <span className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                        )}
+                        <span className="text-muted-foreground" dir="ltr">{log.phone?.replace('@c.us', '')}</span>
+                        {log.status === 'fallback' && <span className="text-yellow-400">(نصي بديل)</span>}
+                        {log.status === 'failed' && <span className="text-red-400 truncate max-w-32">{log.errorMessage}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground flex-shrink-0">
+                        {log.audioSizeBytes > 0 && <span>{Math.round(log.audioSizeBytes / 1024)}KB</span>}
+                        {log.durationMs > 0 && <span>{log.durationMs}ms</span>}
+                        <span>{new Date(log.createdAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* حالة المحرك */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background/30">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" />
+                <span className="text-sm">محرك TTS</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-xs text-green-400">gTTS (Google TTS) — جاهز</span>
+              </div>
+            </div>
+          </div>
+        </Section>
+      )}
       {/* زر الحفظ في الأسفل */}
       <div className="flex justify-end pb-4">
         <Button onClick={handleSave} disabled={saveSettings.isPending} size="lg">

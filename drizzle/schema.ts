@@ -806,3 +806,22 @@ export const reportSchedules = mysqlTable("report_schedules", {
 });
 export type ReportSchedule = typeof reportSchedules.$inferSelect;
 export type InsertReportSchedule = typeof reportSchedules.$inferInsert;
+
+// ===== جدول سجلات TTS (تتبع حالة الرد الصوتي) =====
+export const ttsLogs = mysqlTable("tts_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: varchar("accountId", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 100 }).notNull(),
+  chatId: int("chatId"),
+  status: mysqlEnum("status", ["success", "failed", "fallback"]).notNull(), // نتيجة TTS
+  textLength: int("textLength").default(0).notNull(),                       // طول النص المحوّل
+  audioSizeBytes: int("audioSizeBytes").default(0),                         // حجم الملف الصوتي
+  audioUrl: text("audioUrl"),                                               // رابط الملف في S3
+  errorMessage: text("errorMessage"),                                       // رسالة الخطأ عند الفشل
+  durationMs: int("durationMs"),                                            // مدة التحويل بالمللي ثانية
+  ttsEngine: varchar("ttsEngine", { length: 50 }).default("gtts").notNull(), // المحرك المستخدم
+  voiceDialect: varchar("voiceDialect", { length: 50 }),                    // اللهجة المستخدمة
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type TtsLog = typeof ttsLogs.$inferSelect;
+export type InsertTtsLog = typeof ttsLogs.$inferInsert;

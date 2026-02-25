@@ -148,6 +148,13 @@
       "when": 1771972905772,
       "tag": "0020_sudden_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1772031858109,
+      "tag": "0021_crazy_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

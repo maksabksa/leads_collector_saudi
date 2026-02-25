@@ -334,22 +334,32 @@ async function restoreWhatsAppSessions() {
                   voiceReplyScope === "all_messages" || (voiceReplyScope === "voice_only" && isVoiceMessage)
                 );
                 if (shouldReplyWithVoice) {
+                  const ttsStart = Date.now();
+                  let ttsStatus: "success" | "failed" | "fallback" = "failed";
+                  let ttsAudioUrl: string | null = null;
+                  let ttsAudioSize = 0;
+                  let ttsError: string | null = null;
                   try {
                     const { textToSpeech } = await import("./tts");
                     const { storagePut } = await import("../storage");
-                    console.log(`[AI AutoReply] 🔊 تحويل رد AI لصوت (${ttsVoice})...`);
-                    const ttsResult = await textToSpeech({ text: aiReply, voice: ttsVoice, speed: settings?.voiceSpeed || 1.0 });
+                    const { ttsLogs: ttsLogsTable } = await import("../../drizzle/schema");
+                    const voiceDialect = (settings as any)?.voiceDialect || "ar";
+                    console.log(`[AI AutoReply] 🔊 تحويل رد AI لصوت (${ttsVoice} / ${voiceDialect})...`);
+                    const ttsResult = await textToSpeech({ text: aiReply, voice: ttsVoice as any, speed: settings?.voiceSpeed || 1.0, lang: voiceDialect });
                     if ("audioBuffer" in ttsResult) {
                       // رفع الملف لـ S3
                       const fileKey = `ai-voice-replies/${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`;
                       const { url: audioUrl } = await storagePut(fileKey, ttsResult.audioBuffer, "audio/mpeg");
+                      ttsAudioUrl = audioUrl;
+                      ttsAudioSize = ttsResult.audioBuffer.length;
                       // إرسال الملف الصوتي كمرفق واتساب
                       const { sendWhatsAppMedia } = await import("../whatsappAutomation");
                       const audioBase64 = ttsResult.audioBuffer.toString("base64");
                       const mediaResult = await sendWhatsAppMedia(phone, audioBase64, "audio/mpeg", "reply.mp3", "", accountId);
                       if (mediaResult.success) {
                         sentAsVoice = true;
-                        console.log(`[AI AutoReply] 🔊 رد صوتي أُرسل إلى ${phone}`);
+                        ttsStatus = "success";
+                        console.log(`[AI AutoReply] 🔊 رد صوتي أُرسل إلى ${phone} (${ttsAudioSize} bytes)`);
                         // حفظ الرد في قاعدة البيانات مع رابط الصوت
                         await db3.insert(waChatMsgs).values({
                           chatId: freshChat.id, accountId, direction: "outgoing",
@@ -361,13 +371,50 @@ async function restoreWhatsAppSessions() {
                           lastMessageAt: new Date(),
                         }).where(eq2(waChats.id, freshChat.id));
                       } else {
+                        ttsStatus = "fallback";
+                        ttsError = `فشل إرسال الصوت: ${mediaResult.error}`;
                         console.log(`[AI AutoReply] ⚠️ فشل إرسال الصوت - سيرد نصياً: ${mediaResult.error}`);
                       }
                     } else {
+                      ttsStatus = "fallback";
+                      ttsError = `${ttsResult.error}: ${ttsResult.details || ""}`;
                       console.log(`[AI AutoReply] ⚠️ فشل TTS: ${ttsResult.error} - ${ttsResult.details}`);
                     }
+                    // ===== تسجيل نتيجة TTS في قاعدة البيانات =====
+                    const ttsDuration = Date.now() - ttsStart;
+                    await db3.insert(ttsLogsTable).values({
+                      accountId,
+                      phone,
+                      chatId: freshChat.id,
+                      status: ttsStatus,
+                      textLength: aiReply.length,
+                      audioSizeBytes: ttsAudioSize || null,
+                      audioUrl: ttsAudioUrl,
+                      errorMessage: ttsError,
+                      durationMs: ttsDuration,
+                      ttsEngine: "gtts",
+                      voiceDialect: voiceDialect,
+                    } as any).catch(() => {}); // لا نوقف العملية إذا فشل التسجيل
+                    // ===== إشعار المشرف عند الفشل =====
+                    if (ttsStatus !== "success") {
+                      const { notifyOwner } = await import("./notification");
+                      await notifyOwner({
+                        title: "⚠️ فشل الرد الصوتي TTS",
+                        content: `فشل تحويل الرد الصوتي للعميل ${phone.replace("@c.us", "")}\nالسبب: ${ttsError || "خطأ غير معروف"}\nسيُرسل الرد نصياً بدلاً من ذلك.`,
+                      }).catch(() => {}); // لا نوقف العملية إذا فشل الإشعار
+                    }
                   } catch (ttsErr) {
+                    ttsStatus = "failed";
+                    ttsError = ttsErr instanceof Error ? ttsErr.message : String(ttsErr);
                     console.error("[AI AutoReply] خطأ TTS:", ttsErr);
+                    // إشعار المشرف بالخطأ الحرج
+                    try {
+                      const { notifyOwner } = await import("./notification");
+                      await notifyOwner({
+                        title: "🚨 خطأ حرج في محرك TTS",
+                        content: `خطأ في تحويل الصوت للعميل ${phone.replace("@c.us", "")}\n${ttsError}\nسيُرسل الرد نصياً.`,
+                      });
+                    } catch {}
                   }
                 }
                 // إرسال نصي إذا لم يُرسل صوتياً
