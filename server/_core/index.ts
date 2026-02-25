@@ -326,9 +326,14 @@ async function restoreWhatsAppSessions() {
                 const { whatsappChatMessages: waChatMsgs } = await import("../../drizzle/schema");
                 // ===== رد صوتي إذا كانت الرسالة الواردة صوتية والخيار مفعّل =====
                 const voiceReplyEnabled = settings?.voiceReplyEnabled;
+                const voiceReplyScope = (settings as any)?.voiceReplyScope || "voice_only";
                 const ttsVoice = (settings as any)?.ttsVoice || "nova";
                 let sentAsVoice = false;
-                if (isVoiceMessage && voiceReplyEnabled) {
+                // الرد صوتياً إذا: (نطاق = صوتية فقط وكانت صوتية) أو (نطاق = جميع الرسائل)
+                const shouldReplyWithVoice = voiceReplyEnabled && (
+                  voiceReplyScope === "all_messages" || (voiceReplyScope === "voice_only" && isVoiceMessage)
+                );
+                if (shouldReplyWithVoice) {
                   try {
                     const { textToSpeech } = await import("./tts");
                     const { storagePut } = await import("../storage");

@@ -548,3 +548,20 @@
 - [x] دمج TTS في تدفق الرد التلقائي: تحويل رد AI لصوت ورفعه لـ S3 وإرساله كمرفق واتساب
 - [x] إضافة خيار تفعيل الرد الصوتي في إعدادات AI مع اختيار الصوت (alloy, nova, shimmer...)
 - [x] إضافة عمود ttsVoice في جدول ai_settings
+
+## الدفعة السادسة والثلاثون - خيار نطاق الرد الصوتي ومشغّل صوتي في الشات
+- [ ] إضافة عمود voiceReplyScope في جدول ai_settings (قيم: voice_only / all_messages)
+- [ ] إضافة voiceReplyScope في schema validation وmutation handler في aiSettings.ts
+- [ ] إضافة خيار نطاق الرد الصوتي في واجهة إعدادات AI
+- [ ] تعديل منطق الرد التلقائي في index.ts لاحترام voiceReplyScope
+- [ ] عرض مشغّل صوتي في الشات للردود الصوتية التي أرسلها AI
+
+## الدفعة السادسة والثلاثون - نطاق الرد الصوتي وتحسينات TTS
+- [x] إضافة عمود voiceReplyScope في جدول ai_settings
+- [x] تحديث schema.ts بعمود voiceReplyScope
+- [x] إضافة voiceReplyScope في aiSettings router (validation + mutation)
+- [x] تحديث منطق الرد التلقائي في index.ts لاحترام voiceReplyScope
+- [x] إضافة خيار نطاق الرد الصوتي في واجهة AISettings.tsx (صوتية فقط / جميع الرسائل)
+- [x] إصلاح __dirname في tts.ts لـ ES modules
+- [x] استبدال FORGE TTS بـ gTTS (Python) لأن FORGE لا يدعم TTS
+- [x] 40 اختبار Vitest تمر بنجاح

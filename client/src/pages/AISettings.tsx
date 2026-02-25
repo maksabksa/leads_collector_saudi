@@ -146,6 +146,7 @@ export default function AISettings() {
   const [voiceGender, setVoiceGender] = useState<"male" | "female">("female");
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
   const [transcribeIncoming, setTranscribeIncoming] = useState(true);
+  const [voiceReplyScope, setVoiceReplyScope] = useState<"voice_only" | "all_messages">("voice_only");
   // ===== إعدادات التصعيد =====
   const [escalationEnabled, setEscalationEnabled] = useState(false);
   const [escalationPhone, setEscalationPhone] = useState("");
@@ -200,6 +201,7 @@ export default function AISettings() {
       setVoiceGender((settings as any).voiceGender || "female");
       setVoiceSpeed((settings as any).voiceSpeed ?? 1.0);
       setTranscribeIncoming((settings as any).transcribeIncoming ?? true);
+      setVoiceReplyScope((settings as any).voiceReplyScope || "voice_only");
     }
   }, [settings]);
 
@@ -272,6 +274,7 @@ export default function AISettings() {
       voiceDialect,
       voiceGender,
       voiceSpeed,
+      voiceReplyScope,
       transcribeIncoming,
     });
   };
@@ -1101,6 +1104,36 @@ export default function AISettings() {
                 </div>
               </div>
 
+              {/* نطاق الرد الصوتي */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">نطاق الرد الصوتي</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setVoiceReplyScope("voice_only")}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-all text-right ${
+                      voiceReplyScope === "voice_only" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span>🎤</span>
+                      <span className="font-semibold">الرسائل الصوتية فقط</span>
+                    </div>
+                    <p className="text-xs opacity-70">يرد بصوت فقط عندما يرسل العميل رسالة صوتية</p>
+                  </button>
+                  <button
+                    onClick={() => setVoiceReplyScope("all_messages")}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-all text-right ${
+                      voiceReplyScope === "all_messages" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span>💬</span>
+                      <span className="font-semibold">جميع الرسائل</span>
+                    </div>
+                    <p className="text-xs opacity-70">يرد بصوت على كل رسالة سواء كانت نصية أو صوتية</p>
+                  </button>
+                </div>
+              </div>
               {/* سرعة الصوت */}
               <div>
                 <label className="text-sm font-medium mb-2 block">

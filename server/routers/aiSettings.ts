@@ -173,6 +173,7 @@ export const aiSettingsRouter = router({
         voiceDialect: z.string().optional(),
         voiceGender: z.enum(["male", "female"]).optional(),
         voiceSpeed: z.number().min(0.5).max(2.0).optional(),
+        voiceReplyScope: z.enum(["voice_only", "all_messages"]).optional(),
         transcribeIncoming: z.boolean().optional(),
       })
     )
@@ -214,6 +215,7 @@ export const aiSettingsRouter = router({
       if (input.voiceDialect !== undefined) updateData.voiceDialect = input.voiceDialect;
       if (input.voiceGender !== undefined) updateData.voiceGender = input.voiceGender;
       if (input.voiceSpeed !== undefined) updateData.voiceSpeed = input.voiceSpeed;
+      if (input.voiceReplyScope !== undefined) updateData.voiceReplyScope = input.voiceReplyScope;
       if (input.transcribeIncoming !== undefined) updateData.transcribeIncoming = input.transcribeIncoming;
 
       // تحديث API Key فقط إذا أُرسل قيمة جديدة (غير فارغة)

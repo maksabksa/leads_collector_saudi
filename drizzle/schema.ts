@@ -336,6 +336,7 @@ export const aiSettings = mysqlTable("ai_settings", {
   voiceDialect: varchar("voiceDialect", { length: 50 }).default("ar-SA"), // ar-SA | ar-EG | ar-AE | ar-KW
   voiceGender: mysqlEnum("voiceGender", ["male", "female"]).default("female"), // جنس الصوت
   voiceSpeed: float("voiceSpeed").default(1.0), // سرعة الكلام 0.5-2.0
+  voiceReplyScope: varchar("voice_reply_scope", { length: 20 }).default("voice_only").notNull(), // voice_only | all_messages
   transcribeIncoming: boolean("transcribeIncoming").default(true).notNull(), // تحويل الصوتيات الواردة لنص
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
