@@ -5,7 +5,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
-import { eq, desc, and, like, sql, gte, lt, inArray } from "drizzle-orm";
+import { eq, desc, and, like, sql, gte, lt, inArray, or } from "drizzle-orm";
 import {
   whatsappSettings,
   autoReplyRules,
@@ -13,9 +13,30 @@ import {
   whatsappChatMessages,
   whatsappAccounts,
   users,
+  leads,
 } from "../../drizzle/schema";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
+
+// ===== دالة مساعدة: جلب اسم العميل من رقم الهاتف =====
+async function resolveContactName(db: any, phone: string, providedName?: string): Promise<string | undefined> {
+  // أولوية 1: الاسم المُرسَل (من واتساب pushname)
+  if (providedName) return providedName;
+  // أولوية 2: البحث في قاعدة Leads
+  try {
+    const cleanPhone = phone.replace(/\D/g, "");
+    const [matchedLead] = await db.select({ companyName: leads.companyName })
+      .from(leads)
+      .where(
+        or(
+          like(leads.verifiedPhone, `%${cleanPhone.slice(-9)}%`),
+          like(leads.verifiedPhone, `%${cleanPhone}%`)
+        )
+      ).limit(1);
+    if (matchedLead?.companyName) return matchedLead.companyName;
+  } catch { /* تجاهل */ }
+  return undefined;
+}
 
 export const whatsappSettingsRouter = router({
   // جلب إعدادات حساب واتساب
@@ -454,10 +475,12 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
           .limit(1);
 
         if (!chat) {
+          // جلب اسم جهة الاتصال تلقائياً
+          const resolvedName = await resolveContactName(db, input.phone, input.contactName);
           const [result] = await db.insert(whatsappChats).values({
             accountId: input.accountId,
             phone: input.phone,
-            contactName: input.contactName,
+            contactName: resolvedName,
             leadId: input.leadId,
             lastMessage: lastMsg,
             lastMessageAt: new Date(),
@@ -465,6 +488,13 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
           });
           chatId = (result as { insertId: number }).insertId;
         } else {
+          // تحديث الاسم إذا لم يكن محفوظاً
+          if (!chat.contactName) {
+            const resolvedName = await resolveContactName(db, input.phone, input.contactName);
+            if (resolvedName) {
+              await db.update(whatsappChats).set({ contactName: resolvedName }).where(eq(whatsappChats.id, chat.id));
+            }
+          }
           chatId = chat.id;
         }
       }
@@ -612,10 +642,12 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         .limit(1);
 
       if (!chat) {
+        // جلب اسم جهة الاتصال تلقائياً
+        const resolvedName = await resolveContactName(db, input.phone, input.contactName);
         const [result] = await db.insert(whatsappChats).values({
           accountId: input.accountId,
           phone: input.phone,
-          contactName: input.contactName,
+          contactName: resolvedName,
           leadId: input.leadId,
           lastMessage: input.message,
           lastMessageAt: new Date(),
@@ -624,12 +656,19 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         const insertId = (result as { insertId: number }).insertId;
         [chat] = await db.select().from(whatsappChats).where(eq(whatsappChats.id, insertId)).limit(1);
       } else {
+        // تحديث الاسم إذا لم يكن محفوظاً
+        const nameUpdate: Record<string, any> = {};
+        if (!chat.contactName) {
+          const resolvedName = await resolveContactName(db, input.phone, input.contactName);
+          if (resolvedName) nameUpdate.contactName = resolvedName;
+        }
         await db
           .update(whatsappChats)
           .set({
             lastMessage: input.message,
             lastMessageAt: new Date(),
             unreadCount: chat.unreadCount + 1,
+            ...nameUpdate,
           })
           .where(eq(whatsappChats.id, chat.id));
       }
@@ -1234,5 +1273,28 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       }
       const result = await response.json() as { text: string };
       return { text: result.text || "" };
+    }),
+
+  // ===== مزامنة أسماء المحادثات مع قاعدة Leads =====
+  syncContactNames: protectedProcedure
+    .mutation(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // جلب كل المحادثات بدون اسم
+      const chatsWithoutName = await db.select({ id: whatsappChats.id, phone: whatsappChats.phone })
+        .from(whatsappChats)
+        .where(or(
+          eq(whatsappChats.contactName, ""),
+          sql`${whatsappChats.contactName} IS NULL`
+        ));
+      let updated = 0;
+      for (const chat of chatsWithoutName) {
+        const resolvedName = await resolveContactName(db, chat.phone);
+        if (resolvedName) {
+          await db.update(whatsappChats).set({ contactName: resolvedName }).where(eq(whatsappChats.id, chat.id));
+          updated++;
+        }
+      }
+      return { updated, total: chatsWithoutName.length };
     }),
 });

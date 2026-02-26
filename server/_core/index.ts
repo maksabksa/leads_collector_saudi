@@ -87,20 +87,51 @@ async function restoreWhatsAppSessions() {
         ).limit(1);
 
         const lastMsg = uploadedMediaUrl ? (message || `صورة/ملف`) : message;
+
+        // ===== جلب اسم جهة الاتصال بأولوية: اسم واتساب > اسم Lead > رقم الهاتف =====
+        let resolvedContactName = contactName; // اسم واتساب (pushname) إن وجد
+        if (!resolvedContactName) {
+          // البحث عن الرقم في جدول leads
+          try {
+            const { leads } = await import("../../drizzle/schema");
+            const { or, like } = await import("drizzle-orm");
+            // تنظيف الرقم: حذف الرموز غير الرقمية
+            const cleanPhone = phone.replace(/\D/g, "");
+            const [matchedLead] = await db2.select({ companyName: leads.companyName })
+              .from(leads)
+              .where(
+                or(
+                  like(leads.verifiedPhone, `%${cleanPhone.slice(-9)}%`),
+                  like(leads.verifiedPhone, `%${cleanPhone}%`)
+                )
+              ).limit(1);
+            if (matchedLead?.companyName) {
+              resolvedContactName = matchedLead.companyName;
+            }
+          } catch { /* تجاهل */ }
+        }
+
         if (!chat) {
           const [res] = await db2.insert(whatsappChats).values({
-            accountId, phone, contactName, lastMessage: lastMsg, lastMessageAt: new Date(), unreadCount: 1,
+            accountId, phone,
+            contactName: resolvedContactName,
+            lastMessage: lastMsg, lastMessageAt: new Date(), unreadCount: 1,
           });
           const insertId = (res as { insertId: number }).insertId;
           [chat] = await db2.select().from(whatsappChats).where(eq(whatsappChats.id, insertId)).limit(1);
         } else {
-          // تحديث الاسم تلقائياً: أولوية اسم واتساب (pushname) > الاسم المحفوظ > رقم الهاتف
-          const nameUpdate = contactName && contactName !== chat.contactName ? { contactName } : {};
+          // تحديث الاسم تلقائياً:
+          // 1. إذا وصل اسم واتساب (pushname) جديد → تحديث
+          // 2. إذا لم يكن هناك اسم محفوظ ووجد اسم Lead → تحديث
+          const shouldUpdateName = resolvedContactName && (
+            !chat.contactName || // لا يوجد اسم محفوظ
+            (contactName && contactName !== chat.contactName) // وصل اسم واتساب جديد
+          );
           await db2.update(whatsappChats).set({
             lastMessage: lastMsg,
             lastMessageAt: new Date(),
             unreadCount: chat.unreadCount + 1,
-            ...nameUpdate,
+            ...(shouldUpdateName ? { contactName: resolvedContactName } : {}),
           }).where(eq(whatsappChats.id, chat.id));
         }
 
