@@ -643,6 +643,14 @@ export default function Chats() {
     onSuccess: (data) => { toast.success(data.message || "تم تشغيل الأرشفة"); refetchChats(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
   });
+  // ===== مزامنة أسماء جهات الاتصال من قاعدة Leads =====
+  const syncContactNames = trpc.waSettings.syncContactNames.useMutation({
+    onSuccess: (data) => {
+      toast.success("تمت مزامنة الأسماء", { description: `تم تحديث ${data.updated} محادثة من قاعدة العملاء` });
+      refetchChats();
+    },
+    onError: (e) => toast.error("خطأ في المزامنة", { description: e.message }),
+  });
   // ===== Mutations الذكاء الاصطناعي الصوتي =====
   // ===== TTS باستخدام Web Speech API المدمج في المتصفح =====
   const textToSpeech = { isPending: false }; // placeholder لتجنب أخطاء TypeScript
@@ -1061,6 +1069,19 @@ export default function Chats() {
               >
                 <Settings className="w-3 h-3" />
               </button>
+              {/* زر مزامنة الأسماء من قاعدة Leads */}
+              <button
+                onClick={() => syncContactNames.mutate()}
+                disabled={syncContactNames.isPending}
+                className="text-xs py-1 px-2 rounded-md transition-colors flex items-center gap-1"
+                style={syncContactNames.isPending
+                  ? { color: "#25D366", background: "rgba(37,211,102,0.1)" }
+                  : { color: "#8696a0" }
+                }
+                title="مزامنة أسماء المحادثات من قاعدة العملاء"
+              >
+                <RefreshCw className={`w-3 h-3 ${syncContactNames.isPending ? "animate-spin" : ""}`} />
+              </button>
             </div>
             {/* فلتر حساب الواتساب (الرقم المُرسِل) - يظهر دائماً لمعرفة أي رقم يتعامل مع أكثر العملاء */}
             {(waAccounts as any[]).length > 0 && (
@@ -1152,10 +1173,28 @@ export default function Chats() {
                   onClick={() => handleToggleChatAI(selectedChat.id, selectedChat.aiAutoReplyEnabled)}
                   size="sm"
                 />
-                {selectedChat.leadId && (
+                {selectedChat.leadId ? (
                   <Link href={`/leads/${selectedChat.leadId}`}>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-[#8696a0] hover:text-white">
-                      <ExternalLink className="w-4 h-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 gap-1.5 text-[#25D366] hover:text-white hover:bg-[#25D366]/20 rounded-lg text-xs font-medium"
+                      title="عرض ملف العميل"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">ملف العميل</span>
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href={`/leads/new?phone=${encodeURIComponent(selectedChat.phone)}&name=${encodeURIComponent(selectedChat.contactName || "")}`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 gap-1.5 text-[#8696a0] hover:text-[#25D366] hover:bg-[#25D366]/10 rounded-lg text-xs"
+                      title="إضافة كعميل جديد"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">إضافة عميل</span>
                     </Button>
                   </Link>
                 )}

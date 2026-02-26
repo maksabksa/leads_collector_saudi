@@ -1,19 +1,66 @@
 /**
  * البحث في منصات التواصل الاجتماعي: TikTok, Snapchat, Telegram
- * سياسة صارمة: لا يُسمح بأي بيانات مولّدة أو وهمية - البيانات الحقيقية فقط
+ *
+ * ===== سياسة البيانات الصارمة =====
+ * 1. لا يُسمح بأي بيانات مولّدة أو وهمية تحت أي ظرف
+ * 2. رقم الهاتف: يُستخرج بـ regex من النص الخام فقط - لا من AI
+ * 3. الموقع الإلكتروني: يُستخرج بـ regex من النص الخام فقط - لا من AI
+ * 4. الـ AI يستخرج الاسم والبيو والمعلومات النصية فقط
+ * 5. إذا لم تُجلب بيانات كافية → مصفوفة فارغة (لا بيانات وهمية)
  */
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { TRPCError } from "@trpc/server";
 
-// ===== أدوات محاكاة البشر =====
+// ===== أنماط التحقق من البيانات =====
+/** نمط أرقام الهواتف السعودية والخليجية الحقيقية */
+const PHONE_REGEX = /(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g;
+/** نمط URLs الحقيقية */
+const URL_REGEX = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b(?:[-a-zA-Z0-9@:%_+.~#?&/=]*)/g;
 
-/** تأخير عشوائي يحاكي سلوك البشر */
+/**
+ * استخراج أرقام الهواتف الحقيقية من النص الخام بـ regex
+ * لا يعتمد على AI إطلاقاً
+ */
+function extractRealPhones(rawHtml: string): string[] {
+  const matches = rawHtml.match(PHONE_REGEX) || [];
+  const cleaned = Array.from(new Set(matches.map(p => {
+    const digits = p.replace(/\D/g, "");
+    // تطبيع: إزالة 966 أو 00966 من البداية
+    if (digits.startsWith("966")) return "0" + digits.slice(3);
+    if (digits.startsWith("00966")) return "0" + digits.slice(5);
+    return digits;
+  })));
+  return cleaned.filter(p => p.length >= 10 && p.length <= 12);
+}
+
+/**
+ * استخراج URLs الحقيقية من النص الخام بـ regex
+ * يستبعد CDN والصور وملفات JS/CSS
+ */
+function extractRealWebsites(rawHtml: string): string[] {
+  const matches = rawHtml.match(URL_REGEX) || [];
+  const EXCLUDED_PATTERNS = [
+    "cdn.", "static.", "assets.", "img.", "images.",
+    ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff",
+    "tiktok.com", "snapchat.com", "t.me", "telegram.org", "tgstat.com",
+    "google.com", "facebook.com", "twitter.com", "youtube.com",
+    "apple.com", "microsoft.com", "cloudflare.com", "amazonaws.com",
+    "w3.org", "schema.org", "openstreetmap.org",
+  ];
+  return Array.from(new Set(matches))
+    .filter(url => {
+      const lower = url.toLowerCase();
+      return !EXCLUDED_PATTERNS.some(p => lower.includes(p)) && url.length < 100;
+    })
+    .slice(0, 3);
+}
+
+// ===== أدوات محاكاة البشر =====
 const humanDelay = (min = 1000, max = 3000) =>
   new Promise(r => setTimeout(r, min + Math.random() * (max - min)));
 
-/** User-Agent عشوائي من متصفحات حقيقية */
 const randomUserAgent = () => {
   const agents = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
@@ -25,7 +72,7 @@ const randomUserAgent = () => {
   return agents[Math.floor(Math.random() * agents.length)];
 };
 
-/** جلب صفحة مع headers تحاكي المتصفح الحقيقي */
+/** جلب صفحة مع headers تحاكي المتصفح - يُرجع HTML الخام للـ regex */
 async function fetchLikeHuman(url: string, extraHeaders?: Record<string, string>): Promise<string> {
   await humanDelay(800, 2500);
   const res = await fetch(url, {
@@ -33,55 +80,70 @@ async function fetchLikeHuman(url: string, extraHeaders?: Record<string, string>
       "User-Agent": randomUserAgent(),
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
       "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Accept-Encoding": "gzip, deflate, br",
       "Cache-Control": "no-cache",
       "Pragma": "no-cache",
       "Sec-Fetch-Dest": "document",
       "Sec-Fetch-Mode": "navigate",
       "Sec-Fetch-Site": "none",
-      "Sec-Fetch-User": "?1",
       "Upgrade-Insecure-Requests": "1",
       "Referer": "https://www.google.com/",
       ...extraHeaders,
     },
     signal: AbortSignal.timeout(20000),
   });
-  const text = await res.text();
-  // تنظيف HTML
-  return text
+  // إرجاع HTML الخام (لاستخراج الأرقام والمواقع بـ regex)
+  return await res.text();
+}
+
+/** تنظيف HTML للـ AI (نص قابل للقراءة) */
+function cleanHtmlForAI(html: string): string {
+  return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 10000);
+    .slice(0, 8000);
 }
 
 /**
- * استخراج بيانات الأعمال من نص حقيقي مجلوب من الصفحة.
- * القاعدة الصارمة: يستخرج فقط ما هو موجود في النص - لا يخترع أي بيانات.
- * إذا لم يجد بيانات كافية يُرجع مصفوفة فارغة.
+ * استخراج بيانات الأعمال من HTML حقيقي مجلوب من الصفحة.
+ *
+ * ===== المنهجية الصارمة =====
+ * - الأرقام: regex من HTML الخام → لا يخطئ ولا يخترع
+ * - المواقع: regex من HTML الخام → لا يخطئ ولا يخترع
+ * - الأسماء والبيو: AI يستخرج من النص المنظف
+ * - AI ممنوع من إدخال phone أو website
  */
-async function extractBusinessesFromRealText(rawText: string, platform: string, keyword: string) {
-  if (!rawText || rawText.length < 50) return [];
+async function extractBusinessesFromRealText(rawHtml: string, platform: string, keyword: string) {
+  if (!rawHtml || rawHtml.length < 100) return [];
 
+  // ===== الخطوة 1: استخراج الأرقام والمواقع من HTML الخام (regex - لا AI) =====
+  const realPhones = extractRealPhones(rawHtml);
+  const realWebsites = extractRealWebsites(rawHtml);
+
+  // ===== الخطوة 2: تنظيف HTML للـ AI =====
+  const cleanText = cleanHtmlForAI(rawHtml);
+  if (cleanText.length < 50) return [];
+
+  // ===== الخطوة 3: AI يستخرج الأسماء والمعلومات النصية فقط =====
   const response = await invokeLLM({
     messages: [
       {
         role: "system",
-        content: `أنت محلل استخباراتي دقيق. مهمتك استخراج بيانات الأعمال التجارية الموجودة فعلاً في النص المُعطى فقط.
+        content: `أنت محلل استخباراتي دقيق. مهمتك استخراج أسماء الأعمال التجارية وبياناتها النصية فقط.
 
 قواعد صارمة لا استثناء فيها:
-1. استخرج فقط ما هو مذكور صراحةً في النص
-2. إذا لم يُذكر رقم الهاتف في النص → اترك phone فارغاً ""
-3. إذا لم يُذكر الموقع الإلكتروني في النص → اترك website فارغاً ""
+1. استخرج فقط الاسم، اسم المستخدم، البيو، عدد المتابعين، نوع النشاط، المدينة
+2. حقل phone: اتركه فارغاً "" دائماً بدون استثناء
+3. حقل website: اتركه فارغاً "" دائماً بدون استثناء
 4. إذا لم تجد أي نشاط تجاري واضح → أرجع results: []
 5. لا تخترع أي بيانات أو تتخيل أي معلومات
-6. لا تُكمل بيانات ناقصة بتخمينات`,
+6. الحد الأقصى 15 نتيجة`,
       },
       {
         role: "user",
-        content: `استخرج الأنشطة التجارية الموجودة فعلاً في هذا النص من ${platform} (البحث عن "${keyword}"):\n\n${rawText}`,
+        content: `استخرج الأنشطة التجارية الموجودة فعلاً في هذا النص من ${platform} (البحث عن "${keyword}"):\n\n${cleanText}`,
       },
     ],
     response_format: {
@@ -119,30 +181,36 @@ async function extractBusinessesFromRealText(rawText: string, platform: string, 
       },
     },
   });
+
   try {
     const parsed = JSON.parse(response.choices[0].message.content as string);
-    // تنظيف: حذف أي نتيجة تبدو وهمية (username فارغ أو name فارغ)
-    const results = (parsed.results || []).filter((r: any) =>
+    const aiResults = (parsed.results || []).filter((r: any) =>
       r.name && r.name.trim() !== "" && r.username && r.username.trim() !== ""
     );
-    return results as Array<{
-      name: string; username: string; bio: string; followers: string;
-      businessType: string; phone: string; website: string; city: string;
-      profileUrl: string; engagementLevel: string;
-    }>;
+
+    // ===== الخطوة 4: دمج الأرقام والمواقع الحقيقية (من regex) مع نتائج AI =====
+    // phone و website تأتي من regex فقط - لا من AI
+    return aiResults.map((r: any) => ({
+      ...r,
+      phone: "",       // فارغ دائماً - المستخدم يتحقق يدوياً
+      website: "",     // فارغ دائماً - المستخدم يتحقق يدوياً
+      // أرقام وروابط حقيقية مستخرجة بـ regex للمستخدم ليختار منها
+      availablePhones: realPhones,
+      availableWebsites: realWebsites,
+      dataSource: "real_page_extraction",
+    }));
   } catch {
     return [];
   }
 }
 
-/** توليد هاشتاقات ذكية للبحث (هذه مجرد كلمات بحث وليست بيانات عملاء) */
+/** توليد هاشتاقات ذكية للبحث */
 async function generateSearchHashtags(keyword: string, city: string, platform: string): Promise<string[]> {
   const response = await invokeLLM({
     messages: [
       {
         role: "system",
-        content: `أنت خبير في التسويق الرقمي السعودي ومتخصص في منصة ${platform}.
-أنشئ قائمة هاشتاقات فعّالة للبحث عن أنشطة تجارية.`,
+        content: `أنت خبير في التسويق الرقمي السعودي ومتخصص في منصة ${platform}. أنشئ هاشتاقات فعّالة للبحث عن أنشطة تجارية.`,
       },
       {
         role: "user",
@@ -156,9 +224,7 @@ async function generateSearchHashtags(keyword: string, city: string, platform: s
         strict: true,
         schema: {
           type: "object",
-          properties: {
-            hashtags: { type: "array", items: { type: "string" } },
-          },
+          properties: { hashtags: { type: "array", items: { type: "string" } } },
           required: ["hashtags"],
           additionalProperties: false,
         },
@@ -180,27 +246,19 @@ async function searchTikTok(keyword: string, city: string): Promise<any[]> {
     `https://www.tiktok.com/search?q=${encodeURIComponent(keyword + " " + city)}`,
     `https://www.tiktok.com/tag/${encodeURIComponent(hashtag)}`,
   ];
-
-  let combinedText = "";
+  let combinedRawHtml = "";
   for (const url of urls) {
     try {
-      const text = await fetchLikeHuman(url, {
+      const html = await fetchLikeHuman(url, {
         "Referer": "https://www.tiktok.com/",
         "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120"',
       });
-      combinedText += " " + text;
+      combinedRawHtml += " " + html;
       await humanDelay(1500, 3000);
-    } catch {
-      // تجاهل الأخطاء والمتابعة
-    }
+    } catch { /* تجاهل */ }
   }
-
-  // إذا لم يُجلب نص كافٍ → لا نتائج (لا بيانات وهمية)
-  if (combinedText.trim().length < 100) {
-    return [];
-  }
-
-  return extractBusinessesFromRealText(combinedText, "TikTok", keyword + " " + city);
+  if (combinedRawHtml.trim().length < 100) return [];
+  return extractBusinessesFromRealText(combinedRawHtml, "TikTok", keyword + " " + city);
 }
 
 // ===== Snapchat Search =====
@@ -209,77 +267,43 @@ async function searchSnapchat(keyword: string, city: string): Promise<any[]> {
     `https://www.snapchat.com/search?q=${encodeURIComponent(keyword)}`,
     `https://story.snapchat.com/search?q=${encodeURIComponent(keyword + " " + city)}`,
   ];
-
-  let combinedText = "";
+  let combinedRawHtml = "";
   for (const url of urls) {
     try {
-      const text = await fetchLikeHuman(url, {
-        "Referer": "https://www.snapchat.com/",
-      });
-      combinedText += " " + text;
+      const html = await fetchLikeHuman(url, { "Referer": "https://www.snapchat.com/" });
+      combinedRawHtml += " " + html;
       await humanDelay(1200, 2500);
-    } catch {
-      // تجاهل
-    }
+    } catch { /* تجاهل */ }
   }
-
-  // إذا لم يُجلب نص كافٍ → لا نتائج (لا بيانات وهمية)
-  if (combinedText.trim().length < 100) {
-    return [];
-  }
-
-  return extractBusinessesFromRealText(combinedText, "Snapchat", keyword + " " + city);
+  if (combinedRawHtml.trim().length < 100) return [];
+  return extractBusinessesFromRealText(combinedRawHtml, "Snapchat", keyword + " " + city);
 }
 
 // ===== Telegram Search =====
 async function searchTelegram(keyword: string, city: string): Promise<any[]> {
-  const queries = [
-    `${keyword} ${city}`,
-    `${keyword} السعودية`,
-    `${keyword}`,
-  ];
-
-  let combinedText = "";
+  const queries = [`${keyword} ${city}`, `${keyword} السعودية`, `${keyword}`];
+  let combinedRawHtml = "";
   for (const q of queries) {
     try {
       const url = `https://t.me/s/${encodeURIComponent(q.replace(/\s+/g, ""))}`;
-      const text = await fetchLikeHuman(url, {
-        "Referer": "https://t.me/",
-      });
-      combinedText += " " + text;
+      const html = await fetchLikeHuman(url, { "Referer": "https://t.me/" });
+      combinedRawHtml += " " + html;
       await humanDelay(1000, 2000);
-    } catch {
-      // تجاهل
-    }
+    } catch { /* تجاهل */ }
   }
-
-  // بحث إضافي في tgstat (دليل قنوات تيليجرام)
   try {
     const tgstatUrl = `https://tgstat.com/search?q=${encodeURIComponent(keyword + " " + city)}&type=channel`;
-    const text = await fetchLikeHuman(tgstatUrl, {
-      "Referer": "https://tgstat.com/",
-    });
-    combinedText += " " + text;
-  } catch {
-    // تجاهل
-  }
-
-  // إذا لم يُجلب نص كافٍ → لا نتائج (لا بيانات وهمية)
-  if (combinedText.trim().length < 100) {
-    return [];
-  }
-
-  return extractBusinessesFromRealText(combinedText, "Telegram", keyword + " " + city);
+    const html = await fetchLikeHuman(tgstatUrl, { "Referer": "https://tgstat.com/" });
+    combinedRawHtml += " " + html;
+  } catch { /* تجاهل */ }
+  if (combinedRawHtml.trim().length < 100) return [];
+  return extractBusinessesFromRealText(combinedRawHtml, "Telegram", keyword + " " + city);
 }
 
 // ===== Router =====
 export const socialSearchRouter = router({
-  /** البحث في TikTok */
   searchTikTok: protectedProcedure
-    .input(z.object({
-      keyword: z.string().min(1),
-      city: z.string().default("الرياض"),
-    }))
+    .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
         const results = await searchTikTok(input.keyword, input.city);
@@ -289,12 +313,8 @@ export const socialSearchRouter = router({
       }
     }),
 
-  /** البحث في Snapchat */
   searchSnapchat: protectedProcedure
-    .input(z.object({
-      keyword: z.string().min(1),
-      city: z.string().default("الرياض"),
-    }))
+    .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
         const results = await searchSnapchat(input.keyword, input.city);
@@ -304,12 +324,8 @@ export const socialSearchRouter = router({
       }
     }),
 
-  /** البحث في Telegram */
   searchTelegram: protectedProcedure
-    .input(z.object({
-      keyword: z.string().min(1),
-      city: z.string().default("الرياض"),
-    }))
+    .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
         const results = await searchTelegram(input.keyword, input.city);
@@ -319,7 +335,6 @@ export const socialSearchRouter = router({
       }
     }),
 
-  /** بحث شامل في جميع المنصات دفعة واحدة */
   searchAllPlatforms: protectedProcedure
     .input(z.object({
       keyword: z.string().min(1),
@@ -328,118 +343,25 @@ export const socialSearchRouter = router({
     }))
     .mutation(async ({ input }) => {
       const promises: Promise<{ platform: string; results: any[] }>[] = [];
-
-      if (input.platforms.includes("tiktok")) {
-        promises.push(
-          searchTikTok(input.keyword, input.city)
-            .then(r => ({ platform: "TikTok", results: r }))
-            .catch(() => ({ platform: "TikTok", results: [] }))
-        );
-      }
-      if (input.platforms.includes("snapchat")) {
-        promises.push(
-          searchSnapchat(input.keyword, input.city)
-            .then(r => ({ platform: "Snapchat", results: r }))
-            .catch(() => ({ platform: "Snapchat", results: [] }))
-        );
-      }
-      if (input.platforms.includes("telegram")) {
-        promises.push(
-          searchTelegram(input.keyword, input.city)
-            .then(r => ({ platform: "Telegram", results: r }))
-            .catch(() => ({ platform: "Telegram", results: [] }))
-        );
-      }
-
-      const allResults = await Promise.allSettled(promises);
-      const combined: any[] = [];
-
-      for (const result of allResults) {
-        if (result.status === "fulfilled") {
-          const { platform, results } = result.value;
-          combined.push(...results.map((r: any) => ({ ...r, source: platform })));
-        }
-      }
-
-      return { results: combined, total: combined.length };
+      if (input.platforms.includes("tiktok"))
+        promises.push(searchTikTok(input.keyword, input.city).then(r => ({ platform: "TikTok", results: r })).catch(() => ({ platform: "TikTok", results: [] })));
+      if (input.platforms.includes("snapchat"))
+        promises.push(searchSnapchat(input.keyword, input.city).then(r => ({ platform: "Snapchat", results: r })).catch(() => ({ platform: "Snapchat", results: [] })));
+      if (input.platforms.includes("telegram"))
+        promises.push(searchTelegram(input.keyword, input.city).then(r => ({ platform: "Telegram", results: r })).catch(() => ({ platform: "Telegram", results: [] })));
+      const allResults = await Promise.all(promises);
+      const combined = allResults.flatMap(r => r.results.map((item: any) => ({ ...item, platform: r.platform })));
+      return { results: combined, byPlatform: allResults, total: combined.length };
     }),
 
-  /** اقتراح هاشتاقات ذكية للبحث */
   suggestSocialHashtags: protectedProcedure
     .input(z.object({
       keyword: z.string().min(1),
       city: z.string().default("الرياض"),
-      platform: z.enum(["tiktok", "snapchat", "telegram", "all"]).default("all"),
+      platform: z.string().default("all"),
     }))
     .mutation(async ({ input }) => {
-      const platform = input.platform === "all" ? "TikTok وSnapchat وTelegram" : input.platform;
-      const hashtags = await generateSearchHashtags(input.keyword, input.city, platform);
+      const hashtags = await generateSearchHashtags(input.keyword, input.city, input.platform);
       return { hashtags };
-    }),
-
-  /** تحليل حساب تجاري من رابط مباشر */
-  analyzeProfile: protectedProcedure
-    .input(z.object({
-      profileUrl: z.string().url(),
-      platform: z.enum(["tiktok", "snapchat", "telegram"]),
-    }))
-    .mutation(async ({ input }) => {
-      let pageText = "";
-      try {
-        pageText = await fetchLikeHuman(input.profileUrl);
-      } catch {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذّر الوصول للحساب" });
-      }
-
-      if (!pageText || pageText.length < 50) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على بيانات كافية لهذا الحساب" });
-      }
-
-      const platformName = { tiktok: "TikTok", snapchat: "Snapchat", telegram: "Telegram" }[input.platform];
-
-      const response = await invokeLLM({
-        messages: [
-          {
-            role: "system",
-            content: `أنت محلل أعمال متخصص في السوق السعودي. حلّل هذا الحساب على منصة ${platformName}.
-قاعدة صارمة: استخرج فقط ما هو موجود في النص. لا تخترع أي بيانات. إذا لم يُذكر الهاتف اتركه فارغاً.`,
-          },
-          {
-            role: "user",
-            content: `حلّل هذا الحساب على ${platformName}:\n\n${pageText.slice(0, 5000)}`,
-          },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "profile_analysis",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                username: { type: "string" },
-                bio: { type: "string" },
-                followers: { type: "string" },
-                businessType: { type: "string" },
-                phone: { type: "string" },
-                website: { type: "string" },
-                city: { type: "string" },
-                engagementLevel: { type: "string" },
-                commercialScore: { type: "string" },
-                recommendation: { type: "string" },
-              },
-              required: ["name", "username", "bio", "followers", "businessType", "phone", "website", "city", "engagementLevel", "commercialScore", "recommendation"],
-              additionalProperties: false,
-            },
-          },
-        },
-      });
-
-      try {
-        return JSON.parse(response.choices[0].message.content as string);
-      } catch {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل تحليل الحساب" });
-      }
     }),
 });

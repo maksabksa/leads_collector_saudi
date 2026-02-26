@@ -1068,25 +1068,76 @@ export default function SearchHub() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs mb-1 block">رقم الهاتف</Label>
-                <Input
-                  value={addForm.phone}
-                  onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
-                  placeholder="05xxxxxxxx"
-                  dir="ltr"
-                />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">الموقع الإلكتروني</Label>
-                <Input
-                  value={addForm.website}
-                  onChange={e => setAddForm(f => ({ ...f, website: e.target.value }))}
-                  placeholder="www.example.com"
-                  dir="ltr"
-                />
-              </div>
+            {/* حقل رقم الهاتف - مع قائمة الأرقام الحقيقية للاختيار */}
+            <div>
+              <Label className="text-xs mb-1 block">رقم الهاتف</Label>
+              {addDialog.result?.availablePhones?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-1.5 p-2 rounded-lg bg-green-500/5 border border-green-500/20">
+                  <p className="w-full text-[10px] text-green-400/70 mb-1">أرقام مستخرجة من الصفحة - اضغط للاختيار:</p>
+                  {addDialog.result.availablePhones.map((p: string) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setAddForm(f => ({ ...f, phone: p }))}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors font-mono ${
+                        addForm.phone === p
+                          ? "bg-green-500/30 border-green-500 text-green-300 font-bold"
+                          : "border-green-500/30 text-green-400/80 hover:bg-green-500/20 hover:border-green-500"
+                      }`}
+                      dir="ltr"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Input
+                value={addForm.phone}
+                onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
+                placeholder={
+                  addDialog.result?.availablePhones?.length > 0
+                    ? "اختر من الأرقام أعلاه أو أدخل يدوياً"
+                    : "لم يُعثر على رقم مؤكد - أدخل يدوياً"
+                }
+                dir="ltr"
+                className={addForm.phone ? "border-green-500/50 focus-visible:ring-green-500/30" : ""}
+              />
+            </div>
+            {/* حقل الموقع - مع قائمة المواقع الحقيقية للاختيار */}
+            <div>
+              <Label className="text-xs mb-1 block">الموقع الإلكتروني</Label>
+              {addDialog.result?.availableWebsites?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-1.5 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                  <p className="w-full text-[10px] text-blue-400/70 mb-1">مواقع مستخرجة من الصفحة - اضغط للاختيار:</p>
+                  {addDialog.result.availableWebsites.map((w: string) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setAddForm(f => ({ ...f, website: w }))}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors max-w-[200px] truncate ${
+                        addForm.website === w
+                          ? "bg-blue-500/30 border-blue-500 text-blue-300 font-bold"
+                          : "border-blue-500/30 text-blue-400/80 hover:bg-blue-500/20 hover:border-blue-500"
+                      }`}
+                      dir="ltr"
+                      title={w}
+                    >
+                      {w.replace(/^https?:\/\//, "").slice(0, 35)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Input
+                value={addForm.website}
+                onChange={e => setAddForm(f => ({ ...f, website: e.target.value }))}
+                placeholder={
+                  addDialog.result?.availableWebsites?.length > 0
+                    ? "اختر من المواقع أعلاه أو أدخل يدوياً"
+                    : "لم يُعثر على موقع مؤكد - أدخل يدوياً"
+                }
+                dir="ltr"
+                className={addForm.website ? "border-blue-500/50 focus-visible:ring-blue-500/30" : ""}
+              />
             </div>
             <div>
               <Label className="text-xs mb-1 block">ملاحظات</Label>
