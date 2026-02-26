@@ -345,6 +345,12 @@ export default function SearchHub() {
   const createLead = trpc.leads.create.useMutation();
   const addInstagramAsLead = trpc.instagram.addAsLead.useMutation();
   // نظام تعلم السلوك
+  // جلب تفاصيل Google Maps (الهاتف والموقع) عند فتح نموذج الإضافة
+  const [currentPlaceId, setCurrentPlaceId] = useState<string | null>(null);
+  const placeDetailsQuery = trpc.search.getPlaceDetails.useQuery(
+    currentPlaceId ? { placeId: currentPlaceId } : skipToken,
+    { enabled: !!currentPlaceId, staleTime: 5 * 60 * 1000 }
+  );
   const logSearchSessionMut = trpc.searchBehavior.logSearchSession.useMutation();
   const enhanceQueryMut = trpc.searchBehavior.enhanceQuery.useMutation();
   const behaviorPatternsQuery = trpc.searchBehavior.getBehaviorPatterns.useQuery(
@@ -610,7 +616,29 @@ export default function SearchHub() {
       website: result.website || "",
       notes: result.bio || result.description || "",
     });
+    // لنتائج Google Maps: استدعاء التفاصيل لجلب الهاتف والموقع تلقائياً
+    if (platform === "google" && result.place_id) {
+      setCurrentPlaceId(result.place_id);
+    } else {
+      setCurrentPlaceId(null);
+    }
   };
+
+  // تحديث النموذج تلقائياً عند جلب تفاصيل Google Maps
+  useEffect(() => {
+    if (placeDetailsQuery.data && addDialog.open && addDialog.platform === "google") {
+      const d = placeDetailsQuery.data as any;
+      const phone = d.formatted_phone_number || d.international_phone_number || "";
+      const website = d.website || "";
+      if (phone || website) {
+        setAddForm(f => ({
+          ...f,
+          phone: f.phone || phone,
+          website: f.website || website,
+        }));
+      }
+    }
+  }, [placeDetailsQuery.data, addDialog.open, addDialog.platform]);
 
   const handleAddLead = async () => {
     if (!addDialog.result || !addForm.companyName) return;
@@ -1068,12 +1096,26 @@ export default function SearchHub() {
                 />
               </div>
             </div>
-            {/* حقل رقم الهاتف - مع قائمة الأرقام الحقيقية للاختيار */}
+            {/* حقل رقم الهاتف - يُجلب تلقائياً من Google Places API */}
             <div>
-              <Label className="text-xs mb-1 block">رقم الهاتف</Label>
+              <Label className="text-xs mb-1 flex items-center gap-1.5">
+                رقم الهاتف
+                {addDialog.platform === "google" && placeDetailsQuery.isFetching && (
+                  <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    جاري جلب البيانات من Google...
+                  </span>
+                )}
+                {addDialog.platform === "google" && !placeDetailsQuery.isFetching && addForm.phone && (
+                  <span className="flex items-center gap-1 text-[10px] text-green-400">
+                    <CheckCircle2 className="w-3 h-3" />
+                    تم الجلب من Google
+                  </span>
+                )}
+              </Label>
               {addDialog.result?.availablePhones?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-1.5 p-2 rounded-lg bg-green-500/5 border border-green-500/20">
-                  <p className="w-full text-[10px] text-green-400/70 mb-1">أرقام مستخرجة من الصفحة - اضغط للاختيار:</p>
+                  <p className="w-full text-[10px] text-green-400/70 mb-1">أرقام متاحة - اضغط للاختيار:</p>
                   {addDialog.result.availablePhones.map((p: string) => (
                     <button
                       key={p}
@@ -1095,20 +1137,37 @@ export default function SearchHub() {
                 value={addForm.phone}
                 onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
                 placeholder={
-                  addDialog.result?.availablePhones?.length > 0
-                    ? "اختر من الأرقام أعلاه أو أدخل يدوياً"
-                    : "لم يُعثر على رقم مؤكد - أدخل يدوياً"
+                  placeDetailsQuery.isFetching
+                    ? "جاري الجلب من Google Maps..."
+                    : addForm.phone
+                    ? ""
+                    : "لم يُعثر على رقم - أدخل يدوياً"
                 }
                 dir="ltr"
                 className={addForm.phone ? "border-green-500/50 focus-visible:ring-green-500/30" : ""}
+                disabled={placeDetailsQuery.isFetching}
               />
             </div>
-            {/* حقل الموقع - مع قائمة المواقع الحقيقية للاختيار */}
+            {/* حقل الموقع - يُجلب تلقائياً من Google Places API */}
             <div>
-              <Label className="text-xs mb-1 block">الموقع الإلكتروني</Label>
+              <Label className="text-xs mb-1 flex items-center gap-1.5">
+                الموقع الإلكتروني
+                {addDialog.platform === "google" && placeDetailsQuery.isFetching && (
+                  <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    جاري الجلب...
+                  </span>
+                )}
+                {addDialog.platform === "google" && !placeDetailsQuery.isFetching && addForm.website && (
+                  <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                    <CheckCircle2 className="w-3 h-3" />
+                    تم الجلب من Google
+                  </span>
+                )}
+              </Label>
               {addDialog.result?.availableWebsites?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-1.5 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                  <p className="w-full text-[10px] text-blue-400/70 mb-1">مواقع مستخرجة من الصفحة - اضغط للاختيار:</p>
+                  <p className="w-full text-[10px] text-blue-400/70 mb-1">مواقع متاحة - اضغط للاختيار:</p>
                   {addDialog.result.availableWebsites.map((w: string) => (
                     <button
                       key={w}
@@ -1131,12 +1190,15 @@ export default function SearchHub() {
                 value={addForm.website}
                 onChange={e => setAddForm(f => ({ ...f, website: e.target.value }))}
                 placeholder={
-                  addDialog.result?.availableWebsites?.length > 0
-                    ? "اختر من المواقع أعلاه أو أدخل يدوياً"
-                    : "لم يُعثر على موقع مؤكد - أدخل يدوياً"
+                  placeDetailsQuery.isFetching
+                    ? "جاري الجلب من Google Maps..."
+                    : addForm.website
+                    ? ""
+                    : "لم يُعثر على موقع - أدخل يدوياً"
                 }
                 dir="ltr"
                 className={addForm.website ? "border-blue-500/50 focus-visible:ring-blue-500/30" : ""}
+                disabled={placeDetailsQuery.isFetching}
               />
             </div>
             <div>
