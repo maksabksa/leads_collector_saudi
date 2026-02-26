@@ -2,7 +2,7 @@
  * مركز البحث الاحترافي - نسخة 2.0
  * واجهة موحدة للبحث في جميع المنصات مع نتائج فورية
  */
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
   Building2, ExternalLink, Bot, MessageCircle, Video, Camera,
   Users, Zap, CheckCircle2, RefreshCw, X, Map, Target,
   Layers, SlidersHorizontal, CheckCheck, AlertTriangle,
-  RotateCcw, Info
+  RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock
 } from "lucide-react";
 
 // ===== ثوابت =====
@@ -326,8 +326,16 @@ export default function SearchHub() {
 
   // Instagram search ID
   const [instagramSearchId, setInstagramSearchId] = useState<number | null>(null);
-
-  // ===== API =====
+  // ===== نظام تعلم السلوك =====
+  const [behaviorPatterns, setBehaviorPatterns] = useState<any>(null);
+  const [smartSuggestions, setSmartSuggestions] = useState<string[]>([]);
+  const [showSmartPanel, setShowSmartPanel] = useState(false);
+  const [enhancedQuery, setEnhancedQuery] = useState<string | null>(null);
+  const sessionStartRef = useRef<number>(Date.now());
+  const clickDelaysRef = useRef<number[]>([]);
+  const lastClickRef = useRef<number>(0);
+  const scrollDepthRef = useRef<number>(0);
+  // ===== API ======
   const searchPlaces = trpc.search.searchPlaces.useMutation();
   const searchTiktokMut = trpc.socialSearch.searchTikTok.useMutation();
   const searchSnapchatMut = trpc.socialSearch.searchSnapchat.useMutation();
@@ -336,6 +344,17 @@ export default function SearchHub() {
   const suggestHashtagsMut = trpc.socialSearch.suggestSocialHashtags.useMutation();
   const createLead = trpc.leads.create.useMutation();
   const addInstagramAsLead = trpc.instagram.addAsLead.useMutation();
+  // نظام تعلم السلوك
+  const logSearchSessionMut = trpc.searchBehavior.logSearchSession.useMutation();
+  const enhanceQueryMut = trpc.searchBehavior.enhanceQuery.useMutation();
+  const behaviorPatternsQuery = trpc.searchBehavior.getBehaviorPatterns.useQuery(
+    { platform: activeTab },
+    { staleTime: 60000 }
+  );
+  const smartSuggestionsQuery = trpc.searchBehavior.getSmartSuggestions.useQuery(
+    { platform: activeTab, currentQuery: keyword || undefined },
+    { staleTime: 30000 }
+  );
 
   const instagramAccountsQuery = trpc.instagram.getAccounts.useQuery(
     instagramSearchId ? { searchId: instagramSearchId } : skipToken,
@@ -350,6 +369,77 @@ export default function SearchHub() {
     }
   }, [instagramAccountsQuery.data]);
 
+  // تحديث أنماط السلوك من الـ API
+  useEffect(() => {
+    if (behaviorPatternsQuery.data) {
+      setBehaviorPatterns(behaviorPatternsQuery.data);
+    }
+  }, [behaviorPatternsQuery.data]);
+
+  // تحديث الاقتراحات الذكية
+  useEffect(() => {
+    if (smartSuggestionsQuery.data?.suggestions) {
+      setSmartSuggestions(
+        smartSuggestionsQuery.data.suggestions
+          .map((s: any) => s.query)
+          .filter(Boolean)
+          .slice(0, 5)
+      );
+    }
+  }, [smartSuggestionsQuery.data]);
+
+  // تتبع عمق التمرير
+  useEffect(() => {
+    const handleScroll = () => {
+      const el = document.documentElement;
+      const scrolled = el.scrollTop + el.clientHeight;
+      const total = el.scrollHeight;
+      const depth = Math.round((scrolled / total) * 100);
+      scrollDepthRef.current = Math.max(scrollDepthRef.current, depth);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // تسجيل نقرة (لتتبع أنماط النقر)
+  const trackClick = () => {
+    const now = Date.now();
+    if (lastClickRef.current > 0) {
+      clickDelaysRef.current.push(now - lastClickRef.current);
+      if (clickDelaysRef.current.length > 20) clickDelaysRef.current.shift();
+    }
+    lastClickRef.current = now;
+  };
+
+  // تسجيل جلسة البحث بعد الانتهاء
+  const logSession = useCallback(async (
+    platform: string,
+    query: string,
+    resultsCount: number,
+    addedCount: number,
+    success: boolean,
+    filters?: Record<string, any>
+  ) => {
+    const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
+    try {
+      await logSearchSessionMut.mutateAsync({
+        platform,
+        query,
+        resultsCount,
+        addedToLeads: addedCount,
+        sessionDuration: duration,
+        scrollDepth: scrollDepthRef.current,
+        searchSuccess: success,
+        filters: filters || {},
+        clickPattern: {
+          delays: [...clickDelaysRef.current],
+        },
+      });
+    } catch {
+      // تجاهل أخطاء تسجيل السلوك
+    }
+  }, [logSearchSessionMut]);
+
   // ===== دوال البحث =====
   const setLoadingPlatform = (platform: PlatformId, val: boolean) =>
     setLoading(prev => ({ ...prev, [platform]: val }));
@@ -358,18 +448,25 @@ export default function SearchHub() {
 
   const searchGoogle = useCallback(async () => {
     if (!keyword.trim()) return;
+    sessionStartRef.current = Date.now();
+    scrollDepthRef.current = 0;
+    trackClick();
     setLoadingPlatform("google", true);
     setResultsPlatform("google", []);
     try {
       const res = await searchPlaces.mutateAsync({ query: keyword, city, country: "السعودية" });
-      setResultsPlatform("google", res.results || []);
-      if (!res.results?.length) toast.info("لا توجد نتائج في Google Maps");
+      const googleResults = res.results || [];
+      setResultsPlatform("google", googleResults);
+      if (!googleResults.length) toast.info("لا توجد نتائج في Google Maps");
+      // تسجيل الجلسة
+      await logSession("google", keyword, googleResults.length, 0, googleResults.length > 0, { city });
     } catch (e: any) {
       toast.error("خطأ في Google Maps", { description: e.message });
+      await logSession("google", keyword, 0, 0, false, { city });
     } finally {
       setLoadingPlatform("google", false);
     }
-  }, [keyword, city]);
+  }, [keyword, city, logSession]);
 
   const searchInstagram = useCallback(async () => {
     if (!keyword.trim()) return;
@@ -405,6 +502,8 @@ export default function SearchHub() {
 
   const searchTiktok = useCallback(async () => {
     if (!keyword.trim()) return;
+    sessionStartRef.current = Date.now();
+    trackClick();
     setLoadingPlatform("tiktok", true);
     setResultsPlatform("tiktok", []);
     try {
@@ -412,15 +511,19 @@ export default function SearchHub() {
       const tiktokData = (res as any)?.results || res || [];
       setResultsPlatform("tiktok", tiktokData);
       if (!tiktokData.length) toast.info("لا توجد نتائج في تيك توك");
+      await logSession("tiktok", keyword, tiktokData.length, 0, tiktokData.length > 0, { city });
     } catch (e: any) {
       toast.error("خطأ في تيك توك", { description: e.message });
+      await logSession("tiktok", keyword, 0, 0, false, { city });
     } finally {
       setLoadingPlatform("tiktok", false);
     }
-  }, [keyword, city]);
+  }, [keyword, city, logSession]);
 
-  const searchSnapchat = useCallback(async () => {
+   const searchSnapchat = useCallback(async () => {
     if (!keyword.trim()) return;
+    sessionStartRef.current = Date.now();
+    trackClick();
     setLoadingPlatform("snapchat", true);
     setResultsPlatform("snapchat", []);
     try {
@@ -428,15 +531,18 @@ export default function SearchHub() {
       const snapData = (res as any)?.results || res || [];
       setResultsPlatform("snapchat", snapData);
       if (!snapData.length) toast.info("لا توجد نتائج في سناب شات");
+      await logSession("snapchat", keyword, snapData.length, 0, snapData.length > 0, { city });
     } catch (e: any) {
       toast.error("خطأ في سناب شات", { description: e.message });
+      await logSession("snapchat", keyword, 0, 0, false, { city });
     } finally {
       setLoadingPlatform("snapchat", false);
     }
-  }, [keyword, city]);
-
+  }, [keyword, city, logSession]);
   const searchTelegram = useCallback(async () => {
     if (!keyword.trim()) return;
+    sessionStartRef.current = Date.now();
+    trackClick();
     setLoadingPlatform("telegram", true);
     setResultsPlatform("telegram", []);
     try {
@@ -444,12 +550,14 @@ export default function SearchHub() {
       const telegramData = (res as any)?.results || res || [];
       setResultsPlatform("telegram", telegramData);
       if (!telegramData.length) toast.info("لا توجد نتائج في تيليجرام");
+      await logSession("telegram", keyword, telegramData.length, 0, telegramData.length > 0, { city });
     } catch (e: any) {
       toast.error("خطأ في تيليجرام", { description: e.message });
+      await logSession("telegram", keyword, 0, 0, false, { city });
     } finally {
       setLoadingPlatform("telegram", false);
     }
-  }, [keyword, city]);
+  }, [keyword, city, logSession]);
 
   const searchFunctions: Record<PlatformId, () => void> = {
     google: searchGoogle,
@@ -460,6 +568,23 @@ export default function SearchHub() {
   };
 
   const handleSearch = () => searchFunctions[activeTab]();
+
+  // تحسين الاستعلام بالذكاء الاصطناعي
+  const handleEnhanceQuery = async () => {
+    if (!keyword.trim()) return;
+    try {
+      const res = await enhanceQueryMut.mutateAsync({ query: keyword, platform: activeTab });
+      setEnhancedQuery(res.enhancedQuery);
+      if (res.suggestedHashtags?.length) {
+        setSuggestedHashtags(res.suggestedHashtags);
+      }
+      toast.success("تم تحسين الاستعلام", {
+        description: res.searchStrategy || "استراتيجية بحث محسّنة",
+      });
+    } catch {
+      toast.error("خطأ في تحسين الاستعلام");
+    }
+  };
 
   const handleSearchAll = () => {
     if (!keyword.trim()) return;
@@ -752,6 +877,124 @@ export default function SearchHub() {
                   </div>
                 </div>
 
+                {/* لوحة الذكاء الاصطناعي */}
+                {activeTab === p.id && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleEnhanceQuery}
+                      disabled={!keyword.trim() || enhanceQueryMut.isPending}
+                      className="h-8 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                    >
+                      {enhanceQueryMut.isPending ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3 h-3" />
+                      )}
+                      تحسين بالذكاء
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSmartPanel(!showSmartPanel)}
+                      className={`h-8 text-xs gap-1.5 ${showSmartPanel ? "text-primary bg-primary/10" : ""}`}
+                    >
+                      <Brain className="w-3 h-3" />
+                      أنماط متعلّمة
+                      {behaviorPatterns?.sampleSize > 0 && (
+                        <span className="bg-primary/20 text-primary text-xs px-1.5 rounded-full">
+                          {behaviorPatterns.sampleSize}
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                )}
+                {/* لوحة الأنماط المتعلّمة */}
+                {activeTab === p.id && showSmartPanel && behaviorPatterns && (
+                  <div className="p-4 bg-muted/30 border border-border rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Brain className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-semibold">أنماط السلوك المتعلّمة</h3>
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <TrendingUp className="w-2.5 h-2.5" />
+                        ثقة {behaviorPatterns.confidence}%
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">متوسط مدة الجلسة</p>
+                        <p className="font-medium flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-primary" />
+                          {Math.round((behaviorPatterns.patterns?.avgSessionDuration || 0) / 60)} دقيقة
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">نسبة النجاح</p>
+                        <p className="font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-green-400" />
+                          {Math.round((behaviorPatterns.patterns?.successRate || 0) * 100)}%
+                        </p>
+                      </div>
+                    </div>
+                    {behaviorPatterns.patterns?.topQueries?.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1.5">أكثر الكلمات نجاحاً:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {behaviorPatterns.patterns.topQueries.slice(0, 6).map((w: string, i: number) => (
+                            <button
+                              key={i}
+                              onClick={() => setKeyword(w)}
+                              className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                            >
+                              {w}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {smartSuggestions.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1.5">استعلامات ناجحة سابقاً:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {smartSuggestions.map((s, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setKeyword(s)}
+                              className="text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors border border-green-500/20"
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      بناءً على {behaviorPatterns.sampleSize} جلسة بحث سابقة
+                    </p>
+                  </div>
+                )}
+                {/* استعلام محسّن */}
+                {activeTab === p.id && enhancedQuery && enhancedQuery !== keyword && (
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center gap-3">
+                    <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">استعلام محسّن بالذكاء:</p>
+                      <p className="text-sm font-medium text-primary truncate">{enhancedQuery}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs shrink-0 border-primary/30"
+                      onClick={() => { setKeyword(enhancedQuery); setEnhancedQuery(null); }}
+                    >
+                      استخدام
+                    </Button>
+                    <button onClick={() => setEnhancedQuery(null)} className="text-muted-foreground hover:text-foreground">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 {/* ملاحظة إنستجرام */}
                 {p.id === "instagram" && (
                   <div className="flex items-start gap-2.5 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-xs text-pink-300">

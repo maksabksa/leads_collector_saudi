@@ -829,3 +829,35 @@ export const ttsLogs = mysqlTable("tts_logs", {
 });
 export type TtsLog = typeof ttsLogs.$inferSelect;
 export type InsertTtsLog = typeof ttsLogs.$inferInsert;
+
+// ===== جدول تسجيل سلوك البحث البشري =====
+export const searchBehaviorLogs = mysqlTable("search_behavior_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  platform: varchar("platform", { length: 50 }).notNull(), // google_maps, instagram, tiktok, snapchat, telegram
+  query: varchar("query", { length: 500 }).notNull(),
+  filters: text("filters"),                                // JSON: { city, category, minFollowers, ... }
+  resultsCount: int("resultsCount").default(0),
+  selectedResults: text("selectedResults"),               // JSON: array of selected result IDs/names
+  addedToLeads: int("addedToLeads").default(0),
+  sessionDuration: int("sessionDuration").default(0),     // بالثواني
+  scrollDepth: int("scrollDepth").default(0),             // عمق التمرير (0-100)
+  clickPattern: text("clickPattern"),                     // JSON: { delays, positions }
+  searchSuccess: boolean("searchSuccess").default(true),   // true=ناجح، false=فاشل
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SearchBehaviorLog = typeof searchBehaviorLogs.$inferSelect;
+export type InsertSearchBehaviorLog = typeof searchBehaviorLogs.$inferInsert;
+
+// ===== جدول أنماط السلوك المُستخلصة =====
+export const searchBehaviorPatterns = mysqlTable("search_behavior_patterns", {
+  id: int("id").autoincrement().primaryKey(),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  patternType: varchar("patternType", { length: 100 }).notNull(), // preferred_time, avg_delay, top_queries, etc.
+  patternData: text("patternData").notNull(),                     // JSON: بيانات النمط
+  confidence: int("confidence").default(50),                      // 0-100 نسبة الثقة
+  sampleSize: int("sampleSize").default(0),                       // عدد العينات
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type SearchBehaviorPattern = typeof searchBehaviorPatterns.$inferSelect;
+export type InsertSearchBehaviorPattern = typeof searchBehaviorPatterns.$inferInsert;

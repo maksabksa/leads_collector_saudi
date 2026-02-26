@@ -162,6 +162,13 @@
       "when": 1772058172256,
       "tag": "0022_careful_sally_floyd",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1772105657745,
+      "tag": "0023_handy_liz_osborn",
+      "breakpoints": true
     }
   ]
 }
