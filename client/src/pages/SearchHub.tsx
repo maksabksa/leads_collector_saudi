@@ -483,16 +483,10 @@ export default function SearchHub() {
         setLoadingPlatform("instagram", false);
       }
     } catch (e: any) {
-      if (e.message?.includes("INSTAGRAM_ACCESS_TOKEN")) {
-        toast.warning("Instagram API غير مُعدّ", {
-          description: "يجب إضافة INSTAGRAM_ACCESS_TOKEN في الإعدادات. جاري البحث بالذكاء الاصطناعي..."
+      if (e.message?.includes("Instagram Access Token") || e.message?.includes("INSTAGRAM_ACCESS_TOKEN")) {
+        toast.error("إنستجرام غير مُفعَّل", {
+          description: "يجب إضافة Instagram Access Token وApp ID في إعدادات AI لتفعيل البحث. لا يمكن عرض بيانات بدون مصدر حقيقي."
         });
-        // fallback: TikTok search engine (similar social search)
-        try {
-          const fallback = await searchTiktokMut.mutateAsync({ keyword, city });
-          const fallbackData = (fallback as any)?.results || fallback || [];
-          setResultsPlatform("instagram", (fallbackData).map((r: any) => ({ ...r, source: "Instagram (AI)" })));
-        } catch {}
       } else {
         toast.error("خطأ في البحث", { description: e.message });
       }
@@ -1002,7 +996,7 @@ export default function SearchHub() {
                     <span>
                       <strong>البحث في إنستجرام:</strong> يستخدم Instagram Graph API الرسمي ويحتاج{" "}
                       <code className="bg-pink-500/20 px-1 rounded text-pink-200">INSTAGRAM_ACCESS_TOKEN</code>{" "}
-                      في الإعدادات. بدونه يعمل بالذكاء الاصطناعي كبديل.
+                      في إعدادات AI. بدونه لن تظهر أي نتائج لضمان صحة البيانات.
                     </span>
                   </div>
                 )}

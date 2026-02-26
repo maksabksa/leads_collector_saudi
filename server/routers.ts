@@ -1853,121 +1853,26 @@ const instagramRouter = router({
       const db = await getDb();
       let token: string | null = null;
       let appId: string | null = null;
-      let useAiFallback = false;
-
       if (db) {
         const [settings] = await db.select().from(aiSettings).limit(1);
         if (settings?.instagramApiEnabled && settings?.instagramAccessToken && settings?.instagramAppId) {
           token = settings.instagramAccessToken;
           appId = settings.instagramAppId;
-        } else if (!settings?.instagramApiEnabled) {
-          useAiFallback = true;
         }
       }
       // بديل: متغيرات البيئة
       if (!token) token = process.env.INSTAGRAM_ACCESS_TOKEN || null;
       if (!appId) appId = process.env.INSTAGRAM_APP_ID || null;
-
-      // إذا لا توجد credentials ولا AI fallback
+      // إذا لا توجد credentials → رفض الطلب بدون توليد بيانات وهمية
       if (!token || !appId) {
-        useAiFallback = true;
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "يجب إضافة Instagram Access Token وApp ID في إعدادات AI لتفعيل البحث في إنستجرام. لا يمكن عرض نتائج بدون مصدر حقيقي.",
+        });
       }
-
-       // تنظيف الهاشتاق
+      // تنظيف الهاشتاق وإنشاء سجل البحث
       const hashtag = input.hashtag.replace(/^#/, "").trim();
-      // إنشاء سجل البحث
       const searchId = await createInstagramSearch({ hashtag, status: "running", resultsCount: 0 });
-
-      // ===== AI FALLBACK: بدون Instagram API =====
-      if (useAiFallback) {
-        try {
-          const aiPrompt = `أنت محلل بيانات متخصص في السوق السعودي.
-ابحث عن حسابات إنستجرام سعودية متعلقة بهاشتاق: #${hashtag}
-أرجع قائمة بـ 10-15 حساباً تجارياً سعودياً محتملاً مع هذا الهاشتاق.
-لكل حساب أعطني:
-- username: اسم المستخدم بدون @
-- fullName: الاسم الكامل
-- bio: وصف قصير
-- followersCount: عدد متابعين تقريبي
-- isBusinessAccount: true/false
-- businessCategory: فئة النشاط
-- city: المدينة في السعودية
-- phone: رقم الهاتف إن وجد
-- website: الموقع إن وجد
-أرجع JSON array فقط بدون أي نص إضافي.`;
-
-          const aiResult = await invokeLLM({
-            messages: [
-              { role: "system", content: "أنت محلل بيانات متخصص في السوق السعودي. أرجع دائماً JSON array فقط." },
-              { role: "user", content: aiPrompt },
-            ],
-            response_format: {
-              type: "json_schema",
-              json_schema: {
-                name: "instagram_accounts",
-                strict: true,
-                schema: {
-                  type: "object",
-                  properties: {
-                    accounts: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          username: { type: "string" },
-                          fullName: { type: "string" },
-                          bio: { type: "string" },
-                          followersCount: { type: "number" },
-                          isBusinessAccount: { type: "boolean" },
-                          businessCategory: { type: "string" },
-                          city: { type: "string" },
-                          phone: { type: "string" },
-                          website: { type: "string" },
-                        },
-                        required: ["username", "fullName", "bio", "followersCount", "isBusinessAccount", "businessCategory", "city", "phone", "website"],
-                        additionalProperties: false,
-                      },
-                    },
-                  },
-                  required: ["accounts"],
-                  additionalProperties: false,
-                },
-              },
-            },
-          });
-
-          const parsed = JSON.parse(aiResult.choices[0].message.content as string);
-          const aiAccounts = (parsed.accounts || []).map((a: any) => ({
-            searchId,
-            username: a.username,
-            fullName: a.fullName || null,
-            bio: a.bio || null,
-            website: a.website || null,
-            followersCount: a.followersCount || 0,
-            followingCount: 0,
-            postsCount: 0,
-            profilePicUrl: null,
-            isBusinessAccount: a.isBusinessAccount || false,
-            businessCategory: a.businessCategory || null,
-            phone: a.phone || null,
-            email: null,
-            city: a.city || null,
-          }));
-
-          if (aiAccounts.length > 0) {
-            await createInstagramAccounts(aiAccounts);
-          }
-          await updateInstagramSearch(searchId, { status: "done", resultsCount: aiAccounts.length });
-          return { searchId, status: "done", count: aiAccounts.length, source: "ai" };
-        } catch (aiErr: any) {
-          await updateInstagramSearch(searchId, { status: "error", errorMsg: `AI fallback: ${aiErr.message}` });
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "يجب إضافة Instagram Access Token في إعدادات AI أو تفعيل Instagram API",
-          });
-        }
-      }
-
       try {
         // الخطوة 1: الحصول على معرف الهاشتاق
         const hashtagRes = await fetch(

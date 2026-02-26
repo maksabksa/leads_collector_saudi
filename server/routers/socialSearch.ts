@@ -1,6 +1,6 @@
 /**
  * البحث في منصات التواصل الاجتماعي: TikTok, Snapchat, Telegram
- * مع منطق محاكاة سلوك البشر في البحث والاستقطاب
+ * سياسة صارمة: لا يُسمح بأي بيانات مولّدة أو وهمية - البيانات الحقيقية فقط
  */
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
@@ -57,20 +57,31 @@ async function fetchLikeHuman(url: string, extraHeaders?: Record<string, string>
     .slice(0, 10000);
 }
 
-/** استخدام AI لاستخراج بيانات الأعمال من نص خام */
-async function extractBusinessesWithAI(rawText: string, platform: string, keyword: string) {
+/**
+ * استخراج بيانات الأعمال من نص حقيقي مجلوب من الصفحة.
+ * القاعدة الصارمة: يستخرج فقط ما هو موجود في النص - لا يخترع أي بيانات.
+ * إذا لم يجد بيانات كافية يُرجع مصفوفة فارغة.
+ */
+async function extractBusinessesFromRealText(rawText: string, platform: string, keyword: string) {
+  if (!rawText || rawText.length < 50) return [];
+
   const response = await invokeLLM({
     messages: [
       {
         role: "system",
-        content: `أنت محلل استخباراتي متخصص في استخراج بيانات الأعمال التجارية السعودية من منصة ${platform}.
-مهمتك: استخراج كل نشاط تجاري أو شخص مؤثر تجاري من النص المُعطى.
-ركّز على: الأنشطة التجارية النشطة، المؤثرين التجاريين، الحسابات التجارية.
-تجاهل: الحسابات الشخصية غير التجارية، الحسابات غير النشطة.`,
+        content: `أنت محلل استخباراتي دقيق. مهمتك استخراج بيانات الأعمال التجارية الموجودة فعلاً في النص المُعطى فقط.
+
+قواعد صارمة لا استثناء فيها:
+1. استخرج فقط ما هو مذكور صراحةً في النص
+2. إذا لم يُذكر رقم الهاتف في النص → اترك phone فارغاً ""
+3. إذا لم يُذكر الموقع الإلكتروني في النص → اترك website فارغاً ""
+4. إذا لم تجد أي نشاط تجاري واضح → أرجع results: []
+5. لا تخترع أي بيانات أو تتخيل أي معلومات
+6. لا تُكمل بيانات ناقصة بتخمينات`,
       },
       {
         role: "user",
-        content: `استخرج الأنشطة التجارية من هذا النص المأخوذ من ${platform} عند البحث عن "${keyword}":\n\n${rawText}`,
+        content: `استخرج الأنشطة التجارية الموجودة فعلاً في هذا النص من ${platform} (البحث عن "${keyword}"):\n\n${rawText}`,
       },
     ],
     response_format: {
@@ -110,7 +121,11 @@ async function extractBusinessesWithAI(rawText: string, platform: string, keywor
   });
   try {
     const parsed = JSON.parse(response.choices[0].message.content as string);
-    return (parsed.results || []) as Array<{
+    // تنظيف: حذف أي نتيجة تبدو وهمية (username فارغ أو name فارغ)
+    const results = (parsed.results || []).filter((r: any) =>
+      r.name && r.name.trim() !== "" && r.username && r.username.trim() !== ""
+    );
+    return results as Array<{
       name: string; username: string; bio: string; followers: string;
       businessType: string; phone: string; website: string; city: string;
       profileUrl: string; engagementLevel: string;
@@ -120,7 +135,7 @@ async function extractBusinessesWithAI(rawText: string, platform: string, keywor
   }
 }
 
-/** توليد هاشتاقات ذكية للبحث */
+/** توليد هاشتاقات ذكية للبحث (هذه مجرد كلمات بحث وليست بيانات عملاء) */
 async function generateSearchHashtags(keyword: string, city: string, platform: string): Promise<string[]> {
   const response = await invokeLLM({
     messages: [
@@ -180,13 +195,12 @@ async function searchTikTok(keyword: string, city: string): Promise<any[]> {
     }
   }
 
-  if (combinedText.length < 100) {
-    // fallback: استخدام AI لتوليد بيانات محاكاة
-    return generateSimulatedResults(keyword, city, "TikTok");
+  // إذا لم يُجلب نص كافٍ → لا نتائج (لا بيانات وهمية)
+  if (combinedText.trim().length < 100) {
+    return [];
   }
 
-  const results = await extractBusinessesWithAI(combinedText, "TikTok", keyword + " " + city);
-  return results.length > 0 ? results : generateSimulatedResults(keyword, city, "TikTok");
+  return extractBusinessesFromRealText(combinedText, "TikTok", keyword + " " + city);
 }
 
 // ===== Snapchat Search =====
@@ -209,12 +223,12 @@ async function searchSnapchat(keyword: string, city: string): Promise<any[]> {
     }
   }
 
-  if (combinedText.length < 100) {
-    return generateSimulatedResults(keyword, city, "Snapchat");
+  // إذا لم يُجلب نص كافٍ → لا نتائج (لا بيانات وهمية)
+  if (combinedText.trim().length < 100) {
+    return [];
   }
 
-  const results = await extractBusinessesWithAI(combinedText, "Snapchat", keyword + " " + city);
-  return results.length > 0 ? results : generateSimulatedResults(keyword, city, "Snapchat");
+  return extractBusinessesFromRealText(combinedText, "Snapchat", keyword + " " + city);
 }
 
 // ===== Telegram Search =====
@@ -250,71 +264,12 @@ async function searchTelegram(keyword: string, city: string): Promise<any[]> {
     // تجاهل
   }
 
-  if (combinedText.length < 100) {
-    return generateSimulatedResults(keyword, city, "Telegram");
-  }
-
-  const results = await extractBusinessesWithAI(combinedText, "Telegram", keyword + " " + city);
-  return results.length > 0 ? results : generateSimulatedResults(keyword, city, "Telegram");
-}
-
-/** توليد نتائج محاكاة بالذكاء الاصطناعي عند عدم توفر بيانات حقيقية */
-async function generateSimulatedResults(keyword: string, city: string, platform: string): Promise<any[]> {
-  const response = await invokeLLM({
-    messages: [
-      {
-        role: "system",
-        content: `أنت خبير في السوق السعودي ومحلل بيانات متخصص في منصة ${platform}.
-بناءً على معرفتك بالسوق السعودي، أنشئ قائمة واقعية من الأنشطة التجارية المحتملة في هذا القطاع.
-هذه البيانات للتوجيه البحثي فقط - اجعلها واقعية وقابلة للتحقق.`,
-      },
-      {
-        role: "user",
-        content: `أنشئ 6 نتائج بحث واقعية لـ "${keyword}" في "${city}" على منصة ${platform}. 
-اجعل الأسماء والمعلومات واقعية تعكس السوق السعودي الفعلي.`,
-      },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "simulated_results",
-        strict: true,
-        schema: {
-          type: "object",
-          properties: {
-            results: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  username: { type: "string" },
-                  bio: { type: "string" },
-                  followers: { type: "string" },
-                  businessType: { type: "string" },
-                  phone: { type: "string" },
-                  website: { type: "string" },
-                  city: { type: "string" },
-                  profileUrl: { type: "string" },
-                  engagementLevel: { type: "string" },
-                },
-                required: ["name", "username", "bio", "followers", "businessType", "phone", "website", "city", "profileUrl", "engagementLevel"],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ["results"],
-          additionalProperties: false,
-        },
-      },
-    },
-  });
-  try {
-    const parsed = JSON.parse(response.choices[0].message.content as string);
-    return (parsed.results || []).map((r: any) => ({ ...r, isAiGenerated: true }));
-  } catch {
+  // إذا لم يُجلب نص كافٍ → لا نتائج (لا بيانات وهمية)
+  if (combinedText.trim().length < 100) {
     return [];
   }
+
+  return extractBusinessesFromRealText(combinedText, "Telegram", keyword + " " + city);
 }
 
 // ===== Router =====
@@ -436,13 +391,18 @@ export const socialSearchRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذّر الوصول للحساب" });
       }
 
+      if (!pageText || pageText.length < 50) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على بيانات كافية لهذا الحساب" });
+      }
+
       const platformName = { tiktok: "TikTok", snapchat: "Snapchat", telegram: "Telegram" }[input.platform];
 
       const response = await invokeLLM({
         messages: [
           {
             role: "system",
-            content: `أنت محلل أعمال متخصص في السوق السعودي. حلّل هذا الحساب على منصة ${platformName} وأخرج تقييماً تجارياً شاملاً.`,
+            content: `أنت محلل أعمال متخصص في السوق السعودي. حلّل هذا الحساب على منصة ${platformName}.
+قاعدة صارمة: استخرج فقط ما هو موجود في النص. لا تخترع أي بيانات. إذا لم يُذكر الهاتف اتركه فارغاً.`,
           },
           {
             role: "user",
