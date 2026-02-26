@@ -116,7 +116,17 @@ function ResultCard({
                   <p className="text-xs text-muted-foreground mt-0.5">@{result.username}</p>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                {(result.dataSource === "tiktok_puppeteer" || result.dataSource === "snapchat_puppeteer") && (
+                  <span className="flex items-center gap-0.5 text-xs text-purple-400 bg-purple-400/10 px-1.5 py-0.5 rounded" title="تم الاستخراج بواسطة Puppeteer">
+                    ⚡ متقدم
+                  </span>
+                )}
+                {result.verified && (
+                  <span className="text-xs text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded">
+                    ✓ موثق
+                  </span>
+                )}
                 {result.rating && (
                   <span className="flex items-center gap-0.5 text-xs text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded">
                     <Star className="w-3 h-3 fill-current" />
@@ -220,7 +230,13 @@ function ResultCard({
                   size="sm"
                   variant="ghost"
                   className="h-7 text-xs gap-1.5 px-2"
-                  onClick={() => window.open(`https://instagram.com/${result.username}`, "_blank")}
+                  onClick={() => {
+                    const url = result.profileUrl ||
+                      (result.dataSource?.includes("tiktok") ? `https://www.tiktok.com/@${result.username}` :
+                       result.dataSource?.includes("snapchat") ? `https://www.snapchat.com/add/${result.username}` :
+                       `https://instagram.com/${result.username}`);
+                    window.open(url, "_blank");
+                  }}
                 >
                   <ExternalLink className="w-3 h-3" />
                   الملف

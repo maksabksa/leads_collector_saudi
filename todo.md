@@ -712,3 +712,12 @@
 - [x] عرض علامة "تم الجلب من Google" بجانب الحقل عند نجاح الجلب
 - [x] تعطيل حقل الإدخال أثناء الجلب لمنع التعارض
 - [x] 40 اختبار Vitest تمر بنجاح
+
+## الدفعة 47 - Puppeteer scraper لـ TikTok وSnapchat
+
+- [x] تثبيت puppeteer-core وchromium في المشروع
+- [x] بناء TikTok profile scraper: استخراج bio/phone/website من ملف التعريف
+- [x] بناء Snapchat profile scraper: استخراج بيانات الاتصال من ملف التعريف
+- [x] دمج Scrapers في socialSearch router
+- [x] تحديث واجهة SearchHub لعرض نتائج الاستخراج المتقدم
+- [x] اختبار وحفظ checkpoint

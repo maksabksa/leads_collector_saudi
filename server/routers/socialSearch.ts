@@ -12,6 +12,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { TRPCError } from "@trpc/server";
+import { searchTikTokWithPuppeteer, searchSnapchatWithPuppeteer, scrapeTikTokProfile, scrapeSnapchatProfile } from "./puppeteerScraper";
 
 // ===== أنماط التحقق من البيانات =====
 /** نمط أرقام الهواتف السعودية والخليجية الحقيقية */
@@ -239,8 +240,34 @@ async function generateSearchHashtags(keyword: string, city: string, platform: s
   }
 }
 
-// ===== TikTok Search =====
+// ===== TikTok Search - Puppeteer متقدم =====
 async function searchTikTok(keyword: string, city: string): Promise<any[]> {
+  try {
+    // المحاولة الأولى: Puppeteer (الأدق)
+    const puppeteerResults = await searchTikTokWithPuppeteer(keyword, city);
+    if (puppeteerResults.length > 0) {
+      return puppeteerResults.map(r => ({
+        name: r.displayName,
+        username: r.username,
+        bio: r.bio,
+        followers: r.followers,
+        businessType: "",
+        phone: r.phones[0] || "",
+        website: r.websites[0] || "",
+        city: city,
+        profileUrl: r.profileUrl,
+        engagementLevel: r.verified ? "verified" : "normal",
+        availablePhones: r.phones,
+        availableWebsites: r.websites,
+        dataSource: "tiktok_puppeteer",
+        verified: r.verified,
+      }));
+    }
+  } catch (err) {
+    console.warn("[TikTok] Puppeteer failed, falling back to fetch:", err);
+  }
+
+  // الاحتياط: fetch عادي
   const hashtag = keyword.replace(/\s+/g, "") + city.replace(/\s+/g, "");
   const urls = [
     `https://www.tiktok.com/search?q=${encodeURIComponent(keyword + " " + city)}`,
@@ -261,8 +288,34 @@ async function searchTikTok(keyword: string, city: string): Promise<any[]> {
   return extractBusinessesFromRealText(combinedRawHtml, "TikTok", keyword + " " + city);
 }
 
-// ===== Snapchat Search =====
+// ===== Snapchat Search - Puppeteer متقدم =====
 async function searchSnapchat(keyword: string, city: string): Promise<any[]> {
+  try {
+    // المحاولة الأولى: Puppeteer (الأدق)
+    const puppeteerResults = await searchSnapchatWithPuppeteer(keyword, city);
+    if (puppeteerResults.length > 0) {
+      return puppeteerResults.map(r => ({
+        name: r.displayName,
+        username: r.username,
+        bio: r.bio,
+        followers: r.subscribers,
+        businessType: "",
+        phone: r.phones[0] || "",
+        website: r.websites[0] || "",
+        city: city,
+        profileUrl: r.profileUrl,
+        engagementLevel: "normal",
+        availablePhones: r.phones,
+        availableWebsites: r.websites,
+        dataSource: "snapchat_puppeteer",
+        verified: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("[Snapchat] Puppeteer failed, falling back to fetch:", err);
+  }
+
+  // الاحتياط: fetch عادي
   const urls = [
     `https://www.snapchat.com/search?q=${encodeURIComponent(keyword)}`,
     `https://story.snapchat.com/search?q=${encodeURIComponent(keyword + " " + city)}`,
@@ -313,12 +366,38 @@ export const socialSearchRouter = router({
       }
     }),
 
+  // جلب تفاصيل ملف تعريف TikTok مباشرة بـ Puppeteer
+  getTikTokProfile: protectedProcedure
+    .input(z.object({ username: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      try {
+        const profile = await scrapeTikTokProfile(input.username);
+        if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "لم يُعثر على الملف الشخصي" });
+        return profile;
+      } catch (err: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
   searchSnapchat: protectedProcedure
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
         const results = await searchSnapchat(input.keyword, input.city);
         return { results, platform: "Snapchat", total: results.length };
+      } catch (err: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
+  // جلب تفاصيل ملف تعريف Snapchat مباشرة بـ Puppeteer
+  getSnapchatProfile: protectedProcedure
+    .input(z.object({ username: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      try {
+        const profile = await scrapeSnapchatProfile(input.username);
+        if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "لم يُعثر على الملف الشخصي" });
+        return profile;
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
       }
