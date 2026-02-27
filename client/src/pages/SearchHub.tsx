@@ -321,6 +321,7 @@ export default function SearchHub() {
   const [showFilters, setShowFilters] = useState(false);
   const [minFollowers, setMinFollowers] = useState("");
   const [maxFollowers, setMaxFollowers] = useState("");
+  const [onlyWithPhone, setOnlyWithPhone] = useState(false);
 
   // نتائج البحث
   const [results, setResults] = useState<Record<PlatformId, any[]>>({
@@ -708,6 +709,12 @@ export default function SearchHub() {
   const filteredResults = currentResults.filter((r: any) => {
     if (minFollowers && r.followersCount < parseInt(minFollowers)) return false;
     if (maxFollowers && r.followersCount > parseInt(maxFollowers)) return false;
+    if (onlyWithPhone) {
+      const hasPhone = (r.availablePhones && r.availablePhones.length > 0) ||
+        (r.phone && r.phone.trim() !== "") ||
+        (r.phones && r.phones.length > 0);
+      if (!hasPhone) return false;
+    }
     return true;
   });
 
@@ -809,11 +816,25 @@ export default function SearchHub() {
                 type="number"
               />
             </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">فلتر الأرقام</Label>
+              <button
+                onClick={() => setOnlyWithPhone(!onlyWithPhone)}
+                className={`flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border transition-all ${
+                  onlyWithPhone
+                    ? "bg-green-500/15 border-green-500/40 text-green-400"
+                    : "bg-muted/50 border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Phone className="w-3 h-3" />
+                {onlyWithPhone ? "✓ أرقام فقط" : "كل النتائج"}
+              </button>
+            </div>
             <Button
               variant="ghost"
               size="sm"
               className="h-8 text-xs gap-1"
-              onClick={() => { setMinFollowers(""); setMaxFollowers(""); }}
+              onClick={() => { setMinFollowers(""); setMaxFollowers(""); setOnlyWithPhone(false); }}
             >
               <X className="w-3 h-3" />
               مسح الفلاتر

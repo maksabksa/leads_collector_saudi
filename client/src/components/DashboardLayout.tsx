@@ -94,6 +94,7 @@ const menuGroups = [
     icon: BarChart,
     items: [
       { icon: BarChart2, label: "التقارير الموحدة", path: "/reports", badge: "جديد" },
+      { icon: PieChart, label: "جودة البيانات", path: "/data-quality", badge: null },
       { icon: UserCheck, label: "أداء الموظفين", path: "/employee-performance", badge: null },
       { icon: Activity, label: "تحليل المحادثات", path: "/chats", badge: null },
     ]

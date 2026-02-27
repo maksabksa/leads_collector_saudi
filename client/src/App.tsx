@@ -37,6 +37,7 @@ import WeeklyReports from "./pages/WeeklyReports";
 import Activation from "./pages/Activation";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
+import DataQuality from "./pages/DataQuality";
 
 function Router() {
   return (
@@ -74,6 +75,7 @@ function Router() {
         <Route path="/activation" component={Activation} />
         <Route path="/settings" component={Settings} />
         <Route path="/reports" component={Reports} />
+        <Route path="/data-quality" component={DataQuality} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
