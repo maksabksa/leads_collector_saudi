@@ -58,10 +58,11 @@ const menuGroups = [
     ]
   },
   {
-    group: "واتساب",
+    group: "مركز الرسائل",
     icon: MessageSquare,
     items: [
-      { icon: MessageSquare, label: "المحادثات", path: "/chats", badge: "unread" },
+      { icon: MessageSquare, label: "واتساب + إنستجرام", path: "/messages", badge: "unread" },
+      { icon: MessageSquare, label: "محادثات واتساب", path: "/chats", badge: null },
       { icon: Send, label: "إرسال جماعي", path: "/bulk-whatsapp", badge: null },
       { icon: Smartphone, label: "حسابات واتساب", path: "/whatsapp-accounts", badge: null },
       { icon: Bell, label: "تنبيهات الاهتمام", path: "/whatsapp-auto", badge: null },
@@ -96,7 +97,7 @@ const menuGroups = [
       { icon: BarChart2, label: "التقارير الموحدة", path: "/reports", badge: "جديد" },
       { icon: PieChart, label: "جودة البيانات", path: "/data-quality", badge: null },
       { icon: UserCheck, label: "أداء الموظفين", path: "/employee-performance", badge: null },
-      { icon: Activity, label: "تحليل المحادثات", path: "/chats", badge: null },
+      { icon: Activity, label: "تحليل المحادثات", path: "/messages", badge: null },
     ]
   },
   {
@@ -113,7 +114,6 @@ const menuGroups = [
     icon: Settings,
     items: [
       { icon: Settings, label: "الإعدادات الموحدة", path: "/settings", badge: null },
-      { icon: Users, label: "إدارة المستخدمين", path: "/users", badge: null },
     ]
   },
 ];

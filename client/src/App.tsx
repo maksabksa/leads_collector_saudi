@@ -38,6 +38,7 @@ import Activation from "./pages/Activation";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import DataQuality from "./pages/DataQuality";
+import MessagesHub from "./pages/MessagesHub";
 
 function Router() {
   return (
@@ -76,6 +77,7 @@ function Router() {
         <Route path="/settings" component={Settings} />
         <Route path="/reports" component={Reports} />
         <Route path="/data-quality" component={DataQuality} />
+        <Route path="/messages" component={MessagesHub} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

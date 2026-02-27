@@ -16,7 +16,8 @@ import {
   AlertCircle, Info, ExternalLink, Download, Upload,
   BarChart2, Activity, Layers, Tag, Building2, MapPin,
   Link, Table, Sheet, Cpu, Save, TestTube2, Lock,
-  Mail, Phone, Star, TrendingUp, Target, Palette,
+  Mail, Phone, Star, TrendingUp, Target, Palette, Send, UserPlus, UserCheck,
+  Trash2, Copy, Clock, XCircle, CheckCircle,
 } from "lucide-react";
 
 // ===== أنواع التبويبات =====
@@ -24,6 +25,8 @@ type SettingsTab =
   | "general"
   | "ai"
   | "whatsapp"
+  | "whatsapp-send"
+  | "users-management"
   | "data"
   | "google-sheets"
   | "notifications"
@@ -42,6 +45,8 @@ const TABS: TabConfig[] = [
   { id: "general", label: "عام", icon: Settings2, description: "الإعدادات العامة للنظام" },
   { id: "ai", label: "الذكاء الاصطناعي", icon: Brain, description: "إعدادات AI والرد التلقائي", badge: "مهم" },
   { id: "whatsapp", label: "واتساب", icon: MessageSquare, description: "إعدادات الاتصال والأتمتة" },
+  { id: "whatsapp-send", label: "إرسال واتساب", icon: Send, description: "إرسال جماعي وقوالب الرسائل", badge: "جديد" },
+  { id: "users-management", label: "إدارة المستخدمين", icon: Users, description: "الموظفون والصلاحيات" },
   { id: "data", label: "البيانات", icon: Database, description: "أنواع الأعمال والمدن والتصنيفات" },
   { id: "google-sheets", label: "Google Sheets", icon: Sheet, description: "ربط جداول البيانات", badge: "جديد" },
   { id: "notifications", label: "الإشعارات", icon: Bell, description: "إعدادات التنبيهات" },
@@ -606,6 +611,157 @@ function NotificationsTab() {
   );
 }
 
+// ===== تبويب إرسال واتساب =====
+function WhatsAppSendTab() {
+  const [, navigate] = useLocation();
+  const { data: accounts } = trpc.waAccounts.listAccounts.useQuery();
+  const { data: templates } = trpc.waSettings.listAutoReplyRules.useQuery({ accountId: "all" });
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-4 flex items-start gap-3">
+        <Send className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium">الإرسال الجماعي عبر واتساب</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            أرسل رسائل جماعية لقوائم العملاء مع قوالب مخصصة ومتابعة تفصيلية
+          </p>
+          <Button size="sm" variant="outline" className="mt-2 border-green-500/30 text-green-600" onClick={() => navigate("/bulk-whatsapp")}>
+            <Send className="w-3.5 h-3.5 ml-1.5" />
+            فتح الإرسال الجماعي
+          </Button>
+        </div>
+      </div>
+
+      <SettingCard title="الحسابات المتاحة للإرسال" icon={Smartphone}>
+        <div className="space-y-2">
+          {accounts && accounts.length > 0 ? (
+            accounts.map((acc: any) => (
+              <div key={acc.id} className="flex items-center justify-between p-2.5 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-2 h-2 rounded-full ${acc.isActive ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <div>
+                    <p className="text-sm font-medium">{acc.label}</p>
+                    <p className="text-xs text-muted-foreground">{acc.accountId}</p>
+                  </div>
+                </div>
+                <Badge variant={acc.isActive ? "default" : "destructive"} className="text-xs">
+                  {acc.isActive ? "جاهز" : "غير متصل"}
+                </Badge>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-4">
+              <Smartphone className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">لا توجد حسابات مربوطة</p>
+              <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate("/whatsapp-accounts")}>
+                <UserPlus className="w-4 h-4 ml-1.5" />
+                ربط حساب جديد
+              </Button>
+            </div>
+          )}
+        </div>
+      </SettingCard>
+
+      <SettingCard title="قوالب الرسائل" icon={FileText} description="القوالب المستخدمة في الإرسال الجماعي">
+        <div className="space-y-2">
+          {templates && templates.length > 0 ? (
+            templates.slice(0, 3).map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between p-2.5 bg-muted/30 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">{t.name || t.keyword}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-[200px]">{t.response?.substring(0, 50)}...</p>
+                </div>
+                <Badge variant="outline" className="text-xs">{t.isActive ? "نشط" : "معطل"}</Badge>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-2">لا توجد قوالب محفوظة</p>
+          )}
+          <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/bulk-whatsapp")}>
+            <FileText className="w-4 h-4 ml-1.5" />
+            إدارة القوالب
+          </Button>
+        </div>
+      </SettingCard>
+
+      <SettingCard title="تقرير الإرسال" icon={BarChart2}>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">متابعة إحصائيات الإرسال والتسليم والقراءة</p>
+          <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/whatsapp-report")}>
+            <BarChart2 className="w-4 h-4 ml-1.5" />
+            عرض التقرير الكامل
+          </Button>
+        </div>
+      </SettingCard>
+    </div>
+  );
+}
+
+// ===== تبويب إدارة المستخدمين =====
+function UsersManagementTab() {
+  const [, navigate] = useLocation();
+  // إدارة المستخدمين - بيانات الأدوار ثابتة
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 flex items-start gap-3">
+        <Users className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium">إدارة الموظفين والصلاحيات</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            أضف موظفين جدد وحدد صلاحياتهم وتابع أداءهم
+          </p>
+          <Button size="sm" variant="outline" className="mt-2 border-blue-500/30 text-blue-600" onClick={() => navigate("/users")}>
+            <Users className="w-3.5 h-3.5 ml-1.5" />
+            فتح إدارة المستخدمين الكاملة
+          </Button>
+        </div>
+      </div>
+
+      <SettingCard title="الأدوار والصلاحيات" icon={Shield}>
+        <div className="space-y-3">
+          {[
+            { role: "مدير", desc: "صلاحيات كاملة على جميع الميزات", color: "bg-red-500/20 text-red-600", count: 1 },
+            { role: "موظف مبيعات", desc: "الوصول للعملاء والمحادثات والبحث", color: "bg-blue-500/20 text-blue-600", count: 3 },
+            { role: "موظف دعم", desc: "الوصول للمحادثات فقط", color: "bg-green-500/20 text-green-600", count: 2 },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">{item.role}</p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className={item.color}>{item.count} مستخدم</Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SettingCard>
+
+      <SettingCard title="إضافة موظف جديد" icon={UserPlus}>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">دعوة موظف جديد عبر رابط الدعوة</p>
+          <Button size="sm" className="w-full" onClick={() => navigate("/users")}>
+            <UserPlus className="w-4 h-4 ml-1.5" />
+            إرسال دعوة جديدة
+          </Button>
+        </div>
+      </SettingCard>
+
+      <SettingCard title="أداء الموظفين" icon={UserCheck}>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">متابعة إحصائيات كل موظف وعدد المحادثات والعملاء</p>
+          <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/employee-performance")}>
+            <UserCheck className="w-4 h-4 ml-1.5" />
+            تقرير الأداء
+          </Button>
+        </div>
+      </SettingCard>
+    </div>
+  );
+}
+
 // ===== تبويب الأمان =====
 function SecurityTab() {
   const [, navigate] = useLocation();
@@ -718,6 +874,8 @@ export default function Settings() {
       case "general": return <GeneralTab />;
       case "ai": return <AITab />;
       case "whatsapp": return <WhatsAppTab />;
+      case "whatsapp-send": return <WhatsAppSendTab />;
+      case "users-management": return <UsersManagementTab />;
       case "data": return <DataTab />;
       case "google-sheets": return <GoogleSheetsTab />;
       case "notifications": return <NotificationsTab />;
