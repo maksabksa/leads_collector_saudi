@@ -11,13 +11,29 @@ import { whatsappAccounts, interestAlerts } from "../../drizzle/schema";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
 
-// ===== كلمات الاهتمام الافتراضية =====
+// ===== كلمات الاهتمام العادية =====
 const DEFAULT_INTEREST_KEYWORDS = [
-  "سعر", "كم", "بكم", "أسعار", "تكلفة", "كيف", "أريد", "عايز", "أبي",
-  "أبغى", "اشتري", "شراء", "طلب", "أطلب", "اطلب", "توصيل", "متى",
-  "موعد", "متاح", "مهتم", "مهتمة", "ابي", "ابغى", "اريد", "ممكن",
-  "تواصل", "اتصل", "رقم", "واتساب", "نعم", "أيوه", "موافق", "تمام",
-  "حسناً", "اوكي", "ok", "yes", "interested", "price", "buy", "order",
+  // الموافقة والإيجاب
+  "نعم", "أيوه", "ايوه", "موافق", "تمام", "حسناً", "اوكي", "ok", "yes",
+  // التواصل
+  "تواصل", "اتصل", "رقم", "واتساب", "تلفون", "جوال",
+  // الاستفسار العام
+  "كيف", "متى", "متاح", "متاحة", "ممكن", "توصيل",
+  // الاهتمام الصريح
+  "مهتم", "مهتمة", "interested",
+];
+
+// ===== كلمات الاهتمام العالي (تعطي درجة أعلى) =====
+const HIGH_INTEREST_KEYWORDS = [
+  // طلب موعد أو حجز
+  "موعد", "أحجز", "احجز", "حجز", "أحجز", "زيارة", "أزور", "ازور",
+  // طلب الشراء المباشر
+  "اشتري", "أشتري", "شراء", "أطلب", "اطلب", "طلب", "أريد", "اريد",
+  "أبي", "ابي", "أبغى", "ابغى", "عايز", "عاوز", "بدي", "نبي",
+  // الاستفسار عن السعر
+  "سعر", "كم", "بكم", "أسعار", "تكلفة", "الثمن", "كلفة",
+  // الإنجليزية
+  "buy", "order", "price", "want", "book", "appointment",
 ];
 
 // ===== تحليل مستوى الاهتمام =====
@@ -27,22 +43,32 @@ async function analyzeInterest(message: string): Promise<{
   keywords: string[];
 }> {
   const lowerMsg = message.toLowerCase();
+
   const foundKeywords = DEFAULT_INTEREST_KEYWORDS.filter((kw) =>
     lowerMsg.includes(kw.toLowerCase())
   );
+  const highInterestFound = HIGH_INTEREST_KEYWORDS.filter((kw) =>
+    lowerMsg.includes(kw.toLowerCase())
+  );
 
-  // حساب الدرجة بناءً على الكلمات المفتاحية
-  let score = Math.min(foundKeywords.length * 20, 80);
+  // حساب الدرجة: كلمات عادية = 15 لكل كلمة، كلمات عالية الاهتمام = 30 لكل كلمة
+  let score = Math.min(
+    foundKeywords.length * 15 + highInterestFound.length * 30,
+    80
+  );
 
-  // تحليل AI إضافي إذا كانت الرسالة طويلة
-  if (message.length > 20) {
+  // جمع كل الكلمات المكتشفة
+  const allFoundKeywords = Array.from(new Set([...foundKeywords, ...highInterestFound]));
+
+  // تحليل AI إضافي
+  if (message.length > 5) {
     try {
       const result = await invokeLLM({
         messages: [
           {
             role: "system",
             content:
-              'أنت محلل مبيعات. حلل الرسالة التالية وحدد هل العميل مهتم بالشراء أو الاستفسار الجاد. أجب بـ JSON فقط: {"interested": true/false, "score": 0-100, "reason": "سبب قصير"}',
+              'أنت محلل مبيعات محترف. حلل الرسالة التالية وحدد هل العميل مهتم بالشراء أو الاستفسار الجاد.\n\nقواعد التصنيف الصارمة:\n- طلب موعد أو حجز = 85-95\n- طلب سعر أو شراء مباشر = 75-90\n- استفسار جاد عن المنتج/الخدمة = 55-75\n- رد إيجابي أو موافقة = 60-80\n- استفسار عام غير محدد = 30-50\n- رسالة غير ذات صلة أو سلبية = 0-20\n\nمهم جداً: الدرجة يجب أن تكون رقماً صحيحاً بين 0 و100 (مثل 85 وليس 0.85).\nأجب بـ JSON فقط: {"interested": true/false, "score": 0-100, "reason": "سبب قصير"}',
           },
           { role: "user", content: `الرسالة: "${message}"` },
         ],
@@ -66,11 +92,15 @@ async function analyzeInterest(message: string): Promise<{
       });
 
       const rawContent = result.choices?.[0]?.message?.content;
-      const content = typeof rawContent === 'string' ? rawContent : null;
+      const content = typeof rawContent === "string" ? rawContent : null;
       if (content) {
         const parsed = JSON.parse(content);
-        // دمج النتيجتين
-        score = Math.max(score, Math.min(Number(parsed.score), 100));
+        // تصحيح الدرجة: إذا كانت بين 0 و1 فهي نسبة مئوية مضروبة في 100
+        let aiScore = Number(parsed.score);
+        if (aiScore > 0 && aiScore <= 1) aiScore = Math.round(aiScore * 100);
+        aiScore = Math.min(Math.round(aiScore), 100);
+        // دمج النتيجتين: الأعلى يفوز
+        score = Math.max(score, aiScore);
         if (parsed.interested) score = Math.max(score, 60);
       }
     } catch {
@@ -79,9 +109,9 @@ async function analyzeInterest(message: string): Promise<{
   }
 
   return {
-    isInterested: score >= 40 || foundKeywords.length >= 2,
+    isInterested: score >= 40 || allFoundKeywords.length >= 1,
     score,
-    keywords: foundKeywords,
+    keywords: allFoundKeywords,
   };
 }
 
@@ -115,7 +145,6 @@ export const whatsappAccountsRouter = router({
           .orderBy(whatsappAccounts.sortOrder);
       }
 
-      // bulk_sender أو human_handoff يشمل أيضاً "both"
       return db
         .select()
         .from(whatsappAccounts)
@@ -233,7 +262,6 @@ export const whatsappAccountsRouter = router({
       const analysis = await analyzeInterest(input.message);
 
       if (analysis.isInterested) {
-        // إنشاء إشعار اهتمام
         await db.insert(interestAlerts).values({
           chatId: input.chatId,
           leadId: input.leadId,
@@ -245,7 +273,6 @@ export const whatsappAccountsRouter = router({
           status: "pending",
         });
 
-        // إشعار المالك
         await notifyOwner({
           title: `🔥 عميل مهتم: ${input.contactName || input.phone}`,
           content: `درجة الاهتمام: ${analysis.score}%\nالرسالة: "${input.message}"\nالكلمات المفتاحية: ${analysis.keywords.join(", ")}`,
@@ -264,7 +291,7 @@ export const whatsappAccountsRouter = router({
     .input(
       z.object({
         alertId: z.number(),
-        handoffAccountId: z.string(), // معرف حساب واتساب الموظف
+        handoffAccountId: z.string(),
         notes: z.string().optional(),
         transferredBy: z.string().optional(),
       })
@@ -273,7 +300,6 @@ export const whatsappAccountsRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // جلب الإشعار
       const [alert] = await db
         .select()
         .from(interestAlerts)
@@ -282,7 +308,6 @@ export const whatsappAccountsRouter = router({
 
       if (!alert) throw new TRPCError({ code: "NOT_FOUND", message: "الإشعار غير موجود" });
 
-      // جلب حساب الموظف
       const [account] = await db
         .select()
         .from(whatsappAccounts)
@@ -291,7 +316,6 @@ export const whatsappAccountsRouter = router({
 
       if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "حساب الموظف غير موجود" });
 
-      // تحديث الإشعار
       await db
         .update(interestAlerts)
         .set({
@@ -304,7 +328,6 @@ export const whatsappAccountsRouter = router({
         })
         .where(eq(interestAlerts.id, input.alertId));
 
-      // إنشاء رابط واتساب للتحويل
       const cleanPhone = account.phoneNumber.replace(/\D/g, "");
       const customerPhone = alert.phone.replace(/\D/g, "");
       const waLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(

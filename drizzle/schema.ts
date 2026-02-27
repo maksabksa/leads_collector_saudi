@@ -341,6 +341,7 @@ export const aiSettings = mysqlTable("ai_settings", {
   // إعدادات Instagram API
   instagramAccessToken: text("instagramAccessToken"), // Instagram Graph API Access Token
   instagramAppId: varchar("instagramAppId", { length: 100 }), // Instagram App ID (User ID)
+  instagramAppSecret: varchar("instagramAppSecret", { length: 200 }), // Instagram App Secret
   instagramApiEnabled: boolean("instagramApiEnabled").default(false).notNull(), // تفعيل Instagram API
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

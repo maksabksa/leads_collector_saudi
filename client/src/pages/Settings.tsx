@@ -17,7 +17,8 @@ import {
   BarChart2, Activity, Layers, Tag, Building2, MapPin,
   Link, Table, Sheet, Cpu, Save, TestTube2, Lock,
   Mail, Phone, Star, TrendingUp, Target, Palette, Send, UserPlus, UserCheck,
-  Trash2, Copy, Clock, XCircle, CheckCircle,
+  Trash2, Copy, Clock, XCircle, CheckCircle, Instagram, Camera, Heart,
+  AtSign, Hash, Image, Video, MessageCircle, ThumbsUp, Eye,
 } from "lucide-react";
 
 // ===== أنواع التبويبات =====
@@ -26,6 +27,7 @@ type SettingsTab =
   | "ai"
   | "whatsapp"
   | "whatsapp-send"
+  | "instagram"
   | "users-management"
   | "data"
   | "google-sheets"
@@ -46,6 +48,7 @@ const TABS: TabConfig[] = [
   { id: "ai", label: "الذكاء الاصطناعي", icon: Brain, description: "إعدادات AI والرد التلقائي", badge: "مهم" },
   { id: "whatsapp", label: "واتساب", icon: MessageSquare, description: "إعدادات الاتصال والأتمتة" },
   { id: "whatsapp-send", label: "إرسال واتساب", icon: Send, description: "إرسال جماعي وقوالب الرسائل", badge: "جديد" },
+  { id: "instagram", label: "إنستجرام", icon: Instagram, description: "ربط حساب إنستجرام والصلاحيات", badge: "جديد" },
   { id: "users-management", label: "إدارة المستخدمين", icon: Users, description: "الموظفون والصلاحيات" },
   { id: "data", label: "البيانات", icon: Database, description: "أنواع الأعمال والمدن والتصنيفات" },
   { id: "google-sheets", label: "Google Sheets", icon: Sheet, description: "ربط جداول البيانات", badge: "جديد" },
@@ -698,6 +701,295 @@ function WhatsAppSendTab() {
   );
 }
 
+// ===== تبويب إنستجرام =====
+function InstagramTab() {
+  const [appId, setAppId] = useState("");
+  const [appSecret, setAppSecret] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [accountInfo, setAccountInfo] = useState<{
+    username: string;
+    name: string;
+    followers: number;
+    mediaCount: number;
+  } | null>(null);
+
+  // جلب بيانات Instagram من قاعدة البيانات
+  const { data: igSettings, refetch } = trpc.instagram.getCredentials.useQuery();
+  const saveCredentials = trpc.instagram.saveCredentials.useMutation({
+    onSuccess: () => {
+      toast.success("تم حفظ بيانات إنستجرام بنجاح");
+      refetch();
+    },
+    onError: (e) => toast.error("فشل الحفظ: " + e.message),
+  });
+  const testConnection = trpc.instagram.testConnection.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        setIsConnected(true);
+        setAccountInfo(data.account as any);
+        toast.success("تم الاتصال بنجاح! الحساب: @" + data.account?.username);
+      } else {
+        toast.error("فشل الاتصال: " + data.error);
+      }
+    },
+    onError: (e) => toast.error("خطأ: " + e.message),
+  });
+
+  const handleSave = async () => {
+    if (!accessToken.trim() && !igSettings?.accessToken) {
+      toast.error("أدخل Access Token على الأقل");
+      return;
+    }
+    setIsSaving(true);
+    await saveCredentials.mutateAsync({
+      appId: appId || igSettings?.appId || "",
+      appSecret: appSecret || igSettings?.appSecret || "",
+      accessToken: accessToken || igSettings?.accessToken || "",
+    });
+    setIsSaving(false);
+  };
+
+  const handleTest = () => {
+    testConnection.mutate({});
+  };
+
+  const handleOAuthLogin = () => {
+    const clientId = appId || igSettings?.appId;
+    if (!clientId) {
+      toast.error("أدخل App ID أولاً ثم اضغط حفظ");
+      return;
+    }
+    const redirectUri = encodeURIComponent(window.location.origin + "/instagram-callback");
+    const scope = encodeURIComponent("instagram_basic,instagram_manage_messages,pages_show_list,pages_messaging");
+    const oauthUrl = `https://www.facebook.com/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
+    window.open(oauthUrl, "_blank", "width=600,height=700");
+    toast.info("تم فتح نافذة تسجيل الدخول لإنستجرام");
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* بانر التعريف */}
+      <div className="bg-gradient-to-l from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg p-4 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+          <Instagram className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-medium">ربط حساب إنستجرام</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            اربط حساب إنستجرام Business أو Creator لاستقبال الرسائل وتحليل التعليقات وجمع بيانات العملاء
+          </p>
+        </div>
+      </div>
+
+      {/* حالة الاتصال */}
+      {(isConnected || igSettings?.accessToken) && (
+        <SettingCard title="حالة الحساب" icon={CheckCircle2} badge="متصل">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <Instagram className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">
+                  {accountInfo?.username ? `@${accountInfo.username}` : "الحساب متصل"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {accountInfo?.name || "إنستجرام Business"}
+                </p>
+              </div>
+              <Badge className="bg-green-500/20 text-green-600 border-green-500/30">نشط</Badge>
+            </div>
+            {accountInfo && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-lg font-bold text-primary">{accountInfo.followers?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">متابع</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-lg font-bold text-primary">{accountInfo.mediaCount?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">منشور</p>
+                </div>
+              </div>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={handleTest}
+              disabled={testConnection.isPending}
+            >
+              {testConnection.isPending ? (
+                <><RefreshCw className="w-4 h-4 ml-2 animate-spin" />جاري الاختبار...</>
+              ) : (
+                <><RefreshCw className="w-4 h-4 ml-2" />تحديث حالة الاتصال</>
+              )}
+            </Button>
+          </div>
+        </SettingCard>
+      )}
+
+      {/* طريقة الربط السريع بـ OAuth */}
+      <SettingCard title="الربط السريع عبر Facebook Login" icon={Globe} badge="موصى به">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            الطريقة الأسهل: سجّل دخولك عبر Facebook لمنح الصلاحيات تلقائياً
+          </p>
+          <div className="space-y-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Facebook App ID</label>
+              <Input
+                placeholder="123456789012345"
+                value={appId || igSettings?.appId || ""}
+                onChange={(e) => setAppId(e.target.value)}
+                dir="ltr"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                من <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">developers.facebook.com/apps</a>
+              </p>
+            </div>
+          </div>
+          <Button
+            className="w-full bg-gradient-to-l from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
+            onClick={handleOAuthLogin}
+          >
+            <Instagram className="w-4 h-4 ml-2" />
+            تسجيل الدخول بإنستجرام
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            ستُفتح نافذة لتسجيل الدخول ومنح الصلاحيات المطلوبة
+          </p>
+        </div>
+      </SettingCard>
+
+      {/* الربط اليدوي بـ Access Token */}
+      <SettingCard title="الربط اليدوي بـ Access Token" icon={Key}>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            إذا كان لديك Access Token مباشرة، أدخله هنا
+          </p>
+          <div className="space-y-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">App ID</label>
+              <Input
+                placeholder="Facebook App ID"
+                value={appId || igSettings?.appId || ""}
+                onChange={(e) => setAppId(e.target.value)}
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">App Secret</label>
+              <Input
+                type="password"
+                placeholder="Facebook App Secret"
+                value={appSecret || igSettings?.appSecret || ""}
+                onChange={(e) => setAppSecret(e.target.value)}
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Access Token</label>
+              <Input
+                type="password"
+                placeholder="EAAxxxxxxxxxxxxxxxx"
+                value={accessToken || igSettings?.accessToken || ""}
+                onChange={(e) => setAccessToken(e.target.value)}
+                dir="ltr"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Long-lived User Access Token من Meta Graph Explorer
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleTest}
+              disabled={testConnection.isPending || (!accessToken && !igSettings?.accessToken)}
+            >
+              {testConnection.isPending ? (
+                <><RefreshCw className="w-4 h-4 ml-1.5 animate-spin" />اختبار...</>
+              ) : (
+                <><TestTube2 className="w-4 h-4 ml-1.5" />اختبار الاتصال</>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <><RefreshCw className="w-4 h-4 ml-1.5 animate-spin" />حفظ...</>
+              ) : (
+                <><Save className="w-4 h-4 ml-1.5" />حفظ البيانات</>
+              )}
+            </Button>
+          </div>
+        </div>
+      </SettingCard>
+
+      {/* الصلاحيات المطلوبة */}
+      <SettingCard title="الصلاحيات المطلوبة" icon={Shield}>
+        <div className="space-y-2">
+          {[
+            { perm: "instagram_basic", desc: "قراءة معلومات الحساب الأساسية", required: true },
+            { perm: "instagram_manage_messages", desc: "استقبال وإرسال الرسائل المباشرة", required: true },
+            { perm: "pages_show_list", desc: "عرض قائمة الصفحات المرتبطة", required: true },
+            { perm: "pages_messaging", desc: "إرسال رسائل عبر الصفحة", required: true },
+            { perm: "instagram_manage_comments", desc: "قراءة وإدارة التعليقات", required: false },
+            { perm: "instagram_manage_insights", desc: "إحصائيات الحساب والمنشورات", required: false },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${item.required ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-mono text-primary">{item.perm}</p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </div>
+              <Badge variant={item.required ? "default" : "outline"} className="text-xs shrink-0">
+                {item.required ? "مطلوب" : "اختياري"}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </SettingCard>
+
+      {/* دليل الإعداد */}
+      <SettingCard title="دليل الإعداد خطوة بخطوة" icon={Info}>
+        <div className="space-y-2 text-sm">
+          {[
+            { step: 1, text: "اذهب إلى developers.facebook.com وأنشئ تطبيقاً جديداً من نوع Business" },
+            { step: 2, text: "أضف منتج Instagram Graph API وربطه بحساب إنستجرام Business" },
+            { step: 3, text: "انسخ App ID وأدخله في الحقل أعلاه" },
+            { step: 4, text: "اضغط 'تسجيل الدخول بإنستجرام' لمنح الصلاحيات تلقائياً" },
+            { step: 5, text: "أو استخدم Meta Graph Explorer للحصول على Long-lived Access Token يدوياً" },
+          ].map((item) => (
+            <div key={item.step} className="flex items-start gap-2">
+              <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                {item.step}
+              </span>
+              <p className="text-muted-foreground text-xs leading-relaxed">{item.text}</p>
+            </div>
+          ))}
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <a
+              href="https://developers.facebook.com/docs/instagram-api/getting-started"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              توثيق Instagram API الرسمي
+            </a>
+          </div>
+        </div>
+      </SettingCard>
+    </div>
+  );
+}
+
 // ===== تبويب إدارة المستخدمين =====
 function UsersManagementTab() {
   const [, navigate] = useLocation();
@@ -875,6 +1167,7 @@ export default function Settings() {
       case "ai": return <AITab />;
       case "whatsapp": return <WhatsAppTab />;
       case "whatsapp-send": return <WhatsAppSendTab />;
+      case "instagram": return <InstagramTab />;
       case "users-management": return <UsersManagementTab />;
       case "data": return <DataTab />;
       case "google-sheets": return <GoogleSheetsTab />;

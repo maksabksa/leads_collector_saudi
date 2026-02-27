@@ -1986,6 +1986,96 @@ const instagramRouter = router({
       return { success: true, leadId };
     }),
 
+  // ===== جلب بيانات الاتصال بـ Instagram =====
+  getCredentials: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { appId: "", appSecret: "", accessToken: "" };
+    const [settings] = await db.select().from(aiSettings).limit(1);
+    return {
+      appId: settings?.instagramAppId || "",
+      appSecret: settings?.instagramAppSecret || "",
+      accessToken: settings?.instagramAccessToken || "",
+    };
+  }),
+
+  // ===== حفظ بيانات الاتصال بـ Instagram =====
+  saveCredentials: protectedProcedure
+    .input(z.object({
+      appId: z.string(),
+      appSecret: z.string(),
+      accessToken: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [existing] = await db.select().from(aiSettings).limit(1);
+      if (existing) {
+        await db.update(aiSettings).set({
+          instagramAppId: input.appId || null,
+          instagramAppSecret: input.appSecret || null,
+          instagramAccessToken: input.accessToken || null,
+          instagramApiEnabled: !!(input.accessToken),
+        });
+      } else {
+        await db.insert(aiSettings).values({
+          instagramAppId: input.appId || null,
+          instagramAppSecret: input.appSecret || null,
+          instagramAccessToken: input.accessToken || null,
+          instagramApiEnabled: !!(input.accessToken),
+        });
+      }
+      return { success: true };
+    }),
+
+  // ===== اختبار الاتصال بـ Instagram =====
+  testConnection: protectedProcedure
+    .input(z.object({}))
+    .mutation(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [settings] = await db.select().from(aiSettings).limit(1);
+      const token = settings?.instagramAccessToken || process.env.INSTAGRAM_ACCESS_TOKEN;
+      if (!token) {
+        return { success: false, error: "لا يوجد Access Token محفوظ" };
+      }
+      try {
+        const res = await fetch(
+          `https://graph.facebook.com/v18.0/me?fields=id,name&access_token=${token}`
+        );
+        const data = await res.json() as any;
+        if (data.error) {
+          return { success: false, error: data.error.message };
+        }
+        // جلب تفاصيل حساب Instagram
+        const igRes = await fetch(
+          `https://graph.facebook.com/v18.0/me/accounts?access_token=${token}`
+        );
+        const igData = await igRes.json() as any;
+        let igAccount = null;
+        if (igData.data && igData.data.length > 0) {
+          const pageId = igData.data[0].id;
+          const pageToken = igData.data[0].access_token;
+          const igPageRes = await fetch(
+            `https://graph.facebook.com/v18.0/${pageId}?fields=instagram_business_account&access_token=${pageToken}`
+          );
+          const igPageData = await igPageRes.json() as any;
+          if (igPageData.instagram_business_account) {
+            const igId = igPageData.instagram_business_account.id;
+            const profileRes = await fetch(
+              `https://graph.facebook.com/v18.0/${igId}?fields=username,name,followers_count,media_count&access_token=${pageToken}`
+            );
+            igAccount = await profileRes.json() as any;
+          }
+        }
+        return {
+          success: true,
+          account: igAccount || { username: data.name, name: data.name, followers: 0, mediaCount: 0 },
+        };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    }),
+
   // اقتراح هاشتاقات بالذكاء الاصطناعي
   suggestHashtags: protectedProcedure
     .input(z.object({ niche: z.string() }))

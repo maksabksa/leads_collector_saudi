@@ -758,3 +758,14 @@
 - [x] دمج "إدارة المستخدمين" كتبويب في صفحة الإعدادات
 - [x] تحديث DashboardLayout: إضافة "مركز الرسائل" وإزالة رابط "إدارة المستخدمين" المكرر
 - [x] 40 اختبار Vitest تمر بنجاح
+
+## الدفعة 50 - إصلاح تحليل الرسائل + Instagram Login
+- [x] إصلاح منطق تحليل الرسائل: طلب الموعد = مهتم جداً (80+) - كلمات عالية الاهتمام = 30 نقطة
+- [x] مراجعة جميع كلمات الاهتمام وتصحيح prompt AI (درجة 0.8 تصبح 80)
+- [x] إضافة Instagram Login في صفحة الإعدادات (تبويب إنستجرام)
+- [x] بناء OAuth flow لربط حساب Instagram Professional عبر Facebook Login
+- [x] حفظ Instagram Access Token وApp Secret في قاعدة البيانات
+- [x] إضافة endpoints: getCredentials وsaveCredentials وtestConnection في instagramRouter
+- [x] إضافة حقل instagramAppSecret في schema + migration
+- [x] 56 اختبار Vitest تمر بنجاح (16 اختبار جديد)
+- [x] اختبار وحفظ checkpoint
