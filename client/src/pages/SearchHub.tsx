@@ -20,8 +20,10 @@ import {
   Building2, ExternalLink, Bot, MessageCircle, Video, Camera,
   Users, Zap, CheckCircle2, RefreshCw, X, Map, Target,
   Layers, SlidersHorizontal, CheckCheck, AlertTriangle,
-  RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock
+  RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock,
+  Navigation, Crosshair, CircleDot
 } from "lucide-react";
+import { MapView } from "@/components/Map";
 
 // ===== ثوابت =====
 const SAUDI_CITIES = [
@@ -323,6 +325,19 @@ export default function SearchHub() {
   const [maxFollowers, setMaxFollowers] = useState("");
   const [onlyWithPhone, setOnlyWithPhone] = useState(false);
 
+  // ===== البحث الجغرافي بالنطاق =====
+  const [showRadiusSearch, setShowRadiusSearch] = useState(false);
+  const [radiusKm, setRadiusKm] = useState(5);
+  const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [addressInput, setAddressInput] = useState("");
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const circleRef = useRef<google.maps.Circle | null>(null);
+  const resultMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const searchByRadiusMut = trpc.search.searchByRadius.useMutation();
+  const geocodeAddressMut = trpc.search.geocodeAddress.useMutation();
+
   // نتائج البحث
   const [results, setResults] = useState<Record<PlatformId, any[]>>({
     google: [], instagram: [], tiktok: [], snapchat: [], telegram: []
@@ -462,6 +477,185 @@ export default function SearchHub() {
       // تجاهل أخطاء تسجيل السلوك
     }
   }, [logSearchSessionMut]);
+
+  // ===== دوال الخريطة التفاعلية =====
+  const updateMapCircle = useCallback((center: { lat: number; lng: number }, radiusMeters: number, map: google.maps.Map) => {
+    // حذف الدائرة القديمة
+    if (circleRef.current) {
+      circleRef.current.setMap(null);
+      circleRef.current = null;
+    }
+    // رسم دائرة جديدة
+    circleRef.current = new window.google.maps.Circle({
+      map,
+      center,
+      radius: radiusMeters,
+      fillColor: "#22c55e",
+      fillOpacity: 0.12,
+      strokeColor: "#22c55e",
+      strokeOpacity: 0.6,
+      strokeWeight: 2,
+    });
+    // تحديث الماركر
+    if (markerRef.current) {
+      markerRef.current.map = null;
+    }
+    markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+      map,
+      position: center,
+      title: `مركز البحث (${radiusMeters / 1000} كم)`,
+    });
+    // ضبط العرض ليشمل الدائرة
+    const bounds = circleRef.current.getBounds();
+    if (bounds) map.fitBounds(bounds);
+  }, []);
+
+  const handleMapReady = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    // النقر على الخريطة لتحديد المركز
+    map.addListener("click", (e: google.maps.MapMouseEvent) => {
+      if (!e.latLng) return;
+      const center = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+      setSearchCenter(center);
+      updateMapCircle(center, radiusKm * 1000, map);
+    });
+    // ربط دالة إضافة عميل من الـ InfoWindow
+    (window as any).__addLeadFromMap = (placeId: string) => {
+      const place = results.google.find((r: any) => r.place_id === placeId);
+      if (place) {
+        handleOpenAddDialog(place, "google");
+        if (infoWindowRef.current) infoWindowRef.current.close();
+      }
+    };
+  }, [radiusKm, updateMapCircle]);
+
+  // تحديث الدائرة عند تغيير النطاق
+  useEffect(() => {
+    if (mapRef.current && searchCenter) {
+      updateMapCircle(searchCenter, radiusKm * 1000, mapRef.current);
+    }
+  }, [radiusKm, searchCenter, updateMapCircle]);
+
+  // عرض نتائج البحث كـ pins على الخريطة
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    // حذف الماركرات القديمة
+    resultMarkersRef.current.forEach(m => { m.map = null; });
+    resultMarkersRef.current = [];
+    if (infoWindowRef.current) {
+      infoWindowRef.current.close();
+    }
+    // إضافة pin لكل نتيجة
+    results.google.forEach((place: any) => {
+      if (!place.geometry?.location) return;
+      const pos = {
+        lat: place.geometry.location.lat,
+        lng: place.geometry.location.lng,
+      };
+      // إنشاء عنصر HTML مخصص للـ pin
+      const pinEl = document.createElement("div");
+      pinEl.style.cssText = `
+        width: 32px; height: 32px; border-radius: 50% 50% 50% 0;
+        background: #22c55e; border: 2px solid #fff;
+        transform: rotate(-45deg); cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        display: flex; align-items: center; justify-content: center;
+      `;
+      const inner = document.createElement("div");
+      inner.style.cssText = "width:10px;height:10px;border-radius:50%;background:#fff;transform:rotate(45deg);";
+      pinEl.appendChild(inner);
+      const marker = new window.google.maps.marker.AdvancedMarkerElement({
+        map,
+        position: pos,
+        title: place.name,
+        content: pinEl,
+      });
+      // نافذة معلومات عند النقر
+      marker.addListener("click", () => {
+        if (!infoWindowRef.current) {
+          infoWindowRef.current = new window.google.maps.InfoWindow();
+        }
+        const rating = place.rating ? `★ ${place.rating} (${place.user_ratings_total || 0})` : "غير مقيّم";
+        const status = place.opening_hours?.open_now === true ? '✅ مفتوح الآن' : place.opening_hours?.open_now === false ? '❌ مغلق' : '';
+        infoWindowRef.current.setContent(`
+          <div dir="rtl" style="font-family: 'IBM Plex Sans Arabic', Arial, sans-serif; min-width: 200px; padding: 4px;">
+            <h3 style="margin:0 0 6px;font-size:14px;font-weight:700;color:#111;">${place.name}</h3>
+            <p style="margin:0 0 4px;font-size:12px;color:#555;">${place.formatted_address || ''}</p>
+            <p style="margin:0 0 6px;font-size:12px;color:#888;">${rating} ${status}</p>
+            <button
+              onclick="window.__addLeadFromMap && window.__addLeadFromMap('${place.place_id}')"
+              style="background:#22c55e;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;width:100%;"
+            >➕ إضافة كعميل</button>
+          </div>
+        `);
+        infoWindowRef.current.open({ map, anchor: marker });
+      });
+      resultMarkersRef.current.push(marker);
+    });
+  }, [results.google]);
+
+  const handleGeocodeAddress = useCallback(async () => {
+    if (!addressInput.trim()) return;
+    try {
+      const res = await geocodeAddressMut.mutateAsync({ address: addressInput });
+      const center = { lat: res.lat, lng: res.lng };
+      setSearchCenter(center);
+      if (mapRef.current) {
+        mapRef.current.setCenter(center);
+        mapRef.current.setZoom(13);
+        updateMapCircle(center, radiusKm * 1000, mapRef.current);
+      }
+      toast.success(`تم تحديد الموقع: ${res.formattedAddress}`);
+    } catch (e: any) {
+      toast.error("خطأ في تحديد الموقع", { description: e.message });
+    }
+  }, [addressInput, radiusKm, geocodeAddressMut, updateMapCircle]);
+
+  const handleUseCurrentCity = useCallback(async () => {
+    if (!city) return;
+    setAddressInput(city + ", المملكة العربية السعودية");
+    try {
+      const res = await geocodeAddressMut.mutateAsync({ address: city + ", Saudi Arabia" });
+      const center = { lat: res.lat, lng: res.lng };
+      setSearchCenter(center);
+      if (mapRef.current) {
+        mapRef.current.setCenter(center);
+        mapRef.current.setZoom(12);
+        updateMapCircle(center, radiusKm * 1000, mapRef.current);
+      }
+    } catch {
+      // تجاهل الخطأ
+    }
+  }, [city, radiusKm, geocodeAddressMut, updateMapCircle]);
+
+  const handleSearchByRadius = useCallback(async () => {
+    if (!keyword.trim()) { toast.error("أدخل كلمة البحث أولاً"); return; }
+    if (!searchCenter) { toast.error("حدد مركز البحث على الخريطة أولاً"); return; }
+    sessionStartRef.current = Date.now();
+    setLoadingPlatform("google", true);
+    setResultsPlatform("google", []);
+    try {
+      const res = await searchByRadiusMut.mutateAsync({
+        keyword,
+        lat: searchCenter.lat,
+        lng: searchCenter.lng,
+        radiusKm,
+      });
+      const googleResults = res.results || [];
+      setResultsPlatform("google", googleResults);
+      if (!googleResults.length) {
+        toast.info("لا توجد نتائج ضمن هذا النطاق");
+      } else {
+        toast.success(`تم العثور على ${googleResults.length} نتيجة ضمن نطاق ${radiusKm} كم`);
+      }
+      await logSession("google", keyword, googleResults.length, 0, googleResults.length > 0, { radiusKm, lat: searchCenter.lat, lng: searchCenter.lng });
+    } catch (e: any) {
+      toast.error("خطأ في البحث الجغرافي", { description: e.message });
+    } finally {
+      setLoadingPlatform("google", false);
+    }
+  }, [keyword, searchCenter, radiusKm, searchByRadiusMut, logSession]);
 
   // ===== دوال البحث =====
   const setLoadingPlatform = (platform: PlatformId, val: boolean) =>
@@ -640,6 +834,17 @@ export default function SearchHub() {
       setCurrentPlaceId(null);
     }
   };
+
+  // تحديث دالة إضافة العميل من الخريطة عند تغيير النتائج
+  useEffect(() => {
+    (window as any).__addLeadFromMap = (placeId: string) => {
+      const place = results.google.find((r: any) => r.place_id === placeId);
+      if (place) {
+        handleOpenAddDialog(place, "google");
+        if (infoWindowRef.current) infoWindowRef.current.close();
+      }
+    };
+  }, [results.google]);
 
   // تحديث النموذج تلقائياً عند جلب تفاصيل Google Maps
   useEffect(() => {
@@ -969,6 +1174,125 @@ export default function SearchHub() {
                     </Button>
                   </div>
                 )}
+                {/* ===== لوحة الخريطة التفاعلية - تظهر فقط في تبويب Google Maps ===== */}
+                {p.id === "google" && activeTab === "google" && (
+                  <div className="border border-green-500/30 rounded-xl overflow-hidden bg-card shadow-sm">
+                    {/* شريط التحكم */}
+                    <div className="flex items-center justify-between gap-3 px-4 py-3 bg-green-500/5 border-b border-green-500/20">
+                      <div className="flex items-center gap-2">
+                        <Map className="w-4 h-4 text-green-400" />
+                        <span className="text-sm font-semibold text-foreground">خريطة البحث الجغرافي</span>
+                        {searchCenter && (
+                          <Badge className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                            <Crosshair className="w-3 h-3 ml-1" />
+                            مركز محدد
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleUseCurrentCity}
+                          disabled={geocodeAddressMut.isPending}
+                          className="h-7 text-xs gap-1.5 text-green-400 hover:bg-green-500/10"
+                        >
+                          {geocodeAddressMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Navigation className="w-3 h-3" />}
+                          انتقل لـ {city}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* شريط البحث بالعنوان */}
+                    <div className="flex gap-2 px-4 py-3 border-b border-border bg-muted/20">
+                      <Input
+                        value={addressInput}
+                        onChange={e => setAddressInput(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && handleGeocodeAddress()}
+                        placeholder="ابحث عن عنوان أو حي أو شارع... (مثال: حي الملقا، الرياض)"
+                        className="flex-1 h-9 text-sm"
+                        dir="rtl"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleGeocodeAddress}
+                        disabled={!addressInput.trim() || geocodeAddressMut.isPending}
+                        className="h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {geocodeAddressMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                        تحديد
+                      </Button>
+                    </div>
+
+                    {/* الخريطة */}
+                    <div className="relative">
+                      <MapView
+                        className="w-full h-[420px]"
+                        initialCenter={{ lat: 24.7136, lng: 46.6753 }}
+                        initialZoom={11}
+                        onMapReady={handleMapReady}
+                      />
+                      {/* تعليمة النقر */}
+                      {!searchCenter && (
+                        <div className="absolute top-3 right-3 bg-black/70 text-white text-xs px-3 py-2 rounded-lg pointer-events-none flex items-center gap-1.5">
+                          <CircleDot className="w-3.5 h-3.5 text-green-400" />
+                          انقر على أي نقطة لتحديد مركز البحث
+                        </div>
+                      )}
+                      {/* عداد النتائج على الخريطة */}
+                      {results.google.length > 0 && (
+                        <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-3 py-2 rounded-lg pointer-events-none">
+                          • {results.google.length} نتيجة على الخريطة
+                        </div>
+                      )}
+                    </div>
+
+                    {/* شريط النطاق */}
+                    <div className="px-4 py-3 border-t border-border bg-muted/20 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Target className="w-4 h-4 text-green-400" />
+                          <span className="text-sm font-medium">نطاق البحث</span>
+                        </div>
+                        <span className="text-lg font-bold text-green-400">{radiusKm} كم</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={50}
+                        step={1}
+                        value={radiusKm}
+                        onChange={e => setRadiusKm(Number(e.target.value))}
+                        className="w-full h-2 rounded-full accent-green-500 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>1 كم</span>
+                        <span>10 كم</span>
+                        <span>25 كم</span>
+                        <span>50 كم</span>
+                      </div>
+                      <Button
+                        onClick={handleSearchByRadius}
+                        disabled={!keyword.trim() || !searchCenter || loading.google}
+                        className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {loading.google ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Search className="w-4 h-4" />
+                        )}
+                        بحث ضمن نطاق {radiusKm} كم
+                        {!searchCenter && <span className="text-xs opacity-70">(حدد مركزاً أولاً)</span>}
+                      </Button>
+                      {searchCenter && (
+                        <p className="text-xs text-center text-muted-foreground">
+                          المركز: {searchCenter.lat.toFixed(4)}°ش ، {searchCenter.lng.toFixed(4)}°ش
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* لوحة الأنماط المتعلّمة */}
                 {activeTab === p.id && showSmartPanel && behaviorPatterns && (
                   <div className="p-4 bg-muted/30 border border-border rounded-lg space-y-3">

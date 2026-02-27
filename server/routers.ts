@@ -1014,6 +1014,105 @@ const searchRouter = router({
         existingName: existing[0]?.companyName || null,
       };
     }),
+
+  // ===== بحث جغرافي بالإحداثيات والنطاق =====
+  // يستخدم Google Places Nearby Search API
+  searchByRadius: protectedProcedure
+    .input(z.object({
+      keyword: z.string().min(1),
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      radiusKm: z.number().min(0.5).max(50).default(5),
+      pagetoken: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { makeRequest } = await import("./_core/map");
+      const radiusMeters = Math.round(input.radiusKm * 1000);
+      const params: Record<string, unknown> = {
+        keyword: input.keyword,
+        location: `${input.lat},${input.lng}`,
+        radius: radiusMeters,
+        language: "ar",
+        region: "SA",
+      };
+      if (input.pagetoken) params.pagetoken = input.pagetoken;
+      const data = await makeRequest<{
+        results: Array<{
+          place_id: string;
+          name: string;
+          formatted_address?: string;
+          vicinity?: string;
+          geometry: { location: { lat: number; lng: number } };
+          rating?: number;
+          user_ratings_total?: number;
+          business_status?: string;
+          types?: string[];
+          opening_hours?: { open_now: boolean };
+          photos?: Array<{ photo_reference: string }>;
+        }>;
+        status: string;
+        next_page_token?: string;
+        error_message?: string;
+      }>("/maps/api/place/nearbysearch/json", params);
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Google Nearby Search Error: ${data.status} - ${data.error_message || ""}`,
+        });
+      }
+      // تحويل النتائج لنفس تنسيق searchPlaces
+      const results = (data.results || []).map(r => ({
+        place_id: r.place_id,
+        name: r.name,
+        formatted_address: r.formatted_address || r.vicinity || "",
+        geometry: r.geometry,
+        rating: r.rating,
+        user_ratings_total: r.user_ratings_total,
+        business_status: r.business_status,
+        types: r.types,
+        opening_hours: r.opening_hours,
+      }));
+      return {
+        results,
+        nextPageToken: data.next_page_token || null,
+        total: results.length,
+        searchCenter: { lat: input.lat, lng: input.lng },
+        radiusKm: input.radiusKm,
+      };
+    }),
+
+  // تحويل اسم المدينة أو العنوان إلى إحداثيات جغرافية
+  geocodeAddress: protectedProcedure
+    .input(z.object({
+      address: z.string().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const { makeRequest } = await import("./_core/map");
+      const data = await makeRequest<{
+        results: Array<{
+          geometry: { location: { lat: number; lng: number } };
+          formatted_address: string;
+        }>;
+        status: string;
+        error_message?: string;
+      }>("/maps/api/geocode/json", {
+        address: input.address,
+        language: "ar",
+        region: "SA",
+      });
+      if (data.status !== "OK" || !data.results?.length) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `لم يتم العثور على الإحداثيات لـ: ${input.address}`,
+        });
+      }
+      const loc = data.results[0].geometry.location;
+      return {
+        lat: loc.lat,
+        lng: loc.lng,
+        formattedAddress: data.results[0].formatted_address,
+      };
+    }),
 });
 
 // ===== SEARCH JOBS ROUTER =====
