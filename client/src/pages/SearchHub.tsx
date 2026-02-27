@@ -573,20 +573,32 @@ export default function SearchHub() {
       });
       // نافذة معلومات عند النقر
       marker.addListener("click", () => {
+        // الانتقال لموقع النشاط وتكبيره
+        map.panTo(pos);
+        if (map.getZoom()! < 17) {
+          map.setZoom(17);
+        }
         if (!infoWindowRef.current) {
           infoWindowRef.current = new window.google.maps.InfoWindow();
         }
         const rating = place.rating ? `★ ${place.rating} (${place.user_ratings_total || 0})` : "غير مقيّم";
         const status = place.opening_hours?.open_now === true ? '✅ مفتوح الآن' : place.opening_hours?.open_now === false ? '❌ مغلق' : '';
         infoWindowRef.current.setContent(`
-          <div dir="rtl" style="font-family: 'IBM Plex Sans Arabic', Arial, sans-serif; min-width: 200px; padding: 4px;">
+          <div dir="rtl" style="font-family: 'IBM Plex Sans Arabic', Arial, sans-serif; min-width: 220px; padding: 6px;">
             <h3 style="margin:0 0 6px;font-size:14px;font-weight:700;color:#111;">${place.name}</h3>
             <p style="margin:0 0 4px;font-size:12px;color:#555;">${place.formatted_address || ''}</p>
             <p style="margin:0 0 6px;font-size:12px;color:#888;">${rating} ${status}</p>
-            <button
-              onclick="window.__addLeadFromMap && window.__addLeadFromMap('${place.place_id}')"
-              style="background:#22c55e;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;width:100%;"
-            >➕ إضافة كعميل</button>
+            <div style="display:flex;gap:6px;">
+              <button
+                onclick="window.__addLeadFromMap && window.__addLeadFromMap('${place.place_id}')"
+                style="background:#22c55e;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;flex:1;"
+              >➕ إضافة كعميل</button>
+              <a
+                href="https://www.google.com/maps/place/?q=place_id:${place.place_id}"
+                target="_blank"
+                style="background:#4285F4;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;"
+              >🗺️ فتح في Maps</a>
+            </div>
           </div>
         `);
         infoWindowRef.current.open({ map, anchor: marker });
