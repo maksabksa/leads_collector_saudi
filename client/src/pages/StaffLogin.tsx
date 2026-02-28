@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, LogIn, Loader2, AlertCircle } from "lucide-react";
+import { Link } from "wouter";
 
 export default function StaffLogin() {
   const [, navigate] = useLocation();
@@ -83,7 +84,14 @@ export default function StaffLogin() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-300 text-sm">كلمة المرور</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-slate-300 text-sm">كلمة المرور</Label>
+                  <Link href="/forgot-password">
+                    <span className="text-xs text-purple-400 hover:text-purple-300 cursor-pointer transition-colors">
+                      نسيت كلمة المرور؟
+                    </span>
+                  </Link>
+                </div>
                 <div className="relative">
                   <Input
                     type={showPassword ? "text" : "password"}

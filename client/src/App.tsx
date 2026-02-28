@@ -43,6 +43,9 @@ import SocialAccounts from "./pages/SocialAccounts";
 import UnifiedInbox from "./pages/UnifiedInbox";
 import StaffLogin from "./pages/StaffLogin";
 import AcceptInvitation from "./pages/AcceptInvitation";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import AdminGuard from "./components/AdminGuard";
 function Router() {
   return (
     <Layout>
@@ -60,14 +63,14 @@ function Router() {
         <Route path="/instagram" component={InstagramSearch} />
         <Route path="/whatsapp" component={WhatsApp} />
         <Route path="/search-hub" component={SearchHub} />
-        <Route path="/users" component={UsersManagement} />
+        <Route path="/users">{() => <AdminGuard><UsersManagement /></AdminGuard>}</Route>
         <Route path="/join" component={JoinPage} />
         <Route path="/chats" component={Chats} />
-        <Route path="/ai-settings" component={AISettings} />
-        <Route path="/whatsapp-accounts" component={WhatsAppAccounts} />
+        <Route path="/ai-settings">{() => <AdminGuard><AISettings /></AdminGuard>}</Route>
+        <Route path="/whatsapp-accounts">{() => <AdminGuard><WhatsAppAccounts /></AdminGuard>}</Route>
         <Route path="/interest-keywords" component={InterestKeywords} />
         <Route path="/segments" component={Segments} />
-        <Route path="/data-settings" component={DataSettings} />
+        <Route path="/data-settings">{() => <AdminGuard><DataSettings /></AdminGuard>}</Route>
         <Route path="/bulk-import" component={BulkImport} />
         <Route path="/knowledge-base" component={KnowledgeBase} />
         <Route path="/whatsapp-report" component={WhatsAppReport} />
@@ -81,10 +84,12 @@ function Router() {
         <Route path="/reports" component={Reports} />
         <Route path="/data-quality" component={DataQuality} />
         <Route path="/messages" component={MessagesHub} />
-        <Route path="/social-accounts" component={SocialAccounts} />
+        <Route path="/social-accounts">{() => <AdminGuard><SocialAccounts /></AdminGuard>}</Route>
         <Route path="/unified-inbox" component={UnifiedInbox} />
         <Route path="/staff-login" component={StaffLogin} />
         <Route path="/accept-invitation" component={AcceptInvitation} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

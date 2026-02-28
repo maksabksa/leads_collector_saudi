@@ -7,8 +7,9 @@ import { z } from "zod";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { users, userInvitations, userPermissions } from "../../drizzle/schema";
+import { users, userInvitations, userPermissions, passwordResetTokens } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
@@ -16,6 +17,7 @@ const jwt = require("jsonwebtoken") as typeof import("jsonwebtoken");
 const { sign, verify } = jwt;
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
+import { sendEmail, buildPasswordResetEmail } from "../emailService";
 
 const STAFF_COOKIE = "staff_session";
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_change_me";
@@ -217,6 +219,78 @@ export const staffAuthRouter = router({
       });
 
       return { success: true, message: "تم إنشاء حسابك بنجاح! مرحباً بك" };
+    }),
+
+  // طلب إعادة تعيين كلمة المرور
+  forgotPassword: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      origin: z.string().url(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // البحث عن المستخدم (لا نكشف إن كان موجوداً أم لا)
+      const userRows = await db.select().from(users)
+        .where(eq(users.email, input.email.toLowerCase().trim()))
+        .limit(1);
+
+      const user = userRows[0];
+
+      if (user && user.passwordHash && user.isActive) {
+        const token = randomBytes(48).toString("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // ساعة واحدة
+
+        await db.insert(passwordResetTokens).values({
+          userId: user.id,
+          token,
+          expiresAt,
+        });
+
+        const resetUrl = `${input.origin}/reset-password?token=${token}`;
+        const emailData = buildPasswordResetEmail({ email: user.email!, resetUrl });
+        await sendEmail(emailData);
+      }
+
+      // دائماً نرجع نفس الرسالة لأسباب أمنية
+      return { success: true, message: "إذا كان البريد الإلكتروني مسجلاً، ستصلك رسالة إعادة التعيين" };
+    }),
+
+  // إعادة تعيين كلمة المرور
+  resetPassword: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      newPassword: z.string().min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل"),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const tokenRows = await db.select().from(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, input.token))
+        .limit(1);
+
+      const resetToken = tokenRows[0];
+
+      if (!resetToken) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "رابط إعادة التعيين غير صحيح" });
+      }
+
+      if (resetToken.usedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "هذا الرابط مستخدم بالفعل" });
+      }
+
+      if (new Date() > resetToken.expiresAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "انتهت صلاحية رابط إعادة التعيين. اطلب رابطاً جديداً" });
+      }
+
+      const newHash = await bcrypt.hash(input.newPassword, 12);
+
+      await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, resetToken.userId));
+      await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, resetToken.id));
+
+      return { success: true, message: "تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن" };
     }),
 
   // تغيير كلمة المرور

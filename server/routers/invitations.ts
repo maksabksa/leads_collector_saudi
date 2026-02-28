@@ -13,6 +13,7 @@ import {
 } from "../../drizzle/schema";
 import crypto from "crypto";
 import { notifyOwner } from "../_core/notification";
+import { sendEmail, buildInvitationEmail } from "../emailService";
 
 // قائمة الصلاحيات المتاحة
 export const AVAILABLE_PERMISSIONS = [
@@ -90,7 +91,17 @@ export const invitationsRouter = router({
         content: `تم إرسال دعوة إلى ${input.email}\nرابط الدعوة: ${inviteUrl}`,
       });
 
-      return { success: true, inviteUrl, email: input.email, expiresAt };
+      // إرسال إيميل الدعوة تلقائياً
+      const inviterName = ctx.user.name || ctx.user.email || "المدير";
+      const emailData = buildInvitationEmail({
+        inviteeEmail: input.email,
+        inviterName,
+        inviteUrl,
+        role: input.role,
+      });
+      const emailSent = await sendEmail(emailData);
+
+      return { success: true, inviteUrl, email: input.email, expiresAt, emailSent };
     }),
 
   // قبول الدعوة

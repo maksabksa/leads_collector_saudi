@@ -97,6 +97,8 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (window.location.pathname === "/staff-login") return;
     if (window.location.pathname === "/accept-invitation") return;
+    if (window.location.pathname === "/forgot-password") return;
+    if (window.location.pathname === "/reset-password") return;
 
     window.location.href = "/staff-login";
   }, [

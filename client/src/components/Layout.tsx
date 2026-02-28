@@ -86,7 +86,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     // توجيه لصفحة تسجيل الدخول المستقلة
     const currentPath = window.location.pathname;
-    if (currentPath !== "/staff-login" && currentPath !== "/accept-invitation") {
+    const publicPaths = ["/staff-login", "/accept-invitation", "/forgot-password", "/reset-password"];
+    if (!publicPaths.includes(currentPath)) {
       window.location.href = "/staff-login";
     }
     return null;

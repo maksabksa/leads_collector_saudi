@@ -963,3 +963,15 @@ export const platformCredentials = mysqlTable("platform_credentials", {
 });
 export type PlatformCredentials = typeof platformCredentials.$inferSelect;
 export type InsertPlatformCredentials = typeof platformCredentials.$inferInsert;
+
+// ===== PASSWORD RESET TOKENS =====
+export const passwordResetTokens = mysqlTable("password_reset_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;

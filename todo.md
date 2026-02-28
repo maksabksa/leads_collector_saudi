@@ -867,3 +867,28 @@
 - [x] تحديث رابط الدعوة ليوجه لصفحة accept-invitation
 - [x] 115 اختبار Vitest تمر بنجاح (15 جديد)
 - [x] حفظ checkpoint
+
+## الدفعة 60 - إيميل الدعوة + نسيت كلمة المرور + تقييد الصلاحيات
+- [ ] إعداد SMTP (nodemailer) وبناء emailService.ts
+- [ ] إرسال إيميل الدعوة تلقائياً عند إنشائها
+- [ ] صفحة /forgot-password (طلب إعادة التعيين)
+- [ ] صفحة /reset-password?token=... (إدخال كلمة المرور الجديدة)
+- [ ] جدول password_reset_tokens في قاعدة البيانات
+- [ ] إرسال إيميل إعادة التعيين بالرابط المؤقت
+- [ ] تقييد صفحة إدارة المستخدمين للمدير فقط
+- [ ] إخفاء روابط الإدارة من الـ sidebar للموظفين العاديين
+- [ ] اختبار وحفظ checkpoint
+
+## الدفعة 60 - نظام المصادقة المتكامل للموظفين
+
+- [x] إرسال إيميل الدعوة تلقائياً عند إنشاء الدعوة (كان مطبقاً بالفعل في invitations.ts)
+- [x] إضافة forgotPassword procedure في staffAuth router
+- [x] إضافة resetPassword procedure في staffAuth router
+- [x] إنشاء جدول password_reset_tokens في قاعدة البيانات
+- [x] بناء صفحة /forgot-password مع نموذج البريد الإلكتروني
+- [x] بناء صفحة /reset-password مع نموذج كلمة المرور الجديدة + مؤشر قوة
+- [x] إضافة رابط "نسيت كلمة المرور؟" في صفحة تسجيل الدخول
+- [x] إضافة استثناءات redirect للصفحات العامة (forgot-password, reset-password)
+- [x] إنشاء مكوّن AdminGuard لحماية صفحات الإدارة
+- [x] تطبيق AdminGuard على: /users, /ai-settings, /data-settings, /whatsapp-accounts, /social-accounts
+- [x] 140 اختبار Vitest تمر بنجاح (20 اختبار جديد)
