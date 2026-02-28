@@ -871,7 +871,7 @@ const searchRouter = router({
         error_message?: string;
       }>("/maps/api/place/details/json", {
         place_id: input.placeId,
-        fields: "place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types,opening_hours,url",
+        fields: "place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types,opening_hours,url,photos",
         language: "ar",
       });
       if (data.status !== "OK") {

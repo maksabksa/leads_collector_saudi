@@ -21,7 +21,7 @@ import {
   Users, Zap, CheckCircle2, RefreshCw, X, Map, Target,
   Layers, SlidersHorizontal, CheckCheck, AlertTriangle,
   RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock,
-  Navigation, Crosshair, CircleDot
+  Navigation, Crosshair, CircleDot, ChevronDown
 } from "lucide-react";
 import { MapView } from "@/components/Map";
 
@@ -1435,14 +1435,103 @@ export default function SearchHub() {
 
       {/* ===== نافذة إضافة عميل ===== */}
       <Dialog open={addDialog.open} onOpenChange={open => setAddDialog(prev => ({ ...prev, open }))}>
-        <DialogContent className="max-w-md" dir="rtl">
+        <DialogContent className="max-w-lg" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-primary" />
               إضافة كعميل محتمل
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
+            {/* بطاقة معلومات النشاط من Google Maps */}
+            {addDialog.platform === "google" && addDialog.result && (() => {
+              const details = placeDetailsQuery.data as any;
+              const r = addDialog.result;
+              const rating = details?.rating || r.rating;
+              const totalRatings = details?.user_ratings_total || r.user_ratings_total;
+              const openNow = details?.opening_hours?.open_now ?? r.opening_hours?.open_now;
+              const weekdayText = details?.opening_hours?.weekday_text || r.opening_hours?.weekday_text;
+              const photos = details?.photos || r.photos;
+              const mapsUrl = details?.url || r.url;
+              const address = details?.formatted_address || r.formatted_address || r.vicinity;
+              return (
+                <div className="rounded-xl border border-green-500/30 bg-green-500/5 overflow-hidden">
+                  {/* صور النشاط */}
+                  {photos && photos.length > 0 && (
+                    <div className="flex gap-1 overflow-x-auto p-2 bg-black/20">
+                      {photos.slice(0, 4).map((photo: any, idx: number) => (
+                        <div key={idx} className="shrink-0 w-20 h-16 rounded-lg overflow-hidden bg-muted">
+                          <img
+                            src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=160&photo_reference=${photo.photo_reference}&key=placeholder`}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="p-3 space-y-2">
+                    {/* التقييم وحالة الفتح */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      {rating && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} />
+                            ))}
+                          </div>
+                          <span className="text-sm font-bold text-yellow-400">{rating}</span>
+                          {totalRatings && <span className="text-xs text-muted-foreground">({totalRatings.toLocaleString()} تقييم)</span>}
+                        </div>
+                      )}
+                      {openNow !== undefined && (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${openNow ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {openNow ? '● مفتوح الآن' : '● مغلق الآن'}
+                        </span>
+                      )}
+                    </div>
+                    {/* العنوان */}
+                    {address && (
+                      <p className="text-xs text-muted-foreground flex items-start gap-1">
+                        <MapPin className="w-3 h-3 shrink-0 mt-0.5 text-green-400" />
+                        {address}
+                      </p>
+                    )}
+                    {/* ساعات العمل */}
+                    {weekdayText && weekdayText.length > 0 && (
+                      <details className="group">
+                        <summary className="text-xs text-blue-400 cursor-pointer flex items-center gap-1 list-none">
+                          <Clock className="w-3 h-3" />
+                          ساعات العمل
+                          <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="mt-1.5 space-y-0.5 pr-4">
+                          {weekdayText.map((day: string, i: number) => (
+                            <p key={i} className="text-xs text-muted-foreground">{day}</p>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    {/* رابط Google Maps */}
+                    {mapsUrl && (
+                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+                        <ExternalLink className="w-3 h-3" />
+                        فتح في Google Maps
+                      </a>
+                    )}
+                    {placeDetailsQuery.isFetching && (
+                      <div className="flex items-center gap-1.5 text-xs text-blue-400">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        جاري جلب التفاصيل الكاملة...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div>
               <Label className="text-xs mb-1 block">اسم النشاط التجاري <span className="text-red-400">*</span></Label>
               <Input

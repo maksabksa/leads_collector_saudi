@@ -109,7 +109,31 @@ export default function UnifiedInbox() {
     unreadOnly: filterUnread,
     search: searchQuery || undefined,
     limit: 100,
+  }, {
+    // polling كل 8 ثوانٍ للإشعارات الفورية
+    refetchInterval: 8000,
+    refetchIntervalInBackground: false,
   });
+
+  // إشعار المتصفح عند وصول رسائل جديدة
+  const prevUnreadRef = useRef<number>(0);
+  useEffect(() => {
+    const currentUnread = (inboxData?.conversations as Conversation[] || []).reduce(
+      (sum, c) => sum + (c.unreadCount ?? 0), 0
+    );
+    if (currentUnread > prevUnreadRef.current && prevUnreadRef.current > 0) {
+      const diff = currentUnread - prevUnreadRef.current;
+      toast.info(`${diff} رسالة جديدة`, {
+        description: "لديك رسائل غير مقروءة في صندوق الوارد",
+        duration: 4000,
+      });
+      // إشعار المتصفح إذا كانت الصفحة في الخلفية
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('رسائل جديدة', { body: `${diff} رسالة جديدة في صندوق الوارد` });
+      }
+    }
+    prevUnreadRef.current = currentUnread;
+  }, [inboxData]);
 
   const { data: messages, refetch: refetchMessages } = trpc.inbox.conversations.getMessages.useQuery(
     {
@@ -473,37 +497,153 @@ export default function UnifiedInbox() {
             </div>
           </div>
         ) : (
-          /* حالة عدم اختيار محادثة */
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4">
-            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
-              <MessageSquare className="w-10 h-10 opacity-40" />
-            </div>
-            <div className="text-center">
-              <h3 className="font-medium text-foreground mb-1">صندوق الوارد الموحد</h3>
-              <p className="text-sm max-w-xs">
-                اختر محادثة من القائمة للرد عليها، أو اربط حساباتك الاجتماعية لبدء استقبال الرسائل
-              </p>
-            </div>
-            <div className="flex gap-3">
-              {/* إحصائيات سريعة */}
-              {[
-                { label: "واتساب", icon: <WhatsAppIcon className="w-4 h-4" />, color: "text-green-600" },
-                { label: "إنستجرام", icon: <Instagram className="w-4 h-4" />, color: "text-pink-600" },
-                { label: "تيك توك", icon: <TikTokIcon className="w-4 h-4" />, color: "text-gray-700" },
-                { label: "سناب شات", icon: <SnapchatIcon className="w-4 h-4" />, color: "text-yellow-600" },
-              ].map(p => (
-                <div key={p.label} className={`flex items-center gap-1.5 text-sm ${p.color}`}>
-                  {p.icon}
-                  <span>{p.label}</span>
+          /* حالة عدم اختيار محادثة - دليل الإعداد */
+          <div className="flex-1 overflow-y-auto p-6" dir="rtl">
+            <div className="max-w-2xl mx-auto space-y-6">
+              {/* العنوان */}
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <MessageSquare className="w-8 h-8 text-primary" />
                 </div>
-              ))}
+                <h2 className="text-xl font-bold text-foreground">صندوق الوارد الموحد</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  اربط حساباتك لاستقبال رسائل جميع المنصات في مكان واحد والرد عليها مباشرة
+                </p>
+              </div>
+
+              {/* بطاقات المنصات */}
+              <div className="grid grid-cols-1 gap-3">
+                {/* واتساب */}
+                <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                        <WhatsAppIcon className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">واتساب</h3>
+                        <p className="text-xs text-muted-foreground">ربط عبر QR Code - يعمل الآن</p>
+                      </div>
+                    </div>
+                    <Link href="/whatsapp-accounts">
+                      <Button size="sm" variant="outline" className="text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 gap-1">
+                        <Link2 className="w-3 h-3" />
+                        إعداد الحسابات
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                    <p>✓ استقبال وإرسال الرسائل مباشرة</p>
+                    <p>✓ رد تلقائي بالذكاء الاصطناعي</p>
+                    <p>✓ إرسال جماعي للعملاء</p>
+                  </div>
+                </div>
+
+                {/* إنستجرام */}
+                <div className="rounded-xl border border-pink-500/30 bg-pink-500/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center">
+                        <Instagram className="w-5 h-5 text-pink-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">إنستجرام</h3>
+                        <p className="text-xs text-muted-foreground">ربط عبر Facebook OAuth - يتطلب Business Account</p>
+                      </div>
+                    </div>
+                    <Link href="/settings">
+                      <Button size="sm" variant="outline" className="text-xs border-pink-500/50 text-pink-600 hover:bg-pink-500/10 gap-1">
+                        <Link2 className="w-3 h-3" />
+                        ربط الحساب
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                    <p>✓ استقبال رسائل Direct من المتابعين</p>
+                    <p>✓ الرد على التعليقات والرسائل</p>
+                    <p className="text-amber-600">⚠ يتطلب: حساب Business + Meta App مُعتمد</p>
+                  </div>
+                  <div className="mt-2 p-2 rounded-lg bg-pink-500/10 text-xs">
+                    <p className="font-medium text-pink-600 mb-1">خطوات الإعداد:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                      <li>اذهب إلى الإعدادات ← تبويب إنستجرام</li>
+                      <li>اضغط "تسجيل الدخول بإنستجرام" أو أدخل Access Token يدوياً</li>
+                      <li>ستظهر رسائل Direct هنا تلقائياً</li>
+                    </ol>
+                  </div>
+                </div>
+
+                {/* تيك توك */}
+                <div className="rounded-xl border border-gray-500/30 bg-gray-500/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-500/20 flex items-center justify-center">
+                        <TikTokIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">تيك توك</h3>
+                        <p className="text-xs text-muted-foreground">ربط عبر TikTok OAuth - يتطلب Business Account</p>
+                      </div>
+                    </div>
+                    <Link href="/social-accounts">
+                      <Button size="sm" variant="outline" className="text-xs gap-1">
+                        <Link2 className="w-3 h-3" />
+                        ربط الحساب
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                    <p>✓ استقبال تعليقات الفيديوهات</p>
+                    <p>✓ متابعة الإشارات والردود</p>
+                    <p className="text-amber-600">⚠ الرسائل الخاصة تُفتح في تطبيق TikTok مباشرة</p>
+                  </div>
+                </div>
+
+                {/* سناب شات */}
+                <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                        <SnapchatIcon className="w-5 h-5 text-yellow-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">سناب شات</h3>
+                        <p className="text-xs text-muted-foreground">ربط عبر Snapchat OAuth - يتطلب Business Account</p>
+                      </div>
+                    </div>
+                    <Link href="/social-accounts">
+                      <Button size="sm" variant="outline" className="text-xs border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10 gap-1">
+                        <Link2 className="w-3 h-3" />
+                        ربط الحساب
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                    <p>✓ استقبال رسائل Snapchat Business</p>
+                    <p>✓ متابعة التفاعل مع الإعلانات</p>
+                    <p className="text-amber-600">⚠ الرسائل الخاصة تُفتح في تطبيق Snapchat مباشرة</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* إحصائيات */}
+              {stats && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border p-3 text-center">
+                    <p className="text-2xl font-bold text-foreground">{stats.totalConversations ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">إجمالي المحادثات</p>
+                  </div>
+                  <div className="rounded-xl border p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-500">{stats.unreadConversations ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">غير مقروءة</p>
+                  </div>
+                  <div className="rounded-xl border p-3 text-center">
+                    <p className="text-2xl font-bold text-green-500">{stats.openConversations ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">محادثات مفتوحة</p>
+                  </div>
+                </div>
+              )}
             </div>
-            <Link href="/social-accounts">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Link2 className="w-4 h-4" />
-                ربط الحسابات
-              </Button>
-            </Link>
           </div>
         )}
       </div>
