@@ -48,8 +48,16 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminGuard from "./components/AdminGuard";
 function Router() {
   return (
-    <Layout>
-      <Switch>
+    <Switch>
+      {/* الصفحات العامة - خارج Layout لا تحتاج مصادقة */}
+      <Route path="/staff-login" component={StaffLogin} />
+      <Route path="/accept-invitation" component={AcceptInvitation} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
+      {/* الصفحات المحمية - داخل Layout */}
+      <Route>{() => (
+        <Layout>
+          <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/zones" component={Zones} />
         <Route path="/leads" component={Leads} />
@@ -86,14 +94,12 @@ function Router() {
         <Route path="/messages" component={MessagesHub} />
         <Route path="/social-accounts">{() => <AdminGuard><SocialAccounts /></AdminGuard>}</Route>
         <Route path="/unified-inbox" component={UnifiedInbox} />
-        <Route path="/staff-login" component={StaffLogin} />
-        <Route path="/accept-invitation" component={AcceptInvitation} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password" component={ResetPassword} />
-        <Route path="/404" component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+          <Route path="/404" component={NotFound} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+      )}</Route>
+    </Switch>
   );
 }
 

@@ -892,3 +892,12 @@
 - [x] إنشاء مكوّن AdminGuard لحماية صفحات الإدارة
 - [x] تطبيق AdminGuard على: /users, /ai-settings, /data-settings, /whatsapp-accounts, /social-accounts
 - [x] 140 اختبار Vitest تمر بنجاح (20 اختبار جديد)
+
+## الدفعة 61 - إصلاح نظام الدعوات
+
+- [x] تشخيص سبب فشل إرسال الإيميل (SMTP_USER وSMTP_PASS كانت قيماً خاطئة)
+- [x] إصلاح App Password لـ Gmail (hcfadlukdsvweiqo)
+- [x] التحقق من نجاح الاتصال بـ Gmail SMTP
+- [x] اختبار إرسال إيميل حقيقي بنجاح
+- [x] فصل صفحات accept-invitation وforgot-password وreset-password عن Layout (خارج نظام المصادقة)
+- [x] 140 اختبار تمر بنجاح
