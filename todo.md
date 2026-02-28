@@ -901,3 +901,10 @@
 - [x] اختبار إرسال إيميل حقيقي بنجاح
 - [x] فصل صفحات accept-invitation وforgot-password وreset-password عن Layout (خارج نظام المصادقة)
 - [x] 140 اختبار تمر بنجاح
+
+## الدفعة 62 - إصلاح رابط الدعوة في الإيميل
+
+- [x] تشخيص سبب خطأ Gmail عند فتح رابط الدعوة (كان يستخدم sandbox URL)
+- [x] إصلاح رابط الدعوة ليستخدم الدومين الصحيح maksab-sales.xyz عبر VITE_APP_URL
+- [x] إصلاح ForgotPassword لاستخدام VITE_APP_URL أيضاً
+- [x] التحقق من أن صفحة accept-invitation تعمل بدون مصادقة (خارج Layout)

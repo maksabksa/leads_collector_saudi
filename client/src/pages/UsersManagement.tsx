@@ -99,7 +99,7 @@ export default function UsersManagement() {
       email: inviteEmail,
       role: inviteRole,
       permissions: invitePermissions,
-      origin: window.location.origin,
+      origin: import.meta.env.VITE_APP_URL || window.location.origin,
     });
   };
 
@@ -316,7 +316,7 @@ export default function UsersManagement() {
             <div className="space-y-3">
               {invitations?.map((inv) => {
                 const statusConfig = STATUS_CONFIG[inv.status] || STATUS_CONFIG.pending;
-                const inviteUrl = `${window.location.origin}/join?token=${inv.token}`;
+                const inviteUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/accept-invitation?token=${inv.token}`;
                 return (
                   <Card key={inv.id} className="border-border/50">
                     <CardContent className="p-4">
