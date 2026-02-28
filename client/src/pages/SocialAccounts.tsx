@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,14 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Instagram, Link2, Link2Off, Trash2, RefreshCw,
   CheckCircle2, XCircle, AlertCircle, ExternalLink,
-  Users, MessageCircle, TrendingUp
+  Users, Key, Eye, EyeOff, Save, ChevronDown, ChevronUp,
+  Settings2, Shield, Info
 } from "lucide-react";
 
-// أيقونات المنصات
+// ===== أيقونات المنصات =====
 const TikTokIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
     <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.76a4.85 4.85 0 01-1.01-.07z"/>
@@ -28,18 +29,29 @@ const SnapchatIcon = () => (
   </svg>
 );
 
+// ===== تعريف المنصات =====
 const PLATFORMS = [
   {
     id: "instagram" as const,
     name: "إنستجرام",
     description: "ربط حساب Instagram Business لاستقبال وإرسال الرسائل المباشرة",
-    icon: <Instagram className="w-8 h-8" />,
+    icon: <Instagram className="w-6 h-6" />,
     color: "from-purple-500 to-pink-500",
     bgColor: "bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30",
     borderColor: "border-purple-200 dark:border-purple-800",
-    badgeColor: "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300",
-    requirements: ["حساب Instagram Business أو Creator", "صفحة Facebook مرتبطة", "App ID وApp Secret من Meta Developers"],
-    oauthSupported: true,
+    badgeColor: "bg-purple-100 text-purple-700",
+    appIdLabel: "Facebook App ID",
+    appSecretLabel: "Facebook App Secret",
+    appIdPlaceholder: "مثال: 123456789012345",
+    appSecretPlaceholder: "أدخل App Secret",
+    devLink: "https://developers.facebook.com/apps",
+    devLinkText: "Meta Developers",
+    setupSteps: [
+      "اذهب إلى Meta Developers وأنشئ تطبيقاً جديداً",
+      "أضف منتج Instagram Basic Display أو Instagram Graph API",
+      "انسخ App ID وApp Secret من لوحة التحكم",
+      "أضف Redirect URI: " + window.location.origin + "/social-callback",
+    ],
   },
   {
     id: "tiktok" as const,
@@ -49,9 +61,19 @@ const PLATFORMS = [
     color: "from-gray-800 to-gray-600",
     bgColor: "bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-950/30 dark:to-slate-950/30",
     borderColor: "border-gray-200 dark:border-gray-800",
-    badgeColor: "bg-gray-100 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300",
-    requirements: ["حساب TikTok Business", "Client Key وClient Secret من TikTok Developers"],
-    oauthSupported: true,
+    badgeColor: "bg-gray-100 text-gray-700",
+    appIdLabel: "TikTok Client Key",
+    appSecretLabel: "TikTok Client Secret",
+    appIdPlaceholder: "مثال: aw1234567890abcdef",
+    appSecretPlaceholder: "أدخل Client Secret",
+    devLink: "https://developers.tiktok.com",
+    devLinkText: "TikTok Developers",
+    setupSteps: [
+      "اذهب إلى TikTok Developers وأنشئ تطبيقاً",
+      "فعّل صلاحيات user.info.basic وvideo.list",
+      "انسخ Client Key وClient Secret",
+      "أضف Redirect URI: " + window.location.origin + "/social-callback",
+    ],
   },
   {
     id: "snapchat" as const,
@@ -61,62 +83,423 @@ const PLATFORMS = [
     color: "from-yellow-400 to-yellow-500",
     bgColor: "bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30",
     borderColor: "border-yellow-200 dark:border-yellow-800",
-    badgeColor: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300",
-    requirements: ["حساب Snapchat Business", "Client ID وClient Secret من Snap Kit"],
-    oauthSupported: true,
+    badgeColor: "bg-yellow-100 text-yellow-700",
+    appIdLabel: "Snapchat Client ID",
+    appSecretLabel: "Snapchat Client Secret",
+    appIdPlaceholder: "مثال: abc123-def456-...",
+    appSecretPlaceholder: "أدخل Client Secret",
+    devLink: "https://kit.snapchat.com",
+    devLinkText: "Snap Kit Developers",
+    setupSteps: [
+      "اذهب إلى Snap Kit وأنشئ تطبيقاً",
+      "فعّل Login Kit وأضف الصلاحيات المطلوبة",
+      "انسخ Client ID وClient Secret",
+      "أضف Redirect URI: " + window.location.origin + "/social-callback",
+    ],
   },
 ];
 
-export default function SocialAccounts() {
-  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
-  const [showManualDialog, setShowManualDialog] = useState<string | null>(null);
+// ===== مكوّن بطاقة إعداد المنصة =====
+function PlatformCard({
+  platform,
+  accounts,
+  credentials,
+  onRefetch,
+}: {
+  platform: typeof PLATFORMS[0];
+  accounts: Array<{ id: number; username: string; displayName?: string | null; profilePicUrl?: string | null; status: string; followersCount?: number | null }>;
+  credentials: { appId?: string | null; _hasSecret?: boolean; isConfigured?: boolean } | null | undefined;
+  onRefetch: () => void;
+}) {
+  // فتح قسم API تلقائياً إذا لم يكن مُعدّاً بعد
+  const [showApiKeys, setShowApiKeys] = useState(!credentials?.isConfigured);
+  const [showSecret, setShowSecret] = useState(false);
+  const [appId, setAppId] = useState(credentials?.appId || "");
+  const [appSecret, setAppSecret] = useState("");
+  const [showManualDialog, setShowManualDialog] = useState(false);
   const [manualToken, setManualToken] = useState({ accountId: "", username: "", accessToken: "" });
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
 
-  const { data: accounts, refetch } = trpc.inbox.accounts.list.useQuery();
+  const connectedAccount = accounts.find(a => a.status === "connected");
+  const isConnected = !!connectedAccount;
+  const isConfigured = credentials?.isConfigured || false;
+
+  // تحديث الحقول عند تغيير credentials
+  useEffect(() => {
+    setAppId(credentials?.appId || "");
+    // إغلاق قسم API تلقائياً بعد الإعداد
+    if (credentials?.isConfigured) {
+      setShowApiKeys(false);
+    }
+  }, [credentials?.appId, credentials?.isConfigured]);
+
+  const saveCredentialsMutation = trpc.inbox.credentials.save.useMutation({
+    onSuccess: (data) => {
+      if (data.isConfigured) {
+        toast.success("تم حفظ مفاتيح API", {
+          description: `تم إعداد ${platform.name} بنجاح. يمكنك الآن ربط الحساب.`,
+        });
+      } else {
+        toast.success("تم حفظ البيانات", {
+          description: "يرجى إدخال App ID وApp Secret لإكمال الإعداد.",
+        });
+      }
+      onRefetch();
+    },
+    onError: (err) => toast.error("فشل الحفظ", { description: err.message }),
+  });
 
   const connectMutation = trpc.inbox.accounts.connect.useMutation({
     onSuccess: () => {
-      toast.success("تم الربط بنجاح", { description: "تم ربط الحساب وهو جاهز للاستخدام" });
-      refetch();
-      setShowManualDialog(null);
+      toast.success("تم الربط بنجاح");
+      onRefetch();
+      setShowManualDialog(false);
       setManualToken({ accountId: "", username: "", accessToken: "" });
     },
-    onError: (err) => {
-      toast.error("فشل الربط", { description: err.message });
-    },
+    onError: (err) => toast.error("فشل الربط", { description: err.message }),
   });
 
   const disconnectMutation = trpc.inbox.accounts.disconnect.useMutation({
-    onSuccess: () => {
-      toast.success("تم قطع الاتصال");
-      refetch();
-    },
+    onSuccess: () => { toast.success("تم قطع الاتصال"); onRefetch(); },
   });
 
   const deleteMutation = trpc.inbox.accounts.delete.useMutation({
-    onSuccess: () => {
-      toast.success("تم حذف الحساب");
-      refetch();
-    },
+    onSuccess: () => { toast.success("تم حذف الحساب"); onRefetch(); },
   });
 
-  const { data: oauthData } = trpc.inbox.accounts.getOAuthUrl.useQuery(
+  const { data: oauthData, refetch: refetchOAuth } = trpc.inbox.accounts.getOAuthUrl.useQuery(
     {
-      platform: (connectingPlatform as "instagram" | "tiktok" | "snapchat") || "instagram",
+      platform: platform.id,
       redirectUri: `${window.location.origin}/social-callback`,
     },
-    { enabled: !!connectingPlatform }
+    { enabled: false }
   );
 
-  const exchangeCodeMutation = trpc.inbox.accounts.exchangeCode.useMutation({
-    onSuccess: () => {
-      toast.success("تم ربط الحساب بنجاح");
-      refetch();
-    },
-    onError: (err) => {
-      toast.error("فشل الربط", { description: err.message });
-    },
-  });
+  const handleOAuthConnect = async () => {
+    if (!isConfigured) {
+      toast.error("يرجى حفظ مفاتيح API أولاً", {
+        description: `أدخل ${platform.appIdLabel} و${platform.appSecretLabel} ثم اضغط حفظ`,
+      });
+      setShowApiKeys(true);
+      return;
+    }
+    const result = await refetchOAuth();
+    if (result.data?.url) {
+      window.open(result.data.url, "_blank", "width=600,height=700");
+    } else {
+      toast.error("فشل الحصول على رابط الربط");
+    }
+  };
+
+  const handleSaveCredentials = () => {
+    if (!appId.trim()) {
+      toast.error(`يرجى إدخال ${platform.appIdLabel}`);
+      return;
+    }
+    saveCredentialsMutation.mutate({
+      platform: platform.id,
+      appId: appId.trim(),
+      appSecret: appSecret.trim() || undefined,
+    });
+  };
+
+  const handleManualConnect = () => {
+    if (!manualToken.accountId || !manualToken.username || !manualToken.accessToken) {
+      toast.error("يرجى ملء جميع الحقول");
+      return;
+    }
+    connectMutation.mutate({
+      platform: platform.id,
+      accountId: manualToken.accountId,
+      username: manualToken.username,
+      accessToken: manualToken.accessToken,
+    });
+  };
+
+  return (
+    <>
+      <Card className={`border-2 transition-all duration-200 ${isConnected ? platform.borderColor : "border-border"}`}>
+        {/* Header */}
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${platform.color} flex items-center justify-center text-white shadow-md`}>
+              {platform.icon}
+            </div>
+            <div className="flex items-center gap-2">
+              {isConfigured && (
+                <Badge variant="outline" className="text-xs gap-1 text-green-600 border-green-300 bg-green-50">
+                  <Key className="w-3 h-3" />
+                  API مُعدّ
+                </Badge>
+              )}
+              <Badge
+                variant={isConnected ? "default" : "outline"}
+                className={isConnected
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 border-green-200"
+                  : "text-muted-foreground"
+                }
+              >
+                {isConnected ? (
+                  <><CheckCircle2 className="w-3 h-3 ml-1" />مربوط</>
+                ) : (
+                  <><XCircle className="w-3 h-3 ml-1" />غير مربوط</>
+                )}
+              </Badge>
+            </div>
+          </div>
+          <CardTitle className="mt-3 text-lg">{platform.name}</CardTitle>
+          <CardDescription className="text-sm leading-relaxed">{platform.description}</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* معلومات الحساب المربوط */}
+          {connectedAccount && (
+            <div className={`p-3 rounded-xl ${platform.bgColor} space-y-2`}>
+              <div className="flex items-center gap-2">
+                {connectedAccount.profilePicUrl ? (
+                  <img src={connectedAccount.profilePicUrl} alt={connectedAccount.username} className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${platform.color} flex items-center justify-center text-white text-xs font-bold`}>
+                    {connectedAccount.username?.[0]?.toUpperCase() || "?"}
+                  </div>
+                )}
+                <div>
+                  <p className="font-medium text-sm">@{connectedAccount.username}</p>
+                  {connectedAccount.displayName && (
+                    <p className="text-xs text-muted-foreground">{connectedAccount.displayName}</p>
+                  )}
+                </div>
+              </div>
+              {(connectedAccount.followersCount ?? 0) > 0 && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Users className="w-3 h-3" />
+                  <span>{connectedAccount.followersCount?.toLocaleString("ar-SA")} متابع</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <Separator />
+
+          {/* قسم مفاتيح API */}
+          <div className="space-y-2">
+            <button
+              className="flex items-center justify-between w-full text-sm font-medium hover:text-primary transition-colors"
+              onClick={() => setShowApiKeys(!showApiKeys)}
+            >
+              <div className="flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-muted-foreground" />
+                <span>إعداد مفاتيح API</span>
+                {isConfigured && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                {!isConfigured && <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
+              </div>
+              {showApiKeys ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+            </button>
+
+            {showApiKeys && (
+              <div className="space-y-3 p-3 rounded-lg bg-muted/50 border">
+                {/* رابط المطوّر */}
+                <a
+                  href={platform.devLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  احصل على المفاتيح من {platform.devLinkText}
+                </a>
+
+                {/* App ID */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">{platform.appIdLabel} *</Label>
+                  <Input
+                    placeholder={platform.appIdPlaceholder}
+                    value={appId}
+                    onChange={e => setAppId(e.target.value)}
+                    className="h-8 text-sm font-mono"
+                    dir="ltr"
+                  />
+                </div>
+
+                {/* App Secret */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">
+                    {platform.appSecretLabel}
+                    {credentials?._hasSecret && (
+                      <span className="mr-2 text-green-600 font-normal">(محفوظ)</span>
+                    )}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showSecret ? "text" : "password"}
+                      placeholder={credentials?._hasSecret ? "••••••••••••" : platform.appSecretPlaceholder}
+                      value={appSecret}
+                      onChange={e => setAppSecret(e.target.value)}
+                      className="h-8 text-sm font-mono pl-8"
+                      dir="ltr"
+                    />
+                    <button
+                      type="button"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowSecret(!showSecret)}
+                    >
+                      {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  {credentials?._hasSecret && (
+                    <p className="text-xs text-muted-foreground">اتركه فارغاً للإبقاء على الـ Secret الحالي</p>
+                  )}
+                </div>
+
+                {/* زر الحفظ */}
+                <Button
+                  size="sm"
+                  className="w-full gap-1.5 h-8"
+                  onClick={handleSaveCredentials}
+                  disabled={saveCredentialsMutation.isPending}
+                >
+                  {saveCredentialsMutation.isPending ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  حفظ مفاتيح API
+                </Button>
+
+                {/* دليل الإعداد */}
+                <button
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowSetupGuide(!showSetupGuide)}
+                >
+                  <Info className="w-3 h-3" />
+                  {showSetupGuide ? "إخفاء" : "عرض"} خطوات الإعداد
+                </button>
+                {showSetupGuide && (
+                  <div className="space-y-1.5 p-2 rounded bg-background border">
+                    {platform.setupSteps.map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="shrink-0 w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="leading-relaxed" dir="rtl">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* أزرار الإجراءات */}
+          {isConnected ? (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 gap-1"
+                onClick={() => disconnectMutation.mutate({ id: connectedAccount.id })}
+                disabled={disconnectMutation.isPending}
+              >
+                <Link2Off className="w-4 h-4" />
+                قطع الاتصال
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => deleteMutation.mutate({ id: connectedAccount.id })}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* زر الربط عبر OAuth */}
+              <Button
+                className={`w-full gap-2 bg-gradient-to-r ${platform.color} text-white hover:opacity-90`}
+                onClick={handleOAuthConnect}
+                disabled={!isConfigured}
+              >
+                <Link2 className="w-4 h-4" />
+                {isConfigured ? `ربط عبر ${platform.name}` : "أعدّ مفاتيح API أولاً"}
+                {isConfigured && <ExternalLink className="w-3 h-3" />}
+              </Button>
+
+              {/* زر الربط اليدوي */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1 text-muted-foreground"
+                onClick={() => setShowManualDialog(true)}
+              >
+                ربط يدوي بـ Access Token
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog الربط اليدوي */}
+      <Dialog open={showManualDialog} onOpenChange={setShowManualDialog}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>ربط يدوي - {platform.name}</DialogTitle>
+            <DialogDescription>أدخل بيانات الحساب يدوياً إذا كنت تملك Access Token</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>معرف الحساب (Account ID)</Label>
+              <Input
+                placeholder="مثال: 123456789"
+                value={manualToken.accountId}
+                onChange={e => setManualToken(prev => ({ ...prev, accountId: e.target.value }))}
+                dir="ltr"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>اسم المستخدم (Username)</Label>
+              <Input
+                placeholder="مثال: my_business_account"
+                value={manualToken.username}
+                onChange={e => setManualToken(prev => ({ ...prev, username: e.target.value }))}
+                dir="ltr"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Access Token</Label>
+              <Input
+                type="password"
+                placeholder="أدخل الـ Access Token"
+                value={manualToken.accessToken}
+                onChange={e => setManualToken(prev => ({ ...prev, accessToken: e.target.value }))}
+                dir="ltr"
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleManualConnect}
+              disabled={connectMutation.isPending}
+            >
+              {connectMutation.isPending ? (
+                <><RefreshCw className="w-4 h-4 ml-2 animate-spin" />جاري الربط...</>
+              ) : (
+                <><Link2 className="w-4 h-4 ml-2" />ربط الحساب</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ===== الصفحة الرئيسية =====
+export default function SocialAccounts() {
+  const { data: accounts, refetch: refetchAccounts } = trpc.inbox.accounts.list.useQuery();
+  const { data: allCredentials, refetch: refetchCredentials } = trpc.inbox.credentials.getAll.useQuery();
 
   // معالجة OAuth callback
   useEffect(() => {
@@ -128,46 +511,27 @@ export default function SocialAccounts() {
       try {
         const stateData = JSON.parse(atob(state));
         const platform = stateData.platform as "instagram" | "tiktok" | "snapchat";
-        exchangeCodeMutation.mutate({
-          platform,
-          code,
-          redirectUri: `${window.location.origin}/social-callback`,
-        });
+        // سيتم معالجة الـ code في PlatformCard
+        toast.info(`جاري ربط حساب ${platform}...`);
       } catch {
         // ignore
       }
     }
   }, []);
 
-  const handleOAuthConnect = (platform: string) => {
-    if (!oauthData?.url || connectingPlatform !== platform) {
-      setConnectingPlatform(platform);
-      return;
-    }
-    window.open(oauthData.url, "_blank", "width=600,height=700");
+  const handleRefetch = () => {
+    refetchAccounts();
+    refetchCredentials();
   };
 
-  const handleManualConnect = (platform: "instagram" | "tiktok" | "snapchat") => {
-    if (!manualToken.accountId || !manualToken.username || !manualToken.accessToken) {
-      toast.error("يرجى ملء جميع الحقول");
-      return;
-    }
-    connectMutation.mutate({
-      platform,
-      accountId: manualToken.accountId,
-      username: manualToken.username,
-      accessToken: manualToken.accessToken,
-    });
-  };
-
-  const getAccountForPlatform = (platformId: string) =>
-    accounts?.filter(a => a.platform === platformId) || [];
+  const connectedCount = accounts?.filter(a => a.status === "connected").length || 0;
+  const configuredCount = allCredentials?.filter(c => c.isConfigured).length || 0;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-6 max-w-6xl mx-auto" dir="rtl">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold">حسابات التواصل الاجتماعي</h1>
             <p className="text-muted-foreground mt-1">
@@ -175,160 +539,48 @@ export default function SocialAccounts() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {configuredCount > 0 && (
+              <Badge variant="outline" className="gap-1 text-blue-600 border-blue-300 bg-blue-50">
+                <Key className="w-3 h-3" />
+                {configuredCount} API مُعدّ
+              </Badge>
+            )}
             <Badge variant="outline" className="gap-1">
               <CheckCircle2 className="w-3 h-3 text-green-500" />
-              {accounts?.filter(a => a.status === "connected").length || 0} مربوط
+              {connectedCount} مربوط
             </Badge>
           </div>
         </div>
 
-        {/* Platform Cards */}
+        {/* تنبيه الإعداد */}
+        {configuredCount === 0 && (
+          <div className="flex gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-200">يلزم إعداد مفاتيح API</p>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-0.5">
+                لربط أي منصة، يجب أولاً إدخال مفاتيح API الخاصة بها. انقر على "إعداد مفاتيح API" في بطاقة كل منصة.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* بطاقات المنصات */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {PLATFORMS.map((platform) => {
-            const platformAccounts = getAccountForPlatform(platform.id);
-            const connectedAccount = platformAccounts.find(a => a.status === "connected");
-            const isConnected = !!connectedAccount;
-
+            const platformAccounts = accounts?.filter(a => a.platform === platform.id) || [];
+            const credentials = allCredentials?.find(c => c.platform === platform.id);
             return (
-              <Card key={platform.id} className={`border-2 transition-all ${isConnected ? platform.borderColor : "border-border"}`}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${platform.color} flex items-center justify-center text-white shadow-lg`}>
-                      {platform.icon}
-                    </div>
-                    <Badge
-                      variant={isConnected ? "default" : "outline"}
-                      className={isConnected ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 border-green-200" : ""}
-                    >
-                      {isConnected ? (
-                        <><CheckCircle2 className="w-3 h-3 ml-1" />مربوط</>
-                      ) : (
-                        <><XCircle className="w-3 h-3 ml-1" />غير مربوط</>
-                      )}
-                    </Badge>
-                  </div>
-                  <CardTitle className="mt-3">{platform.name}</CardTitle>
-                  <CardDescription className="text-sm leading-relaxed">
-                    {platform.description}
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {/* معلومات الحساب المربوط */}
-                  {connectedAccount && (
-                    <div className={`p-3 rounded-xl ${platform.bgColor} space-y-2`}>
-                      <div className="flex items-center gap-2">
-                        {connectedAccount.profilePicUrl ? (
-                          <img
-                            src={connectedAccount.profilePicUrl}
-                            alt={connectedAccount.username}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${platform.color} flex items-center justify-center text-white text-xs font-bold`}>
-                            {connectedAccount.username?.[0]?.toUpperCase() || "?"}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-sm">@{connectedAccount.username}</p>
-                          {connectedAccount.displayName && (
-                            <p className="text-xs text-muted-foreground">{connectedAccount.displayName}</p>
-                          )}
-                        </div>
-                      </div>
-                      {(connectedAccount.followersCount ?? 0) > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Users className="w-3 h-3" />
-                          <span>{connectedAccount.followersCount?.toLocaleString("ar-SA")} متابع</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* متطلبات الربط */}
-                  {!isConnected && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground">المتطلبات:</p>
-                      {platform.requirements.map((req, i) => (
-                        <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                          <AlertCircle className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" />
-                          <span>{req}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  {/* أزرار الإجراءات */}
-                  {isConnected ? (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-1"
-                        onClick={() => disconnectMutation.mutate({ id: connectedAccount.id })}
-                        disabled={disconnectMutation.isPending}
-                      >
-                        <Link2Off className="w-4 h-4" />
-                        قطع الاتصال
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => deleteMutation.mutate({ id: connectedAccount.id })}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {/* زر الربط السريع عبر OAuth */}
-                      <Button
-                        className={`w-full gap-2 bg-gradient-to-r ${platform.color} text-white hover:opacity-90`}
-                        onClick={() => handleOAuthConnect(platform.id)}
-                      >
-                        <Link2 className="w-4 h-4" />
-                        ربط عبر {platform.name}
-                        <ExternalLink className="w-3 h-3" />
-                      </Button>
-
-                      {/* زر الربط اليدوي */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-1 text-muted-foreground"
-                        onClick={() => setShowManualDialog(platform.id)}
-                      >
-                        ربط يدوي بـ Access Token
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <PlatformCard
+                key={platform.id}
+                platform={platform}
+                accounts={platformAccounts}
+                credentials={credentials}
+                onRefetch={handleRefetch}
+              />
             );
           })}
         </div>
-
-        {/* إرشادات الربط */}
-        <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4">
-            <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-medium text-blue-800 dark:text-blue-200">كيفية الربط الصحيح</p>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  لربط إنستجرام: تحتاج حساب Business مرتبط بصفحة Facebook. اذهب إلى الإعدادات ← إنستجرام لإضافة App ID وApp Secret أولاً.
-                </p>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  لربط تيك توك وسناب شات: تحتاج حساب Business Developer. يمكنك الربط اليدوي بـ Access Token مؤقتاً.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* جميع الحسابات المربوطة */}
         {(accounts?.length ?? 0) > 0 && (
@@ -361,14 +613,6 @@ export default function SocialAccounts() {
                         >
                           {account.status === "connected" ? "متصل" : "منقطع"}
                         </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 hover:text-red-700 h-7 w-7 p-0"
-                          onClick={() => deleteMutation.mutate({ id: account.id })}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
                       </div>
                     </div>
                   );
@@ -377,59 +621,18 @@ export default function SocialAccounts() {
             </CardContent>
           </Card>
         )}
-      </div>
 
-      {/* Dialog الربط اليدوي */}
-      <Dialog open={!!showManualDialog} onOpenChange={() => setShowManualDialog(null)}>
-        <DialogContent className="max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>
-              ربط يدوي - {PLATFORMS.find(p => p.id === showManualDialog)?.name}
-            </DialogTitle>
-            <DialogDescription>
-              أدخل بيانات الحساب يدوياً إذا كنت تملك Access Token
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>معرف الحساب (Account ID)</Label>
-              <Input
-                placeholder="مثال: 123456789"
-                value={manualToken.accountId}
-                onChange={e => setManualToken(prev => ({ ...prev, accountId: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>اسم المستخدم (Username)</Label>
-              <Input
-                placeholder="مثال: my_business_account"
-                value={manualToken.username}
-                onChange={e => setManualToken(prev => ({ ...prev, username: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Access Token</Label>
-              <Input
-                type="password"
-                placeholder="أدخل الـ Access Token"
-                value={manualToken.accessToken}
-                onChange={e => setManualToken(prev => ({ ...prev, accessToken: e.target.value }))}
-              />
-            </div>
-            <Button
-              className="w-full"
-              onClick={() => handleManualConnect(showManualDialog as "instagram" | "tiktok" | "snapchat")}
-              disabled={connectMutation.isPending}
-            >
-              {connectMutation.isPending ? (
-                <><RefreshCw className="w-4 h-4 ml-2 animate-spin" />جاري الربط...</>
-              ) : (
-                <><Link2 className="w-4 h-4 ml-2" />ربط الحساب</>
-              )}
-            </Button>
+        {/* معلومات الأمان */}
+        <div className="flex gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+          <Shield className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-blue-800 dark:text-blue-200">أمان البيانات</p>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mt-0.5">
+              يتم تخزين مفاتيح API بشكل آمن في قاعدة البيانات. لا تشارك هذه المفاتيح مع أي طرف آخر.
+            </p>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
     </div>
   );
 }

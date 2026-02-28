@@ -13,6 +13,7 @@ import {
   socialMessages,
   whatsappChats,
   whatsappChatMessages,
+  platformCredentials,
 } from "../../drizzle/schema";
 import { eq, desc, and, or, like, sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
@@ -814,7 +815,102 @@ export const instagramWebhookHandler = async (body: Record<string, unknown>) => 
   }
 };
 
+// ===== PLATFORM CREDENTIALS MANAGEMENT =====
+const platformCredentialsRouter = router({
+  // جلب مفاتيح API لمنصة معينة
+  get: protectedProcedure
+    .input(z.object({ platform: z.enum(["instagram", "tiktok", "snapchat"]) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const result = await db.select().from(platformCredentials)
+        .where(eq(platformCredentials.platform, input.platform))
+        .limit(1);
+      if (!result[0]) return null;
+      // إخفاء الـ secret جزئياً للأمان
+      const cred = result[0];
+      return {
+        ...cred,
+        appSecret: cred.appSecret ? "***" + cred.appSecret.slice(-4) : null,
+        _hasSecret: !!cred.appSecret,
+      };
+    }),
+
+  // جلب جميع مفاتيح API
+  getAll: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const results = await db.select().from(platformCredentials);
+    return results.map(cred => ({
+      ...cred,
+      appSecret: cred.appSecret ? "***" + cred.appSecret.slice(-4) : null,
+      _hasSecret: !!cred.appSecret,
+    }));
+  }),
+
+  // حفظ مفاتيح API
+  save: protectedProcedure
+    .input(z.object({
+      platform: z.enum(["instagram", "tiktok", "snapchat"]),
+      appId: z.string().optional(),
+      appSecret: z.string().optional(),
+      extraField1: z.string().optional(),
+      extraField2: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const existing = await db.select().from(platformCredentials)
+        .where(eq(platformCredentials.platform, input.platform))
+        .limit(1);
+
+      const isConfigured = !!(input.appId && input.appSecret);
+
+      if (existing.length > 0) {
+        const updateData: Record<string, unknown> = {
+          isConfigured,
+          updatedAt: new Date(),
+        };
+        if (input.appId !== undefined) updateData.appId = input.appId;
+        // فقط تحديث الـ secret إذا لم يكن "***..."
+        if (input.appSecret !== undefined && !input.appSecret.startsWith("***")) {
+          updateData.appSecret = input.appSecret;
+        }
+        if (input.extraField1 !== undefined) updateData.extraField1 = input.extraField1;
+        if (input.extraField2 !== undefined) updateData.extraField2 = input.extraField2;
+
+        await db.update(platformCredentials)
+          .set(updateData)
+          .where(eq(platformCredentials.id, existing[0].id));
+      } else {
+        await db.insert(platformCredentials).values({
+          platform: input.platform,
+          appId: input.appId,
+          appSecret: input.appSecret,
+          extraField1: input.extraField1,
+          extraField2: input.extraField2,
+          isConfigured,
+        });
+      }
+
+      return { success: true, isConfigured };
+    }),
+
+  // حذف مفاتيح API
+  delete: protectedProcedure
+    .input(z.object({ platform: z.enum(["instagram", "tiktok", "snapchat"]) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(platformCredentials)
+        .where(eq(platformCredentials.platform, input.platform));
+      return { success: true };
+    }),
+});
+
 export const unifiedInboxRouter = router({
   accounts: socialAccountsRouter,
   conversations: conversationsRouter,
+  credentials: platformCredentialsRouter,
 });

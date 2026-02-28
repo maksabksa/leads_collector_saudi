@@ -943,3 +943,19 @@ export const socialMessages = mysqlTable("social_messages", {
 });
 export type SocialMessage = typeof socialMessages.$inferSelect;
 export type InsertSocialMessage = typeof socialMessages.$inferInsert;
+
+// ===== PLATFORM CREDENTIALS (مفاتيح API للمنصات الاجتماعية) =====
+// يخزن App ID وApp Secret وClient Key لكل منصة
+export const platformCredentials = mysqlTable("platform_credentials", {
+  id: int("id").autoincrement().primaryKey(),
+  platform: mysqlEnum("platform", ["instagram", "tiktok", "snapchat"]).notNull().unique(),
+  appId: varchar("appId", { length: 300 }),         // Facebook App ID / TikTok Client Key / Snapchat Client ID
+  appSecret: text("appSecret"),                      // App Secret / Client Secret
+  extraField1: varchar("extraField1", { length: 300 }), // حقل إضافي (مثل Redirect URI)
+  extraField2: varchar("extraField2", { length: 300 }), // حقل إضافي
+  isConfigured: boolean("isConfigured").default(false).notNull(), // هل تم الإعداد؟
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PlatformCredentials = typeof platformCredentials.$inferSelect;
+export type InsertPlatformCredentials = typeof platformCredentials.$inferInsert;

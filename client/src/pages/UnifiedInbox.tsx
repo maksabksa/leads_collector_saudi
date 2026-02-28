@@ -549,7 +549,7 @@ export default function UnifiedInbox() {
                         <p className="text-xs text-muted-foreground">ربط عبر Facebook OAuth - يتطلب Business Account</p>
                       </div>
                     </div>
-                    <Link href="/settings">
+                    <Link href="/social-accounts">
                       <Button size="sm" variant="outline" className="text-xs border-pink-500/50 text-pink-600 hover:bg-pink-500/10 gap-1">
                         <Link2 className="w-3 h-3" />
                         ربط الحساب
@@ -564,9 +564,9 @@ export default function UnifiedInbox() {
                   <div className="mt-2 p-2 rounded-lg bg-pink-500/10 text-xs">
                     <p className="font-medium text-pink-600 mb-1">خطوات الإعداد:</p>
                     <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
-                      <li>اذهب إلى الإعدادات ← تبويب إنستجرام</li>
-                      <li>اضغط "تسجيل الدخول بإنستجرام" أو أدخل Access Token يدوياً</li>
-                      <li>ستظهر رسائل Direct هنا تلقائياً</li>
+                      <li>اذهب إلى حسابات التواصل ← إنستجرام</li>
+                      <li>أدخل Facebook App ID وApp Secret ثم احفظ</li>
+                      <li>اضغط "ربط عبر إنستجرام" لتسجيل الدخول</li>
                     </ol>
                   </div>
                 </div>

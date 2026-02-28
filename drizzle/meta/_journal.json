@@ -176,6 +176,13 @@
       "when": 1772292439169,
       "tag": "0024_yellow_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1772305496762,
+      "tag": "0025_serious_switch",
+      "breakpoints": true
     }
   ]
 }
