@@ -829,3 +829,10 @@
 - [x] إحصائيات الصندوق (إجمالي + غير مقروءة + مفتوحة) في شاشة الترحيب
 - [x] 87 اختبار Vitest تمر بنجاح
 - [x] اختبار وحفظ checkpoint
+
+## الدفعة 56 - إصلاح السيدبار المكرر
+- [x] فحص Layout.tsx وDashboardLayout.tsx: 3 صفحات تستخدم DashboardLayout داخل Layout
+- [x] إزالة DashboardLayout من SocialAccounts وUnifiedInbox وMessagesHub
+- [x] إضافة "صندوق الوارد" في القائمة الرئيسية + "حسابات التواصل" في قائمة الإدارة
+- [x] سيدبار واحد فقط في جميع الصفحات
+- [x] اختبار وحفظ checkpoint

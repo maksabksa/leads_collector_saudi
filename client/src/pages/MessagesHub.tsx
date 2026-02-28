@@ -17,7 +17,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
-import DashboardLayout from "@/components/DashboardLayout";
 
 // ===== تبويب واتساب =====
 function WhatsAppTab() {
@@ -549,8 +548,7 @@ export default function MessagesHub() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full">
         {/* رأس الصفحة */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border/50">
           <div>
@@ -599,7 +597,6 @@ export default function MessagesHub() {
           {activeTab === "whatsapp" && <WhatsAppTab />}
           {activeTab === "instagram" && <InstagramTab />}
         </div>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

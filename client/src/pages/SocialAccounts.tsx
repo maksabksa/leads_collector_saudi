@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -164,7 +164,7 @@ export default function SocialAccounts() {
     accounts?.filter(a => a.platform === platformId) || [];
 
   return (
-    <DashboardLayout>
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="p-6 space-y-6" dir="rtl">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -430,6 +430,6 @@ export default function SocialAccounts() {
           </div>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </div>
   );
 }

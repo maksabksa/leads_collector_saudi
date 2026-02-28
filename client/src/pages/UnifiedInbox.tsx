@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -205,8 +204,7 @@ export default function UnifiedInbox() {
   const conversations = inboxData?.conversations as Conversation[] || [];
 
   return (
-    <DashboardLayout>
-      <div className="flex h-[calc(100vh-4rem)] overflow-hidden" dir="rtl">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden" dir="rtl">
         {/* ===== القائمة الجانبية ===== */}
         <div className="w-80 border-l flex flex-col bg-background shrink-0">
           {/* Header */}
@@ -646,7 +644,6 @@ export default function UnifiedInbox() {
             </div>
           </div>
         )}
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

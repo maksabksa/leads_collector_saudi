@@ -20,6 +20,8 @@ import {
   Settings2,
   FileSpreadsheet,
   Upload,
+  Inbox,
+  Share2,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -27,7 +29,8 @@ import { Link, useLocation } from "wouter";
 // القائمة الرئيسية - مرتبة بشكل احترافي
 const navItems = [
   { path: "/", label: "لوحة التحكم", icon: BarChart3, permission: null },
-  { path: "/chats", label: "المحادثات", icon: MessagesSquare, permission: "whatsapp.send" },
+  { path: "/unified-inbox", label: "صندوق الوارد", icon: Inbox, permission: "whatsapp.send" },
+  { path: "/chats", label: "محادثات واتساب", icon: MessagesSquare, permission: "whatsapp.send" },
   { path: "/whatsapp", label: "إرسال واتساب", icon: MessageCircle, permission: "whatsapp.send" },
   { path: "/leads", label: "قائمة العملاء", icon: Users, permission: "leads.view" },
   { path: "/search-hub", label: "مركز البحث", icon: Search, permission: "search.use" },
@@ -41,6 +44,7 @@ const adminNavItems = [
   // إعدادات البيانات تشمل كشف الاهتمام + شرائح العملاء (مدمجة داخل الصفحة)
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
+  { path: "/social-accounts", label: "حسابات التواصل", icon: Share2 },
   // تقرير الإرسال وصحة الأرقام وأداء الموظفين مدمجة داخل صفحة التقارير
 ];
 
