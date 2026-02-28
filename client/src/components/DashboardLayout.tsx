@@ -61,7 +61,9 @@ const menuGroups = [
     group: "مركز الرسائل",
     icon: MessageSquare,
     items: [
-      { icon: MessageSquare, label: "واتساب + إنستجرام", path: "/messages", badge: "unread" },
+      { icon: MessageSquare, label: "صندوق الوارد الموحد", path: "/unified-inbox", badge: "unread" },
+      { icon: Smartphone, label: "حسابات التواصل", path: "/social-accounts", badge: null },
+      { icon: MessageSquare, label: "واتساب + إنستجرام", path: "/messages", badge: null },
       { icon: MessageSquare, label: "محادثات واتساب", path: "/chats", badge: null },
       { icon: Send, label: "إرسال جماعي", path: "/bulk-whatsapp", badge: null },
       { icon: Smartphone, label: "حسابات واتساب", path: "/whatsapp-accounts", badge: null },

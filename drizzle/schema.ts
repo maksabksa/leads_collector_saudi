@@ -862,3 +862,84 @@ export const searchBehaviorPatterns = mysqlTable("search_behavior_patterns", {
 });
 export type SearchBehaviorPattern = typeof searchBehaviorPatterns.$inferSelect;
 export type InsertSearchBehaviorPattern = typeof searchBehaviorPatterns.$inferInsert;
+
+// ===== UNIFIED INBOX - SOCIAL ACCOUNTS (حسابات المنصات الاجتماعية) =====
+// يخزن حسابات إنستجرام وتيك توك وسناب شات المربوطة بالنظام
+export const socialAccounts = mysqlTable("social_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  platform: mysqlEnum("platform", ["instagram", "tiktok", "snapchat"]).notNull(),
+  accountId: varchar("accountId", { length: 200 }).notNull(),       // معرف الحساب في المنصة
+  username: varchar("username", { length: 200 }).notNull(),          // اسم المستخدم
+  displayName: varchar("displayName", { length: 200 }),              // الاسم المعروض
+  profilePicUrl: text("profilePicUrl"),                              // صورة الحساب
+  accessToken: text("accessToken"),                                  // رمز الوصول (مشفر)
+  refreshToken: text("refreshToken"),                                // رمز التجديد
+  tokenExpiresAt: timestamp("tokenExpiresAt"),                       // انتهاء صلاحية التوكن
+  pageId: varchar("pageId", { length: 200 }),                       // معرف الصفحة (إنستجرام Business)
+  webhookVerified: boolean("webhookVerified").default(false).notNull(), // هل الويبهوك مفعّل؟
+  isActive: boolean("isActive").default(true).notNull(),
+  status: mysqlEnum("status", ["connected", "disconnected", "error", "pending"]).default("pending").notNull(),
+  statusMessage: text("statusMessage"),
+  followersCount: int("followersCount").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SocialAccount = typeof socialAccounts.$inferSelect;
+export type InsertSocialAccount = typeof socialAccounts.$inferInsert;
+
+// ===== UNIFIED INBOX - SOCIAL CONVERSATIONS (محادثات المنصات) =====
+// كل محادثة مع مستخدم على أي منصة
+export const socialConversations = mysqlTable("social_conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  socialAccountId: int("socialAccountId").notNull(),                 // الحساب المربوط
+  platform: mysqlEnum("platform", ["instagram", "tiktok", "snapchat", "whatsapp"]).notNull(),
+  externalConversationId: varchar("externalConversationId", { length: 300 }), // معرف المحادثة في المنصة
+  // بيانات المتحدث
+  senderExternalId: varchar("senderExternalId", { length: 200 }),   // معرف المرسل في المنصة
+  senderUsername: varchar("senderUsername", { length: 200 }),        // اسم المستخدم
+  senderDisplayName: varchar("senderDisplayName", { length: 200 }), // الاسم المعروض
+  senderProfilePic: text("senderProfilePic"),                        // صورة المرسل
+  // ربط بالعميل
+  leadId: int("leadId"),                                             // إذا تم ربطه بعميل
+  // حالة المحادثة
+  lastMessageAt: timestamp("lastMessageAt"),
+  lastMessagePreview: varchar("lastMessagePreview", { length: 300 }),
+  unreadCount: int("unreadCount").default(0).notNull(),
+  isRead: boolean("isRead").default(false).notNull(),
+  isArchived: boolean("isArchived").default(false).notNull(),
+  assignedTo: int("assignedTo"),                                     // معرف الموظف المسؤول
+  aiAutoReply: boolean("aiAutoReply").default(false).notNull(),      // هل الرد التلقائي مفعّل؟
+  status: mysqlEnum("status", ["open", "closed", "pending"]).default("open").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SocialConversation = typeof socialConversations.$inferSelect;
+export type InsertSocialConversation = typeof socialConversations.$inferInsert;
+
+// ===== UNIFIED INBOX - SOCIAL MESSAGES (رسائل المنصات) =====
+// كل رسالة في محادثة
+export const socialMessages = mysqlTable("social_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull(),
+  platform: mysqlEnum("platform", ["instagram", "tiktok", "snapchat", "whatsapp"]).notNull(),
+  externalMessageId: varchar("externalMessageId", { length: 300 }), // معرف الرسالة في المنصة
+  direction: mysqlEnum("direction", ["inbound", "outbound"]).notNull(), // وارد أو صادر
+  senderType: mysqlEnum("senderType", ["customer", "agent", "ai"]).default("customer").notNull(),
+  // محتوى الرسالة
+  messageType: mysqlEnum("messageType", ["text", "image", "video", "audio", "story_reply", "reaction", "unsupported"]).default("text").notNull(),
+  content: text("content"),                                          // نص الرسالة
+  mediaUrl: text("mediaUrl"),                                        // رابط الوسائط
+  mediaType: varchar("mediaType", { length: 50 }),                  // نوع الوسائط
+  // حالة الرسالة
+  status: mysqlEnum("status", ["sent", "delivered", "read", "failed", "pending"]).default("sent").notNull(),
+  errorMessage: text("errorMessage"),
+  // توقيت
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+  deliveredAt: timestamp("deliveredAt"),
+  readAt: timestamp("readAt"),
+  // بيانات إضافية
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SocialMessage = typeof socialMessages.$inferSelect;
+export type InsertSocialMessage = typeof socialMessages.$inferInsert;

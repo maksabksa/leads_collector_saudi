@@ -169,6 +169,13 @@
       "when": 1772105657745,
       "tag": "0023_handy_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1772292439169,
+      "tag": "0024_yellow_wild_child",
+      "breakpoints": true
     }
   ]
 }

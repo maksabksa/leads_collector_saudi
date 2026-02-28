@@ -39,7 +39,8 @@ import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import DataQuality from "./pages/DataQuality";
 import MessagesHub from "./pages/MessagesHub";
-
+import SocialAccounts from "./pages/SocialAccounts";
+import UnifiedInbox from "./pages/UnifiedInbox";
 function Router() {
   return (
     <Layout>
@@ -78,6 +79,8 @@ function Router() {
         <Route path="/reports" component={Reports} />
         <Route path="/data-quality" component={DataQuality} />
         <Route path="/messages" component={MessagesHub} />
+        <Route path="/social-accounts" component={SocialAccounts} />
+        <Route path="/unified-inbox" component={UnifiedInbox} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
