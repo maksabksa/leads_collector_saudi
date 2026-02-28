@@ -2303,6 +2303,7 @@ import { reportSchedulerRouter } from "./routers/reportScheduler";
 import { searchBehaviorRouter } from "./routers/searchBehavior";
 import { dataQualityRouter } from "./routers/dataQuality";
 import { unifiedInboxRouter } from "./routers/unifiedInbox";
+import { staffAuthRouter } from "./routers/staffAuth";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2342,5 +2343,6 @@ export const appRouter = router({
   searchBehavior: searchBehaviorRouter,
   dataQuality: dataQualityRouter,
   inbox: unifiedInboxRouter,
+  staffAuth: staffAuthRouter,
 });
 export type AppRouter = typeof appRouter;

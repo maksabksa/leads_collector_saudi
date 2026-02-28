@@ -22,6 +22,10 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   defaultWhatsappAccountId: varchar("defaultWhatsappAccountId", { length: 64 }), // حساب واتساب الافتراضي للموظف
+  passwordHash: varchar("passwordHash", { length: 255 }), // كلمة المرور المشفرة (لتسجيل الدخول المستقل)
+  isActive: boolean("isActive").default(true).notNull(), // تفعيل/تعطيل الحساب
+  displayName: varchar("displayName", { length: 100 }), // الاسم الظاهر
+  department: varchar("department", { length: 100 }), // القسم
 });
 
 export type User = typeof users.$inferSelect;

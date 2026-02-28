@@ -41,6 +41,8 @@ import DataQuality from "./pages/DataQuality";
 import MessagesHub from "./pages/MessagesHub";
 import SocialAccounts from "./pages/SocialAccounts";
 import UnifiedInbox from "./pages/UnifiedInbox";
+import StaffLogin from "./pages/StaffLogin";
+import AcceptInvitation from "./pages/AcceptInvitation";
 function Router() {
   return (
     <Layout>
@@ -81,6 +83,8 @@ function Router() {
         <Route path="/messages" component={MessagesHub} />
         <Route path="/social-accounts" component={SocialAccounts} />
         <Route path="/unified-inbox" component={UnifiedInbox} />
+        <Route path="/staff-login" component={StaffLogin} />
+        <Route path="/accept-invitation" component={AcceptInvitation} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

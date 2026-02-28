@@ -84,26 +84,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center max-w-md mx-auto px-6">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
-            <Zap className="w-8 h-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">منصة تحليل التسويق الرقمي</h1>
-          <p className="text-muted-foreground mb-8 text-sm leading-relaxed">
-            اكتشف الثغرات التسويقية في المواقع الإلكترونية وحسابات السوشيال ميديا للعملاء المحتملين في السعودية
-          </p>
-          <a
-            href={getLoginUrl()}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-          >
-            تسجيل الدخول للمتابعة
-            <ChevronRight className="w-4 h-4" />
-          </a>
-        </div>
-      </div>
-    );
+    // توجيه لصفحة تسجيل الدخول المستقلة
+    const currentPath = window.location.pathname;
+    if (currentPath !== "/staff-login" && currentPath !== "/accept-invitation") {
+      window.location.href = "/staff-login";
+    }
+    return null;
   }
 
   const handleLogout = async () => {

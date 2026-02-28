@@ -856,3 +856,14 @@
 - [x] إصلاح exchangeCode: يقرأ المفاتيح من قاعدة البيانات أولاً للثلاث منصات
 - [x] 100 اختبار Vitest تمر بنجاح
 - [x] اختبار وحفظ checkpoint
+
+## الدفعة 59 - نظام تسجيل دخول مستقل للموظفين
+- [x] إضافة حقل passwordHash وisActive وdisplayName وdepartment لجدول users
+- [x] بناء staffAuth router (تسجيل دخول + قبول دعوة + تغيير كلمة مرور + me + logout)
+- [x] بناء صفحة StaffLogin (إيميل + كلمة مرور بتصميم احترافي)
+- [x] بناء صفحة AcceptInvitation (قبول الدعوة + إنشاء الحساب بكلمة مرور)
+- [x] تحديث useAuth ليقرأ من staffAuth.me أيضاً (بعد Manus OAuth)
+- [x] تحديث Layout ليوجه لصفحة /staff-login بدلاً من Manus OAuth
+- [x] تحديث رابط الدعوة ليوجه لصفحة accept-invitation
+- [x] 115 اختبار Vitest تمر بنجاح (15 جديد)
+- [x] حفظ checkpoint

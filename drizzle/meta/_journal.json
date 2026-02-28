@@ -183,6 +183,13 @@
       "when": 1772305496762,
       "tag": "0025_serious_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1772317894852,
+      "tag": "0026_glorious_whiplash",
+      "breakpoints": true
     }
   ]
 }

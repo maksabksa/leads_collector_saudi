@@ -83,7 +83,7 @@ export const invitationsRouter = router({
         expiresAt,
       });
 
-      const inviteUrl = `${input.origin}/join?token=${token}`;
+      const inviteUrl = `${input.origin}/accept-invitation?token=${token}`;
 
       await notifyOwner({
         title: "دعوة مستخدم جديد",
