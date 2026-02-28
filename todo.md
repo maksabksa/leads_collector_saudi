@@ -849,3 +849,10 @@
 - [x] إصلاح رابط ربط إنستجرام في UnifiedInbox ليوجه لصفحة social-accounts
 - [x] 100 اختبار Vitest تمر بنجاح (13 اختبار جديد لـ socialCredentials)
 - [x] اختبار وحفظ checkpoint
+
+## الدفعة 58 - إصلاح TikTok OAuth (client_key)
+- [x] فحص كود بناء رابط TikTok OAuth: كان يقرأ من process.env فقط
+- [x] إصلاح getOAuthUrl: يقرأ المفاتيح من قاعدة البيانات أولاً للثلاث منصات
+- [x] إصلاح exchangeCode: يقرأ المفاتيح من قاعدة البيانات أولاً للثلاث منصات
+- [x] 100 اختبار Vitest تمر بنجاح
+- [x] اختبار وحفظ checkpoint

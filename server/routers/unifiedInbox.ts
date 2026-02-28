@@ -117,16 +117,26 @@ const socialAccountsRouter = router({
       redirectUri: z.string(),
     }))
     .query(async ({ input }) => {
+      const db = await getDb();
       const state = Buffer.from(JSON.stringify({
         platform: input.platform,
         ts: Date.now(),
       })).toString("base64");
 
+      // جلب المفاتيح من قاعدة البيانات أولاً
+      let dbCreds: { appId: string | null; appSecret: string | null } | null = null;
+      if (db) {
+        const rows = await db.select().from(platformCredentials)
+          .where(eq(platformCredentials.platform, input.platform))
+          .limit(1);
+        if (rows[0]) dbCreds = { appId: rows[0].appId, appSecret: rows[0].appSecret };
+      }
+
       let url = "";
       switch (input.platform) {
         case "instagram": {
-          // Instagram Business عبر Facebook Login
-          const appId = process.env.INSTAGRAM_APP_ID || "";
+          const appId = dbCreds?.appId || process.env.INSTAGRAM_APP_ID || "";
+          if (!appId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "يرجى حفظ Instagram App ID أولاً" });
           const scopes = [
             "instagram_basic",
             "instagram_manage_messages",
@@ -137,15 +147,15 @@ const socialAccountsRouter = router({
           break;
         }
         case "tiktok": {
-          // TikTok OAuth
-          const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
+          const clientKey = dbCreds?.appId || process.env.TIKTOK_CLIENT_KEY || "";
+          if (!clientKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "يرجى حفظ TikTok Client Key أولاً" });
           const scopes = "user.info.basic,video.list";
           url = `https://www.tiktok.com/v2/auth/authorize?client_key=${clientKey}&scope=${scopes}&response_type=code&redirect_uri=${encodeURIComponent(input.redirectUri)}&state=${state}`;
           break;
         }
         case "snapchat": {
-          // Snapchat OAuth
-          const clientId = process.env.SNAPCHAT_CLIENT_ID || "";
+          const clientId = dbCreds?.appId || process.env.SNAPCHAT_CLIENT_ID || "";
+          if (!clientId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "يرجى حفظ Snapchat Client ID أولاً" });
           const scopes = "snapchat-marketing-api";
           url = `https://accounts.snapchat.com/login/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(input.redirectUri)}&response_type=code&scope=${scopes}&state=${state}`;
           break;
@@ -176,14 +186,23 @@ const socialAccountsRouter = router({
         followersCount?: number;
       } | null = null;
 
+      // جلب المفاتيح من قاعدة البيانات أولاً
+      let dbCreds2: { appId: string | null; appSecret: string | null } | null = null;
+      {
+        const rows = await db.select().from(platformCredentials)
+          .where(eq(platformCredentials.platform, input.platform))
+          .limit(1);
+        if (rows[0]) dbCreds2 = { appId: rows[0].appId, appSecret: rows[0].appSecret };
+      }
+
       if (input.platform === "instagram") {
-        const appId = process.env.INSTAGRAM_APP_ID || "";
-        const appSecret = process.env.INSTAGRAM_APP_SECRET || "";
+        const appId = dbCreds2?.appId || process.env.INSTAGRAM_APP_ID || "";
+        const appSecret = dbCreds2?.appSecret || process.env.INSTAGRAM_APP_SECRET || "";
 
         if (!appId || !appSecret) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "يرجى إضافة INSTAGRAM_APP_ID وINSTAGRAM_APP_SECRET في الإعدادات أولاً",
+            message: "يرجى حفظ Instagram App ID وApp Secret في صفحة حسابات التواصل أولاً",
           });
         }
 
@@ -253,13 +272,13 @@ const socialAccountsRouter = router({
           followersCount: igProfile.followers_count,
         };
       } else if (input.platform === "tiktok") {
-        const clientKey = process.env.TIKTOK_CLIENT_KEY || "";
-        const clientSecret = process.env.TIKTOK_CLIENT_SECRET || "";
+        const clientKey = dbCreds2?.appId || process.env.TIKTOK_CLIENT_KEY || "";
+        const clientSecret = dbCreds2?.appSecret || process.env.TIKTOK_CLIENT_SECRET || "";
 
         if (!clientKey || !clientSecret) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "يرجى إضافة TIKTOK_CLIENT_KEY وTIKTOK_CLIENT_SECRET في الإعدادات",
+            message: "يرجى حفظ TikTok Client Key وClient Secret في صفحة حسابات التواصل أولاً",
           });
         }
 
@@ -304,13 +323,13 @@ const socialAccountsRouter = router({
           profilePicUrl: user?.avatar_url,
         };
       } else if (input.platform === "snapchat") {
-        const clientId = process.env.SNAPCHAT_CLIENT_ID || "";
-        const clientSecret = process.env.SNAPCHAT_CLIENT_SECRET || "";
+        const clientId = dbCreds2?.appId || process.env.SNAPCHAT_CLIENT_ID || "";
+        const clientSecret = dbCreds2?.appSecret || process.env.SNAPCHAT_CLIENT_SECRET || "";
 
         if (!clientId || !clientSecret) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "يرجى إضافة SNAPCHAT_CLIENT_ID وSNAPCHAT_CLIENT_SECRET في الإعدادات",
+            message: "يرجى حفظ Snapchat Client ID وClient Secret في صفحة حسابات التواصل أولاً",
           });
         }
 
