@@ -929,8 +929,13 @@ const platformCredentialsRouter = router({
     }),
 });
 
+const oauthRouter = router({
+  exchangeCode: socialAccountsRouter.exchangeCode,
+});
+
 export const unifiedInboxRouter = router({
   accounts: socialAccountsRouter,
   conversations: conversationsRouter,
   credentials: platformCredentialsRouter,
+  oauth: oauthRouter,
 });

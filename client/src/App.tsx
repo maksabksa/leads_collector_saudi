@@ -42,6 +42,7 @@ import MessagesHub from "./pages/MessagesHub";
 import SocialAccounts from "./pages/SocialAccounts";
 import UnifiedInbox from "./pages/UnifiedInbox";
 import StaffLogin from "./pages/StaffLogin";
+import SocialCallback from "./pages/SocialCallback";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/accept-invitation" component={AcceptInvitation} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/social-callback" component={SocialCallback} />
       {/* الصفحات المحمية - داخل Layout */}
       <Route>{() => (
         <Layout>
