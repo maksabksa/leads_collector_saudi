@@ -50,7 +50,7 @@ const PLATFORMS = [
       "اذهب إلى Meta Developers وأنشئ تطبيقاً جديداً",
       "أضف منتج Instagram Basic Display أو Instagram Graph API",
       "انسخ App ID وApp Secret من لوحة التحكم",
-      "أضف Redirect URI: " + window.location.origin + "/social-callback",
+      "أضف Redirect URI: " + (import.meta.env.VITE_APP_URL || window.location.origin) + "/social-callback",
     ],
   },
   {
@@ -72,7 +72,7 @@ const PLATFORMS = [
       "اذهب إلى TikTok Developers وأنشئ تطبيقاً",
       "فعّل صلاحيات user.info.basic وvideo.list",
       "انسخ Client Key وClient Secret",
-      "أضف Redirect URI: " + window.location.origin + "/social-callback",
+      "أضف Redirect URI: " + (import.meta.env.VITE_APP_URL || window.location.origin) + "/social-callback",
     ],
   },
   {
@@ -94,7 +94,7 @@ const PLATFORMS = [
       "اذهب إلى Snap Kit وأنشئ تطبيقاً",
       "فعّل Login Kit وأضف الصلاحيات المطلوبة",
       "انسخ Client ID وClient Secret",
-      "أضف Redirect URI: " + window.location.origin + "/social-callback",
+      "أضف Redirect URI: " + (import.meta.env.VITE_APP_URL || window.location.origin) + "/social-callback",
     ],
   },
 ];
@@ -170,7 +170,7 @@ function PlatformCard({
   const { data: oauthData, refetch: refetchOAuth } = trpc.inbox.accounts.getOAuthUrl.useQuery(
     {
       platform: platform.id,
-      redirectUri: `${window.location.origin}/social-callback`,
+      redirectUri: `${import.meta.env.VITE_APP_URL || window.location.origin}/social-callback`,
     },
     { enabled: false }
   );
