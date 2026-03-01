@@ -141,7 +141,8 @@ const socialAccountsRouter = router({
             "instagram_basic",
             "instagram_manage_messages",
             "pages_show_list",
-            "pages_messaging",
+            "pages_read_engagement",
+            "public_profile",
           ].join(",");
           url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(input.redirectUri)}&scope=${scopes}&state=${state}&response_type=code`;
           break;
