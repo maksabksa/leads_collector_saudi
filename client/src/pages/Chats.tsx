@@ -11,7 +11,7 @@ import {
   Paperclip, FileText, Download, Smile, Mic, MicOff, Sparkles,
   Copy, Plus, Check, Zap, ChevronDown, UserPlus, BarChart2, AlertTriangle, TrendingUp,
   Volume2, VolumeX, Settings, Image, Film, Music, File, ZoomIn, CheckSquare, Square,
-  Tag,
+  Tag, GitFork, CalendarClock,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -191,11 +191,19 @@ function ChatCard({ chat, isActive, onClick, bulkMode, isSelected, onToggleSelec
           </div>
           <div className="flex items-center justify-between gap-1">
             <p className="text-xs text-[#8696a0] truncate flex-1">{chat.lastMessage || "لا توجد رسائل"}</p>
-            {chat.unreadCount > 0 && (
-              <span className="flex-shrink-0 min-w-[20px] h-5 rounded-full bg-[#25D366] text-white text-[10px] font-bold flex items-center justify-center px-1">
-                {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
-              </span>
-            )}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {(chat as any).stage && (chat as any).stage !== "new" && (() => {
+                const stageColors: Record<string,string> = { contacted:"#34B7F1", interested:"#f0a55a", price_offer:"#9B59B6", meeting:"#E67E22", won:"#25D366", lost:"#e74c3c" };
+                const stageLabels: Record<string,string> = { contacted:"تواصل", interested:"مهتم", price_offer:"سعر", meeting:"اجتماع", won:"عميل", lost:"خسرنا" };
+                const s = (chat as any).stage as string;
+                return <span style={{ fontSize:9, background: stageColors[s]+"22", color: stageColors[s], border:`1px solid ${stageColors[s]}44`, borderRadius:8, padding:"1px 5px", fontWeight:600 }}>{stageLabels[s]}</span>;
+              })()}
+              {chat.unreadCount > 0 && (
+                <span className="min-w-[20px] h-5 rounded-full bg-[#25D366] text-white text-[10px] font-bold flex items-center justify-center px-1">
+                  {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -536,6 +544,8 @@ export default function Chats() {
   // ===== حالة Labels =====
   const [showLabelPanel, setShowLabelPanel] = useState(false);
   const [filterLabelId, setFilterLabelId] = useState<number | null>(null);
+  // ===== حالة Stage Filter =====
+  const [filterStage, setFilterStage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -642,6 +652,12 @@ export default function Chats() {
       toast.success(`${vars.enabled ? "تفعيل" : "إيقاف"} AI لـ ${data.updatedCount} محادثة`);
       refetchChats();
     },
+  });
+  // ===== Stage + Follow-up =====
+  const [showStagePanel, setShowStagePanel] = useState(false);
+  const updateChatStage = trpc.waSettings.updateChatStage.useMutation({
+    onSuccess: () => { toast.success("تم تحديث مرحلة العميل"); refetchChats(); },
+    onError: (e) => toast.error("خطأ في التحديث", { description: e.message }),
   });
   // ===== Mutations الأرشفة =====
   const bulkArchive = trpc.waSettings.bulkArchive.useMutation({
@@ -771,10 +787,16 @@ export default function Chats() {
     { enabled: filterLabelId !== null }
   );
   const displayedChats = useMemo(() => {
-    if (!filterLabelId || !labelFilteredChatIds) return filteredChats;
-    const ids = new Set(labelFilteredChatIds);
-    return filteredChats.filter(c => ids.has(c.id));
-  }, [filteredChats, filterLabelId, labelFilteredChatIds]);
+    let list = filteredChats;
+    if (filterLabelId && labelFilteredChatIds) {
+      const ids = new Set(labelFilteredChatIds);
+      list = list.filter(c => ids.has(c.id));
+    }
+    if (filterStage) {
+      list = list.filter(c => (c as any).stage === filterStage);
+    }
+    return list;
+  }, [filteredChats, filterLabelId, labelFilteredChatIds, filterStage]);
 
   // ===== ترتيب وتجميع الرسائل =====
   const sortedMessages = useMemo(() =>
@@ -1113,33 +1135,63 @@ export default function Chats() {
               </button>
             </div>
             {/* فلتر Labels */}
-          {(allLabels as any[]).length > 0 && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-[10px] text-[#8696a0]">فلتر حسب التصنيف:</p>
-                {filterLabelId && (
-                  <button onClick={() => setFilterLabelId(null)} className="text-[10px] text-[#25D366] hover:underline">إلغاء</button>
-                )}
+            {(allLabels as any[]).length > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] text-[#8696a0]">فلتر حسب التصنيف:</p>
+                  {filterLabelId && (
+                    <button onClick={() => setFilterLabelId(null)} className="text-[10px] text-[#25D366] hover:underline">إلغاء</button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(allLabels as any[]).map((label: any) => (
+                    <button
+                      key={label.id}
+                      onClick={() => setFilterLabelId(filterLabelId === label.id ? null : label.id)}
+                      className="text-[11px] px-2 py-0.5 rounded-full border transition-all flex items-center gap-1"
+                      style={filterLabelId === label.id
+                        ? { background: label.color + "33", borderColor: label.color, color: label.color }
+                        : { background: "transparent", borderColor: "rgba(255,255,255,0.15)", color: "#8696a0" }
+                      }
+                    >
+                      <Tag className="w-2.5 h-2.5" />
+                      {label.name}
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
+            {/* فلتر Stage */}
+            <div className="space-y-1">
+              <p className="text-[10px] text-[#8696a0] px-1">فلتر حسب المرحلة:</p>
               <div className="flex flex-wrap gap-1">
-                {(allLabels as any[]).map((label: any) => (
-                  <button
-                    key={label.id}
-                    onClick={() => setFilterLabelId(filterLabelId === label.id ? null : label.id)}
-                    className="text-[11px] px-2 py-0.5 rounded-full border transition-all flex items-center gap-1"
-                    style={filterLabelId === label.id
-                      ? { background: label.color + "33", borderColor: label.color, color: label.color }
-                      : { background: "transparent", borderColor: "rgba(255,255,255,0.15)", color: "#8696a0" }
-                    }
-                  >
-                    <Tag className="w-2.5 h-2.5" />
-                    {label.name}
-                  </button>
-                ))}
+                <button
+                  onClick={() => setFilterStage(null)}
+                  className="text-[11px] px-2 py-0.5 rounded-full border transition-all"
+                  style={!filterStage ? { background: "#25D366", borderColor: "#25D366", color: "white" } : { background: "transparent", borderColor: "rgba(255,255,255,0.15)", color: "#8696a0" }}
+                >الكل</button>
+                {(["new","contacted","interested","price_offer","meeting","won","lost"] as const).map(s => {
+                  const stageColors: Record<string,string> = { new:"#8696a0", contacted:"#34B7F1", interested:"#f0a55a", price_offer:"#9B59B6", meeting:"#E67E22", won:"#25D366", lost:"#e74c3c" };
+                  const stageLabels: Record<string,string> = { new:"جديد", contacted:"تواصل", interested:"مهتم", price_offer:"سعر", meeting:"اجتماع", won:"عميل", lost:"خسرنا" };
+                  const count = (chats as any[]).filter(c => c.stage === s).length;
+                  if (count === 0 && s !== "new") return null;
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setFilterStage(filterStage === s ? null : s)}
+                      className="text-[11px] px-2 py-0.5 rounded-full border transition-all"
+                      style={filterStage === s
+                        ? { background: stageColors[s]+"33", borderColor: stageColors[s], color: stageColors[s] }
+                        : { background: "transparent", borderColor: "rgba(255,255,255,0.15)", color: "#8696a0" }
+                      }
+                    >
+                      {stageLabels[s]} ({count})
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
-          {/* فلتر حساب الواتساب (الرقم المُرسِل) - يظهر دائماً لمعرفة أي رقم يتعامل مع أكثر العملاء */}
+            {/* فلتر حساب الواتساب (الرقم المُرسِل) */}
             {(waAccounts as any[]).length > 0 && (
               <div className="space-y-1">
                 <p className="text-[10px] text-[#8696a0] px-1">فلتر حسب الرقم المُرسِل:</p>
@@ -1288,6 +1340,11 @@ export default function Chats() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10" />
                     <DropdownMenuItem className="text-white hover:bg-white/10 cursor-pointer"
+                      onClick={() => setShowStagePanel(v => !v)}>
+                      <GitFork className="w-4 h-4 ml-2" />
+                      مرحلة العميل
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-white hover:bg-white/10 cursor-pointer"
                       onClick={() => setShowLabelPanel(v => !v)}>
                       <Tag className="w-4 h-4 ml-2" />
                       إدارة التصنيفات
@@ -1336,6 +1393,56 @@ export default function Chats() {
                   {(allLabels as any[]).length === 0 && (
                     <span className="text-[11px] text-[#8696a0]">لا تصنيفات - أضف من صفحة إدارة التصنيفات</span>
                   )}
+                </div>
+              </div>
+            )}
+            {/* ===== Stage Panel ===== */}
+            {showStagePanel && (
+              <div className="flex-shrink-0 px-4 py-3 border-b border-white/10" style={{ background: "#1a2830" }}>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-[#25D366]">مرحلة العميل</span>
+                    <button onClick={() => setShowStagePanel(false)} className="text-[#8696a0] hover:text-white text-xs">×</button>
+                  </div>
+                  {/* Stage buttons */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["new","contacted","interested","price_offer","meeting","won","lost"] as const).map(s => {
+                      const labels: Record<string,string> = { new:"جديد", contacted:"تم التواصل", interested:"مهتم", price_offer:"عرض سعر", meeting:"اجتماع", won:"عميل", lost:"خسرنا" };
+                      const colors: Record<string,string> = { new:"#8696a0", contacted:"#34B7F1", interested:"#f0a55a", price_offer:"#9B59B6", meeting:"#E67E22", won:"#25D366", lost:"#e74c3c" };
+                      const isActive = (selectedChat as any)?.stage === s;
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => updateChatStage.mutate({ chatId: selectedChat!.id, stage: s })}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
+                          style={{
+                            background: isActive ? colors[s] : "rgba(255,255,255,0.05)",
+                            color: isActive ? "#fff" : colors[s],
+                            border: `1px solid ${colors[s]}40`,
+                          }}
+                        >
+                          {labels[s]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Next Step */}
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="الخطوة القادمة..."
+                      defaultValue={(selectedChat as any)?.nextStep || ""}
+                      onBlur={e => { if (e.target.value !== ((selectedChat as any)?.nextStep || "")) updateChatStage.mutate({ chatId: selectedChat!.id, nextStep: e.target.value }); }}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-[#8696a0] focus:outline-none focus:border-[#25D366]/50"
+                    />
+                    <input
+                      type="datetime-local"
+                      defaultValue={(selectedChat as any)?.followUpDate ? new Date((selectedChat as any).followUpDate).toISOString().slice(0,16) : ""}
+                      onChange={e => updateChatStage.mutate({ chatId: selectedChat!.id, followUpDate: e.target.value || null })}
+                      className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#25D366]/50"
+                      title="تاريخ المتابعة"
+                    />
+                  </div>
                 </div>
               </div>
             )}

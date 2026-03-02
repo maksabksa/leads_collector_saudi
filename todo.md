@@ -951,3 +951,24 @@
 - [x] تحسين UsersManagement: تفعيل/تعطيل الحسابات + حد الرسائل اليومية
 - [x] backend: toggleUserActive وsetUserDailyLimit endpoints
 - [x] حفظ checkpoint
+
+## الدفعة 68 - إصلاح خطأ key prop + ميزات جديدة
+- [ ] إصلاح خطأ key prop في Chats.tsx (Labels filter buttons)
+- [ ] إضافة Emoji picker في مربع الكتابة بالشات
+- [ ] إضافة Stage (مرحلة) للعملاء: جديد / مهتم / مفاوضة / مغلق / خسارة
+- [ ] إضافة حقل nextFollowUp (موعد المتابعة القادمة) للعملاء
+- [ ] تنبيه تلقائي عند تأخر المتابعة أو عدم تحديد موعد للعميل المهتم
+- [ ] عرض الرقم المُرسل منه بوضوح داخل كل محادثة
+
+## الدفعة 68 - إصلاح key prop + Stage + FollowUp
+
+- [x] إصلاح خطأ key prop في Chats.tsx (قسم Labels filter)
+- [x] إضافة حقول stage وnextStep وfollowUpDate وownerUserId لجدول whatsapp_chats
+- [x] إضافة endpoint updateChatStage في whatsappSettings router
+- [x] إضافة Stage Panel في رأس المحادثة (اختيار المرحلة + الخطوة القادمة + تاريخ المتابعة)
+- [x] إضافة مؤشر Stage في بطاقة المحادثة (قائمة اليسار)
+- [x] إضافة فلتر Stage في قسم الفلترة (الجانب الأيسر)
+- [x] إنشاء followUp router (getFollowUpNeeded + getFollowUpStats)
+- [x] إنشاء صفحة FollowUp.tsx لعرض العملاء الذين يحتاجون متابعة
+- [x] إضافة قسم "متابعة" في الـ sidebar مع عداد التنبيهات الحمراء
+- [x] إضافة رابط /follow-up في App.tsx

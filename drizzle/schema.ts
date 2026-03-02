@@ -375,6 +375,12 @@ export const whatsappChats = mysqlTable("whatsapp_chats", {
   totalMessages: int("totalMessages").default(0).notNull(), // إجمالي الرسائل
   sentiment: mysqlEnum("sentiment", ["positive", "neutral", "negative", "unknown"]).default("unknown"), // مشاعر العميل
   opportunityMissed: boolean("opportunityMissed").default(false).notNull(), // فرصة ضائعة
+  // ===== نظام Stage + Follow-up =====
+  stage: mysqlEnum("stage", ["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).default("new").notNull(),
+  nextStep: text("nextStep"),                                          // الخطوة القادمة
+  followUpDate: timestamp("followUpDate"),                             // تاريخ المتابعة القادمة
+  ownerUserId: int("ownerUserId"),                                     // المسؤول عن المحادثة
+  ownerUserName: varchar("ownerUserName", { length: 100 }),            // اسم المسؤول
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

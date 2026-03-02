@@ -24,6 +24,8 @@ import {
   Share2,
   Tag,
   ClipboardList,
+  CalendarClock,
+  Bell,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -52,6 +54,12 @@ const adminNavItems = [
   // تقرير الإرسال وصحة الأرقام وأداء الموظفين مدمجة داخل صفحة التقارير
 ];
 
+// قائمة المتابعة - متاحة لكل المستخدمين
+const followUpNavItems = [
+  { path: "/follow-up", label: "المتابعة التلقائية", icon: CalendarClock },
+  { path: "/reminders", label: "التذكيرات", icon: Bell },
+];
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, loading, isAuthenticated } = useAuth();
   const logout = trpc.auth.logout.useMutation();
@@ -69,6 +77,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     refetchInterval: 10000,
   });
   const totalUnread = unreadData?.total ?? 0;
+  // جلب إحصائيات المتابعة
+  const { data: followUpStats } = trpc.followUp.getFollowUpStats.useQuery(undefined, {
+    enabled: isAuthenticated,
+    refetchInterval: 60000,
+  });
+  const totalFollowUp = followUpStats?.total ?? 0;
   // فلترة navItems حسب الصلاحيات
   const visibleNavItems = navItems.filter((item) => {
     if (isAdmin) return true;
@@ -162,6 +176,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       style={{ background: "oklch(0.55 0.22 25)" }}
                     >
                       {totalUnread > 99 ? "99+" : totalUnread}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+          {/* قسم المتابعة */}
+          <div className="px-3 pt-3 pb-1">
+            <p className="text-xs text-muted-foreground/60 font-medium uppercase tracking-wider">متابعة</p>
+          </div>
+          {followUpNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.path;
+            return (
+              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)}>
+                <div
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                    isActive
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  }`}
+                  style={isActive ? {
+                    background: "oklch(0.65 0.18 200 / 0.12)",
+                    border: "1px solid oklch(0.65 0.18 200 / 0.2)",
+                    color: "var(--brand-cyan)",
+                  } : {}}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1">{item.label}</span>
+                  {item.path === "/follow-up" && totalFollowUp > 0 && (
+                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold text-white" style={{ background: "#e74c3c" }}>
+                      {totalFollowUp > 99 ? "99+" : totalFollowUp}
                     </span>
                   )}
                 </div>

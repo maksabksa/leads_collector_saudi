@@ -2307,6 +2307,7 @@ import { staffAuthRouter } from "./routers/staffAuth";
 import { labelsRouter } from "./routers/labels";
 import { auditLogRouter } from "./routers/auditLog";
 import { messageLimitsRouter } from "./routers/messageLimits";
+import { followUpRouter } from "./routers/followUp";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2350,5 +2351,6 @@ export const appRouter = router({
   labels: labelsRouter,
   auditLog: auditLogRouter,
   messageLimits: messageLimitsRouter,
+  followUp: followUpRouter,
 });
 export type AppRouter = typeof appRouter;

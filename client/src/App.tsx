@@ -49,6 +49,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminGuard from "./components/AdminGuard";
 import AuditLog from "./pages/AuditLog";
 import LabelsManager from "./pages/LabelsManager";
+import FollowUp from "./pages/FollowUp";
 function Router() {
   return (
     <Switch>
@@ -100,6 +101,7 @@ function Router() {
         <Route path="/unified-inbox" component={UnifiedInbox} />
         <Route path="/audit-log">{() => <AdminGuard><AuditLog /></AdminGuard>}</Route>
         <Route path="/labels" component={LabelsManager} />
+        <Route path="/follow-up" component={FollowUp} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

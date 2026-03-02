@@ -1285,6 +1285,29 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       return { text: result.text || "" };
     }),
 
+  // ===== تحديث Stage + Follow-up للمحادثة =====
+  updateChatStage: protectedProcedure
+    .input(z.object({
+      chatId: z.number(),
+      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).optional(),
+      nextStep: z.string().optional(),
+      followUpDate: z.string().nullable().optional(), // ISO date string or null
+      ownerUserId: z.number().nullable().optional(),
+      ownerUserName: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const updateData: Record<string, unknown> = {};
+      if (input.stage !== undefined) updateData.stage = input.stage;
+      if (input.nextStep !== undefined) updateData.nextStep = input.nextStep;
+      if (input.followUpDate !== undefined) updateData.followUpDate = input.followUpDate ? new Date(input.followUpDate) : null;
+      if (input.ownerUserId !== undefined) updateData.ownerUserId = input.ownerUserId;
+      if (input.ownerUserName !== undefined) updateData.ownerUserName = input.ownerUserName;
+      await db.update(whatsappChats).set(updateData as any).where(eq(whatsappChats.id, input.chatId));
+      return { success: true };
+    }),
+
   // ===== مزامنة أسماء المحادثات مع قاعدة Leads =====
   syncContactNames: protectedProcedure
     .mutation(async () => {
