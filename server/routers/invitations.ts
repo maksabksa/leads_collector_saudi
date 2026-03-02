@@ -262,4 +262,26 @@ export const invitationsRouter = router({
       const permissions = (perms?.permissions as string[]) || [];
       return { hasPermission: permissions.includes(input.permission) };
     }),
+
+  // تفعيل/تعطيل حساب مستخدم
+  toggleUserActive: protectedProcedure
+    .input(z.object({ userId: z.number(), isActive: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(users).set({ isActive: input.isActive }).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
+
+  // تحديث حد الرسائل اليومية للمستخدم
+  setUserDailyLimit: protectedProcedure
+    .input(z.object({ userId: z.number(), limit: z.number().min(0).max(10000) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(users).set({ dailyMessageLimit: input.limit }).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
 });

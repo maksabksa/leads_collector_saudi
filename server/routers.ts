@@ -2304,6 +2304,9 @@ import { searchBehaviorRouter } from "./routers/searchBehavior";
 import { dataQualityRouter } from "./routers/dataQuality";
 import { unifiedInboxRouter } from "./routers/unifiedInbox";
 import { staffAuthRouter } from "./routers/staffAuth";
+import { labelsRouter } from "./routers/labels";
+import { auditLogRouter } from "./routers/auditLog";
+import { messageLimitsRouter } from "./routers/messageLimits";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2344,5 +2347,8 @@ export const appRouter = router({
   dataQuality: dataQualityRouter,
   inbox: unifiedInboxRouter,
   staffAuth: staffAuthRouter,
+  labels: labelsRouter,
+  auditLog: auditLogRouter,
+  messageLimits: messageLimitsRouter,
 });
 export type AppRouter = typeof appRouter;

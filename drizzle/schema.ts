@@ -26,6 +26,7 @@ export const users = mysqlTable("users", {
   isActive: boolean("isActive").default(true).notNull(), // تفعيل/تعطيل الحساب
   displayName: varchar("displayName", { length: 100 }), // الاسم الظاهر
   department: varchar("department", { length: 100 }), // القسم
+  dailyMessageLimit: int("dailyMessageLimit").default(0).notNull(), // 0 = unlimited, >0 = max messages per day
 });
 
 export type User = typeof users.$inferSelect;
@@ -975,3 +976,79 @@ export const passwordResetTokens = mysqlTable("password_reset_tokens", {
 });
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+// ===== CONVERSATION LABELS =====
+// نظام Labels احترافي مثل واتساب Business
+export const conversationLabels = mysqlTable("conversation_labels", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  color: varchar("color", { length: 20 }).notNull().default("#3B82F6"), // hex color
+  description: text("description"),
+  createdBy: int("createdBy").notNull(), // userId
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ConversationLabel = typeof conversationLabels.$inferSelect;
+export type InsertConversationLabel = typeof conversationLabels.$inferInsert;
+
+// ===== CONVERSATION LABEL ASSIGNMENTS =====
+// ربط labels بالمحادثات (many-to-many)
+export const conversationLabelAssignments = mysqlTable("conversation_label_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  chatId: int("chatId").notNull(),           // whatsapp_chats.id
+  labelId: int("labelId").notNull(),          // conversation_labels.id
+  assignedBy: int("assignedBy").notNull(),    // userId
+  assignedAt: timestamp("assignedAt").defaultNow().notNull(),
+});
+export type ConversationLabelAssignment = typeof conversationLabelAssignments.$inferSelect;
+export type InsertConversationLabelAssignment = typeof conversationLabelAssignments.$inferInsert;
+
+// ===== DAILY MESSAGE COUNTS =====
+// تتبع عدد الرسائل اليومية لكل مستخدم
+export const dailyMessageCounts = mysqlTable("daily_message_counts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  count: int("count").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type DailyMessageCount = typeof dailyMessageCounts.$inferSelect;
+export type InsertDailyMessageCount = typeof dailyMessageCounts.$inferInsert;
+
+// ===== AUDIT LOG =====
+// سجل تدقيق شامل لجميع العمليات الحساسة
+export const auditLogs = mysqlTable("audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),                          // من قام بالعملية (null = system)
+  userName: varchar("userName", { length: 100 }), // اسم المستخدم وقت التنفيذ
+  action: varchar("action", { length: 100 }).notNull(), // e.g. "send_message", "assign_label", "change_permission"
+  entityType: varchar("entityType", { length: 50 }), // e.g. "chat", "lead", "user"
+  entityId: varchar("entityId", { length: 64 }),     // معرف الكيان المتأثر
+  details: json("details").$type<Record<string, unknown>>(), // تفاصيل إضافية
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// ===== AI REFERENCE USERS =====
+// المستخدمون المرجعيون الذين يتعلم AI من أسلوبهم
+export const aiReferenceUsers = mysqlTable("ai_reference_users", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  userName: varchar("userName", { length: 100 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  learnedPatterns: json("learnedPatterns").$type<{
+    greetings: string[];
+    closings: string[];
+    toneKeywords: string[];
+    avgResponseLength: number;
+    commonPhrases: string[];
+  }>(),
+  lastLearnedAt: timestamp("lastLearnedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AiReferenceUser = typeof aiReferenceUsers.$inferSelect;
+export type InsertAiReferenceUser = typeof aiReferenceUsers.$inferInsert;

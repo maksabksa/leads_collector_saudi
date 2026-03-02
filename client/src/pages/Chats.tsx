@@ -11,6 +11,7 @@ import {
   Paperclip, FileText, Download, Smile, Mic, MicOff, Sparkles,
   Copy, Plus, Check, Zap, ChevronDown, UserPlus, BarChart2, AlertTriangle, TrendingUp,
   Volume2, VolumeX, Settings, Image, Film, Music, File, ZoomIn, CheckSquare, Square,
+  Tag,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -532,6 +533,9 @@ export default function Chats() {
   const [bulkMode, setBulkMode] = useState(false);
   const [showArchiveSettings, setShowArchiveSettings] = useState(false);
   const [archiveDaysInput, setArchiveDaysInput] = useState(30);
+  // ===== حالة Labels =====
+  const [showLabelPanel, setShowLabelPanel] = useState(false);
+  const [filterLabelId, setFilterLabelId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -551,6 +555,20 @@ export default function Chats() {
   const { data: stats } = trpc.waSettings.getChatStats.useQuery({ accountId: "all" }, { refetchInterval: 5000 });
   const { data: waAccounts = [] } = trpc.waAccounts.listAccounts.useQuery();
   const { data: aiSettingsData } = trpc.aiConfig.getSettings.useQuery();
+  const { data: allLabels = [] } = trpc.labels.getAll.useQuery();
+  const { data: chatLabels = [], refetch: refetchChatLabels } = trpc.labels.getChatLabels.useQuery(
+    { chatId: selectedChatId! },
+    { enabled: selectedChatId !== null && selectedChatId > 0 }
+  );
+  const utils = trpc.useUtils();
+  const assignLabel = trpc.labels.assignLabel.useMutation({
+    onSuccess: () => { refetchChatLabels(); utils.labels.getChatLabels.invalidate({ chatId: selectedChatId! }); },
+    onError: (e) => toast.error("خطأ في إضافة التصنيف", { description: e.message }),
+  });
+  const removeLabel = trpc.labels.removeLabel.useMutation({
+    onSuccess: () => { refetchChatLabels(); utils.labels.getChatLabels.invalidate({ chatId: selectedChatId! }); },
+    onError: (e) => toast.error("خطأ في إزالة التصنيف", { description: e.message }),
+  });
 
   useEffect(() => {
     if (aiSettingsData) setGlobalAiEnabled(aiSettingsData.globalAutoReplyEnabled ?? false);
@@ -746,6 +764,17 @@ export default function Chats() {
     }
     return list;
   }, [chats, filterMode, searchQuery, selectedAccountId]);
+
+  // ===== فلترة Labels =====
+  const { data: labelFilteredChatIds } = trpc.labels.getChatsByLabel.useQuery(
+    { labelId: filterLabelId! },
+    { enabled: filterLabelId !== null }
+  );
+  const displayedChats = useMemo(() => {
+    if (!filterLabelId || !labelFilteredChatIds) return filteredChats;
+    const ids = new Set(labelFilteredChatIds);
+    return filteredChats.filter(c => ids.has(c.id));
+  }, [filteredChats, filterLabelId, labelFilteredChatIds]);
 
   // ===== ترتيب وتجميع الرسائل =====
   const sortedMessages = useMemo(() =>
@@ -1083,7 +1112,34 @@ export default function Chats() {
                 <RefreshCw className={`w-3 h-3 ${syncContactNames.isPending ? "animate-spin" : ""}`} />
               </button>
             </div>
-            {/* فلتر حساب الواتساب (الرقم المُرسِل) - يظهر دائماً لمعرفة أي رقم يتعامل مع أكثر العملاء */}
+            {/* فلتر Labels */}
+          {(allLabels as any[]).length > 0 && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-[10px] text-[#8696a0]">فلتر حسب التصنيف:</p>
+                {filterLabelId && (
+                  <button onClick={() => setFilterLabelId(null)} className="text-[10px] text-[#25D366] hover:underline">إلغاء</button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {(allLabels as any[]).map((label: any) => (
+                  <button
+                    key={label.id}
+                    onClick={() => setFilterLabelId(filterLabelId === label.id ? null : label.id)}
+                    className="text-[11px] px-2 py-0.5 rounded-full border transition-all flex items-center gap-1"
+                    style={filterLabelId === label.id
+                      ? { background: label.color + "33", borderColor: label.color, color: label.color }
+                      : { background: "transparent", borderColor: "rgba(255,255,255,0.15)", color: "#8696a0" }
+                    }
+                  >
+                    <Tag className="w-2.5 h-2.5" />
+                    {label.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* فلتر حساب الواتساب (الرقم المُرسِل) - يظهر دائماً لمعرفة أي رقم يتعامل مع أكثر العملاء */}
             {(waAccounts as any[]).length > 0 && (
               <div className="space-y-1">
                 <p className="text-[10px] text-[#8696a0] px-1">فلتر حسب الرقم المُرسِل:</p>
@@ -1129,7 +1185,7 @@ export default function Chats() {
           </div>
           {/* قائمة المحادثات - virtual scrolling للأداء */}
           <VirtualChatList
-            chats={filteredChats as Chat[]}
+            chats={displayedChats as Chat[]}
             selectedChatId={selectedChatId}
             bulkMode={bulkMode}
             selectedChats={selectedChats}
@@ -1231,6 +1287,12 @@ export default function Chats() {
                       {selectedChat.isArchived ? "إلغاء الأرشفة" : "أرشفة"}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem className="text-white hover:bg-white/10 cursor-pointer"
+                      onClick={() => setShowLabelPanel(v => !v)}>
+                      <Tag className="w-4 h-4 ml-2" />
+                      إدارة التصنيفات
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/10" />
                     <DropdownMenuItem className="text-red-400 hover:bg-red-500/10 cursor-pointer"
                       onClick={() => { if (confirm("هل تريد حذف هذه المحادثة؟")) deleteChat.mutate({ chatId: selectedChat.id }); }}>
                       <Trash2 className="w-4 h-4 ml-2" />
@@ -1241,6 +1303,42 @@ export default function Chats() {
               </div>
             </div>
 
+            {/* ===== شريط Labels للمحادثة ===== */}
+            {showLabelPanel && (
+              <div className="flex-shrink-0 px-4 py-2 border-b border-white/10" style={{ background: "#1a2830" }}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Tag className="w-3.5 h-3.5 text-[#8696a0] flex-shrink-0" />
+                  <span className="text-[11px] text-[#8696a0] flex-shrink-0">التصنيفات:</span>
+                  {(chatLabels as any[]).map((cl: any) => (
+                    <span
+                      key={cl.labelId}
+                      className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1 cursor-pointer hover:opacity-80"
+                      style={{ background: cl.color + "33", border: `1px solid ${cl.color}`, color: cl.color }}
+                      onClick={() => removeLabel.mutate({ chatId: selectedChat.id, labelId: cl.labelId })}
+                      title="اضغط لإزالة التصنيف"
+                    >
+                      {cl.name}
+                      <X className="w-2.5 h-2.5" />
+                    </span>
+                  ))}
+                  {/* إضافة تصنيف جديد */}
+                  {(allLabels as any[]).filter((l: any) => !(chatLabels as any[]).some((cl: any) => cl.labelId === l.id)).map((label: any) => (
+                    <button
+                      key={label.id}
+                      onClick={() => assignLabel.mutate({ chatId: selectedChat.id, labelId: label.id })}
+                      className="text-[11px] px-2 py-0.5 rounded-full border border-dashed transition-all hover:opacity-80"
+                      style={{ borderColor: "rgba(255,255,255,0.2)", color: "#8696a0" }}
+                      title={`إضافة تصنيف: ${label.name}`}
+                    >
+                      + {label.name}
+                    </button>
+                  ))}
+                  {(allLabels as any[]).length === 0 && (
+                    <span className="text-[11px] text-[#8696a0]">لا تصنيفات - أضف من صفحة إدارة التصنيفات</span>
+                  )}
+                </div>
+              </div>
+            )}
             {/* ===== منطقة الرسائل - سكرول منفرد مستقل ===== */}
             <div
               ref={messagesContainerRef}

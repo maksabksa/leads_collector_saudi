@@ -22,6 +22,8 @@ import {
   Upload,
   Inbox,
   Share2,
+  Tag,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -45,6 +47,8 @@ const adminNavItems = [
   { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
   { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
   { path: "/social-accounts", label: "حسابات التواصل", icon: Share2 },
+  { path: "/labels", label: "إدارة التصنيفات", icon: Tag },
+  { path: "/audit-log", label: "سجل التدقيق", icon: ClipboardList },
   // تقرير الإرسال وصحة الأرقام وأداء الموظفين مدمجة داخل صفحة التقارير
 ];
 

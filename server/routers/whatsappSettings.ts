@@ -403,9 +403,19 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         mediaFilename: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // فرض حد الرسائل اليومية
+      const { checkAndIncrementDailyLimit } = await import("./messageLimits");
+      const limitCheck = await checkAndIncrementDailyLimit(ctx.user.id);
+      if (!limitCheck.allowed) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `لقد تجاوزت حد الرسائل اليومي (${limitCheck.currentCount}/${limitCheck.limit}). تواصل مع المدير لرفع الحد.`,
+        });
+      }
 
       let uploadedMediaUrl: string | undefined;
       let resolvedMediaType: string | undefined;

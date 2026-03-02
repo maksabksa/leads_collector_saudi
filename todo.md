@@ -908,3 +908,46 @@
 - [x] إصلاح رابط الدعوة ليستخدم الدومين الصحيح maksab-sales.xyz عبر VITE_APP_URL
 - [x] إصلاح ForgotPassword لاستخدام VITE_APP_URL أيضاً
 - [x] التحقق من أن صفحة accept-invitation تعمل بدون مصادقة (خارج Layout)
+
+## الدفعة 66 - التحديث الشامل (SaaS-grade)
+
+### أولاً: إدارة المحادثات والصلاحيات
+- [ ] نظام Labels: جدول conversation_labels + جدول conversation_label_assignments
+- [ ] Labels API: CRUD كامل + تعيين/إزالة labels من المحادثة
+- [ ] واجهة Labels في الشات: إضافة/إزالة labels مع ألوان + فلترة بالـ label
+- [ ] حد أقصى للرسائل اليومية: عمود dailyMessageLimit في جدول users
+- [ ] تتبع الرسائل اليومية: جدول daily_message_counts
+- [ ] فرض الحد: middleware يمنع الإرسال عند تجاوز الحد
+- [ ] توحيد صندوق الوارد: دمج WhatsApp + Social في صندوق واحد "صندوق الرسائل"
+
+### ثانياً: نظام الصلاحيات الدقيق
+- [ ] توسيع جدول users: إضافة permissions JSON column
+- [ ] صلاحيات: view_messages, reply_messages, transfer_conversations, send_bulk, view_reports
+- [ ] واجهة إدارة الصلاحيات: لكل موظف قائمة صلاحيات قابلة للتعديل
+- [ ] تطبيق الصلاحيات في backend: middleware يتحقق من الصلاحية قبل كل عملية
+
+### ثالثاً: مراقبة أرقام واتساب
+- [ ] جدول whatsapp_number_health: score, dailyLoad, warningCount, status
+- [ ] تحديث Score تلقائياً بناءً على معدل الاستجابة وعدد الرسائل
+- [ ] إيقاف تلقائي عند تجاوز حدود الأمان
+- [ ] لوحة مراقبة الأرقام: Score + حمل يومي + تحذيرات
+
+### رابعاً: AI مخصص
+- [ ] تحديد مستخدمين مرجعيين (reference users) يتعلم AI من أسلوبهم
+- [ ] استخراج أنماط الرد من محادثاتهم السابقة
+- [ ] ردود AI تعكس أسلوب الشركة الفعلي
+
+### خامساً: تحسين واجهة الشات
+- [ ] تصميم واجهة شات أكثر مرونة وسرعة
+- [ ] اقتراحات ردود ذكية فوق مربع الكتابة
+- [ ] إمكانية تعديل الرد المقترح قبل الإرسال
+
+## الدفعة 67 - تكامل Labels وAuditLog وإدارة المستخدمين المحسّنة
+- [x] صفحة /labels: إدارة التصنيفات (إنشاء/تعديل/حذف) مع ألوان مخصصة
+- [x] صفحة /audit-log: سجل التدقيق الكامل مع فلترة حسب المستخدم والإجراء
+- [x] فلترة المحادثات بالـ Labels في قائمة الشات
+- [x] شريط Labels في رأس المحادثة (إضافة/إزالة labels بضغطة واحدة)
+- [x] إضافة روابط Labels وAuditLog في sidebar الإدارة
+- [x] تحسين UsersManagement: تفعيل/تعطيل الحسابات + حد الرسائل اليومية
+- [x] backend: toggleUserActive وsetUserDailyLimit endpoints
+- [x] حفظ checkpoint

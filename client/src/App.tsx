@@ -47,6 +47,8 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AdminGuard from "./components/AdminGuard";
+import AuditLog from "./pages/AuditLog";
+import LabelsManager from "./pages/LabelsManager";
 function Router() {
   return (
     <Switch>
@@ -96,6 +98,8 @@ function Router() {
         <Route path="/messages" component={MessagesHub} />
         <Route path="/social-accounts">{() => <AdminGuard><SocialAccounts /></AdminGuard>}</Route>
         <Route path="/unified-inbox" component={UnifiedInbox} />
+        <Route path="/audit-log">{() => <AdminGuard><AuditLog /></AdminGuard>}</Route>
+        <Route path="/labels" component={LabelsManager} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>
