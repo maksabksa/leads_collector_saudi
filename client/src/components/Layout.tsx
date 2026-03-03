@@ -45,19 +45,19 @@ const FOLLOWUP_NAV = [
   { path: "/reminders",  label: "التذكيرات",          icon: Bell },
 ];
 
-/** قسم الإعدادات — للأدمن فقط */
+/** قسم الإعدادات — للأدمن فقط (يشمل كل الإعدادات والحسابات والتدقيق) */
 const SETTINGS_NAV = [
   { path: "/whatsapp-accounts", label: "حسابات واتساب",    icon: Smartphone },
   { path: "/social-accounts",   label: "حسابات التواصل",   icon: Share2 },
   { path: "/data-settings",     label: "إعدادات البيانات", icon: Settings2 },
   { path: "/ai-settings",       label: "ذكاء اصطناعي AI",  icon: Brain },
   { path: "/labels",            label: "إدارة التصنيفات",  icon: Tag },
+  { path: "/audit-log",         label: "سجل التدقيق",      icon: ClipboardList },
 ];
 
-/** قسم الإدارة — للأدمن فقط */
+/** قسم الإدارة — للأدمن فقط (إدارة المستخدمين فقط) */
 const ADMIN_NAV = [
-  { path: "/users",     label: "إدارة المستخدمين", icon: Shield },
-  { path: "/audit-log", label: "سجل التدقيق",      icon: ClipboardList },
+  { path: "/users", label: "إدارة المستخدمين", icon: Shield },
 ];
 
 // ─────────────────────────────────────────────
