@@ -21,7 +21,7 @@ import {
   Users, Zap, CheckCircle2, RefreshCw, X, Map, Target,
   Layers, SlidersHorizontal, CheckCheck, AlertTriangle,
   RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock,
-  Navigation, Crosshair, CircleDot, ChevronDown
+  Navigation, Crosshair, CircleDot, ChevronDown, UserPlus
 } from "lucide-react";
 import { MapView } from "@/components/Map";
 
@@ -358,6 +358,15 @@ export default function SearchHub() {
 
   // Instagram search ID
   const [instagramSearchId, setInstagramSearchId] = useState<number | null>(null);
+  // ===== Popup الخريطة التفاعلي =====
+  const [mapPopup, setMapPopup] = useState<{ place: any; x: number; y: number } | null>(null);
+  const [mapPopupPlaceId, setMapPopupPlaceId] = useState<string | null>(null);
+  const mapPopupDetailsQuery = trpc.search.getPlaceDetails.useQuery(
+    mapPopupPlaceId ? { placeId: mapPopupPlaceId } : skipToken,
+    { enabled: !!mapPopupPlaceId, staleTime: 5 * 60 * 1000 }
+  );
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+
   // ===== نظام تعلم السلوك =====
   const [behaviorPatterns, setBehaviorPatterns] = useState<any>(null);
   const [smartSuggestions, setSmartSuggestions] = useState<string[]>([]);
@@ -571,61 +580,21 @@ export default function SearchHub() {
         title: place.name,
         content: pinEl,
       });
-      // نافذة معلومات عند النقر
-      marker.addListener("click", () => {
+      // Popup React عند النقر على نقطة الخريطة
+      marker.addListener("click", (e: any) => {
         // الانتقال لموقع النشاط وتكبيره
         map.panTo(pos);
-        if (map.getZoom()! < 17) {
-          map.setZoom(17);
+        if (map.getZoom()! < 16) map.setZoom(16);
+        // تحديد موضع النافذة بالنسبة لحاوية الخريطة
+        const container = mapContainerRef.current;
+        let px = 200, py = 200;
+        if (container && e?.domEvent) {
+          const rect = container.getBoundingClientRect();
+          px = (e.domEvent as MouseEvent).clientX - rect.left;
+          py = (e.domEvent as MouseEvent).clientY - rect.top;
         }
-        if (!infoWindowRef.current) {
-          infoWindowRef.current = new window.google.maps.InfoWindow();
-        }
-        // بناء تفاصيل النشاط
-        const rating = place.rating ? place.rating.toFixed(1) : null;
-        const ratingCount = place.user_ratings_total || 0;
-        const stars = rating ? '★'.repeat(Math.round(parseFloat(rating))) + '☆'.repeat(5 - Math.round(parseFloat(rating))) : '';
-        const isOpen = place.opening_hours?.open_now;
-        const statusBadge = isOpen === true
-          ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">● مفتوح الآن</span>'
-          : isOpen === false
-          ? '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">● مغلق</span>'
-          : '';
-        const phone = place.formatted_phone_number || place.international_phone_number || '';
-        const website = place.website || '';
-        const types = (place.types || []).slice(0, 2).map((t: string) => t.replace(/_/g, ' ')).join(' · ');
-        const photoUrl = place.photos?.[0]?.getUrl ? place.photos[0].getUrl({ maxWidth: 300, maxHeight: 120 }) : '';
-        const photoHtml = photoUrl ? `<img src="${photoUrl}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />` : '';
-        const phoneHtml = phone ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="font-size:14px;">📞</span><a href="tel:${phone}" style="color:#2563eb;font-size:12px;text-decoration:none;font-weight:500;">${phone}</a></div>` : '';
-        const websiteHtml = website ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="font-size:14px;">🌐</span><a href="${website}" target="_blank" style="color:#2563eb;font-size:12px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;">${website.replace(/^https?:\/\//, '')}</a></div>` : '';
-        const ratingHtml = rating ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="color:#f59e0b;font-size:13px;">${stars}</span><span style="font-size:12px;font-weight:700;color:#92400e;">${rating}</span><span style="font-size:11px;color:#9ca3af;">(${ratingCount.toLocaleString()} تقييم)</span></div>` : '';
-        const typesHtml = types ? `<div style="margin-bottom:6px;"><span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:20px;font-size:11px;">${types}</span></div>` : '';
-        infoWindowRef.current.setContent(`
-          <div dir="rtl" style="font-family: 'IBM Plex Sans Arabic', Arial, sans-serif; min-width: 260px; max-width: 300px; padding: 4px;">
-            ${photoHtml}
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
-              <h3 style="margin:0;font-size:15px;font-weight:700;color:#111;line-height:1.3;flex:1;">${place.name}</h3>
-              <div style="margin-right:8px;flex-shrink:0;">${statusBadge}</div>
-            </div>
-            ${typesHtml}
-            <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;"><span style="font-size:12px;">📍</span><p style="margin:0;font-size:11px;color:#6b7280;line-height:1.4;">${place.formatted_address || ''}</p></div>
-            ${ratingHtml}
-            ${phoneHtml}
-            ${websiteHtml}
-            <div style="display:flex;gap:6px;margin-top:8px;">
-              <button
-                onclick="window.__addLeadFromMap && window.__addLeadFromMap('${place.place_id}')"
-                style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex:1;box-shadow:0 2px 4px rgba(34,197,94,0.3);"
-              >➕ إضافة كعميل</button>
-              <a
-                href="https://www.google.com/maps/place/?q=place_id:${place.place_id}"
-                target="_blank"
-                style="background:#4285F4;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;"
-              >🗺️</a>
-            </div>
-          </div>
-        `);
-        infoWindowRef.current.open({ map, anchor: marker });
+        setMapPopup({ place, x: px, y: py });
+        setMapPopupPlaceId(place.place_id || null);
       });
       resultMarkersRef.current.push(marker);
     });
@@ -1261,7 +1230,7 @@ export default function SearchHub() {
                     </div>
 
                     {/* الخريطة */}
-                    <div className="relative">
+                    <div className="relative" ref={mapContainerRef}>
                       <MapView
                         className="w-full h-[420px]"
                         initialCenter={{ lat: 24.7136, lng: 46.6753 }}
@@ -1281,6 +1250,148 @@ export default function SearchHub() {
                           • {results.google.length} نتيجة على الخريطة
                         </div>
                       )}
+
+                      {/* ===== React Popup تفاصيل النشاط ===== */}
+                      {mapPopup && (() => {
+                        const place = mapPopup.place;
+                        const details = mapPopupDetailsQuery.data as any;
+                        const isLoading = mapPopupDetailsQuery.isFetching;
+                        const phone = details?.formatted_phone_number || details?.international_phone_number || place.formatted_phone_number || '';
+                        const website = details?.website || place.website || '';
+                        const rating = place.rating ? place.rating.toFixed(1) : null;
+                        const ratingCount = place.user_ratings_total || 0;
+                        const isOpen = details?.opening_hours?.open_now ?? place.opening_hours?.open_now;
+                        const hours = details?.opening_hours?.weekday_text || [];
+                        const types = (place.types || []).slice(0, 3).map((t: string) => t.replace(/_/g, ' ')).join(' · ');
+                        const photoUrl = place.photos?.[0]?.getUrl ? place.photos[0].getUrl({ maxWidth: 400, maxHeight: 180 }) : '';
+                        // حساب موضع النافذة
+                        const containerW = mapContainerRef.current?.offsetWidth || 600;
+                        const containerH = mapContainerRef.current?.offsetHeight || 420;
+                        const popupW = 300;
+                        const popupH = 380;
+                        let left = mapPopup.x + 12;
+                        let top = mapPopup.y - popupH / 2;
+                        if (left + popupW > containerW - 8) left = mapPopup.x - popupW - 12;
+                        if (top < 8) top = 8;
+                        if (top + popupH > containerH - 8) top = containerH - popupH - 8;
+                        return (
+                          <div
+                            className="absolute z-50 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+                            style={{ left, top, width: popupW }}
+                            dir="rtl"
+                          >
+                            {/* زر الإغلاق */}
+                            <button
+                              onClick={() => { setMapPopup(null); setMapPopupPlaceId(null); }}
+                              className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-xs"
+                            >×</button>
+
+                            {/* صورة النشاط */}
+                            {photoUrl ? (
+                              <img src={photoUrl} alt={place.name} className="w-full h-28 object-cover" />
+                            ) : (
+                              <div className="w-full h-16 bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center">
+                                <MapPin className="w-8 h-8 text-green-400" />
+                              </div>
+                            )}
+
+                            <div className="p-3 space-y-2">
+                              {/* الاسم وحالة الفتح */}
+                              <div className="flex items-start justify-between gap-2">
+                                <h3 className="font-bold text-sm text-foreground leading-tight flex-1">{place.name}</h3>
+                                {isOpen === true && <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 font-medium whitespace-nowrap flex-shrink-0">● مفتوح</span>}
+                                {isOpen === false && <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium whitespace-nowrap flex-shrink-0">● مغلق</span>}
+                              </div>
+
+                              {/* نوع النشاط */}
+                              {types && <p className="text-xs text-muted-foreground">{types}</p>}
+
+                              {/* التقييم */}
+                              {rating && (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="flex">
+                                    {[1,2,3,4,5].map(s => (
+                                      <span key={s} className={`text-xs ${s <= Math.round(parseFloat(rating)) ? 'text-yellow-400' : 'text-muted-foreground/30'}`}>★</span>
+                                    ))}
+                                  </div>
+                                  <span className="text-xs font-bold text-yellow-500">{rating}</span>
+                                  <span className="text-xs text-muted-foreground">({ratingCount.toLocaleString()})</span>
+                                </div>
+                              )}
+
+                              {/* العنوان */}
+                              {place.formatted_address && (
+                                <div className="flex items-start gap-1.5">
+                                  <MapPin className="w-3 h-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                  <p className="text-xs text-muted-foreground leading-relaxed">{place.formatted_address}</p>
+                                </div>
+                              )}
+
+                              {/* التحميل */}
+                              {isLoading && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  جاري جلب التفاصيل...
+                                </div>
+                              )}
+
+                              {/* الهاتف */}
+                              {phone && (
+                                <a href={`tel:${phone}`} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                                  <Phone className="w-3 h-3" />
+                                  {phone}
+                                </a>
+                              )}
+
+                              {/* الموقع */}
+                              {website && (
+                                <a href={website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                                  <Globe className="w-3 h-3" />
+                                  <span className="truncate max-w-[220px]">{website.replace(/^https?:\/\//, '')}</span>
+                                </a>
+                              )}
+
+                              {/* ساعات العمل */}
+                              {hours.length > 0 && (
+                                <details className="text-xs">
+                                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    ساعات العمل
+                                  </summary>
+                                  <div className="mt-1 space-y-0.5 pr-4">
+                                    {hours.slice(0, 3).map((h: string, i: number) => (
+                                      <p key={i} className="text-muted-foreground">{h}</p>
+                                    ))}
+                                  </div>
+                                </details>
+                              )}
+
+                              {/* أزرار الإجراء */}
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  onClick={() => {
+                                    handleOpenAddDialog(place, "google");
+                                    setMapPopup(null);
+                                    setMapPopupPlaceId(null);
+                                  }}
+                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+                                >
+                                  <UserPlus className="w-3.5 h-3.5" />
+                                  إضافة كعميل
+                                </button>
+                                <a
+                                  href={`https://www.google.com/maps/place/?q=place_id:${place.place_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* شريط النطاق */}
