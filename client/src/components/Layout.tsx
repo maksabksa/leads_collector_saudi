@@ -45,19 +45,12 @@ const FOLLOWUP_NAV = [
   { path: "/reminders",  label: "التذكيرات",          icon: Bell },
 ];
 
-/** قسم الإعدادات — للأدمن فقط (يشمل كل الإعدادات والحسابات والتدقيق) */
+/** قسم الإعدادات — للأدمن فقط */
 const SETTINGS_NAV = [
-  { path: "/whatsapp-accounts", label: "حسابات واتساب",    icon: Smartphone },
-  { path: "/social-accounts",   label: "حسابات التواصل",   icon: Share2 },
-  { path: "/data-settings",     label: "إعدادات البيانات", icon: Settings2 },
-  { path: "/ai-settings",       label: "ذكاء اصطناعي AI",  icon: Brain },
-  { path: "/labels",            label: "إدارة التصنيفات",  icon: Tag },
+  { path: "/settings",          label: "الإعدادات",           icon: Settings2 },
+  { path: "/reports",           label: "التقارير",           icon: BarChart3 },
+  { path: "/users",             label: "إدارة المستخدمين", icon: Shield },
   { path: "/audit-log",         label: "سجل التدقيق",      icon: ClipboardList },
-];
-
-/** قسم الإدارة — للأدمن فقط (إدارة المستخدمين فقط) */
-const ADMIN_NAV = [
-  { path: "/users", label: "إدارة المستخدمين", icon: Shield },
 ];
 
 // ─────────────────────────────────────────────
@@ -270,23 +263,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <>
               <SectionLabel label="إعدادات" />
               {SETTINGS_NAV.map((item) => (
-                <NavItem
-                  key={item.path}
-                  path={item.path}
-                  label={item.label}
-                  icon={item.icon}
-                  isActive={isActive(item.path)}
-                  onClick={closeSidebar}
-                />
-              ))}
-            </>
-          )}
-
-          {/* ── قسم الإدارة (أدمن فقط) ── */}
-          {isAdmin && (
-            <>
-              <SectionLabel label="إدارة" />
-              {ADMIN_NAV.map((item) => (
                 <NavItem
                   key={item.path}
                   path={item.path}

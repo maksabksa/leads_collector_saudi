@@ -581,23 +581,47 @@ export default function SearchHub() {
         if (!infoWindowRef.current) {
           infoWindowRef.current = new window.google.maps.InfoWindow();
         }
-        const rating = place.rating ? `★ ${place.rating} (${place.user_ratings_total || 0})` : "غير مقيّم";
-        const status = place.opening_hours?.open_now === true ? '✅ مفتوح الآن' : place.opening_hours?.open_now === false ? '❌ مغلق' : '';
+        // بناء تفاصيل النشاط
+        const rating = place.rating ? place.rating.toFixed(1) : null;
+        const ratingCount = place.user_ratings_total || 0;
+        const stars = rating ? '★'.repeat(Math.round(parseFloat(rating))) + '☆'.repeat(5 - Math.round(parseFloat(rating))) : '';
+        const isOpen = place.opening_hours?.open_now;
+        const statusBadge = isOpen === true
+          ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">● مفتوح الآن</span>'
+          : isOpen === false
+          ? '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">● مغلق</span>'
+          : '';
+        const phone = place.formatted_phone_number || place.international_phone_number || '';
+        const website = place.website || '';
+        const types = (place.types || []).slice(0, 2).map((t: string) => t.replace(/_/g, ' ')).join(' · ');
+        const photoUrl = place.photos?.[0]?.getUrl ? place.photos[0].getUrl({ maxWidth: 300, maxHeight: 120 }) : '';
+        const photoHtml = photoUrl ? `<img src="${photoUrl}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />` : '';
+        const phoneHtml = phone ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="font-size:14px;">📞</span><a href="tel:${phone}" style="color:#2563eb;font-size:12px;text-decoration:none;font-weight:500;">${phone}</a></div>` : '';
+        const websiteHtml = website ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="font-size:14px;">🌐</span><a href="${website}" target="_blank" style="color:#2563eb;font-size:12px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;">${website.replace(/^https?:\/\//, '')}</a></div>` : '';
+        const ratingHtml = rating ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="color:#f59e0b;font-size:13px;">${stars}</span><span style="font-size:12px;font-weight:700;color:#92400e;">${rating}</span><span style="font-size:11px;color:#9ca3af;">(${ratingCount.toLocaleString()} تقييم)</span></div>` : '';
+        const typesHtml = types ? `<div style="margin-bottom:6px;"><span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:20px;font-size:11px;">${types}</span></div>` : '';
         infoWindowRef.current.setContent(`
-          <div dir="rtl" style="font-family: 'IBM Plex Sans Arabic', Arial, sans-serif; min-width: 220px; padding: 6px;">
-            <h3 style="margin:0 0 6px;font-size:14px;font-weight:700;color:#111;">${place.name}</h3>
-            <p style="margin:0 0 4px;font-size:12px;color:#555;">${place.formatted_address || ''}</p>
-            <p style="margin:0 0 6px;font-size:12px;color:#888;">${rating} ${status}</p>
-            <div style="display:flex;gap:6px;">
+          <div dir="rtl" style="font-family: 'IBM Plex Sans Arabic', Arial, sans-serif; min-width: 260px; max-width: 300px; padding: 4px;">
+            ${photoHtml}
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+              <h3 style="margin:0;font-size:15px;font-weight:700;color:#111;line-height:1.3;flex:1;">${place.name}</h3>
+              <div style="margin-right:8px;flex-shrink:0;">${statusBadge}</div>
+            </div>
+            ${typesHtml}
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;"><span style="font-size:12px;">📍</span><p style="margin:0;font-size:11px;color:#6b7280;line-height:1.4;">${place.formatted_address || ''}</p></div>
+            ${ratingHtml}
+            ${phoneHtml}
+            ${websiteHtml}
+            <div style="display:flex;gap:6px;margin-top:8px;">
               <button
                 onclick="window.__addLeadFromMap && window.__addLeadFromMap('${place.place_id}')"
-                style="background:#22c55e;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;flex:1;"
+                style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;flex:1;box-shadow:0 2px 4px rgba(34,197,94,0.3);"
               >➕ إضافة كعميل</button>
               <a
                 href="https://www.google.com/maps/place/?q=place_id:${place.place_id}"
                 target="_blank"
-                style="background:#4285F4;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;"
-              >🗺️ فتح في Maps</a>
+                style="background:#4285F4;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;"
+              >🗺️</a>
             </div>
           </div>
         `);
