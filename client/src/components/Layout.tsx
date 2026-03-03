@@ -1,11 +1,9 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import {
   BarChart3,
   LogOut,
   Users,
-  ChevronRight,
   Menu,
   X,
   Search,
@@ -16,10 +14,7 @@ import {
   Globe,
   Brain,
   Smartphone,
-  Layers,
   Settings2,
-  FileSpreadsheet,
-  Upload,
   Inbox,
   Share2,
   Tag,
@@ -30,66 +25,144 @@ import {
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
-// القائمة الرئيسية - مرتبة بشكل احترافي
-const navItems = [
-  { path: "/", label: "لوحة التحكم", icon: BarChart3, permission: null },
-  { path: "/unified-inbox", label: "صندوق الوارد", icon: Inbox, permission: "whatsapp.send" },
-  { path: "/chats", label: "محادثات واتساب", icon: MessagesSquare, permission: "whatsapp.send" },
-  { path: "/whatsapp", label: "إرسال واتساب", icon: MessageCircle, permission: "whatsapp.send" },
-  { path: "/leads", label: "قائمة العملاء", icon: Users, permission: "leads.view" },
-  { path: "/search-hub", label: "مركز البحث", icon: Search, permission: "search.use" },
+// ─────────────────────────────────────────────
+// تعريف الأقسام الأربعة للقائمة الجانبية
+// ─────────────────────────────────────────────
+
+/** القسم الرئيسي — متاح لجميع المستخدمين (مع فلترة الصلاحيات) */
+const MAIN_NAV = [
+  { path: "/",              label: "لوحة التحكم",      icon: BarChart3,     permission: null },
+  { path: "/unified-inbox", label: "صندوق الوارد",     icon: Inbox,         permission: "whatsapp.send" },
+  { path: "/chats",         label: "محادثات واتساب",   icon: MessagesSquare, permission: "whatsapp.send" },
+  { path: "/whatsapp",      label: "إرسال واتساب",     icon: MessageCircle, permission: "whatsapp.send" },
+  { path: "/leads",         label: "قائمة العملاء",    icon: Users,         permission: "leads.view" },
+  { path: "/search-hub",    label: "مركز البحث",       icon: Search,        permission: "search.use" },
 ];
 
-// قائمة الإدارة - مدمجة ومرتبة بدون تكرار
-const adminNavItems = [
-  { path: "/users", label: "إدارة المستخدمين", icon: Shield },
-  // AI مدمج: إعدادات AI + قاعدة المعرفة في صفحة واحدة
-  { path: "/ai-settings", label: "ذكاء اصطناعي AI", icon: Brain },
-  // إعدادات البيانات تشمل كشف الاهتمام + شرائح العملاء (مدمجة داخل الصفحة)
-  { path: "/data-settings", label: "إعدادات البيانات", icon: Settings2 },
-  { path: "/whatsapp-accounts", label: "حسابات واتساب", icon: Smartphone },
-  { path: "/social-accounts", label: "حسابات التواصل", icon: Share2 },
-  { path: "/labels", label: "إدارة التصنيفات", icon: Tag },
-  { path: "/audit-log", label: "سجل التدقيق", icon: ClipboardList },
-  // تقرير الإرسال وصحة الأرقام وأداء الموظفين مدمجة داخل صفحة التقارير
+/** قسم المتابعة — متاح لجميع المستخدمين */
+const FOLLOWUP_NAV = [
+  { path: "/follow-up",  label: "المتابعة التلقائية", icon: CalendarClock },
+  { path: "/reminders",  label: "التذكيرات",          icon: Bell },
 ];
 
-// قائمة المتابعة - متاحة لكل المستخدمين
-const followUpNavItems = [
-  { path: "/follow-up", label: "المتابعة التلقائية", icon: CalendarClock },
-  { path: "/reminders", label: "التذكيرات", icon: Bell },
+/** قسم الإعدادات — للأدمن فقط */
+const SETTINGS_NAV = [
+  { path: "/whatsapp-accounts", label: "حسابات واتساب",    icon: Smartphone },
+  { path: "/social-accounts",   label: "حسابات التواصل",   icon: Share2 },
+  { path: "/data-settings",     label: "إعدادات البيانات", icon: Settings2 },
+  { path: "/ai-settings",       label: "ذكاء اصطناعي AI",  icon: Brain },
+  { path: "/labels",            label: "إدارة التصنيفات",  icon: Tag },
 ];
 
+/** قسم الإدارة — للأدمن فقط */
+const ADMIN_NAV = [
+  { path: "/users",     label: "إدارة المستخدمين", icon: Shield },
+  { path: "/audit-log", label: "سجل التدقيق",      icon: ClipboardList },
+];
+
+// ─────────────────────────────────────────────
+// مكوّن NavItem — لتفادي تكرار الكود
+// ─────────────────────────────────────────────
+function NavItem({
+  path,
+  label,
+  icon: Icon,
+  isActive,
+  badge,
+  onClick,
+}: {
+  path: string;
+  label: string;
+  icon: React.ElementType;
+  isActive: boolean;
+  badge?: number;
+  onClick?: () => void;
+}) {
+  return (
+    <Link href={path} onClick={onClick}>
+      <div
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+          isActive
+            ? "text-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+        }`}
+        style={
+          isActive
+            ? {
+                background: "oklch(0.65 0.18 200 / 0.12)",
+                border: "1px solid oklch(0.65 0.18 200 / 0.2)",
+                color: "var(--brand-cyan)",
+              }
+            : {}
+        }
+      >
+        <Icon className="w-4 h-4 flex-shrink-0" />
+        <span className="flex-1">{label}</span>
+        {badge !== undefined && badge > 0 && (
+          <span
+            className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold text-white"
+            style={{ background: "oklch(0.55 0.22 25)" }}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+// ─────────────────────────────────────────────
+// مكوّن SectionLabel — عنوان القسم
+// ─────────────────────────────────────────────
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div className="px-3 pt-4 pb-1">
+      <p className="text-xs text-muted-foreground/50 font-semibold uppercase tracking-widest">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// المكوّن الرئيسي Layout
+// ─────────────────────────────────────────────
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, loading, isAuthenticated } = useAuth();
   const logout = trpc.auth.logout.useMutation();
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // جلب صلاحيات المستخدم
+  const closeSidebar = () => setSidebarOpen(false);
+
+  // صلاحيات المستخدم
   const { data: myPerms } = trpc.invitations.myPermissions.useQuery(undefined, {
     enabled: isAuthenticated,
   });
   const userPermissionsList = myPerms?.permissions ?? [];
   const isAdmin = user?.role === "admin";
-  // جلب عداد الرسائل غير المقروءة
+
+  // عداد الرسائل غير المقروءة
   const { data: unreadData } = trpc.waSettings.getTotalUnread.useQuery(undefined, {
     enabled: isAuthenticated,
     refetchInterval: 10000,
   });
   const totalUnread = unreadData?.total ?? 0;
-  // جلب إحصائيات المتابعة
+
+  // عداد تنبيهات المتابعة
   const { data: followUpStats } = trpc.followUp.getFollowUpStats.useQuery(undefined, {
     enabled: isAuthenticated,
     refetchInterval: 60000,
   });
   const totalFollowUp = followUpStats?.total ?? 0;
-  // فلترة navItems حسب الصلاحيات
-  const visibleNavItems = navItems.filter((item) => {
+
+  // فلترة القسم الرئيسي حسب الصلاحيات
+  const visibleMain = MAIN_NAV.filter((item) => {
     if (isAdmin) return true;
     if (!item.permission) return true;
     return userPermissionsList.includes(item.permission);
   });
 
+  // ─── Loading ───
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -101,8 +174,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // ─── Not authenticated ───
   if (!isAuthenticated) {
-    // توجيه لصفحة تسجيل الدخول المستقلة
     const currentPath = window.location.pathname;
     const publicPaths = ["/staff-login", "/accept-invitation", "/forgot-password", "/reset-password"];
     if (!publicPaths.includes(currentPath)) {
@@ -116,27 +189,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     window.location.href = "/";
   };
 
+  const isActive = (path: string) =>
+    path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
+
+  // ─── Layout ───
   return (
     <div className="min-h-screen flex bg-background" dir="rtl">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
-      {/* Sidebar */}
+      {/* ══════════════ Sidebar ══════════════ */}
       <aside
         className={`fixed top-0 right-0 h-full w-64 z-50 flex flex-col border-l border-border transition-transform duration-300 lg:static lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
         }`}
         style={{ background: "oklch(0.11 0.012 240)" }}
       >
-        {/* Logo */}
-        <div className="p-5 border-b border-border flex items-center justify-between">
+        {/* ── Logo ── */}
+        <div className="p-5 border-b border-border flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "oklch(0.65 0.18 200 / 0.2)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{
+                background: "oklch(0.65 0.18 200 / 0.2)",
+                border: "1px solid oklch(0.65 0.18 200 / 0.3)",
+              }}
+            >
               <Zap className="w-5 h-5" style={{ color: "var(--brand-cyan)" }} />
             </div>
             <div>
@@ -144,117 +227,98 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground">مجمع البيانات</p>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-muted-foreground hover:text-foreground">
+          <button
+            onClick={closeSidebar}
+            className="lg:hidden text-muted-foreground hover:text-foreground"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {visibleNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
-            return (
-              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)}>
-                <div
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                  }`}
-                  style={isActive ? {
-                    background: "oklch(0.65 0.18 200 / 0.12)",
-                    border: "1px solid oklch(0.65 0.18 200 / 0.2)",
-                    color: "var(--brand-cyan)",
-                  } : {}}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {item.path === "/chats" && totalUnread > 0 && (
-                    <span
-                      className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold text-white"
-                      style={{ background: "oklch(0.55 0.22 25)" }}
-                    >
-                      {totalUnread > 99 ? "99+" : totalUnread}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-          {/* قسم المتابعة */}
-          <div className="px-3 pt-3 pb-1">
-            <p className="text-xs text-muted-foreground/60 font-medium uppercase tracking-wider">متابعة</p>
-          </div>
-          {followUpNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.path;
-            return (
-              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)}>
-                <div
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                  }`}
-                  style={isActive ? {
-                    background: "oklch(0.65 0.18 200 / 0.12)",
-                    border: "1px solid oklch(0.65 0.18 200 / 0.2)",
-                    color: "var(--brand-cyan)",
-                  } : {}}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {item.path === "/follow-up" && totalFollowUp > 0 && (
-                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold text-white" style={{ background: "#e74c3c" }}>
-                      {totalFollowUp > 99 ? "99+" : totalFollowUp}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-          {/* قسم الأدمن */}
-          {user?.role === "admin" && (
+        {/* ── Navigation ── */}
+        <nav className="flex-1 p-3 overflow-y-auto space-y-0.5">
+
+          {/* ── القسم الرئيسي ── */}
+          {visibleMain.map((item) => (
+            <NavItem
+              key={item.path}
+              path={item.path}
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive(item.path)}
+              badge={item.path === "/chats" ? totalUnread : undefined}
+              onClick={closeSidebar}
+            />
+          ))}
+
+          {/* ── قسم المتابعة ── */}
+          <SectionLabel label="متابعة" />
+          {FOLLOWUP_NAV.map((item) => (
+            <NavItem
+              key={item.path}
+              path={item.path}
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive(item.path)}
+              badge={item.path === "/follow-up" ? totalFollowUp : undefined}
+              onClick={closeSidebar}
+            />
+          ))}
+
+          {/* ── قسم الإعدادات (أدمن فقط) ── */}
+          {isAdmin && (
             <>
-              <div className="px-3 pt-3 pb-1">
-                <p className="text-xs text-muted-foreground/60 font-medium uppercase tracking-wider">إدارة</p>
-              </div>
-              {adminNavItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
-                return (
-                  <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)}>
-                    <div
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                        isActive
-                          ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                      }`}
-                      style={isActive ? {
-                        background: "oklch(0.65 0.18 200 / 0.12)",
-                        border: "1px solid oklch(0.65 0.18 200 / 0.2)",
-                        color: "var(--brand-cyan)",
-                      } : {}}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      {item.label}
-                    </div>
-                  </Link>
-                );
-              })}
+              <SectionLabel label="إعدادات" />
+              {SETTINGS_NAV.map((item) => (
+                <NavItem
+                  key={item.path}
+                  path={item.path}
+                  label={item.label}
+                  icon={item.icon}
+                  isActive={isActive(item.path)}
+                  onClick={closeSidebar}
+                />
+              ))}
+            </>
+          )}
+
+          {/* ── قسم الإدارة (أدمن فقط) ── */}
+          {isAdmin && (
+            <>
+              <SectionLabel label="إدارة" />
+              {ADMIN_NAV.map((item) => (
+                <NavItem
+                  key={item.path}
+                  path={item.path}
+                  label={item.label}
+                  icon={item.icon}
+                  isActive={isActive(item.path)}
+                  onClick={closeSidebar}
+                />
+              ))}
             </>
           )}
         </nav>
 
-        {/* User section */}
-        <div className="p-3 border-t border-border">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl mb-2" style={{ background: "oklch(0.15 0.015 240)" }}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "oklch(0.65 0.18 200 / 0.2)", color: "var(--brand-cyan)" }}>
-              {user?.name?.charAt(0) || "U"}
+        {/* ── User section ── */}
+        <div className="p-3 border-t border-border flex-shrink-0">
+          <div
+            className="flex items-center gap-3 px-3 py-2 rounded-xl mb-2"
+            style={{ background: "oklch(0.15 0.015 240)" }}
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+              style={{
+                background: "oklch(0.65 0.18 200 / 0.2)",
+                color: "var(--brand-cyan)",
+              }}
+            >
+              {user?.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{user?.name || "المستخدم"}</p>
+              <p className="text-sm font-medium text-foreground truncate">
+                {user?.name || "المستخدم"}
+              </p>
               <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
             </div>
           </div>
@@ -268,10 +332,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* ══════════════ Main content ══════════════ */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="h-14 border-b border-border flex items-center px-4 gap-3 flex-shrink-0" style={{ background: "oklch(0.11 0.012 240)" }}>
+        <header
+          className="h-14 border-b border-border flex items-center px-4 gap-3 flex-shrink-0"
+          style={{ background: "oklch(0.11 0.012 240)" }}
+        >
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden text-muted-foreground hover:text-foreground"
@@ -289,9 +356,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
       </main>
     </div>
   );
