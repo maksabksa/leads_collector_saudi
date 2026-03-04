@@ -324,6 +324,20 @@ export default function SearchHub() {
   const [minFollowers, setMinFollowers] = useState("");
   const [maxFollowers, setMaxFollowers] = useState("");
   const [onlyWithPhone, setOnlyWithPhone] = useState(false);
+  // ===== معالج الاستهداف الذكي =====
+  const [showTargetWizard, setShowTargetWizard] = useState(false);
+  const [targetFilters, setTargetFilters] = useState({
+    targetCount: 20,
+    activityType: "",
+    minRating: 0,
+    mustHavePhone: false,
+    mustHaveWebsite: false,
+    onlyOpenNow: false,
+    minReviews: 0,
+    priceLevel: "any" as "any" | "1" | "2" | "3" | "4",
+    district: "",
+    additionalKeywords: "",
+  });
 
   // ===== البحث الجغرافي بالنطاق =====
   const [showRadiusSearch, setShowRadiusSearch] = useState(false);
@@ -1001,8 +1015,50 @@ export default function SearchHub() {
           >
             <SlidersHorizontal className="w-4 h-4" />
           </Button>
+          {/* زر معالج الاستهداف الذكي */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 gap-1.5 px-3 shrink-0 border-primary/40 text-primary hover:bg-primary/10"
+            onClick={() => setShowTargetWizard(true)}
+            title="معالج الاستهداف الذكي"
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-xs">استهداف ذكي</span>
+          </Button>
         </div>
-
+        {/* شريط الفلاتر المختارة */}
+        {(targetFilters.activityType || targetFilters.mustHavePhone || targetFilters.minRating > 0 || targetFilters.targetCount !== 20) && (
+          <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+            <span className="text-xs text-muted-foreground">فلاتر نشطة:</span>
+            {targetFilters.activityType && (
+              <Badge variant="outline" className="text-xs gap-1 border-primary/40 text-primary">
+                <Building2 className="w-2.5 h-2.5" />
+                {targetFilters.activityType}
+              </Badge>
+            )}
+            {targetFilters.mustHavePhone && (
+              <Badge variant="outline" className="text-xs gap-1 border-green-500/40 text-green-400">
+                <Phone className="w-2.5 h-2.5" />
+                رقم هاتف مطلوب
+              </Badge>
+            )}
+            {targetFilters.minRating > 0 && (
+              <Badge variant="outline" className="text-xs gap-1 border-yellow-500/40 text-yellow-400">
+                <Star className="w-2.5 h-2.5" />
+                تقييم ≥ {targetFilters.minRating}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-xs gap-1 border-blue-500/40 text-blue-400">
+              <Users className="w-2.5 h-2.5" />
+              الهدف: {targetFilters.targetCount} نتيجة
+            </Badge>
+            <button
+              onClick={() => setTargetFilters({ targetCount: 20, activityType: "", minRating: 0, mustHavePhone: false, mustHaveWebsite: false, onlyOpenNow: false, minReviews: 0, priceLevel: "any", district: "", additionalKeywords: "" })}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >× مسح</button>
+          </div>
+        )}
         {/* فلاتر متقدمة */}
         {showFilters && (
           <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-border flex flex-wrap gap-3 items-end">
@@ -1824,6 +1880,187 @@ export default function SearchHub() {
                 <Plus className="w-4 h-4" />
               )}
               إضافة كعميل
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== نافذة معالج الاستهداف الذكي ===== */}
+      <Dialog open={showTargetWizard} onOpenChange={setShowTargetWizard}>
+        <DialogContent className="max-w-xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Target className="w-5 h-5 text-primary" />
+              معالج الاستهداف الذكي
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">حدد معايير البحث للحصول على نتائج أكثر دقة واستهدافاً</p>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* سؤال 1: نوع النشاط */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-primary" />
+                ما هو نوع النشاط التجاري المستهدف؟
+              </Label>
+              <div className="grid grid-cols-3 gap-2">
+                {["مطاعم", "صالونات", "عيادات", "محلات ملابس", "مقاهي", "فنادق", "مدارس", "صيدليات", "مكتبات", "مواقف سيارات", "بقالة", "أخرى"].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setTargetFilters(f => ({ ...f, activityType: f.activityType === type ? "" : type }))}
+                    className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      targetFilters.activityType === type
+                        ? "bg-primary/15 border-primary text-primary"
+                        : "border-border hover:border-primary/50 hover:bg-muted/50"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+              {targetFilters.activityType === "أخرى" && (
+                <Input
+                  placeholder="اكتب نوع النشاط..."
+                  className="h-8 text-sm mt-1"
+                  onChange={e => setTargetFilters(f => ({ ...f, activityType: e.target.value }))}
+                />
+              )}
+            </div>
+
+            {/* سؤال 2: العدد المطلوب */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                كم عميل محتمل تريد استخراجه؟
+              </Label>
+              <div className="flex gap-2 flex-wrap">
+                {[10, 20, 50, 100, 200].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setTargetFilters(f => ({ ...f, targetCount: n }))}
+                    className={`px-4 py-1.5 rounded-full border text-sm font-medium transition-all ${
+                      targetFilters.targetCount === n
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <Input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={targetFilters.targetCount}
+                  onChange={e => setTargetFilters(f => ({ ...f, targetCount: Number(e.target.value) }))}
+                  className="h-8 w-20 text-sm"
+                  placeholder="مخصص"
+                />
+              </div>
+            </div>
+
+            {/* سؤال 3: التقييم الأدنى */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Star className="w-4 h-4 text-yellow-400" />
+                ما هو الحد الأدنى للتقييم على جوجل مابس؟
+              </Label>
+              <div className="flex gap-2">
+                {[0, 3, 3.5, 4, 4.5].map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setTargetFilters(f => ({ ...f, minRating: r }))}
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                      targetFilters.minRating === r
+                        ? "bg-yellow-500/20 border-yellow-500 text-yellow-400"
+                        : "border-border hover:border-yellow-500/50"
+                    }`}
+                  >
+                    {r === 0 ? "أي تقييم" : `★ ${r}+`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* سؤال 4: متطلبات إضافية */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">متطلبات إضافية</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: "mustHavePhone", label: "رقم هاتف مطلوب", icon: Phone, color: "green" },
+                  { key: "mustHaveWebsite", label: "موقع إلكتروني مطلوب", icon: Globe, color: "blue" },
+                  { key: "onlyOpenNow", label: "مفتوح الآن فقط", icon: Clock, color: "orange" },
+                ].map(opt => {
+                  const Icon = opt.icon;
+                  const val = targetFilters[opt.key as keyof typeof targetFilters] as boolean;
+                  return (
+                    <button
+                      key={opt.key}
+                      onClick={() => setTargetFilters(f => ({ ...f, [opt.key]: !val }))}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        val
+                          ? `bg-${opt.color}-500/15 border-${opt.color}-500 text-${opt.color}-400`
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* سؤال 5: الحي / المنطقة */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-primary" />
+                الحي أو المنطقة (اختياري)
+              </Label>
+              <Input
+                placeholder="مثل: العليا - الملز - النخيل..."
+                value={targetFilters.district}
+                onChange={e => setTargetFilters(f => ({ ...f, district: e.target.value }))}
+                className="h-9 text-sm"
+              />
+            </div>
+
+            {/* سؤال 6: كلمات مفتاحية إضافية */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                كلمات مفتاحية إضافية (اختياري)
+              </Label>
+              <Input
+                placeholder="مثل: توصيل - بالجملة - فاخر - خدمة سريعة..."
+                value={targetFilters.additionalKeywords}
+                onChange={e => setTargetFilters(f => ({ ...f, additionalKeywords: e.target.value }))}
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setTargetFilters({ targetCount: 20, activityType: "", minRating: 0, mustHavePhone: false, mustHaveWebsite: false, onlyOpenNow: false, minReviews: 0, priceLevel: "any", district: "", additionalKeywords: "" })}
+            >
+              إعادة تعيين
+            </Button>
+            <Button
+              onClick={() => {
+                // تطبيق الفلاتر على كلمة البحث
+                if (targetFilters.activityType && targetFilters.activityType !== "أخرى") {
+                  setKeyword(targetFilters.activityType + (targetFilters.district ? ` في ${targetFilters.district}` : "") + (targetFilters.additionalKeywords ? ` ${targetFilters.additionalKeywords}` : ""));
+                }
+                setShowTargetWizard(false);
+                // بدء البحث تلقائياً
+                setTimeout(() => handleSearch(), 300);
+              }}
+              className="gap-2"
+            >
+              <Search className="w-4 h-4" />
+              ابدأ البحث
             </Button>
           </DialogFooter>
         </DialogContent>

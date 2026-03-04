@@ -823,79 +823,256 @@ function PerformanceReport() {
 
 // ===== تقرير الذكاء الاصطناعي =====
 function AIReport() {
-  const [period, setPeriod] = useState("7");
-  const { data } = trpc.waSettings.getDailyStats.useQuery(
-    { days: parseInt(period) },
-    { refetchOnWindowFocus: false }
-  );
+  const [period, setPeriod] = useState("30");
+  const [insights, setInsights] = useState<any>(null);
+  const [systemSummary, setSystemSummary] = useState<any>(null);
 
-  const totalSent = data?.totals?.sent || 0;
-  const totalReceived = data?.totals?.received || 0;
-  const replyRate = totalReceived > 0 ? Math.round((totalSent / totalReceived) * 100) : 0;
-  const activeAccounts = data?.accounts?.filter((a: { isConnected: boolean }) => a.isConnected)?.length || 0;
+  const getInsights = trpc.aiReport.getSystemInsights.useMutation({
+    onSuccess: (data) => {
+      setInsights(data.insights);
+      setSystemSummary(data.systemSummary);
+    },
+    onError: (e: { message: string }) => toast.error("خطأ في التحليل", { description: e.message }),
+  });
 
-  const chartData = useMemo(() => {
-    if (!data?.dailyBreakdown) return [];
-    return data.dailyBreakdown.map((d: { day: string; sent: number; received: number }) => ({
-      date: new Date(d.day).toLocaleDateString("ar-SA", { month: "short", day: "numeric" }),
-      "مُرسَلة": d.sent || 0,
-      "مُستقبَلة": d.received || 0,
-    }));
-  }, [data]);
+  const impactColor = (impact: string) => {
+    if (impact === "high") return "#E74C3C";
+    if (impact === "medium") return "#E67E22";
+    return "#25D366";
+  };
+  const statusColor = (status: string) => {
+    if (status === "good") return "#25D366";
+    if (status === "warning") return "#E67E22";
+    return "#E74C3C";
+  };
+  const categoryLabel = (cat: string) => {
+    const map: Record<string, string> = { leads: "عملاء", whatsapp: "واتساب", followup: "متابعة", search: "بحث" };
+    return map[cat] || cat;
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-white font-semibold">تقرير أداء الذكاء الاصطناعي</h2>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-36 h-8 text-xs border-white/10 text-white" style={{ background: "#202c33" }}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">آخر 7 أيام</SelectItem>
-            <SelectItem value="14">آخر 14 يوم</SelectItem>
-            <SelectItem value="30">آخر 30 يوم</SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="space-y-6" dir="rtl">
+      {/* رأس الصفحة */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-white font-bold text-lg">التحليل الذكي الشامل</h2>
+          <p className="text-xs text-[#8696a0] mt-0.5">تحليل عميق لأداء النظام مع توصيات تطوير دقيقة</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-32 h-8 text-xs border-white/10 text-white" style={{ background: "#202c33" }}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">آخر 7 أيام</SelectItem>
+              <SelectItem value="14">آخر 14 يوم</SelectItem>
+              <SelectItem value="30">آخر 30 يوم</SelectItem>
+              <SelectItem value="60">آخر 60 يوم</SelectItem>
+              <SelectItem value="90">آخر 90 يوم</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={() => getInsights.mutate({ period: parseInt(period) })}
+            disabled={getInsights.isPending}
+            className="h-8 text-xs gap-1.5 bg-[#25D366] hover:bg-[#20b858] text-black"
+          >
+            {getInsights.isPending ? (
+              <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> جاري التحليل...</>
+            ) : (
+              <><Sparkles className="w-3.5 h-3.5" /> تحليل ذكي</>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="إجمالي الرسائل المُرسَلة" value={totalSent} icon={Bot} color="#25D366" />
-        <StatCard title="إجمالي الرسائل الواردة" value={totalReceived} icon={Zap} color="#34B7F1" />
-        <StatCard title="معدل الاستجابة" value={`${replyRate}%`} icon={Activity} color="#9B59B6" />
-        <StatCard title="الحسابات النشطة" value={activeAccounts} icon={Clock} color="#E67E22" />
-      </div>
-
-      {chartData.length > 0 && (
-        <div className="rounded-xl border p-5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
-          <h3 className="text-white font-medium mb-4 text-sm">نشاط الرسائل اليومي</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fill: "#8696a0", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#8696a0", fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: "#1e2a32", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }} />
-              <Legend />
-              <Line type="monotone" dataKey="مُرسَلة" stroke="#25D366" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="مُستقبَلة" stroke="#34B7F1" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+      {/* بطاقات ملخص النظام */}
+      {systemSummary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard title="إجمالي العملاء" value={systemSummary.leads?.total || 0} icon={Users} color="#25D366" />
+          <StatCard title="معدل التحويل" value={`${systemSummary.leads?.conversionRate || 0}%`} icon={TrendingUp} color="#34B7F1" />
+          <StatCard title="رسائل الفترة" value={systemSummary.messages?.total || 0} icon={MessageSquare} color="#9B59B6" />
+          <StatCard title="معدل الرد" value={`${systemSummary.messages?.replyRate || 0}%`} icon={Activity} color="#E67E22" />
         </div>
       )}
 
-      <div className="rounded-xl border p-5" style={{ background: "rgba(37,211,102,0.05)", borderColor: "rgba(37,211,102,0.2)" }}>
-        <div className="flex items-start gap-3">
-          <Sparkles className="w-5 h-5 text-[#25D366] mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-white font-medium text-sm">تحليل أداء النظام</p>
-            <p className="text-xs text-[#8696a0] mt-1 leading-relaxed">
-              {totalSent > 0
-                ? `النظام يُرسل ${totalSent.toLocaleString("ar-SA")} رسالة ويستقبل ${totalReceived.toLocaleString("ar-SA")} رسالة في آخر ${period} أيام. معدل الاستجابة ${replyRate}%.`
-                : "لا توجد بيانات كافية. تأكد من ربط حسابات واتساب وتفعيل الرد التلقائي في الإعدادات."}
-            </p>
-          </div>
+      {/* حالة الانتظار */}
+      {getInsights.isPending && (
+        <div className="rounded-xl border p-8 text-center" style={{ background: "rgba(37,211,102,0.05)", borderColor: "rgba(37,211,102,0.2)" }}>
+          <Sparkles className="w-8 h-8 text-[#25D366] mx-auto mb-3 animate-pulse" />
+          <p className="text-white font-medium">جاري تحليل بيانات النظام...</p>
+          <p className="text-xs text-[#8696a0] mt-1">يستغرق هذا حوالي 10-20 ثانية</p>
         </div>
-      </div>
+      )}
+
+      {/* نتائج التحليل */}
+      {insights && !getInsights.isPending && (
+        <div className="space-y-5">
+          {/* الملخص التنفيذي */}
+          <div className="rounded-xl border p-5" style={{ background: "rgba(37,211,102,0.05)", borderColor: "rgba(37,211,102,0.2)" }}>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(37,211,102,0.15)" }}>
+                <span className="text-xl font-bold text-[#25D366]">{insights.overallScore || 0}</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-semibold text-sm mb-1">الملخص التنفيذي</p>
+                <p className="text-xs text-[#8696a0] leading-relaxed">{insights.summary}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* نقاط القوة والضعف */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-xl border p-4" style={{ background: "rgba(37,211,102,0.05)", borderColor: "rgba(37,211,102,0.15)" }}>
+              <h3 className="text-[#25D366] font-semibold text-sm mb-3 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" /> نقاط القوة
+              </h3>
+              <ul className="space-y-2">
+                {(insights.strengths || []).map((s: string, i: number) => (
+                  <li key={i} className="text-xs text-[#8696a0] flex items-start gap-2">
+                    <span className="text-[#25D366] mt-0.5">✓</span> {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border p-4" style={{ background: "rgba(231,76,60,0.05)", borderColor: "rgba(231,76,60,0.15)" }}>
+              <h3 className="text-[#E74C3C] font-semibold text-sm mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" /> نقاط الضعف
+              </h3>
+              <ul className="space-y-2">
+                {(insights.weaknesses || []).map((w: string, i: number) => (
+                  <li key={i} className="text-xs text-[#8696a0] flex items-start gap-2">
+                    <span className="text-[#E74C3C] mt-0.5">✕</span> {w}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* إجراءات عاجلة */}
+          {insights.urgentActions?.length > 0 && (
+            <div className="rounded-xl border p-4" style={{ background: "rgba(231,76,60,0.05)", borderColor: "rgba(231,76,60,0.2)" }}>
+              <h3 className="text-[#E74C3C] font-semibold text-sm mb-3 flex items-center gap-2">
+                <Flag className="w-4 h-4" /> إجراءات عاجلة
+              </h3>
+              <div className="space-y-3">
+                {insights.urgentActions.map((action: any, i: number) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: impactColor(action.impact) + "25" }}>
+                      <span className="text-xs font-bold" style={{ color: impactColor(action.impact) }}>{i + 1}</span>
+                    </div>
+                    <div>
+                      <p className="text-white text-xs font-medium">{action.title}</p>
+                      <p className="text-[#8696a0] text-xs mt-0.5">{action.description}</p>
+                    </div>
+                    <Badge className="text-[10px] px-1.5 py-0.5 ml-auto flex-shrink-0" style={{ background: impactColor(action.impact) + "25", color: impactColor(action.impact), border: "none" }}>
+                      {action.impact === "high" ? "عالي" : action.impact === "medium" ? "متوسط" : "منخفض"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* تحسينات مقترحة */}
+          {insights.improvements?.length > 0 && (
+            <div className="rounded-xl border p-4" style={{ background: "rgba(52,183,241,0.05)", borderColor: "rgba(52,183,241,0.15)" }}>
+              <h3 className="text-[#34B7F1] font-semibold text-sm mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" /> تحسينات مقترحة
+              </h3>
+              <div className="space-y-2">
+                {insights.improvements.map((imp: any, i: number) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
+                    <Badge className="text-[10px] px-1.5 py-0.5 flex-shrink-0 mt-0.5" style={{ background: "rgba(52,183,241,0.15)", color: "#34B7F1", border: "none" }}>
+                      {categoryLabel(imp.category)}
+                    </Badge>
+                    <div>
+                      <p className="text-white text-xs font-medium">{imp.title}</p>
+                      <p className="text-[#8696a0] text-xs mt-0.5">{imp.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* تحليل التحويل + صحة المسار */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {insights.conversionAnalysis && (
+              <div className="rounded-xl border p-4" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+                <h3 className="text-white font-semibold text-sm mb-2 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-[#9B59B6]" /> تحليل التحويل
+                </h3>
+                <p className="text-xs text-[#8696a0] leading-relaxed">{insights.conversionAnalysis}</p>
+              </div>
+            )}
+            {insights.pipelineHealth && (
+              <div className="rounded-xl border p-4" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+                <h3 className="text-white font-semibold text-sm mb-2 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#E67E22]" /> صحة المسار البيعي
+                </h3>
+                <p className="text-xs text-[#8696a0] leading-relaxed">{insights.pipelineHealth}</p>
+              </div>
+            )}
+          </div>
+
+          {/* أولويات الأسبوع القادم */}
+          {insights.nextWeekFocus?.length > 0 && (
+            <div className="rounded-xl border p-4" style={{ background: "rgba(155,89,182,0.05)", borderColor: "rgba(155,89,182,0.2)" }}>
+              <h3 className="text-[#9B59B6] font-semibold text-sm mb-3 flex items-center gap-2">
+                <Calendar className="w-4 h-4" /> أولويات الأسبوع القادم
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {insights.nextWeekFocus.map((f: string, i: number) => (
+                  <Badge key={i} className="text-xs" style={{ background: "rgba(155,89,182,0.15)", color: "#9B59B6", border: "none" }}>
+                    {i + 1}. {f}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* KPIs */}
+          {insights.kpis?.length > 0 && (
+            <div className="rounded-xl border p-4" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+              <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-[#34B7F1]" /> مؤشرات الأداء الرئيسية
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {insights.kpis.map((kpi: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
+                    <div>
+                      <p className="text-white text-xs font-medium">{kpi.name}</p>
+                      <p className="text-[#8696a0] text-xs">الهدف: {kpi.target}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold" style={{ color: statusColor(kpi.status) }}>{kpi.current}</p>
+                      <Badge className="text-[10px]" style={{ background: statusColor(kpi.status) + "25", color: statusColor(kpi.status), border: "none" }}>
+                        {kpi.status === "good" ? "جيد" : kpi.status === "warning" ? "تحذير" : "حرج"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* حالة البداية */}
+      {!insights && !getInsights.isPending && (
+        <div className="rounded-xl border p-10 text-center" style={{ background: "rgba(37,211,102,0.03)", borderColor: "rgba(37,211,102,0.1)" }}>
+          <Sparkles className="w-12 h-12 text-[#25D366]/40 mx-auto mb-4" />
+          <p className="text-white font-medium mb-2">ابدأ التحليل الذكي</p>
+          <p className="text-xs text-[#8696a0] mb-4">اضغط على "تحليل ذكي" للحصول على تحليل شامل لأداء النظام مع توصيات تطوير دقيقة</p>
+          <Button
+            onClick={() => getInsights.mutate({ period: parseInt(period) })}
+            className="gap-2 bg-[#25D366] hover:bg-[#20b858] text-black"
+          >
+            <Sparkles className="w-4 h-4" />
+            تحليل ذكي
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

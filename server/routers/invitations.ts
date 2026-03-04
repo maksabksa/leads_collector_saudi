@@ -15,18 +15,52 @@ import crypto from "crypto";
 import { notifyOwner } from "../_core/notification";
 import { sendEmail, buildInvitationEmail } from "../emailService";
 
-// قائمة الصلاحيات المتاحة
+// قائمة الصلاحيات المتاحة - مُنظَّمة حسب الوظيفة
 export const AVAILABLE_PERMISSIONS = [
-  "leads.view",
-  "leads.add",
-  "leads.edit",
-  "leads.delete",
-  "whatsapp.send",
-  "whatsapp.settings",
-  "search.use",
-  "analytics.view",
-  "templates.manage",
+  // ===== إدارة العملاء =====
+  "leads.view",           // عرض قائمة العملاء
+  "leads.add",            // إضافة عملاء جدد
+  "leads.edit",           // تعديل بيانات العملاء
+  "leads.delete",         // حذف العملاء
+  "leads.export",         // تصدير بيانات العملاء
+  // ===== واتساب والتواصل =====
+  "whatsapp.send",        // إرسال رسائل واتساب فردية
+  "whatsapp.bulk_send",   // الإرسال الجماعي
+  "whatsapp.view_all_chats", // عرض جميع المحادثات
+  "whatsapp.settings",    // إعدادات واتساب
+  // ===== البحث والاستخراج =====
+  "search.use",           // استخدام البحث الأساسي
+  "search.extract",       // استخراج البيانات من المواقع
+  "search.advanced",      // البحث المتقدم والمحرك الذكي
+  // ===== المتابعة =====
+  "followup.view",        // عرض قائمة المتابعة
+  "followup.manage",      // إدارة مواعيد المتابعة
+  "followup.assign",      // تعيين متابعات للموظفين
+  // ===== التحليل والتقارير =====
+  "analytics.view",       // عرض التحليلات والإحصائيات
+  "analytics.export",     // تصدير التقارير
+  "reports.view",         // عرض التقارير الموحدة
+  // ===== الإعدادات =====
+  "templates.manage",     // إدارة قوالب الرسائل
+  "ai.settings",          // إعدادات الذكاء الاصطناعي
 ] as const;
+
+// مجموعات الصلاحيات الجاهزة للأدوار
+export const PERMISSION_PRESETS = {
+  searcher: ["leads.view", "search.use", "search.extract", "search.advanced", "leads.add"],
+  sender: ["leads.view", "whatsapp.send", "whatsapp.bulk_send", "whatsapp.view_all_chats"],
+  lead_manager: ["leads.view", "leads.add", "leads.edit", "leads.export"],
+  followup_agent: ["leads.view", "leads.edit", "followup.view", "followup.manage", "whatsapp.send"],
+  analyst: ["leads.view", "analytics.view", "analytics.export", "reports.view"],
+  full_access: [
+    "leads.view", "leads.add", "leads.edit", "leads.export",
+    "whatsapp.send", "whatsapp.bulk_send", "whatsapp.view_all_chats",
+    "search.use", "search.extract", "search.advanced",
+    "followup.view", "followup.manage",
+    "analytics.view", "reports.view",
+    "templates.manage",
+  ],
+} as const;
 
 export type Permission = (typeof AVAILABLE_PERMISSIONS)[number];
 

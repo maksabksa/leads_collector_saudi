@@ -17,7 +17,7 @@ import {
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { whatsappMessages, dataSettings, aiSettings } from "../drizzle/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -723,6 +723,135 @@ const analysisRouter = router({
       return { queued, skipped };
     }),
 });
+// ===== AI SYSTEM INSIGHTS =====
+const aiReportRouter = router({
+  getSystemInsights: protectedProcedure
+    .input(z.object({ period: z.number().min(7).max(90).default(30) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'قاعدة البيانات غير متاحة' });
+
+      // جلب إحصائيات العملاء باستخدام Drizzle ORM
+      const { leads: leadsTable, whatsappChatMessages, whatsappAccounts } = await import('../drizzle/schema');
+      const { count, sum, countDistinct } = await import('drizzle-orm');
+
+      const totalLeads = await db.select({ c: sql<number>`count(*)` }).from(leadsTable);
+      const stageGroups = await db.select({
+        stage: leadsTable.stage,
+        c: sql<number>`count(*)`
+      }).from(leadsTable).groupBy(leadsTable.stage);
+      const withPhone = await db.select({ c: sql<number>`count(*)` }).from(leadsTable).where(sql`${leadsTable.verifiedPhone} IS NOT NULL AND ${leadsTable.verifiedPhone} != ''`);
+      const withWebsite = await db.select({ c: sql<number>`count(*)` }).from(leadsTable).where(sql`${leadsTable.website} IS NOT NULL AND ${leadsTable.website} != ''`);
+
+      const stageMap: Record<string, number> = {};
+      for (const row of stageGroups) { stageMap[row.stage] = Number(row.c); }
+
+      const leads = {
+        total: Number(totalLeads[0]?.c) || 0,
+        new: stageMap['new'] || 0,
+        contacted: stageMap['contacted'] || 0,
+        interested: stageMap['interested'] || 0,
+        offer: (stageMap['price_offer'] || 0),
+        meeting: stageMap['meeting'] || 0,
+        client: stageMap['won'] || 0,
+        lost: stageMap['lost'] || 0,
+        withPhone: Number(withPhone[0]?.c) || 0,
+        withWebsite: Number(withWebsite[0]?.c) || 0,
+      };
+
+      // إحصائيات الرسائل
+      const periodMs = input.period * 24 * 60 * 60 * 1000;
+      const sinceDate = new Date(Date.now() - periodMs);
+      const sinceStr = sinceDate.toISOString().slice(0, 19).replace('T', ' ');
+
+      const totalMsgs = await db.select({ c: sql<number>`count(*)` }).from(whatsappChatMessages).where(sql`${whatsappChatMessages.sentAt} >= ${sinceStr}`);
+      const sentMsgs = await db.select({ c: sql<number>`count(*)` }).from(whatsappChatMessages).where(sql`${whatsappChatMessages.direction} = 'outbound' AND ${whatsappChatMessages.sentAt} >= ${sinceStr}`);
+      const recvMsgs = await db.select({ c: sql<number>`count(*)` }).from(whatsappChatMessages).where(sql`${whatsappChatMessages.direction} = 'inbound' AND ${whatsappChatMessages.sentAt} >= ${sinceStr}`);
+
+      const msgs = {
+        total: Number(totalMsgs[0]?.c) || 0,
+        sent: Number(sentMsgs[0]?.c) || 0,
+        received: Number(recvMsgs[0]?.c) || 0,
+        replyRate: Number(sentMsgs[0]?.c) > 0 ? Math.round((Number(recvMsgs[0]?.c) / Number(sentMsgs[0]?.c)) * 100) : 0,
+      };
+
+      // إحصائيات الحسابات
+      const { whatsappAccounts: waAccTable } = await import('../drizzle/schema');
+      const totalAccs = await db.select({ c: sql<number>`count(*)` }).from(waAccTable);
+      const activeAccs = await db.select({ c: sql<number>`count(*)` }).from(waAccTable).where(eq(waAccTable.isActive, true));
+      const accs = {
+        total: Number(totalAccs[0]?.c) || 0,
+        connected: Number(activeAccs[0]?.c) || 0,
+      };
+
+      const systemSummary = {
+        leads: {
+          total: Number(leads.total) || 0,
+          new: Number(leads.new) || 0,
+          contacted: Number(leads.contacted) || 0,
+          interested: Number(leads.interested) || 0,
+          offer: Number(leads.offer) || 0,
+          meeting: Number(leads.meeting) || 0,
+          client: Number(leads.client) || 0,
+          lost: Number(leads.lost) || 0,
+          withPhone: Number(leads.withPhone) || 0,
+          withWebsite: Number(leads.withWebsite) || 0,
+          conversionRate: Number(leads.total) > 0 ? Math.round((Number(leads.client) / Number(leads.total)) * 100) : 0,
+        },
+        messages: {
+          total: Number(msgs.total) || 0,
+          sent: Number(msgs.sent) || 0,
+          received: Number(msgs.received) || 0,
+          replyRate: Number(msgs.sent) > 0 ? Math.round((Number(msgs.received) / Number(msgs.sent)) * 100) : 0,
+        },
+        accounts: {
+          total: Number(accs.total) || 0,
+          connected: Number(accs.connected) || 0,
+        },
+        period: input.period,
+      };
+
+      const prompt = `أنت محلل أعمال خبير متخصص في السوق السعودي.
+بيانات نظام CRM واتساب لآخر ${input.period} يوماً:
+${JSON.stringify(systemSummary, null, 2)}
+
+قدم تحليلاً شاملاً بصيغة JSON فقط:
+{
+  "overallScore": 7,
+  "summary": "ملخص تنفيذي في 3 أسطر",
+  "strengths": ["نقطة قوة 1", "نقطة قوة 2"],
+  "weaknesses": ["نقطة ضعف 1", "نقطة ضعف 2"],
+  "urgentActions": [
+    { "title": "إجراء عاجل", "description": "وصف تفصيلي", "impact": "high", "effort": "low" }
+  ],
+  "improvements": [
+    { "title": "تحسين", "description": "وصف تفصيلي", "category": "leads", "impact": "medium", "effort": "medium" }
+  ],
+  "conversionAnalysis": "تحليل معدل التحويل",
+  "pipelineHealth": "تحليل صحة المسار البيعي",
+  "nextWeekFocus": ["أولوية 1", "أولوية 2"],
+  "kpis": [
+    { "name": "KPI", "current": "قيمة", "target": "هدف", "status": "good" }
+  ]
+}`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "أنت محلل CRM خبير. أجب دائماً بـ JSON صحيح فقط." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" } as any,
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      const content = typeof rawContent === 'string' ? rawContent : "{}";
+      let insights: any = {};
+      try { insights = JSON.parse(content); } catch { insights = { summary: "تعذر تحليل البيانات" }; }
+
+      return { insights, systemSummary };
+    }),
+});
+
 // ===== EXPORT ROUTER ======
 const exportRouter = router({
   exportCSV: protectedProcedure
@@ -2352,5 +2481,6 @@ export const appRouter = router({
   auditLog: auditLogRouter,
   messageLimits: messageLimitsRouter,
   followUp: followUpRouter,
+  aiReport: aiReportRouter,
 });
 export type AppRouter = typeof appRouter;

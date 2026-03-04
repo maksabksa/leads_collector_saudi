@@ -546,6 +546,8 @@ export default function Chats() {
   const [filterLabelId, setFilterLabelId] = useState<number | null>(null);
   // ===== حالة Stage Filter =====
   const [filterStage, setFilterStage] = useState<string | null>(null);
+  // ===== حالة فلتر المنصة (دمج صندوق الوارد) =====
+  const [filterPlatform, setFilterPlatform] = useState<"all" | "whatsapp" | "instagram" | "tiktok" | "snapchat">("whatsapp");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -558,6 +560,12 @@ export default function Chats() {
     { accountId: selectedAccountId, includeArchived: filterMode === "archived" },
     { refetchInterval: 2000 }
   );
+  // جلب محادثات المنصات الأخرى
+  const { data: inboxData } = trpc.inbox.conversations.list.useQuery(
+    { platform: filterPlatform === "whatsapp" ? "all" : filterPlatform, limit: 50, offset: 0 },
+    { refetchInterval: 5000, enabled: filterPlatform !== "whatsapp" }
+  );
+  const socialConvs: any[] = (inboxData as any)?.conversations ?? [];
   const { data: messages = [], refetch: refetchMessages } = trpc.waSettings.getChatMessages.useQuery(
     { chatId: selectedChatId! },
     { enabled: selectedChatId !== null && selectedChatId > 0, refetchInterval: 2000 }
@@ -787,6 +795,27 @@ export default function Chats() {
     { enabled: filterLabelId !== null }
   );
   const displayedChats = useMemo(() => {
+    // إذا كانت المنصة ليست واتساب، أظهر محادثات المنصة الأخرى كبيانات متوافقة
+    if (filterPlatform !== "whatsapp") {
+      const q = searchQuery.toLowerCase();
+      return socialConvs
+        .filter(c => filterPlatform === "all" || c.platform === filterPlatform)
+        .filter(c => !q || (c.senderDisplayName || "").toLowerCase().includes(q) || (c.senderUsername || "").toLowerCase().includes(q))
+        .map(c => ({
+          id: c.id,
+          accountId: c.platform,
+          phone: c.senderUsername || c.id,
+          contactName: c.senderDisplayName || c.senderUsername,
+          leadId: null,
+          lastMessage: c.lastMessagePreview,
+          lastMessageAt: c.lastMessageAt,
+          unreadCount: c.unreadCount ?? 0,
+          isArchived: false,
+          aiAutoReplyEnabled: c.aiAutoReplyEnabled ?? false,
+          createdAt: c.createdAt,
+          platform: c.platform,
+        })) as Chat[];
+    }
     let list = filteredChats;
     if (filterLabelId && labelFilteredChatIds) {
       const ids = new Set(labelFilteredChatIds);
@@ -796,7 +825,7 @@ export default function Chats() {
       list = list.filter(c => (c as any).stage === filterStage);
     }
     return list;
-  }, [filteredChats, filterLabelId, labelFilteredChatIds, filterStage]);
+  }, [filteredChats, filterLabelId, labelFilteredChatIds, filterStage, filterPlatform, socialConvs, searchQuery]);
 
   // ===== ترتيب وتجميع الرسائل =====
   const sortedMessages = useMemo(() =>
@@ -1056,6 +1085,28 @@ export default function Chats() {
       <div className="flex flex-1 overflow-hidden">
         {/* ===== قائمة المحادثات ===== */}
         <div className="w-72 flex-shrink-0 flex flex-col border-l border-white/10" style={{ background: "#111b21" }}>
+          {/* تبويبات المنصات - دمج صندوق الوارد */}
+          <div className="flex items-center gap-0.5 px-2 pt-2 pb-1 border-b border-white/10 overflow-x-auto">
+            {([
+              { id: "whatsapp", label: "واتساب", icon: "💬", color: "#25D366" },
+              { id: "instagram", label: "إنستجرام", icon: "📸", color: "#E1306C" },
+              { id: "tiktok", label: "تيك توك", icon: "🎵", color: "#010101" },
+              { id: "snapchat", label: "سناب", icon: "👻", color: "#FFFC00" },
+            ] as const).map(p => (
+              <button
+                key={p.id}
+                onClick={() => { setFilterPlatform(p.id); setSelectedChatId(null); }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0"
+                style={filterPlatform === p.id
+                  ? { background: p.color + "22", color: p.color, border: `1px solid ${p.color}44` }
+                  : { color: "#8696a0", border: "1px solid transparent" }
+                }
+              >
+                <span>{p.icon}</span>
+                <span>{p.label}</span>
+              </button>
+            ))}
+          </div>
           {/* بحث وفلتر */}
           <div className="p-2 space-y-2 border-b border-white/10">
             <div className="relative">
