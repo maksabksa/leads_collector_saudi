@@ -798,22 +798,16 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
         else stat.received += Number(row.count);
       }
 
-      // إحصائيات يومية (آخر N يوم)
-      const dailyStats = await db
-        .select({
-          accountId: whatsappChatMessages.accountId,
-          direction: whatsappChatMessages.direction,
-          day: sql<string>`DATE(${whatsappChatMessages.sentAt})`,
-          count: sql<number>`COUNT(*)`,
-        })
-        .from(whatsappChatMessages)
-        .where(sql`${whatsappChatMessages.sentAt} >= ${startDateStr}`)
-        .groupBy(
-          whatsappChatMessages.accountId,
-          whatsappChatMessages.direction,
-          sql`DATE(${whatsappChatMessages.sentAt})`
-        )
-        .orderBy(sql`DATE(${whatsappChatMessages.sentAt})`);
+      // إحصائيات يومية (آخر N يوم) - استخدام execute مباشرة لتجنب مشكلة ONLY_FULL_GROUP_BY
+      const [dailyStatsRaw] = await (db as any).execute(
+        sql`SELECT accountId, direction, DATE(sentAt) as day, COUNT(*) as count FROM whatsapp_chat_messages WHERE sentAt >= ${startDateStr} GROUP BY accountId, direction, DATE(sentAt) ORDER BY DATE(sentAt) ASC`
+      );
+      const dailyStats = (dailyStatsRaw as any[]).map((r: any) => ({
+        accountId: r.accountId as string,
+        direction: r.direction as string,
+        day: r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day),
+        count: Number(r.count),
+      }));
 
       // تجميع البيانات اليومية
       const dayMap = new Map<string, { day: string; sent: number; received: number; byAccount: Record<string, { sent: number; received: number }> }>();

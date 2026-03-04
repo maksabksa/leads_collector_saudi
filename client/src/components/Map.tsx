@@ -92,21 +92,43 @@ const FORGE_BASE_URL =
   "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
+// متغير عالمي لتتبع حالة تحميل Google Maps
+let googleMapsLoadPromise: Promise<void> | null = null;
+
 function loadMapScript() {
-  return new Promise(resolve => {
+  // إذا كانت المكتبة محملة بالفعل، أعد promise محلولة فوراً
+  if (window.google?.maps) {
+    return Promise.resolve();
+  }
+  // إذا كان التحميل جارياً، أعد نفس الـ promise
+  if (googleMapsLoadPromise) {
+    return googleMapsLoadPromise;
+  }
+  // تحقق من وجود script محمل بالفعل
+  const existingScript = document.querySelector(`script[src*="maps/api/js"]`);
+  if (existingScript) {
+    googleMapsLoadPromise = new Promise(resolve => {
+      existingScript.addEventListener('load', () => resolve());
+      // إذا كان محملاً بالفعل
+      if (window.google?.maps) resolve();
+    });
+    return googleMapsLoadPromise;
+  }
+  googleMapsLoadPromise = new Promise(resolve => {
     const script = document.createElement("script");
     script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
     script.async = true;
     script.crossOrigin = "anonymous";
     script.onload = () => {
-      resolve(null);
-      script.remove(); // Clean up immediately
+      resolve();
     };
     script.onerror = () => {
       console.error("Failed to load Google Maps script");
+      googleMapsLoadPromise = null; // إعادة تعيين عند الخطأ للسماح بإعادة المحاولة
     };
     document.head.appendChild(script);
   });
+  return googleMapsLoadPromise;
 }
 
 interface MapViewProps {
