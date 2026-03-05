@@ -86,7 +86,7 @@ export const invitationsRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "قاعدة البيانات غير متاحة" });
 
-      // التحقق من عدم وجود دعوة مفعلة لنفس الإيميل
+      // التحقق من وجود دعوة مفعلة لنفس الإيميل - إذا وجدت نقوم بتحديثها
       const existing = await db
         .select()
         .from(userInvitations)
@@ -98,25 +98,31 @@ export const invitationsRouter = router({
         )
         .limit(1);
 
-      if (existing.length > 0) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "يوجد دعوة مفعلة لهذا البريد الإلكتروني",
-        });
-      }
-
       const token = crypto.randomBytes(48).toString("hex");
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 أيام
 
-      await db.insert(userInvitations).values({
-        email: input.email,
-        invitedBy: ctx.user.id,
-        token,
-        role: input.role,
-        permissions: input.permissions,
-        status: "pending",
-        expiresAt,
-      });
+      if (existing.length > 0) {
+        // تحديث الدعوة الموجودة برابط جديد وصلاحيات محدثة
+        await db.update(userInvitations)
+          .set({
+            token,
+            role: input.role,
+            permissions: input.permissions,
+            expiresAt,
+            invitedBy: ctx.user.id,
+          })
+          .where(eq(userInvitations.id, existing[0].id));
+      } else {
+        await db.insert(userInvitations).values({
+          email: input.email,
+          invitedBy: ctx.user.id,
+          token,
+          role: input.role,
+          permissions: input.permissions,
+          status: "pending",
+          expiresAt,
+        });
+      }
 
       const inviteUrl = `${input.origin}/accept-invitation?token=${token}`;
 
