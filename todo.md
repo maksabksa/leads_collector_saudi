@@ -998,3 +998,22 @@
 - [x] إعادة تفعيل استخراج البيانات من المواقع بفلاتر متقدمة (عدد، نشاط، منطقة، إلخ)
 - [x] تطوير نظام التحليل الذكي ليشمل توصيات التطوير والتعديل
 - [x] تخصيص صلاحيات تفصيلية: من يبحث، من يرسل، من يضيف عملاء، من يتابع
+
+## الدفعة - دمج Bright Data Browser API (مركز البحث الذكي)
+
+- [ ] إنشاء server/routers/brightDataSearch.ts - helper لـ Browser API
+- [ ] Backend: searchInstagram - بحث في إنستجرام بالكيورد + هاشتاق
+- [ ] Backend: searchTikTok - بحث في تيك توك بالكيورد + هاشتاق
+- [ ] Backend: searchTwitter - بحث في تويتر بالكيورد
+- [ ] Backend: searchLinkedIn - بحث في لينكدإن بالكيورد
+- [ ] Backend: searchSnapchat - بحث في سناب شات بالكيورد
+- [ ] Backend: searchGoogleWeb - بحث في جوجل سيرش (مش Maps)
+- [ ] تحديث SearchHub.tsx: إضافة تبويب Instagram مع بطاقات نتائج
+- [ ] تحديث SearchHub.tsx: إضافة تبويب TikTok مع بطاقات نتائج
+- [ ] تحديث SearchHub.tsx: إضافة تبويب Twitter مع بطاقات نتائج
+- [ ] تحديث SearchHub.tsx: إضافة تبويب LinkedIn مع بطاقات نتائج
+- [ ] تحديث SearchHub.tsx: إضافة تبويب Snapchat مع بطاقات نتائج
+- [ ] تحديث SearchHub.tsx: إضافة تبويب Google Search مع بطاقات نتائج
+- [ ] إضافة تبويب "الكل" - بحث متزامن في كل المنصات
+- [ ] بطاقات نتائج موحدة: اسم، متابعون، هاتف، درجة ملاءمة AI، أزرار إضافة/واتساب
+- [ ] ربط BRIGHT_DATA_API_KEY عبر webdev_request_secrets

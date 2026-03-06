@@ -2438,6 +2438,7 @@ import { auditLogRouter } from "./routers/auditLog";
 import { messageLimitsRouter } from "./routers/messageLimits";
 import { followUpRouter } from "./routers/followUp";
 import { googleSearchRouter } from "./routers/googleSearch";
+import { brightDataSearchRouter } from "./routers/brightDataSearch";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2484,5 +2485,6 @@ export const appRouter = router({
   followUp: followUpRouter,
   aiReport: aiReportRouter,
   googleSearch: googleSearchRouter,
+  brightDataSearch: brightDataSearchRouter,
 });
 export type AppRouter = typeof appRouter;

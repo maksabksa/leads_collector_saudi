@@ -22,7 +22,7 @@ import {
   Layers, SlidersHorizontal, CheckCheck, AlertTriangle,
   RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock,
   Navigation, Crosshair, CircleDot, ChevronDown, UserPlus,
-  SearchCheck, Link2, BarChart2, Shield
+  SearchCheck, Link2, BarChart2, Shield, Twitter, Linkedin
 } from "lucide-react";
 import { MapView } from "@/components/Map";
 
@@ -87,6 +87,24 @@ const PLATFORMS = [
     bgColor: "bg-blue-500/10",
     borderColor: "border-blue-500/30",
     badgeColor: "bg-blue-500/20 text-blue-400 border-blue-500/40",
+  },
+  {
+    id: "twitter",
+    label: "تويتر / X",
+    icon: Twitter,
+    color: "text-sky-400",
+    bgColor: "bg-sky-500/10",
+    borderColor: "border-sky-500/30",
+    badgeColor: "bg-sky-500/20 text-sky-400 border-sky-500/40",
+  },
+  {
+    id: "linkedin",
+    label: "لينكدإن",
+    icon: Linkedin,
+    color: "text-blue-500",
+    bgColor: "bg-blue-600/10",
+    borderColor: "border-blue-600/30",
+    badgeColor: "bg-blue-600/20 text-blue-500 border-blue-600/40",
   },
 ] as const;
 
@@ -373,11 +391,11 @@ export default function SearchHub() {
 
   // نتائج البحث
   const [results, setResults] = useState<Record<PlatformId, any[]>>({
-    google: [], googleWeb: [], instagram: [], tiktok: [], snapchat: [], telegram: []
+    google: [], googleWeb: [], instagram: [], tiktok: [], snapchat: [], telegram: [], twitter: [], linkedin: []
   });
   // حالة التحميل
   const [loading, setLoading] = useState<Record<PlatformId, boolean>>({
-    google: false, googleWeb: false, instagram: false, tiktok: false, snapchat: false, telegram: false
+    google: false, googleWeb: false, instagram: false, tiktok: false, snapchat: false, telegram: false, twitter: false, linkedin: false
   });
 
   // إضافة عميل
@@ -414,6 +432,8 @@ export default function SearchHub() {
   const searchTiktokMut = trpc.socialSearch.searchTikTok.useMutation();
   const searchSnapchatMut = trpc.socialSearch.searchSnapchat.useMutation();
   const searchTelegramMut = trpc.socialSearch.searchTelegram.useMutation();
+  const brightDataSearchMut = trpc.brightDataSearch.searchPlatform.useMutation();
+  const brightDataConnectionQuery = trpc.brightDataSearch.checkConnection.useQuery();
   const instagramSearchMut = trpc.instagram.startSearch.useMutation();
   const suggestHashtagsMut = trpc.socialSearch.suggestSocialHashtags.useMutation();
   const createLead = trpc.leads.create.useMutation();
@@ -762,7 +782,7 @@ export default function SearchHub() {
       if (!tiktokData.length) toast.info("لا توجد نتائج في تيك توك");
       await logSession("tiktok", keyword, tiktokData.length, 0, tiktokData.length > 0, { city });
     } catch (e: any) {
-      toast.error("خطأ في تيك توك", { description: e.message });
+      handleBrightDataError(e, "تيك توك");
       await logSession("tiktok", keyword, 0, 0, false, { city });
     } finally {
       setLoadingPlatform("tiktok", false);
@@ -782,7 +802,7 @@ export default function SearchHub() {
       if (!snapData.length) toast.info("لا توجد نتائج في سناب شات");
       await logSession("snapchat", keyword, snapData.length, 0, snapData.length > 0, { city });
     } catch (e: any) {
-      toast.error("خطأ في سناب شات", { description: e.message });
+      handleBrightDataError(e, "سناب شات");
       await logSession("snapchat", keyword, 0, 0, false, { city });
     } finally {
       setLoadingPlatform("snapchat", false);
@@ -874,6 +894,67 @@ export default function SearchHub() {
     }
   };
 
+  // ===== معالج أخطاء Bright Data المشترك =====
+  const handleBrightDataError = (e: any, platform: string) => {
+    const msg = e?.message || "";
+    if (msg.includes("رصيد Bright Data غير كاف")) {
+      toast.error("رصيد Bright Data غير كافٍ — يرجى شحن الحساب", {
+        description: (
+          <span>
+            اذهب إلى{" "}
+            <a href="https://brightdata.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">
+              brightdata.com
+            </a>{" "}
+            واشحن حسابك لمتابعة البحث.
+          </span>
+        ) as any,
+        duration: 8000,
+      });
+    } else if (msg.includes("حجبت الوصول")) {
+      toast.warning(`المنصة حجبت الوصول مؤقتًا`, { description: "حاول مرة أخرى بعد دقيقة", duration: 5000 });
+    } else if (msg.includes("انتهت مهلة")) {
+      toast.warning("انتهت مهلة البحث", { description: "تأكد من اتصال Bright Data وحاول مرة أخرى", duration: 5000 });
+    } else {
+      toast.error(`خطأ في ${platform}`, { description: msg });
+    }
+  };
+
+  // ===== دالة البحث في Twitter/X عبر Bright Data =====
+  const searchTwitter = useCallback(async () => {
+    if (!keyword.trim()) return;
+    setLoadingPlatform("twitter", true);
+    setResultsPlatform("twitter", []);
+    try {
+      const res = await brightDataSearchMut.mutateAsync({ platform: "twitter", query: keyword, location: city, analyzeWithAI: true });
+      const data = res.results || [];
+      setResultsPlatform("twitter", data);
+      if (!data.length) toast.info("لا توجد نتائج في تويتر");
+      else toast.success(`تم العثور على ${data.length} نتيجة من تويتر`);
+    } catch (e: any) {
+      handleBrightDataError(e, "تويتر");
+    } finally {
+      setLoadingPlatform("twitter", false);
+    }
+  }, [keyword, city]);
+
+  // ===== دالة البحث في LinkedIn عبر Bright Data =====
+  const searchLinkedIn = useCallback(async () => {
+    if (!keyword.trim()) return;
+    setLoadingPlatform("linkedin", true);
+    setResultsPlatform("linkedin", []);
+    try {
+      const res = await brightDataSearchMut.mutateAsync({ platform: "linkedin", query: keyword, location: city, analyzeWithAI: true });
+      const data = res.results || [];
+      setResultsPlatform("linkedin", data);
+      if (!data.length) toast.info("لا توجد نتائج في لينكدإن");
+      else toast.success(`تم العثور على ${data.length} شركة من لينكدإن`);
+    } catch (e: any) {
+      handleBrightDataError(e, "لينكدإن");
+    } finally {
+      setLoadingPlatform("linkedin", false);
+    }
+  }, [keyword, city]);
+
   const searchFunctions: Record<PlatformId, () => void> = {
     google: searchGoogle,
     googleWeb: searchGoogleWeb,
@@ -881,6 +962,8 @@ export default function SearchHub() {
     tiktok: searchTiktok,
     snapchat: searchSnapchat,
     telegram: searchTelegram,
+    twitter: searchTwitter,
+    linkedin: searchLinkedIn,
   };
 
   const handleSearch = () => searchFunctions[activeTab]();
@@ -909,7 +992,9 @@ export default function SearchHub() {
     searchTiktok();
     searchSnapchat();
     searchTelegram();
-    toast.info("بدأ البحث في جميع المنصات", { description: "سيستغرق بضع ثوانٍ..." });
+    searchTwitter();
+    searchLinkedIn();
+    toast.info("بدأ البحث في جميع المنصات", { description: "سيستغرق بضع ثوانَ..." });
   };
 
   const handleSuggestHashtags = async () => {
@@ -1043,12 +1128,25 @@ export default function SearchHub() {
               ابحث في جميع المنصات واستقطب العملاء بنقرة واحدة
             </p>
           </div>
-          {totalResults > 0 && (
-            <Badge className="text-sm px-3 py-1.5 gap-1.5">
-              <Zap className="w-3.5 h-3.5" />
-              {totalResults} نتيجة إجمالية
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {brightDataConnectionQuery.data?.connected ? (
+              <Badge variant="outline" className="text-xs gap-1.5 border-green-500/40 text-green-400 bg-green-500/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                Bright Data نشط
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs gap-1.5 border-yellow-500/40 text-yellow-400 bg-yellow-500/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                وضع محدود
+              </Badge>
+            )}
+            {totalResults > 0 && (
+              <Badge className="text-sm px-3 py-1.5 gap-1.5">
+                <Zap className="w-3.5 h-3.5" />
+                {totalResults} نتيجة إجمالية
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* شريط البحث */}
