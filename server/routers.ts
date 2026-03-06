@@ -141,6 +141,22 @@ const leadsRouter = router({
       return lead;
     }),
 
+  getNames: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const { leads: leadsTable } = await import('../drizzle/schema');
+    const rows = await db
+      .select({
+        name: leadsTable.companyName,
+        phone: leadsTable.verifiedPhone,
+        instagram: leadsTable.instagramUrl,
+        twitter: leadsTable.twitterUrl,
+        tiktok: leadsTable.tiktokUrl,
+      })
+      .from(leadsTable);
+    return rows;
+  }),
+
   create: protectedProcedure
     .input(z.object({
       companyName: z.string().min(1),

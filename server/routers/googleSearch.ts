@@ -1,5 +1,5 @@
 /**
- * Google Web Search - بحث ذكي في نتائج Google العادية
+ * Google Web Search - بحث ذكي عبر Bright Data Browser API
  *
  * ===== سياسة البيانات الصارمة =====
  * 1. لا يُسمح بأي بيانات مولّدة أو وهمية تحت أي ظرف
@@ -13,6 +13,28 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { TRPCError } from "@trpc/server";
+import puppeteer from "puppeteer-core";
+
+// ===== Bright Data Browser API =====
+const BRIGHT_DATA_WS_ENDPOINT = process.env.BRIGHT_DATA_WS_ENDPOINT || "";
+
+function getBrightDataEndpoint(): string {
+  if (BRIGHT_DATA_WS_ENDPOINT) return BRIGHT_DATA_WS_ENDPOINT;
+  throw new TRPCError({
+    code: "PRECONDITION_FAILED",
+    message: "Bright Data غير مضبوط. يرجى إضافة BRIGHT_DATA_WS_ENDPOINT في الإعدادات.",
+  });
+}
+
+async function openBrightDataBrowser() {
+  const endpoint = getBrightDataEndpoint();
+  const browser = await puppeteer.connect({
+    browserWSEndpoint: endpoint,
+  });
+  return browser;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ===== أنماط التحقق من البيانات =====
 const PHONE_PATTERNS = [
@@ -57,10 +79,8 @@ const EXCLUDED_DOMAINS = [
   "gstatic.com", "googleapis.com", "googletagmanager.com",
 ];
 
-function extractWebsites(text: string): string[] {
-  const urlRegex = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b(?:[-a-zA-Z0-9@:%_+.~#?&/=]*)/g;
-  const matches = text.match(urlRegex) || [];
-  return Array.from(new Set(matches))
+function extractWebsites(urls: string[]): string[] {
+  return Array.from(new Set(urls))
     .filter(url => {
       const lower = url.toLowerCase();
       return !EXCLUDED_DOMAINS.some(d => lower.includes(d)) && url.length < 150;
@@ -68,156 +88,7 @@ function extractWebsites(text: string): string[] {
     .slice(0, 5);
 }
 
-// ===== محاكاة سلوك بشري =====
-const humanDelay = (min = 800, max = 2500) =>
-  new Promise(r => setTimeout(r, min + Math.random() * (max - min)));
-
-const USER_AGENTS = [
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
-  "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36",
-];
-
-const randomUA = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-
-// ===== تنظيف HTML =====
-function cleanHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 10000);
-}
-
-// ===== استخراج نتائج Google من HTML =====
-function extractGoogleResults(html: string): Array<{
-  title: string;
-  url: string;
-  snippet: string;
-  displayUrl: string;
-}> {
-  const results: Array<{ title: string; url: string; snippet: string; displayUrl: string }> = [];
-
-  // استخراج عناوين ومقتطفات النتائج
-  // نمط بحث عن عناوين h3 مع روابطها
-  const titlePattern = /<h3[^>]*>(.*?)<\/h3>/gi;
-  const titles: string[] = [];
-  let titleMatch;
-  while ((titleMatch = titlePattern.exec(html)) !== null) {
-    const title = titleMatch[1].replace(/<[^>]+>/g, "").trim();
-    if (title.length > 3) titles.push(title);
-  }
-
-  // استخراج الروابط الحقيقية (مش روابط Google الداخلية)
-  const linkPattern = /href="(https?:\/\/(?!(?:www\.)?google\.)[^"]+)"/gi;
-  const urls: string[] = [];
-  let linkMatch;
-  while ((linkMatch = linkPattern.exec(html)) !== null) {
-    const url = linkMatch[1];
-    if (!EXCLUDED_DOMAINS.some(d => url.toLowerCase().includes(d))) {
-      urls.push(url);
-    }
-  }
-
-  // استخراج المقتطفات النصية (snippets)
-  const snippetPattern = /<span[^>]*class="[^"]*(?:VwiC3b|MUxGbd|yXK7lf|lEBKkf)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
-  const snippets: string[] = [];
-  let snippetMatch;
-  while ((snippetMatch = snippetPattern.exec(html)) !== null) {
-    const snippet = snippetMatch[1].replace(/<[^>]+>/g, "").trim();
-    if (snippet.length > 20) snippets.push(snippet);
-  }
-
-  // دمج النتائج
-  const maxResults = Math.min(titles.length, 15);
-  for (let i = 0; i < maxResults; i++) {
-    const url = urls[i] || "";
-    const domain = url ? new URL(url).hostname.replace("www.", "") : "";
-    results.push({
-      title: titles[i] || "",
-      url: url,
-      snippet: snippets[i] || "",
-      displayUrl: domain,
-    });
-  }
-
-  return results.filter(r => r.title && r.url);
-}
-
-// ===== دالة البحث الرئيسية =====
-export async function searchGoogleWeb(
-  keyword: string,
-  city: string,
-  searchType: "businesses" | "general" = "businesses",
-  page = 1
-): Promise<{
-  results: GoogleSearchResult[];
-  rawCount: number;
-  query: string;
-}> {
-  const query = searchType === "businesses"
-    ? `${keyword} ${city} السعودية موقع هاتف`
-    : `${keyword} ${city}`;
-
-  const startIndex = (page - 1) * 10;
-  const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=ar&gl=SA&num=20&start=${startIndex}`;
-
-  let rawHtml = "";
-
-  try {
-    await humanDelay(500, 1500);
-    const response = await fetch(googleUrl, {
-      headers: {
-        "User-Agent": randomUA(),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Upgrade-Insecure-Requests": "1",
-        "DNT": "1",
-      },
-      signal: AbortSignal.timeout(25000),
-    });
-
-    rawHtml = await response.text();
-  } catch (err) {
-    console.error("[Google Search] Fetch error:", err);
-    throw new Error("فشل في الاتصال بـ Google");
-  }
-
-  if (!rawHtml || rawHtml.length < 500) {
-    return { results: [], rawCount: 0, query };
-  }
-
-  // استخراج أرقام الهواتف من HTML الخام
-  const realPhones = extractPhones(rawHtml);
-  const realWebsites = extractWebsites(rawHtml);
-
-  // استخراج نتائج Google المنظمة
-  const googleResults = extractGoogleResults(rawHtml);
-
-  if (googleResults.length === 0) {
-    // محاولة استخراج بديل من النص الكامل
-    const cleanText = cleanHtml(rawHtml);
-    return await analyzeWithAI(cleanText, keyword, city, realPhones, realWebsites, query);
-  }
-
-  // تحليل النتائج بالـ AI لاستخراج بيانات الأعمال
-  const resultsText = googleResults
-    .map((r, i) => `[${i + 1}] العنوان: ${r.title}\nالرابط: ${r.url}\nالمقتطف: ${r.snippet}`)
-    .join("\n\n");
-
-  return await analyzeWithAI(resultsText, keyword, city, realPhones, realWebsites, query, googleResults);
-}
-
+// ===== واجهة النتيجة =====
 export interface GoogleSearchResult {
   id: string;
   name: string;
@@ -240,6 +111,125 @@ export interface GoogleSearchResult {
   };
 }
 
+// ===== بحث Google عبر Bright Data =====
+async function scrapeGoogleSearch(query: string, page = 1): Promise<{
+  items: Array<{ title: string; link: string; snippet: string; displayLink: string }>;
+  rawHtmlText: string;
+}> {
+  const browser = await openBrightDataBrowser();
+  const items: Array<{ title: string; link: string; snippet: string; displayLink: string }> = [];
+  let rawHtmlText = "";
+
+  try {
+    const tab = await browser.newPage();
+
+    // User-Agent بشري
+    await tab.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+    );
+
+    await tab.setExtraHTTPHeaders({
+      "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    });
+
+    // بناء رابط Google Search
+    const start = (page - 1) * 10;
+    const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=ar&gl=SA&num=10${start > 0 ? `&start=${start}` : ""}`;
+
+    await tab.goto(googleUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await sleep(1500 + Math.random() * 1000);
+
+    // استخراج النتائج من صفحة Google
+    const extracted = await tab.evaluate(() => {
+      const results: Array<{ title: string; link: string; snippet: string; displayLink: string }> = [];
+
+      // نتائج Google العضوية
+      const resultDivs = document.querySelectorAll("div.g, div[data-sokoban-container], div.MjjYud > div");
+
+      resultDivs.forEach((div) => {
+        const titleEl = div.querySelector("h3");
+        const linkEl = div.querySelector("a[href]") as HTMLAnchorElement | null;
+        const snippetEl = div.querySelector(".VwiC3b, .lEBKkf, span[data-ved]");
+
+        if (titleEl && linkEl) {
+          const href = linkEl.href || "";
+          // تجاهل روابط Google الداخلية
+          if (href.startsWith("http") && !href.includes("google.com/search") && !href.includes("accounts.google")) {
+            const displayLink = new URL(href).hostname.replace("www.", "");
+            results.push({
+              title: titleEl.textContent?.trim() || "",
+              link: href,
+              snippet: snippetEl?.textContent?.trim() || "",
+              displayLink,
+            });
+          }
+        }
+      });
+
+      return results;
+    });
+
+    // استخراج النص الكامل للصفحة لاستخراج أرقام الهواتف
+    rawHtmlText = await tab.evaluate(() => document.body.innerText || "");
+
+    items.push(...extracted.filter(r => r.title && r.link));
+
+    await tab.close();
+  } catch (err: any) {
+    console.error("[Google Bright Data] Error:", err.message);
+    throw new Error(`فشل البحث في Google عبر Bright Data: ${err.message}`);
+  } finally {
+    await browser.close();
+  }
+
+  return { items, rawHtmlText };
+}
+
+// ===== دالة البحث الرئيسية =====
+export async function searchGoogleWeb(
+  keyword: string,
+  city: string,
+  searchType: "businesses" | "general" = "businesses",
+  page = 1
+): Promise<{
+  results: GoogleSearchResult[];
+  rawCount: number;
+  query: string;
+  totalResults?: string;
+}> {
+  const query = searchType === "businesses"
+    ? `${keyword} ${city} السعودية`
+    : `${keyword} ${city}`;
+
+  let items: Array<{ title: string; link: string; snippet: string; displayLink: string }> = [];
+  let rawHtmlText = "";
+
+  try {
+    const scraped = await scrapeGoogleSearch(query, page);
+    items = scraped.items;
+    rawHtmlText = scraped.rawHtmlText;
+  } catch (err: any) {
+    throw new Error(err.message || "فشل في البحث عبر Bright Data");
+  }
+
+  if (items.length === 0) {
+    return { results: [], rawCount: 0, query };
+  }
+
+  // استخراج أرقام الهواتف من النص الكامل
+  const allText = rawHtmlText + " " + items.map(i => `${i.title} ${i.snippet}`).join(" ");
+  const realPhones = extractPhones(allText);
+  const realWebsites = extractWebsites(items.map(i => i.link));
+
+  // تحليل النتائج بالـ AI
+  const resultsText = items
+    .map((r, i) => `[${i + 1}] العنوان: ${r.title}\nالرابط: ${r.link}\nالمقتطف: ${r.snippet}`)
+    .join("\n\n");
+
+  return await analyzeWithAI(resultsText, keyword, city, realPhones, realWebsites, query, items);
+}
+
 async function analyzeWithAI(
   text: string,
   keyword: string,
@@ -247,8 +237,8 @@ async function analyzeWithAI(
   realPhones: string[],
   realWebsites: string[],
   query: string,
-  rawResults?: Array<{ title: string; url: string; snippet: string; displayUrl: string }>
-): Promise<{ results: GoogleSearchResult[]; rawCount: number; query: string }> {
+  rawItems: Array<{ title: string; link: string; snippet: string; displayLink: string }>
+): Promise<{ results: GoogleSearchResult[]; rawCount: number; query: string; totalResults?: string }> {
   try {
     const response = await invokeLLM({
       messages: [
@@ -264,7 +254,7 @@ async function analyzeWithAI(
 4. isLeadCandidate: true إذا كان نشاطاً تجارياً يحتاج خدمات تسويق
 5. relevanceScore: من 1-10 بناءً على مدى ملاءمة النشاط للبحث
 6. لا تخترع أي بيانات
-7. الحد الأقصى 12 نتيجة`,
+7. الحد الأقصى 10 نتائج`,
         },
         {
           role: "user",
@@ -317,15 +307,15 @@ async function analyzeWithAI(
       id: `google-${Date.now()}-${idx}`,
       name: r.name,
       description: r.description || "",
-      url: r.url || rawResults?.[idx]?.url || "",
-      displayUrl: r.displayUrl || rawResults?.[idx]?.displayUrl || "",
+      url: r.url || rawItems[idx]?.link || "",
+      displayUrl: r.displayUrl || rawItems[idx]?.displayLink || "",
       phone: "",
       availablePhones: realPhones,
       availableWebsites: realWebsites,
       businessType: r.businessType || "غير محدد",
       city: r.city || city,
       relevanceScore: Math.min(10, Math.max(1, r.relevanceScore || 5)),
-      dataSource: "google_web_search",
+      dataSource: "google_bright_data",
       isLeadCandidate: r.isLeadCandidate ?? true,
       socialLinks: {
         instagram: r.instagramUrl || undefined,
@@ -337,66 +327,121 @@ async function analyzeWithAI(
 
     return {
       results: finalResults,
-      rawCount: rawResults?.length || aiResults.length,
+      rawCount: rawItems.length,
       query,
     };
   } catch (err) {
     console.error("[Google Search] AI analysis error:", err);
-    return { results: [], rawCount: 0, query };
+    // fallback: إرجاع النتائج الخام بدون تحليل AI
+    const fallbackResults: GoogleSearchResult[] = rawItems.map((item, idx) => ({
+      id: `google-${Date.now()}-${idx}`,
+      name: item.title,
+      description: item.snippet,
+      url: item.link,
+      displayUrl: item.displayLink,
+      phone: "",
+      availablePhones: realPhones,
+      availableWebsites: realWebsites,
+      businessType: "غير محدد",
+      city,
+      relevanceScore: 5,
+      dataSource: "google_bright_data",
+      isLeadCandidate: true,
+      socialLinks: {},
+    }));
+    return { results: fallbackResults, rawCount: rawItems.length, query };
   }
 }
 
-// ===== البحث المتعمق في موقع محدد =====
+// ===== البحث المتعمق في موقع محدد عبر Bright Data =====
 export async function deepSearchWebsite(url: string, keyword: string): Promise<{
   phones: string[];
   emails: string[];
   socialLinks: Record<string, string>;
   description: string;
 }> {
+  // محاولة أولى: Bright Data Browser
   try {
-    await humanDelay(500, 1500);
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": randomUA(),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
+    const browser = await openBrightDataBrowser();
+    try {
+      const tab = await browser.newPage();
+      await tab.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+      );
+      await tab.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+      await sleep(1000);
 
-    const html = await response.text();
-    const phones = extractPhones(html);
+      const html = await tab.evaluate(() => document.body.innerHTML || "");
+      const text = await tab.evaluate(() => document.body.innerText || "");
+      await tab.close();
+      await browser.close();
 
-    // استخراج الإيميلات
-    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-    const emails = Array.from(new Set(html.match(emailRegex) || []))
-      .filter(e => !e.includes("example.com") && !e.includes("test.com"))
-      .slice(0, 3);
+      const phones = extractPhones(text);
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      const emails = Array.from(new Set(text.match(emailRegex) || []))
+        .filter(e => !e.includes("example.com") && !e.includes("test.com"))
+        .slice(0, 3);
 
-    // استخراج روابط السوشيال ميديا
-    const socialLinks: Record<string, string> = {};
-    const instagramMatch = html.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
-    if (instagramMatch) socialLinks.instagram = `https://instagram.com/${instagramMatch[1]}`;
-    const twitterMatch = html.match(/twitter\.com\/([a-zA-Z0-9_]+)/);
-    if (twitterMatch) socialLinks.twitter = `https://twitter.com/${twitterMatch[1]}`;
-    const snapchatMatch = html.match(/snapchat\.com\/add\/([a-zA-Z0-9._-]+)/);
-    if (snapchatMatch) socialLinks.snapchat = `https://snapchat.com/add/${snapchatMatch[1]}`;
-    const tiktokMatch = html.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
-    if (tiktokMatch) socialLinks.tiktok = `https://tiktok.com/@${tiktokMatch[1]}`;
+      const socialLinks: Record<string, string> = {};
+      const instagramMatch = html.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+      if (instagramMatch) socialLinks.instagram = `https://instagram.com/${instagramMatch[1]}`;
+      const twitterMatch = html.match(/twitter\.com\/([a-zA-Z0-9_]+)/);
+      if (twitterMatch) socialLinks.twitter = `https://twitter.com/${twitterMatch[1]}`;
+      const snapchatMatch = html.match(/snapchat\.com\/add\/([a-zA-Z0-9._-]+)/);
+      if (snapchatMatch) socialLinks.snapchat = `https://snapchat.com/add/${snapchatMatch[1]}`;
+      const tiktokMatch = html.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
+      if (tiktokMatch) socialLinks.tiktok = `https://tiktok.com/@${tiktokMatch[1]}`;
 
-    // وصف مختصر من الـ meta description
-    const metaDescMatch = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i);
-    const description = metaDescMatch?.[1] || "";
+      const metaDescMatch = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i);
+      const description = metaDescMatch?.[1] || "";
 
-    return { phones, emails, socialLinks, description };
+      return { phones, emails, socialLinks, description };
+    } catch (innerErr) {
+      await browser.close();
+      throw innerErr;
+    }
   } catch {
-    return { phones: [], emails: [], socialLinks: {}, description: "" };
+    // fallback: fetch مباشر
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8",
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      const html = await response.text();
+      const phones = extractPhones(html);
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      const emails = Array.from(new Set(html.match(emailRegex) || []))
+        .filter(e => !e.includes("example.com") && !e.includes("test.com"))
+        .slice(0, 3);
+
+      const socialLinks: Record<string, string> = {};
+      const instagramMatch = html.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+      if (instagramMatch) socialLinks.instagram = `https://instagram.com/${instagramMatch[1]}`;
+      const twitterMatch = html.match(/twitter\.com\/([a-zA-Z0-9_]+)/);
+      if (twitterMatch) socialLinks.twitter = `https://twitter.com/${twitterMatch[1]}`;
+      const snapchatMatch = html.match(/snapchat\.com\/add\/([a-zA-Z0-9._-]+)/);
+      if (snapchatMatch) socialLinks.snapchat = `https://snapchat.com/add/${snapchatMatch[1]}`;
+      const tiktokMatch = html.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
+      if (tiktokMatch) socialLinks.tiktok = `https://tiktok.com/@${tiktokMatch[1]}`;
+
+      const metaDescMatch = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i);
+      const description = metaDescMatch?.[1] || "";
+
+      return { phones, emails, socialLinks, description };
+    } catch {
+      return { phones: [], emails: [], socialLinks: {}, description: "" };
+    }
   }
 }
 
 // ===== Router =====
 export const googleSearchRouter = router({
-  // البحث في Google Web
+  // البحث في Google Web عبر Bright Data Browser API
   searchWeb: protectedProcedure
     .input(z.object({
       keyword: z.string().min(1),
@@ -428,54 +473,16 @@ export const googleSearchRouter = router({
       }
     }),
 
-  // تحليل ذكي للاستعلام وتوليد استراتيجية بحث
-  analyzeSearchIntent: protectedProcedure
-    .input(z.object({
-      keyword: z.string().min(1),
-      city: z.string().default("الرياض"),
-    }))
-    .mutation(async ({ input }) => {
-      try {
-        const response = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content: `أنت خبير استراتيجي في استخبارات السوق السعودي.
-مهمتك: تحليل استعلام البحث وتوليد استراتيجية بحث ذكية تشمل:
-- استعلامات بحث محسّنة لـ Google
-- أنواع الأنشطة المستهدفة
-- مؤشرات الجودة للعملاء المحتملين`,
-            },
-            {
-              role: "user",
-              content: `حلّل استعلام البحث: "${input.keyword}" في "${input.city}" وأنشئ استراتيجية بحث شاملة.`,
-            },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "search_strategy",
-              strict: true,
-              schema: {
-                type: "object",
-                properties: {
-                  enhancedQueries: { type: "array", items: { type: "string" } },
-                  targetBusinessTypes: { type: "array", items: { type: "string" } },
-                  searchTips: { type: "array", items: { type: "string" } },
-                  estimatedLeads: { type: "number" },
-                  marketInsight: { type: "string" },
-                },
-                required: ["enhancedQueries", "targetBusinessTypes", "searchTips", "estimatedLeads", "marketInsight"],
-                additionalProperties: false,
-              },
-            },
-          },
-        });
-
-        const parsed = JSON.parse(response.choices[0].message.content as string);
-        return parsed;
-      } catch (err: any) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
-      }
+  // تحقق من حالة Bright Data
+  checkApiStatus: protectedProcedure
+    .query(async () => {
+      const hasBrightData = !!BRIGHT_DATA_WS_ENDPOINT;
+      return {
+        brightDataConfigured: hasBrightData,
+        method: "bright_data_browser",
+        status: hasBrightData ? "جاهز" : "يحتاج إعداد BRIGHT_DATA_WS_ENDPOINT",
+        dailyLimit: "غير محدود (يعتمد على رصيد Bright Data)",
+        note: "يستخدم Bright Data Browser API لتجنب الحجب",
+      };
     }),
 });

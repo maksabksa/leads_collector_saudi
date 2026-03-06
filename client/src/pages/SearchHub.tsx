@@ -28,9 +28,20 @@ import { MapView } from "@/components/Map";
 
 // ===== ثوابت =====
 const SAUDI_CITIES = [
+  // المدن الرئيسية
   "الرياض", "جدة", "مكة المكرمة", "المدينة المنورة", "الدمام",
-  "الخبر", "الطائف", "تبوك", "أبها", "القصيم", "حائل", "نجران",
-  "جازان", "الجوف", "عرعر", "الأحساء", "الجبيل", "ينبع"
+  "الخبر", "الطائف", "تبوك", "أبها", "القصيم",
+  "حائل", "نجران", "جازان", "الجوف", "عرعر",
+  "الأحساء", "الجبيل", "ينبع",
+  // مدن إضافية
+  "بريدة", "عنيزة", "الرس، القصيم", "خميس مشيط", "الباحة",
+  "سكاكا", "بيش", "صبيا", "القنفذة", "الليث",
+  "رابغ", "وادي الدواسر", "الدوادمي", "المجمعة", "شقراء",
+  "الزلفي", "القطيف", "سيهات", "الوجه", "المويه",
+  "ضبا", "الحديدة", "صامطة", "فيفاء", "أملج",
+  "بدر", "خيبر", "العلا", "تيماء", "الخرج",
+  "الافلاج", "الحوية", "السليل", "بيشة", "محايل عسير",
+  "طريف", "العقيق", "النماص", "الطائف الهدا"
 ];
 
 const PLATFORMS = [
@@ -80,15 +91,6 @@ const PLATFORMS = [
     badgeColor: "bg-yellow-500/20 text-yellow-400 border-yellow-500/40",
   },
   {
-    id: "telegram",
-    label: "تيليجرام",
-    icon: MessageCircle,
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10",
-    borderColor: "border-blue-500/30",
-    badgeColor: "bg-blue-500/20 text-blue-400 border-blue-500/40",
-  },
-  {
     id: "twitter",
     label: "تويتر / X",
     icon: Twitter,
@@ -108,7 +110,10 @@ const PLATFORMS = [
   },
 ] as const;
 
+const ALL_PLATFORM_IDS = ["google", "googleWeb", "instagram", "tiktok", "snapchat", "twitter", "linkedin"] as const;
+
 type PlatformId = typeof PLATFORMS[number]["id"];
+type ActiveTabType = PlatformId | "all";
 
 // ===== مكون بطاقة نتيجة =====
 function ResultCard({
@@ -346,7 +351,7 @@ function EmptyState({ platform, keyword, onSearch }: {
 export default function SearchHub() {
   const [keyword, setKeyword] = useState("");
   const [city, setCity] = useState("الرياض");
-  const [activeTab, setActiveTab] = useState<PlatformId>("google");
+  const [activeTab, setActiveTab] = useState<ActiveTabType>("google");
   const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [minFollowers, setMinFollowers] = useState("");
@@ -387,16 +392,17 @@ export default function SearchHub() {
   const [showGoogleStrategy, setShowGoogleStrategy] = useState(false);
   const googleWebSearchMut = trpc.googleSearch.searchWeb.useMutation();
   const googleWebDeepSearchMut = trpc.googleSearch.deepSearchSite.useMutation();
-  const googleWebAnalyzeMut = trpc.googleSearch.analyzeSearchIntent.useMutation();
 
   // نتائج البحث
   const [results, setResults] = useState<Record<PlatformId, any[]>>({
-    google: [], googleWeb: [], instagram: [], tiktok: [], snapchat: [], telegram: [], twitter: [], linkedin: []
+    google: [], googleWeb: [], instagram: [], tiktok: [], snapchat: [], twitter: [], linkedin: []
   });
   // حالة التحميل
   const [loading, setLoading] = useState<Record<PlatformId, boolean>>({
-    google: false, googleWeb: false, instagram: false, tiktok: false, snapchat: false, telegram: false, twitter: false, linkedin: false
+    google: false, googleWeb: false, instagram: false, tiktok: false, snapchat: false, twitter: false, linkedin: false
   });
+  // عدد النتائج المعروضة
+  const [resultLimit, setResultLimit] = useState<number>(25);
 
   // إضافة عميل
   const [addDialog, setAddDialog] = useState<{ open: boolean; result: any | null; platform: PlatformId | "" }>({
@@ -455,6 +461,18 @@ export default function SearchHub() {
     { platform: activeTab, currentQuery: keyword || undefined },
     { staleTime: 30000 }
   );
+
+  // ===== جلب أسماء العملاء الموجودين لمنع التكرار =====
+  const existingLeadsQuery = trpc.leads.getNames.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000, // 5 دقائق
+  });
+  const existingNames = new Set(
+    (existingLeadsQuery.data || []).map((l: any) => (l.name || "").trim().toLowerCase())
+  );
+  const isExistingLead = (result: any): boolean => {
+    const name = (result.name || result.fullName || result.username || "").trim().toLowerCase();
+    return name.length > 0 && existingNames.has(name);
+  };
 
   const instagramAccountsQuery = trpc.instagram.getAccounts.useQuery(
     instagramSearchId ? { searchId: instagramSearchId } : skipToken,
@@ -808,25 +826,7 @@ export default function SearchHub() {
       setLoadingPlatform("snapchat", false);
     }
   }, [keyword, city, logSession]);
-  const searchTelegram = useCallback(async () => {
-    if (!keyword.trim()) return;
-    sessionStartRef.current = Date.now();
-    trackClick();
-    setLoadingPlatform("telegram", true);
-    setResultsPlatform("telegram", []);
-    try {
-      const res = await searchTelegramMut.mutateAsync({ keyword, city });
-      const telegramData = (res as any)?.results || res || [];
-      setResultsPlatform("telegram", telegramData);
-      if (!telegramData.length) toast.info("لا توجد نتائج في تيليجرام");
-      await logSession("telegram", keyword, telegramData.length, 0, telegramData.length > 0, { city });
-    } catch (e: any) {
-      toast.error("خطأ في تيليجرام", { description: e.message });
-      await logSession("telegram", keyword, 0, 0, false, { city });
-    } finally {
-      setLoadingPlatform("telegram", false);
-    }
-  }, [keyword, city, logSession]);
+  // telegram removed
 
   // ===== دالة البحث في Google Web =====
   const searchGoogleWeb = useCallback(async () => {
@@ -860,16 +860,6 @@ export default function SearchHub() {
     }
   }, [keyword, city, googleWebSearchType, logSession]);
 
-  const handleGoogleWebAnalyze = async () => {
-    if (!keyword.trim()) return;
-    try {
-      const res = await googleWebAnalyzeMut.mutateAsync({ keyword, city });
-      setGoogleWebStrategy(res);
-      setShowGoogleStrategy(true);
-    } catch {
-      toast.error("خطأ في تحليل الاستعلام");
-    }
-  };
 
   const handleGoogleWebDeepSearch = async (url: string) => {
     if (!url) return;
@@ -961,12 +951,17 @@ export default function SearchHub() {
     instagram: searchInstagram,
     tiktok: searchTiktok,
     snapchat: searchSnapchat,
-    telegram: searchTelegram,
     twitter: searchTwitter,
     linkedin: searchLinkedIn,
   };
 
-  const handleSearch = () => searchFunctions[activeTab]();
+  const handleSearch = () => {
+    if (activeTab === "all") {
+      handleSearchAll();
+    } else {
+      searchFunctions[activeTab]();
+    }
+  };
 
   // تحسين الاستعلام بالذكاء الاصطناعي
   const handleEnhanceQuery = async () => {
@@ -991,7 +986,6 @@ export default function SearchHub() {
     searchGoogleWeb();
     searchTiktok();
     searchSnapchat();
-    searchTelegram();
     searchTwitter();
     searchLinkedIn();
     toast.info("بدأ البحث في جميع المنصات", { description: "سيستغرق بضع ثوانَ..." });
@@ -1000,7 +994,7 @@ export default function SearchHub() {
   const handleSuggestHashtags = async () => {
     if (!keyword.trim()) return;
     try {
-      const platformForHashtags = (activeTab === "tiktok" || activeTab === "snapchat" || activeTab === "telegram") ? activeTab : undefined;
+      const platformForHashtags = (activeTab === "tiktok" || activeTab === "snapchat") ? activeTab : undefined;
       const res = await suggestHashtagsMut.mutateAsync({ keyword, city: undefined, platform: platformForHashtags });
       setSuggestedHashtags((res as any)?.hashtags || res || []);
     } catch {
@@ -1098,9 +1092,9 @@ export default function SearchHub() {
   const totalResults = Object.values(results).reduce((s, r) => s + r.length, 0);
   const isAnyLoading = Object.values(loading).some(Boolean);
 
-  const currentPlatform = PLATFORMS.find(p => p.id === activeTab)!;
-  const currentResults = results[activeTab];
-  const currentLoading = loading[activeTab];
+  const currentPlatform = PLATFORMS.find(p => p.id === activeTab);
+  const currentResults = activeTab === "all" ? [] : results[activeTab as PlatformId];
+  const currentLoading = activeTab === "all" ? isAnyLoading : loading[activeTab as PlatformId];
 
   const filteredResults = currentResults.filter((r: any) => {
     if (minFollowers && r.followersCount < parseInt(minFollowers)) return false;
@@ -1113,6 +1107,9 @@ export default function SearchHub() {
     }
     return true;
   });
+
+  // عدد التكرارات في النتائج الحالية
+  const duplicateCount = filteredResults.filter((r: any) => isExistingLead(r)).length;
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
@@ -1163,11 +1160,15 @@ export default function SearchHub() {
             />
           </div>
           <Select value={city} onValueChange={setCity}>
-            <SelectTrigger className="w-36 h-10 text-sm shrink-0">
+            <SelectTrigger className="w-40 h-10 text-sm shrink-0">
               <MapPin className="w-3.5 h-3.5 ml-1 text-muted-foreground shrink-0" />
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-72">
+              <SelectItem value="جميع المدن">
+                <span className="font-semibold text-primary">جميع المدن السعودية</span>
+              </SelectItem>
+              <div className="h-px bg-border my-1" />
               {SAUDI_CITIES.map(c => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
@@ -1212,6 +1213,57 @@ export default function SearchHub() {
             <span className="hidden sm:inline text-xs">استهداف ذكي</span>
           </Button>
         </div>
+        {/* ===== شريط الفلاتر العامة ===== */}
+        <div className="flex items-center gap-2 flex-wrap mt-2">
+          {/* فلتر عدد النتائج */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">عرض:</span>
+            {[10, 25, 50, 100].map(n => (
+              <button
+                key={n}
+                onClick={() => setResultLimit(n)}
+                className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
+                  resultLimit === n
+                    ? "bg-primary/15 border-primary/40 text-primary font-semibold"
+                    : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-4 bg-border" />
+          {/* فلتر الأرقام */}
+          <button
+            onClick={() => setOnlyWithPhone(!onlyWithPhone)}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-all ${
+              onlyWithPhone
+                ? "bg-green-500/15 border-green-500/40 text-green-400 font-semibold"
+                : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Phone className="w-3 h-3" />
+            {onlyWithPhone ? "✓ أرقام فقط" : "كل النتائج"}
+          </button>
+          {/* فلاتر المنصات المتقدمة */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-all ${
+              showFilters
+                ? "bg-primary/15 border-primary/40 text-primary"
+                : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <SlidersHorizontal className="w-3 h-3" />
+            فلاتر المنصات
+          </button>
+          {totalResults > 0 && (
+            <span className="text-xs text-muted-foreground mr-auto">
+              يظهر: <span className="text-foreground font-medium">{Math.min(resultLimit, filteredResults.length)}</span> من {totalResults} نتيجة
+            </span>
+          )}
+        </div>
+
         {/* شريط الفلاتر المختارة */}
         {(targetFilters.activityType || targetFilters.mustHavePhone || targetFilters.minRating > 0 || targetFilters.targetCount !== 20) && (
           <div className="mt-2 flex flex-wrap gap-1.5 items-center">
@@ -1315,10 +1367,28 @@ export default function SearchHub() {
 
       {/* ===== التبويبات ===== */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as PlatformId)} className="flex-1 min-h-0 flex flex-col">
+        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as ActiveTabType)} className="flex-1 min-h-0 flex flex-col">
           {/* شريط التبويبات */}
           <div className="border-b border-border bg-card px-6 shrink-0 overflow-x-auto">
             <TabsList className="h-auto bg-transparent p-0 gap-0 w-max">
+              {/* تبويب الكل */}
+              <TabsTrigger
+                value="all"
+                className="relative px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground gap-2 transition-colors whitespace-nowrap"
+              >
+                {isAnyLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                ) : (
+                  <Layers className={`w-3.5 h-3.5 ${activeTab === "all" ? "text-primary" : ""}`} />
+                )}
+                الكل
+                {totalResults > 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 font-semibold min-w-[1.25rem] text-center">
+                    {totalResults}
+                  </span>
+                )}
+              </TabsTrigger>
+              <div className="w-px h-6 bg-border self-center mx-1" />
               {PLATFORMS.map(p => {
                 const count = results[p.id].length;
                 const isLoading = loading[p.id];
@@ -1345,6 +1415,77 @@ export default function SearchHub() {
             </TabsList>
           </div>
 
+          {/* ===== محتوى تبويب الكل ===== */}
+          <TabsContent value="all" className="flex-1 min-h-0 overflow-y-auto m-0 p-6">
+            <div className="max-w-3xl mx-auto space-y-4">
+              {isAnyLoading && (
+                <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">جاري البحث في جميع المنصات...</p>
+                    <div className="flex gap-2 mt-1">
+                      {PLATFORMS.map(p => loading[p.id] && (
+                        <span key={p.id} className={`text-xs ${p.color} flex items-center gap-1`}>
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />{p.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {totalResults === 0 && !isAnyLoading ? (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+                    <Layers className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="font-semibold text-foreground mb-2">ابحث في جميع المنصات</h3>
+                  <p className="text-sm text-muted-foreground mb-4 max-w-xs mx-auto">
+                    اضغط بحث للبحث في Google Maps وجميع منصات التواصل دفعة واحدة
+                  </p>
+                  <Button onClick={handleSearchAll} disabled={!keyword.trim()} className="gap-2">
+                    <Layers className="w-4 h-4" />
+                    بحث في الكل
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* ملخص النتائج لكل منصة */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {PLATFORMS.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => setActiveTab(p.id)}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border transition-all hover:border-primary/40 ${
+                          results[p.id].length > 0 ? `${p.bgColor} ${p.borderColor}` : "bg-muted/20 border-border opacity-50"
+                        }`}
+                      >
+                        <p.icon className={`w-3.5 h-3.5 ${p.color}`} />
+                        <span className="text-xs font-medium">{p.label}</span>
+                        {results[p.id].length > 0 && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${p.badgeColor} font-bold mr-auto`}>
+                            {results[p.id].length}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {/* عرض جميع النتائج مدمجة */}
+                  {PLATFORMS.flatMap(p =>
+                    results[p.id].slice(0, Math.ceil(resultLimit / PLATFORMS.length)).map((r: any, i: number) => (
+                      <ResultCard
+                        key={`${p.id}-${i}`}
+                        result={r}
+                        platform={p}
+                        onAdd={(res) => handleOpenAddDialog(res, p.id)}
+                        isDuplicate={addedNames.has(r.name || r.fullName || r.username || "")}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
           {/* محتوى التبويبات */}
           {PLATFORMS.map(p => (
             <TabsContent key={p.id} value={p.id} className="flex-1 min-h-0 overflow-y-auto m-0 p-6">
@@ -1357,7 +1498,7 @@ export default function SearchHub() {
                     platform={p}
                   />
                   <div className="flex items-center gap-2 mr-auto">
-                    {(p.id === "instagram" || p.id === "tiktok" || p.id === "snapchat" || p.id === "telegram") && (
+                    {(p.id === "instagram" || p.id === "tiktok" || p.id === "snapchat") && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1432,16 +1573,7 @@ export default function SearchHub() {
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleGoogleWebAnalyze}
-                          disabled={!keyword.trim() || googleWebAnalyzeMut.isPending}
-                          className="h-7 text-xs gap-1.5 text-orange-400 hover:bg-orange-500/10"
-                        >
-                          {googleWebAnalyzeMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
-                          تحليل الاستعلام
-                        </Button>
+
                       </div>
                     </div>
                     <div className="p-4 space-y-3">
@@ -1886,12 +2018,13 @@ export default function SearchHub() {
                 {/* النتائج */}
                 {filteredResults.length > 0 ? (
                   <div className="space-y-3">
-                    {filteredResults.length !== results[p.id].length && (
+                    {(filteredResults.length !== results[p.id].length || filteredResults.length > resultLimit) && (
                       <p className="text-xs text-muted-foreground">
-                        يُعرض {filteredResults.length} من {results[p.id].length} نتيجة (بعد الفلترة)
+                        يُعرض <span className="text-foreground font-medium">{Math.min(resultLimit, filteredResults.length)}</span> من {results[p.id].length} نتيجة
+                        {filteredResults.length < results[p.id].length && " (بعد الفلترة)"}
                       </p>
                     )}
-                    {filteredResults.map((result: any, i: number) => (
+                    {filteredResults.slice(0, resultLimit).map((result: any, i: number) => (
                       p.id === "googleWeb" ? (
                         /* بطاقة Google Web Search مخصصة */
                         <Card key={result.id || i} className={`group transition-all duration-200 hover:border-orange-500/40 hover:shadow-sm ${
