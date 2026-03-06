@@ -767,22 +767,15 @@ export default function SearchHub() {
     setResultsPlatform("instagram", []);
     setInstagramSearchId(null);
     try {
-      const hashtag = keyword.replace(/^#/, "").trim();
-      const res = await instagramSearchMut.mutateAsync({ hashtag });
-      if (res.searchId) {
-        setInstagramSearchId(res.searchId);
-        // سيتم تحديث النتائج عبر useQuery
-      } else {
-        setLoadingPlatform("instagram", false);
-      }
+      // استخدام Bright Data Browser API مباشرة بدون حاجة لأي Token
+      const res = await brightDataSearchMut.mutateAsync({ platform: "instagram", query: keyword, location: city, analyzeWithAI: true });
+      const data = res.results || [];
+      setResultsPlatform("instagram", data);
+      if (!data.length) toast.info("لا توجد نتائج في إنستجرام");
+      else toast.success(`تم العثور على ${data.length} نتيجة من إنستجرام`);
     } catch (e: any) {
-      if (e.message?.includes("Instagram Access Token") || e.message?.includes("INSTAGRAM_ACCESS_TOKEN")) {
-        toast.error("إنستجرام غير مُفعَّل", {
-          description: "يجب إضافة Instagram Access Token وApp ID في إعدادات AI لتفعيل البحث. لا يمكن عرض بيانات بدون مصدر حقيقي."
-        });
-      } else {
-        toast.error("خطأ في البحث", { description: e.message });
-      }
+      handleBrightDataError(e, "إنستجرام");
+    } finally {
       setLoadingPlatform("instagram", false);
     }
   }, [keyword, city]);
@@ -2003,17 +1996,7 @@ export default function SearchHub() {
                     </button>
                   </div>
                 )}
-                {/* ملاحظة إنستجرام */}
-                {p.id === "instagram" && (
-                  <div className="flex items-start gap-2.5 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-xs text-pink-300">
-                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>البحث في إنستجرام:</strong> يستخدم Instagram Graph API الرسمي ويحتاج{" "}
-                      <code className="bg-pink-500/20 px-1 rounded text-pink-200">INSTAGRAM_ACCESS_TOKEN</code>{" "}
-                      في إعدادات AI. بدونه لن تظهر أي نتائج لضمان صحة البيانات.
-                    </span>
-                  </div>
-                )}
+                {/* إنستجرام يعمل عبر Bright Data مباشرة - لا حاجة لأي ملاحظة */}
 
                 {/* النتائج */}
                 {filteredResults.length > 0 ? (

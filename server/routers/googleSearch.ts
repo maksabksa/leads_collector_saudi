@@ -128,9 +128,11 @@ async function scrapeGoogleSearch(query: string, page = 1): Promise<{
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
     );
 
-    await tab.setExtraHTTPHeaders({
-      "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    // ملاحظة: Bright Data يحظر تعديل Accept header
+    // نستخدم Accept-Language فقط عبر evaluate لتعيين اللغة
+    await tab.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'language', { get: () => 'ar-SA' });
+      Object.defineProperty(navigator, 'languages', { get: () => ['ar-SA', 'ar', 'en-US'] });
     });
 
     // بناء رابط Google Search
