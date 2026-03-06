@@ -2437,6 +2437,7 @@ import { labelsRouter } from "./routers/labels";
 import { auditLogRouter } from "./routers/auditLog";
 import { messageLimitsRouter } from "./routers/messageLimits";
 import { followUpRouter } from "./routers/followUp";
+import { googleSearchRouter } from "./routers/googleSearch";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2482,5 +2483,6 @@ export const appRouter = router({
   messageLimits: messageLimitsRouter,
   followUp: followUpRouter,
   aiReport: aiReportRouter,
+  googleSearch: googleSearchRouter,
 });
 export type AppRouter = typeof appRouter;

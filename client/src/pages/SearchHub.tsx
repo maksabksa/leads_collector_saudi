@@ -21,7 +21,8 @@ import {
   Users, Zap, CheckCircle2, RefreshCw, X, Map, Target,
   Layers, SlidersHorizontal, CheckCheck, AlertTriangle,
   RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock,
-  Navigation, Crosshair, CircleDot, ChevronDown, UserPlus
+  Navigation, Crosshair, CircleDot, ChevronDown, UserPlus,
+  SearchCheck, Link2, BarChart2, Shield
 } from "lucide-react";
 import { MapView } from "@/components/Map";
 
@@ -41,6 +42,15 @@ const PLATFORMS = [
     bgColor: "bg-green-500/10",
     borderColor: "border-green-500/30",
     badgeColor: "bg-green-500/20 text-green-400 border-green-500/40",
+  },
+  {
+    id: "googleWeb",
+    label: "Google Search",
+    icon: SearchCheck,
+    color: "text-orange-400",
+    bgColor: "bg-orange-500/10",
+    borderColor: "border-orange-500/30",
+    badgeColor: "bg-orange-500/20 text-orange-400 border-orange-500/40",
   },
   {
     id: "instagram",
@@ -352,13 +362,22 @@ export default function SearchHub() {
   const searchByRadiusMut = trpc.search.searchByRadius.useMutation();
   const geocodeAddressMut = trpc.search.geocodeAddress.useMutation();
 
+  // ===== Google Web Search State =====
+  const [googleWebSearchType, setGoogleWebSearchType] = useState<"businesses" | "general">("businesses");
+  const [googleWebPage, setGoogleWebPage] = useState(1);
+  const [googleWebStrategy, setGoogleWebStrategy] = useState<any>(null);
+  const [showGoogleStrategy, setShowGoogleStrategy] = useState(false);
+  const googleWebSearchMut = trpc.googleSearch.searchWeb.useMutation();
+  const googleWebDeepSearchMut = trpc.googleSearch.deepSearchSite.useMutation();
+  const googleWebAnalyzeMut = trpc.googleSearch.analyzeSearchIntent.useMutation();
+
   // نتائج البحث
   const [results, setResults] = useState<Record<PlatformId, any[]>>({
-    google: [], instagram: [], tiktok: [], snapchat: [], telegram: []
+    google: [], googleWeb: [], instagram: [], tiktok: [], snapchat: [], telegram: []
   });
   // حالة التحميل
   const [loading, setLoading] = useState<Record<PlatformId, boolean>>({
-    google: false, instagram: false, tiktok: false, snapchat: false, telegram: false
+    google: false, googleWeb: false, instagram: false, tiktok: false, snapchat: false, telegram: false
   });
 
   // إضافة عميل
@@ -789,8 +808,75 @@ export default function SearchHub() {
     }
   }, [keyword, city, logSession]);
 
+  // ===== دالة البحث في Google Web =====
+  const searchGoogleWeb = useCallback(async () => {
+    if (!keyword.trim()) return;
+    sessionStartRef.current = Date.now();
+    trackClick();
+    setLoadingPlatform("googleWeb", true);
+    setResultsPlatform("googleWeb", []);
+    setGoogleWebPage(1);
+    try {
+      const res = await googleWebSearchMut.mutateAsync({
+        keyword,
+        city,
+        searchType: googleWebSearchType,
+        page: 1,
+      });
+      const webResults = res.results || [];
+      setResultsPlatform("googleWeb", webResults);
+      if (!webResults.length) {
+        toast.info("لا توجد نتائج في Google Search", { description: "جرب كلمات بحث مختلفة" });
+      } else {
+        toast.success(`تم العثور على ${webResults.length} نتيجة من Google`, {
+          description: `الاستعلام: ${res.query}`,
+        });
+      }
+      await logSession("googleWeb", keyword, webResults.length, 0, webResults.length > 0, { city, searchType: googleWebSearchType });
+    } catch (e: any) {
+      toast.error("خطأ في Google Search", { description: e.message });
+    } finally {
+      setLoadingPlatform("googleWeb", false);
+    }
+  }, [keyword, city, googleWebSearchType, logSession]);
+
+  const handleGoogleWebAnalyze = async () => {
+    if (!keyword.trim()) return;
+    try {
+      const res = await googleWebAnalyzeMut.mutateAsync({ keyword, city });
+      setGoogleWebStrategy(res);
+      setShowGoogleStrategy(true);
+    } catch {
+      toast.error("خطأ في تحليل الاستعلام");
+    }
+  };
+
+  const handleGoogleWebDeepSearch = async (url: string) => {
+    if (!url) return;
+    try {
+      const res = await googleWebDeepSearchMut.mutateAsync({ url, keyword });
+      // تحديث النتيجة في القائمة
+      setResults(prev => ({
+        ...prev,
+        googleWeb: prev.googleWeb.map((r: any) =>
+          r.url === url
+            ? { ...r, availablePhones: [...(r.availablePhones || []), ...res.phones], availableWebsites: [...(r.availableWebsites || [])], deepSearched: true, deepData: res }
+            : r
+        ),
+      }));
+      if (res.phones.length > 0) {
+        toast.success(`تم العثور على ${res.phones.length} رقم هاتف`, { description: url });
+      } else {
+        toast.info("لم يُعثر على أرقام في هذا الموقع");
+      }
+    } catch {
+      toast.error("خطأ في البحث المتعمق");
+    }
+  };
+
   const searchFunctions: Record<PlatformId, () => void> = {
     google: searchGoogle,
+    googleWeb: searchGoogleWeb,
     instagram: searchInstagram,
     tiktok: searchTiktok,
     snapchat: searchSnapchat,
@@ -819,6 +905,7 @@ export default function SearchHub() {
   const handleSearchAll = () => {
     if (!keyword.trim()) return;
     searchGoogle();
+    searchGoogleWeb();
     searchTiktok();
     searchSnapchat();
     searchTelegram();
@@ -1235,6 +1322,111 @@ export default function SearchHub() {
                     </Button>
                   </div>
                 )}
+                {/* ===== لوحة Google Web Search ===== */}
+                {p.id === "googleWeb" && activeTab === "googleWeb" && (
+                  <div className="border border-orange-500/30 rounded-xl overflow-hidden bg-card shadow-sm">
+                    <div className="flex items-center justify-between gap-3 px-4 py-3 bg-orange-500/5 border-b border-orange-500/20">
+                      <div className="flex items-center gap-2">
+                        <SearchCheck className="w-4 h-4 text-orange-400" />
+                        <span className="text-sm font-semibold text-foreground">بحث Google الذكي</span>
+                        <Badge className="text-xs bg-orange-500/20 text-orange-400 border-orange-500/30">
+                          نتائج حقيقية
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleGoogleWebAnalyze}
+                          disabled={!keyword.trim() || googleWebAnalyzeMut.isPending}
+                          className="h-7 text-xs gap-1.5 text-orange-400 hover:bg-orange-500/10"
+                        >
+                          {googleWebAnalyzeMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
+                          تحليل الاستعلام
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {/* نوع البحث */}
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground">نوع البحث:</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setGoogleWebSearchType("businesses")}
+                            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                              googleWebSearchType === "businesses"
+                                ? "bg-orange-500/20 border-orange-500 text-orange-400 font-medium"
+                                : "border-border text-muted-foreground hover:border-orange-500/50"
+                            }`}
+                          >
+                            <Building2 className="w-3 h-3 inline ml-1" />
+                            أنشطة تجارية
+                          </button>
+                          <button
+                            onClick={() => setGoogleWebSearchType("general")}
+                            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                              googleWebSearchType === "general"
+                                ? "bg-orange-500/20 border-orange-500 text-orange-400 font-medium"
+                                : "border-border text-muted-foreground hover:border-orange-500/50"
+                            }`}
+                          >
+                            <Globe className="w-3 h-3 inline ml-1" />
+                            بحث عام
+                          </button>
+                        </div>
+                      </div>
+                      {/* استراتيجية البحث */}
+                      {showGoogleStrategy && googleWebStrategy && (
+                        <div className="p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-orange-400 flex items-center gap-1">
+                              <BarChart2 className="w-3 h-3" />
+                              استراتيجية البحث الذكية
+                            </p>
+                            <button onClick={() => setShowGoogleStrategy(false)} className="text-muted-foreground hover:text-foreground">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{googleWebStrategy.marketInsight}</p>
+                          {googleWebStrategy.enhancedQueries?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-muted-foreground mb-1">استعلامات محسّنة:</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {googleWebStrategy.enhancedQueries.slice(0, 4).map((q: string, i: number) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => setKeyword(q)}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20 transition-colors"
+                                  >
+                                    {q}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {googleWebStrategy.targetBusinessTypes?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-muted-foreground mb-1">أنواع الأنشطة المستهدفة:</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {googleWebStrategy.targetBusinessTypes.slice(0, 5).map((t: string, i: number) => (
+                                  <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">{t}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-[10px] text-muted-foreground">
+                            <TrendingUp className="w-3 h-3 inline ml-1 text-green-400" />
+                            عملاء محتملون متوقعون: <span className="text-green-400 font-semibold">{googleWebStrategy.estimatedLeads}</span>
+                          </p>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Shield className="w-3 h-3 text-orange-400" />
+                        يبحث في نتائج Google الحقيقية ويحلل الأنشطة التجارية بالذكاء الاصطناعي
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {/* ===== لوحة الخريطة التفاعلية - تظهر فقط في تبويب Google Maps ===== */}
                 {p.id === "google" && activeTab === "google" && (
                   <div className="border border-green-500/30 rounded-xl overflow-hidden bg-card shadow-sm">
@@ -1602,6 +1794,141 @@ export default function SearchHub() {
                       </p>
                     )}
                     {filteredResults.map((result: any, i: number) => (
+                      p.id === "googleWeb" ? (
+                        /* بطاقة Google Web Search مخصصة */
+                        <Card key={result.id || i} className={`group transition-all duration-200 hover:border-orange-500/40 hover:shadow-sm ${
+                          addedNames.has(result.name || "") ? "opacity-60 border-orange-500/30 bg-orange-500/5" : ""
+                        }`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-9 h-9 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                                <SearchCheck className="w-4 h-4 text-orange-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-foreground text-sm leading-tight">{result.name}</h3>
+                                    {result.displayUrl && (
+                                      <p className="text-xs text-orange-400/70 mt-0.5 font-mono" dir="ltr">{result.displayUrl}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {result.isLeadCandidate && (
+                                      <Badge className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                                        <CheckCircle2 className="w-2.5 h-2.5 ml-1" />
+                                        عميل محتمل
+                                      </Badge>
+                                    )}
+                                    {result.relevanceScore >= 7 && (
+                                      <Badge className="text-xs bg-orange-500/20 text-orange-400 border-orange-500/30">
+                                        {result.relevanceScore}/10
+                                      </Badge>
+                                    )}
+                                    {addedNames.has(result.name || "") && (
+                                      <Badge variant="outline" className="text-xs bg-orange-500/20 text-orange-400 border-orange-400/40 gap-1">
+                                        <AlertTriangle className="w-2.5 h-2.5" />
+                                        موجود
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mb-2.5">
+                                  {result.city && (
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 shrink-0" />
+                                      {result.city}
+                                    </span>
+                                  )}
+                                  {result.businessType && result.businessType !== "غير محدد" && (
+                                    <span className="flex items-center gap-1">
+                                      <Building2 className="w-3 h-3 shrink-0" />
+                                      {result.businessType}
+                                    </span>
+                                  )}
+                                  {result.availablePhones?.length > 0 && (
+                                    <span className="flex items-center gap-1 text-green-400 font-medium">
+                                      <Phone className="w-3 h-3 shrink-0" />
+                                      {result.availablePhones.length} رقم متاح
+                                    </span>
+                                  )}
+                                </div>
+                                {result.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2.5 leading-relaxed">
+                                    {result.description}
+                                  </p>
+                                )}
+                                {/* روابط السوشيال */}
+                                {(result.socialLinks?.instagram || result.socialLinks?.twitter || result.socialLinks?.snapchat || result.socialLinks?.tiktok) && (
+                                  <div className="flex items-center gap-2 mb-2.5">
+                                    {result.socialLinks.instagram && (
+                                      <a href={result.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-xs text-pink-400 hover:underline flex items-center gap-0.5">
+                                        <Instagram className="w-3 h-3" /> إنستجرام
+                                      </a>
+                                    )}
+                                    {result.socialLinks.tiktok && (
+                                      <a href={result.socialLinks.tiktok} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-0.5">
+                                        <Video className="w-3 h-3" /> تيك توك
+                                      </a>
+                                    )}
+                                    {result.socialLinks.snapchat && (
+                                      <a href={result.socialLinks.snapchat} target="_blank" rel="noopener noreferrer" className="text-xs text-yellow-400 hover:underline flex items-center gap-0.5">
+                                        <Camera className="w-3 h-3" /> سناب
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleOpenAddDialog(result, p.id)}
+                                    disabled={addedNames.has(result.name || "")}
+                                    className="h-7 text-xs gap-1.5 px-3"
+                                  >
+                                    {addedNames.has(result.name || "") ? (
+                                      <><CheckCheck className="w-3 h-3" /> موجود مسبقاً</>
+                                    ) : (
+                                      <><Plus className="w-3 h-3" /> إضافة كعميل</>
+                                    )}
+                                  </Button>
+                                  {result.url && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs gap-1.5 px-2"
+                                      onClick={() => window.open(result.url, "_blank")}
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      الموقع
+                                    </Button>
+                                  )}
+                                  {result.url && !result.deepSearched && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs gap-1.5 px-2 text-orange-400 hover:bg-orange-500/10"
+                                      onClick={() => handleGoogleWebDeepSearch(result.url)}
+                                      disabled={googleWebDeepSearchMut.isPending}
+                                    >
+                                      {googleWebDeepSearchMut.isPending ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Search className="w-3 h-3" />
+                                      )}
+                                      بحث متعمق
+                                    </Button>
+                                  )}
+                                  {result.deepSearched && result.deepData?.phones?.length > 0 && (
+                                    <span className="text-xs text-green-400 flex items-center gap-1">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      {result.deepData.phones.length} رقم
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ) : (
                       <ResultCard
                         key={result.place_id || result.id || result.username || i}
                         result={result}
@@ -1609,6 +1936,7 @@ export default function SearchHub() {
                         onAdd={(r) => handleOpenAddDialog(r, p.id)}
                         isDuplicate={addedNames.has(result.name || result.fullName || result.username || "")}
                       />
+                      )
                     ))}
                   </div>
                 ) : !loading[p.id] ? (
