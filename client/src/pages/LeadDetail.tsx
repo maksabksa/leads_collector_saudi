@@ -4,7 +4,8 @@ import { useState } from "react";
 import {
   ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
-  Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown, MessagesSquare
+  Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown, MessagesSquare,
+  Activity, Users, Clock, Brain, ChevronUp, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -70,6 +71,22 @@ export default function LeadDetail() {
   const sendOneWa = trpc.wauto.sendOne.useMutation();
   const { data: allSessionsData } = trpc.wauto.allStatus.useQuery(undefined, { refetchInterval: 5000 });
   const [waSending, setWaSending] = useState(false);
+
+  // تحليل السلوك
+  const [behaviorAnalysis, setBehaviorAnalysis] = useState<any>(null);
+  const [showBehaviorPanel, setShowBehaviorPanel] = useState(false);
+  const analyzeBehavior = trpc.behaviorAnalysis.analyzeCustomer.useMutation();
+
+  const handleAnalyzeBehavior = async () => {
+    try {
+      setShowBehaviorPanel(true);
+      const result = await analyzeBehavior.mutateAsync({ leadId: id });
+      setBehaviorAnalysis(result);
+      toast.success("تم تحليل السلوك الرقمي");
+    } catch (e: any) {
+      toast.error(e.message || "فشل تحليل السلوك");
+    }
+  };
 
   // أول حساب متصل
   const connectedSession = ((allSessionsData as any[]) ?? []).find((s: any) => s.status === "connected");
@@ -278,6 +295,12 @@ export default function LeadDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={handleAnalyzeBehavior} disabled={analyzeBehavior.isPending}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+            {analyzeBehavior.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+            تحليل السلوك
+          </button>
           <button onClick={handleGenerateReport} disabled={generateReport.isPending}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "oklch(0.62 0.18 285 / 0.15)", color: "var(--brand-purple)", border: "1px solid oklch(0.62 0.18 285 / 0.3)" }}>
@@ -569,6 +592,179 @@ export default function LeadDetail() {
                   <p className="text-sm text-foreground leading-relaxed">{lead.suggestedSalesEntryAngle}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Behavior Analysis Panel */}
+          {showBehaviorPanel && (
+            <div className="rounded-2xl border overflow-hidden" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.3)" }}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "oklch(0.65 0.18 200 / 0.2)", background: "oklch(0.65 0.18 200 / 0.06)" }}>
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Activity className="w-4 h-4" style={{ color: "oklch(0.75 0.18 200)" }} />
+                  تحليل السلوك الرقمي
+                </h3>
+                <div className="flex items-center gap-2">
+                  {behaviorAnalysis && (
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)" }}>
+                      {new Date(behaviorAnalysis.analyzedAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                  <button onClick={handleAnalyzeBehavior} disabled={analyzeBehavior.isPending}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all"
+                    title="إعادة التحليل">
+                    {analyzeBehavior.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  </button>
+                  <button onClick={() => setShowBehaviorPanel(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {analyzeBehavior.isPending && !behaviorAnalysis ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                  <div className="relative">
+                    <Brain className="w-10 h-10" style={{ color: "oklch(0.65 0.18 200 / 0.3)" }} />
+                    <Loader2 className="w-5 h-5 animate-spin absolute -top-1 -right-1" style={{ color: "oklch(0.75 0.18 200)" }} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">جاري تحليل السلوك الرقمي...</p>
+                  <p className="text-xs text-muted-foreground opacity-60">يستغرق 10-20 ثانية</p>
+                </div>
+              ) : behaviorAnalysis ? (
+                <div className="p-5 space-y-4">
+                  {/* الملخص والدرجة */}
+                  <div className="flex items-start gap-4">
+                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl border-2"
+                        style={{
+                          borderColor: (behaviorAnalysis.analysis?.activityScore || 5) >= 7 ? "oklch(0.65 0.2 145)" : (behaviorAnalysis.analysis?.activityScore || 5) >= 5 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)",
+                          color: (behaviorAnalysis.analysis?.activityScore || 5) >= 7 ? "oklch(0.65 0.2 145)" : (behaviorAnalysis.analysis?.activityScore || 5) >= 5 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)",
+                          background: "oklch(0.14 0.015 240)"
+                        }}>
+                        {behaviorAnalysis.analysis?.activityScore || "—"}
+                      </div>
+                      <span className="text-xs text-muted-foreground">النشاط</span>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-foreground">{behaviorAnalysis.analysis?.activityLevel}</span>
+                        {behaviorAnalysis.analysis?.urgencyLevel && (
+                          <span className="text-xs px-2 py-0.5 rounded-full"
+                            style={{
+                              background: behaviorAnalysis.analysis.urgencyLevel === "عاجل" ? "oklch(0.58 0.22 25 / 0.15)" : "oklch(0.78 0.16 75 / 0.15)",
+                              color: behaviorAnalysis.analysis.urgencyLevel === "عاجل" ? "oklch(0.7 0.22 25)" : "oklch(0.78 0.16 75)"
+                            }}>
+                            ⚡ {behaviorAnalysis.analysis.urgencyLevel}
+                          </span>
+                        )}
+                        {behaviorAnalysis.analysis?.responselikelihood && (
+                          <span className="text-xs px-2 py-0.5 rounded-full"
+                            style={{
+                              background: behaviorAnalysis.analysis.responselikelihood === "عالية" ? "oklch(0.65 0.2 145 / 0.15)" : "oklch(0.65 0.05 240 / 0.15)",
+                              color: behaviorAnalysis.analysis.responselikelihood === "عالية" ? "oklch(0.65 0.2 145)" : "oklch(0.65 0.05 240)"
+                            }}>
+                            احتمال الاستجابة: {behaviorAnalysis.analysis.responselikelihood}
+                          </span>
+                        )}
+                      </div>
+                      {behaviorAnalysis.analysis?.summary && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">{behaviorAnalysis.analysis.summary}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* المنصات المفضلة وأوقات التواصل */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {behaviorAnalysis.analysis?.preferredPlatforms?.length > 0 && (
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "oklch(0.14 0.015 240)" }}>
+                        <p className="text-xs font-semibold" style={{ color: "oklch(0.75 0.18 200)" }}>
+                          <Users className="w-3 h-3 inline ml-1" />
+                          المنصات المفضلة
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {behaviorAnalysis.analysis.preferredPlatforms.map((p: string, i: number) => (
+                            <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 200 / 0.12)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.2)" }}>
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {behaviorAnalysis.analysis?.bestContactTimes?.length > 0 && (
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "oklch(0.14 0.015 240)" }}>
+                        <p className="text-xs font-semibold" style={{ color: "oklch(0.78 0.16 75)" }}>
+                          <Clock className="w-3 h-3 inline ml-1" />
+                          أوقات التواصل المثلى
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {behaviorAnalysis.analysis.bestContactTimes.map((t: string, i: number) => (
+                            <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.78 0.16 75 / 0.12)", color: "oklch(0.78 0.16 75)", border: "1px solid oklch(0.78 0.16 75 / 0.2)" }}>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* أسلوب التواصل */}
+                  {behaviorAnalysis.analysis?.communicationStyle && (
+                    <div className="rounded-xl p-3" style={{ background: "oklch(0.62 0.18 285 / 0.07)", border: "1px solid oklch(0.62 0.18 285 / 0.2)" }}>
+                      <p className="text-xs font-semibold mb-1" style={{ color: "var(--brand-purple)" }}>
+                        <Brain className="w-3 h-3 inline ml-1" />
+                        أسلوب التواصل الأمثل
+                      </p>
+                      <p className="text-xs text-foreground leading-relaxed">{behaviorAnalysis.analysis.communicationStyle}</p>
+                    </div>
+                  )}
+
+                  {/* الفرص والتوصيات */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {behaviorAnalysis.analysis?.marketingOpportunities?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold" style={{ color: "var(--brand-green)" }}>
+                          <TrendingUp className="w-3 h-3 inline ml-1" />
+                          الفرص التسويقية
+                        </p>
+                        {behaviorAnalysis.analysis.marketingOpportunities.slice(0, 3).map((o: string, i: number) => (
+                          <p key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                            <span className="w-1 h-1 rounded-full flex-shrink-0 mt-1.5" style={{ background: "var(--brand-green)" }} />
+                            {o}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {behaviorAnalysis.analysis?.contactRecommendations?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold" style={{ color: "oklch(0.75 0.18 200)" }}>
+                          <Sparkles className="w-3 h-3 inline ml-1" />
+                          توصيات التواصل
+                        </p>
+                        {behaviorAnalysis.analysis.contactRecommendations.slice(0, 3).map((r: string, i: number) => (
+                          <p key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                            <span className="w-1 h-1 rounded-full flex-shrink-0 mt-1.5" style={{ background: "oklch(0.75 0.18 200)" }} />
+                            {r}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* نقاط القوة الرقمية */}
+                  {behaviorAnalysis.analysis?.digitalStrengths?.length > 0 && (
+                    <div className="rounded-xl p-3" style={{ background: "oklch(0.65 0.2 145 / 0.07)", border: "1px solid oklch(0.65 0.2 145 / 0.2)" }}>
+                      <p className="text-xs font-semibold mb-2" style={{ color: "var(--brand-green)" }}>نقاط القوة الرقمية</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {behaviorAnalysis.analysis.digitalStrengths.map((s: string, i: number) => (
+                          <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.2 145 / 0.12)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.65 0.2 145 / 0.2)" }}>
+                            ✓ {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
 

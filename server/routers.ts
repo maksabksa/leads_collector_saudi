@@ -2455,6 +2455,7 @@ import { messageLimitsRouter } from "./routers/messageLimits";
 import { followUpRouter } from "./routers/followUp";
 import { googleSearchRouter } from "./routers/googleSearch";
 import { brightDataSearchRouter } from "./routers/brightDataSearch";
+import { behaviorAnalysisRouter } from "./routers/behaviorAnalysis";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2502,5 +2503,6 @@ export const appRouter = router({
   aiReport: aiReportRouter,
   googleSearch: googleSearchRouter,
   brightDataSearch: brightDataSearchRouter,
+  behaviorAnalysis: behaviorAnalysisRouter,
 });
 export type AppRouter = typeof appRouter;

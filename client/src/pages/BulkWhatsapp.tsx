@@ -1,9 +1,9 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   MessageCircle, Send, Zap, Loader2, CheckCircle, Filter,
   Plus, Pencil, Trash2, Save, X, Copy, ExternalLink, ChevronLeft, ChevronRight,
-  BookTemplate, Sparkles, RefreshCw
+  BookTemplate, Sparkles, RefreshCw, Pause, Play, Timer, AlertTriangle, FastForward
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -149,6 +149,76 @@ export default function BulkWhatsapp() {
   const [generating, setGenerating] = useState(false);
   const [currentSendIndex, setCurrentSendIndex] = useState<number | null>(null);
   const [step, setStep] = useState<"select" | "preview">("select");
+
+  // عداد التوقيت والإيقاف المؤقت
+  const [sendDelay, setSendDelay] = useState(15); // ثانية بين كل رسالة
+  const [countdown, setCountdown] = useState<number | null>(null); // العد التنازلي
+  const [isPaused, setIsPaused] = useState(false); // حالة الإيقاف المؤقت
+  const [isAutoSending, setIsAutoSending] = useState(false); // وضع الإرسال التلقائي
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pausedRef = useRef(false);
+
+  // تنظيف المؤقت عند الخروج
+  useEffect(() => {
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, []);
+
+  const startCountdown = (onComplete: () => void) => {
+    setCountdown(sendDelay);
+    let remaining = sendDelay;
+    countdownRef.current = setInterval(() => {
+      if (pausedRef.current) return;
+      remaining -= 1;
+      setCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(countdownRef.current!);
+        countdownRef.current = null;
+        setCountdown(null);
+        onComplete();
+      }
+    }, 1000);
+  };
+
+  const handlePauseResume = () => {
+    const newPaused = !isPaused;
+    setIsPaused(newPaused);
+    pausedRef.current = newPaused;
+  };
+
+  const handleStopAutoSend = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = null;
+    setCountdown(null);
+    setIsAutoSending(false);
+    setIsPaused(false);
+    pausedRef.current = false;
+    toast.info("تم إيقاف الإرسال التلقائي");
+  };
+
+  const handleAutoSendAll = async () => {
+    const pending = generatedMessages.filter(m => !m.sent);
+    if (pending.length === 0) { toast.success("تم إرسال جميع الرسائل!"); return; }
+    if (sendDelay < 10) {
+      toast.warning("تحذير: التأخير أقل من 10 ثواني قد يؤدي إلى حظر واتساب");
+    }
+    setIsAutoSending(true);
+    pausedRef.current = false;
+    setIsPaused(false);
+
+    const sendNext = async () => {
+      const nextIndex = generatedMessages.findIndex(m => !m.sent);
+      if (nextIndex === -1 || !isAutoSending) {
+        setIsAutoSending(false);
+        setCountdown(null);
+        toast.success("✅ تم إرسال جميع الرسائل!");
+        return;
+      }
+      await handleSendOne(nextIndex);
+      startCountdown(sendNext);
+    };
+
+    await sendNext();
+  };
 
   const filteredLeads = useMemo(() => {
     if (!leads) return [];
@@ -487,14 +557,99 @@ export default function BulkWhatsapp() {
             ))}
           </div>
 
-          {/* How to send instructions */}
-          <div className="rounded-2xl p-4 border space-y-2" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.2)" }}>
-            <p className="text-xs font-semibold text-foreground flex items-center gap-2">
-              <ExternalLink className="w-3.5 h-3.5" style={{ color: "oklch(0.75 0.18 200)" }} />
-              كيفية الإرسال
-            </p>
+          {/* شريط التحكم بالإرسال التلقائي */}
+          <div className="rounded-2xl p-4 border space-y-3" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.2)" }}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs font-semibold text-foreground flex items-center gap-2">
+                <Timer className="w-3.5 h-3.5" style={{ color: "oklch(0.75 0.18 200)" }} />
+                إعداد الإرسال التلقائي
+              </p>
+              {/* ضبط التأخير */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">التأخير بين الرسائل:</span>
+                <div className="flex items-center gap-1">
+                  {[10, 15, 20, 30, 45, 60].map(d => (
+                    <button key={d} onClick={() => setSendDelay(d)}
+                      className="text-xs px-2 py-0.5 rounded-lg transition-all"
+                      style={sendDelay === d
+                        ? { background: "oklch(0.65 0.18 200 / 0.2)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.4)" }
+                        : { background: "oklch(0.15 0.015 240)", color: "oklch(0.5 0.01 240)", border: "1px solid oklch(0.25 0.02 240)" }}>
+                      {d}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* تحذير التأخير القصير */}
+            {sendDelay < 15 && (
+              <div className="flex items-center gap-2 p-2 rounded-xl" style={{ background: "oklch(0.58 0.22 25 / 0.1)", border: "1px solid oklch(0.58 0.22 25 / 0.2)" }}>
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "oklch(0.7 0.22 25)" }} />
+                <p className="text-xs" style={{ color: "oklch(0.7 0.22 25)" }}>
+                  {sendDelay < 10 ? "تحذير عالي: تأخير أقل من 10 ثواني قد يؤدي إلى حظر واتساب" : "تنبيه: ينصح بتأخير 15 ثانية أو أكثر لتجنب الحظر"}
+                </p>
+              </div>
+            )}
+
+            {/* أزرار التحكم*/}
+            <div className="flex items-center gap-2 flex-wrap">
+              {!isAutoSending ? (
+                <button onClick={handleAutoSendAll} disabled={pendingCount === 0}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40"
+                  style={{ background: "oklch(0.55 0.2 145)" }}>
+                  <FastForward className="w-4 h-4" />
+                  إرسال تلقائي ({pendingCount} رسالة)
+                </button>
+              ) : (
+                <>
+                  <button onClick={handlePauseResume}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                    style={isPaused
+                      ? { background: "oklch(0.65 0.2 145 / 0.2)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.65 0.2 145 / 0.4)" }
+                      : { background: "oklch(0.78 0.16 75 / 0.2)", color: "oklch(0.78 0.16 75)", border: "1px solid oklch(0.78 0.16 75 / 0.4)" }}>
+                    {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                    {isPaused ? "استئناف" : "إيقاف مؤقت"}
+                  </button>
+                  <button onClick={handleStopAutoSend}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                    style={{ background: "oklch(0.58 0.22 25 / 0.2)", color: "oklch(0.7 0.22 25)", border: "1px solid oklch(0.58 0.22 25 / 0.4)" }}>
+                    <X className="w-4 h-4" />
+                    إيقاف نهائي
+                  </button>
+                </>
+              )}
+
+              {/* عداد تنازلي */}
+              {countdown !== null && (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl"
+                  style={{ background: isPaused ? "oklch(0.78 0.16 75 / 0.1)" : "oklch(0.65 0.18 200 / 0.1)", border: `1px solid ${isPaused ? "oklch(0.78 0.16 75 / 0.3)" : "oklch(0.65 0.18 200 / 0.3)"}` }}>
+                  <Timer className="w-4 h-4" style={{ color: isPaused ? "oklch(0.78 0.16 75)" : "oklch(0.75 0.18 200)" }} />
+                  <span className="text-sm font-bold" style={{ color: isPaused ? "oklch(0.78 0.16 75)" : "oklch(0.75 0.18 200)" }}>
+                    {isPaused ? "‖ موقوف" : `⏱ ${countdown}s`}
+                  </span>
+                  {!isPaused && (
+                    <span className="text-xs text-muted-foreground">الرسالة التالية...</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* شريط التقدم */}
+            {generatedMessages.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>التقدم: {sentCount}/{generatedMessages.length}</span>
+                  <span>{Math.round((sentCount / generatedMessages.length) * 100)}%</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: "oklch(0.18 0.02 240)" }}>
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${(sentCount / generatedMessages.length) * 100}%`, background: "oklch(0.55 0.2 145)" }} />
+                </div>
+              </div>
+            )}
+
             <p className="text-xs text-muted-foreground">
-              اضغط على زر <strong className="text-foreground">إرسال</strong> بجانب كل رسالة — سيفتح واتساب ويب مع الرسالة جاهزة تلقائياً، فقط اضغط إرسال في واتساب.
+              اضغط <strong className="text-foreground">إرسال تلقائي</strong> لفتح واتساب تلقائياً بتأخير آمن بين كل رسالة، أو اضغط <strong className="text-foreground">إرسال</strong> بجانب كل رسالة يدوياً.
             </p>
           </div>
 
