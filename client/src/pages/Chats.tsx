@@ -526,6 +526,10 @@ export default function Chats() {
   const [globalAiLoading, setGlobalAiLoading] = useState(false);
    const [chatAiLoading, setChatAiLoading] = useState(false);
   const [aiEditedReply, setAiEditedReply] = useState(""); // الرد المختار/المعدّل
+  const [aiRagSources, setAiRagSources] = useState<{ source: string; sourceType: string; docType?: string }[]>([]); // مصادر RAG
+  const [showRagSources, setShowRagSources] = useState(false); // عرض/إخفاء المصادر
+  const [improvementHint, setImprovementHint] = useState(""); // تلميح تحسين الرد
+  const [showImprovementInput, setShowImprovementInput] = useState(false); // عرض حقل التلميح
   // ===== حالة الذكاء الاصطناعي الصوتي =====
   const [voiceMode, setVoiceMode] = useState(false); // وضع المحادثة الصوتية مع AI
   const [isListening, setIsListening] = useState(false); // جاري الاستماع
@@ -631,12 +635,33 @@ export default function Chats() {
       setAiSuggestions(data.suggestions);
       setAiIntent(data.intentAnalysis);
       setAiEditedReply(data.suggestions[0] || "");
+      setAiRagSources(data.ragSources || []);
       setShowAiPanel(true);
-      if (data.ragContext && data.ragContext.length > 0) {
-        toast.success("تحسين بقاعدة المعرفة", { description: `${data.ragContext.length} مصدر معلومات` });
+      setShowRagSources(false);
+      if (data.ragSources && data.ragSources.length > 0) {
+        toast.success("تحسين بقاعدة المعرفة", { description: `${data.ragSources.length} مصدر معلومات` });
       }
     },
     onError: (e) => toast.error("خطأ في AI", { description: e.message }),
+  });
+
+  // ===== AI: تحسين الرد المقترح (Improve Reply) =====
+  const improveAiReply = trpc.ragKnowledge.improveReply.useMutation({
+    onSuccess: (data) => {
+      setAiEditedReply(data.improvedReply);
+      // إضافة البدائل إلى قائمة الاقتراحات
+      if (data.alternatives?.length) {
+        setAiSuggestions([data.improvedReply, ...data.alternatives]);
+      }
+      setShowImprovementInput(false);
+      setImprovementHint("");
+      if (data.improvements?.length) {
+        toast.success("تحسين الرد", { description: data.improvements[0] });
+      } else {
+        toast.success("تم تحسين الرد بنجاح");
+      }
+    },
+    onError: (e) => toast.error("خطأ في تحسين الرد", { description: e.message }),
   });
 
   // تحكم AI لكل محادثة
@@ -1639,6 +1664,36 @@ export default function Chats() {
                       <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#25D366]/20 text-[#25D366]">
                         {aiIntent.interestScore}% اهتمام
                       </span>
+                      {aiIntent.suggestedAction && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 w-full mt-0.5">
+                          → {aiIntent.suggestedAction}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* مصادر RAG */}
+                  {aiRagSources.length > 0 && (
+                    <div className="px-4 py-1.5 border-b border-white/5">
+                      <button
+                        className="flex items-center gap-1.5 text-[11px] text-[#8696a0] hover:text-[#25D366] transition-colors"
+                        onClick={() => setShowRagSources(p => !p)}
+                      >
+                        <FileText className="w-3 h-3" />
+                        <span>{aiRagSources.length} مصدر من قاعدة المعرفة</span>
+                        <ChevronDown className={`w-3 h-3 transition-transform ${showRagSources ? "rotate-180" : ""}`} />
+                      </button>
+                      {showRagSources && (
+                        <div className="mt-1.5 space-y-1">
+                          {aiRagSources.map((src, i) => (
+                            <div key={i} className="flex items-center gap-1.5 text-[10px] text-[#8696a0] px-2 py-1 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                              <span className="text-[#25D366]">{src.sourceType === "document" ? "📄" : "💬"}</span>
+                              <span className="truncate">{src.source}</span>
+                              {src.docType && <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: "rgba(37,211,102,0.15)", color: "#25D366" }}>{src.docType === "faq" ? "FAQ" : src.docType === "product" ? "منتج" : src.docType === "policy" ? "سياسة" : "نص"}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1677,6 +1732,42 @@ export default function Chats() {
                       style={{ background: "#2a3942", borderRadius: "10px", minHeight: "60px" }}
                       rows={2}
                     />
+
+                    {/* حقل تلميح التحسين */}
+                    {showImprovementInput && (
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={improvementHint}
+                          onChange={e => setImprovementHint(e.target.value)}
+                          placeholder="توجيه اختياري: أقصر، أكثر إقناعاً، أضف سعر..."
+                          className="flex-1 text-xs px-3 py-1.5 rounded-lg text-white border-0 outline-none"
+                          style={{ background: "#2a3942" }}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" && selectedChatId && aiEditedReply) {
+                              improveAiReply.mutate({ chatId: selectedChatId, currentReply: aiEditedReply, tone: aiTone, improvementHint: improvementHint || undefined });
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs text-white px-3"
+                          style={{ background: "rgba(37,211,102,0.3)" }}
+                          onClick={() => selectedChatId && aiEditedReply && improveAiReply.mutate({ chatId: selectedChatId, currentReply: aiEditedReply, tone: aiTone, improvementHint: improvementHint || undefined })}
+                          disabled={improveAiReply.isPending || !aiEditedReply}
+                        >
+                          {improveAiReply.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : "تطبيق"}
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm"
+                          className="h-8 w-8 p-0 text-[#8696a0]"
+                          onClick={() => { setShowImprovementInput(false); setImprovementHint(""); }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
@@ -1687,6 +1778,20 @@ export default function Chats() {
                       >
                         <Send className="w-3.5 h-3.5 ml-1" />
                         إرسال الرد
+                      </Button>
+                      {/* زر تحسين الرد */}
+                      <Button
+                        variant="ghost" size="sm"
+                        className="h-8 text-xs text-[#8696a0] hover:text-[#25D366] px-2"
+                        style={showImprovementInput ? { color: "#25D366" } : {}}
+                        onClick={() => setShowImprovementInput(p => !p)}
+                        disabled={!aiEditedReply || improveAiReply.isPending}
+                        title="تحسين الرد"
+                      >
+                        {improveAiReply.isPending
+                          ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          : <Zap className="w-3.5 h-3.5" />}
+                        <span className="mr-1">تحسين</span>
                       </Button>
                       <Button
                         variant="ghost" size="sm"
@@ -1700,7 +1805,7 @@ export default function Chats() {
                         className="h-8 w-8 p-0 text-[#8696a0] hover:text-[#25D366]"
                         onClick={() => selectedChatId && suggestAiReply.mutate({ chatId: selectedChatId, tone: aiTone })}
                         disabled={suggestAiReply.isPending}
-                        title="تحديث الاقتراحات"
+                        title="تجديد الاقتراحات"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${suggestAiReply.isPending ? "animate-spin" : ""}`} />
                       </Button>

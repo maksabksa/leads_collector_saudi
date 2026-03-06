@@ -15,7 +15,6 @@ import {
   Brain,
   Smartphone,
   Settings2,
-  Inbox,
   Share2,
   Tag,
   ClipboardList,
@@ -32,7 +31,6 @@ import { Link, useLocation } from "wouter";
 /** القسم الرئيسي — متاح لجميع المستخدمين (مع فلترة الصلاحيات) */
 const MAIN_NAV = [
   { path: "/",              label: "لوحة التحكم",      icon: BarChart3,     permission: null },
-  { path: "/unified-inbox", label: "صندوق الوارد",     icon: Inbox,         permission: "whatsapp.send" },
   { path: "/chats",         label: "محادثات واتساب",   icon: MessagesSquare, permission: "whatsapp.send" },
   { path: "/whatsapp",      label: "إرسال واتساب",     icon: MessageCircle, permission: "whatsapp.send" },
   { path: "/leads",         label: "قائمة العملاء",    icon: Users,         permission: "leads.view" },

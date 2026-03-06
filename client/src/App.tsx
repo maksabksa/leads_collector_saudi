@@ -40,7 +40,6 @@ import Reports from "./pages/Reports";
 import DataQuality from "./pages/DataQuality";
 import MessagesHub from "./pages/MessagesHub";
 import SocialAccounts from "./pages/SocialAccounts";
-import UnifiedInbox from "./pages/UnifiedInbox";
 import StaffLogin from "./pages/StaffLogin";
 import SocialCallback from "./pages/SocialCallback";
 import AcceptInvitation from "./pages/AcceptInvitation";
@@ -98,7 +97,6 @@ function Router() {
         <Route path="/data-quality" component={DataQuality} />
         <Route path="/messages" component={MessagesHub} />
         <Route path="/social-accounts">{() => <AdminGuard><SocialAccounts /></AdminGuard>}</Route>
-        <Route path="/unified-inbox" component={UnifiedInbox} />
         <Route path="/audit-log">{() => <AdminGuard><AuditLog /></AdminGuard>}</Route>
         <Route path="/labels" component={LabelsManager} />
         <Route path="/follow-up" component={FollowUp} />

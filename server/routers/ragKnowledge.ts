@@ -28,19 +28,28 @@ function splitTextIntoChunks(text: string, maxChunkSize = 500): string[] {
   return chunks.filter(c => c.length > 10);
 }
 
-// ===== مساعد: البحث في قاعدة المعرفة بالكلمات المفتاحية =====
-async function searchKnowledgeBase(query: string, limit = 5): Promise<string[]> {
+// ===== نوع نتيجة البحث في قاعدة المعرفة =====
+type KnowledgeResult = {
+  text: string;
+  source: string;
+  sourceType: "document" | "example";
+  docType?: string;
+};
+
+// ===== مساعد: البحث في قاعدة المعرفة بالكلمات المفتاحية (محسّن مع المصادر) =====
+async function searchKnowledgeBase(query: string, limit = 6): Promise<KnowledgeResult[]> {
   const db = await getDb();
   if (!db) return [];
 
   // بحث بسيط بالكلمات المفتاحية
-  const keywords = query.split(/\s+/).filter(w => w.length > 2).slice(0, 5);
-  const results: string[] = [];
+  const keywords = query.split(/\s+/).filter(w => w.length > 2).slice(0, 6);
+  const results: KnowledgeResult[] = [];
+  const seenTexts = new Set<string>();
 
   // البحث في المستندات
   for (const keyword of keywords) {
     const docs = await db
-      .select({ content: ragDocuments.content, title: ragDocuments.title, docType: ragDocuments.docType })
+      .select({ id: ragDocuments.id, content: ragDocuments.content, title: ragDocuments.title, docType: ragDocuments.docType, category: ragDocuments.category })
       .from(ragDocuments)
       .where(and(
         eq(ragDocuments.isActive, true),
@@ -49,15 +58,24 @@ async function searchKnowledgeBase(query: string, limit = 5): Promise<string[]> 
       .limit(3);
 
     for (const doc of docs) {
-      const snippet = `[${doc.docType === "faq" ? "سؤال وجواب" : doc.docType === "product" ? "منتج/خدمة" : doc.docType === "policy" ? "سياسة" : "معلومة"}] ${doc.title}: ${doc.content.substring(0, 300)}`;
-      if (!results.includes(snippet)) results.push(snippet);
+      const typeLabel = doc.docType === "faq" ? "سؤال وجواب" : doc.docType === "product" ? "منتج/خدمة" : doc.docType === "policy" ? "سياسة" : "معلومة";
+      const snippet = `[${typeLabel}] ${doc.title}: ${doc.content.substring(0, 400)}`;
+      if (!seenTexts.has(snippet)) {
+        seenTexts.add(snippet);
+        results.push({
+          text: snippet,
+          source: doc.title,
+          sourceType: "document",
+          docType: doc.docType,
+        });
+      }
     }
   }
 
   // البحث في أمثلة المحادثات
   for (const keyword of keywords.slice(0, 3)) {
     const examples = await db
-      .select({ customerMessage: ragConversationExamples.customerMessage, idealResponse: ragConversationExamples.idealResponse })
+      .select({ id: ragConversationExamples.id, customerMessage: ragConversationExamples.customerMessage, idealResponse: ragConversationExamples.idealResponse, context: ragConversationExamples.context })
       .from(ragConversationExamples)
       .where(and(
         eq(ragConversationExamples.isActive, true),
@@ -66,11 +84,24 @@ async function searchKnowledgeBase(query: string, limit = 5): Promise<string[]> 
       .limit(2);
 
     for (const ex of examples) {
-      results.push(`[مثال رد] عندما يقول العميل: "${ex.customerMessage}" → الرد المثالي: "${ex.idealResponse}"`);
+      const snippet = `[مثال رد] عندما يقول العميل: "${ex.customerMessage}" → الرد المثالي: "${ex.idealResponse}"`;
+      if (!seenTexts.has(snippet)) {
+        seenTexts.add(snippet);
+          results.push({
+          text: snippet,
+          source: ex.context || "مثال محادثة",
+          sourceType: "example",
+        });
+      }
     }
   }
 
   return results.slice(0, limit);
+}
+
+// ===== مساعد: إرجاع نص RAG فقط للـ prompt =====
+function ragResultsToText(results: KnowledgeResult[]): string {
+  return results.map(r => r.text).join("\n\n");
 }
 
 export const ragKnowledgeRouter = router({
@@ -307,16 +338,16 @@ export const ragKnowledgeRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { suggestions: [], intentAnalysis: null, ragContext: [] };
+      if (!db) return { suggestions: [], intentAnalysis: null, ragContext: [], ragSources: [] };
 
-      // جلب آخر رسائل المحادثة
+      // جلب آخر رسائل المحادثة (20 رسالة للسياق الأعمق)
       const { whatsappChatMessages, whatsappChats } = await import("../../drizzle/schema");
       const messages = await db
         .select()
         .from(whatsappChatMessages)
         .where(eq(whatsappChatMessages.chatId, input.chatId))
         .orderBy(desc(whatsappChatMessages.sentAt))
-        .limit(10);
+        .limit(20);
 
       const [chatInfo] = await db.select().from(whatsappChats).where(eq(whatsappChats.id, input.chatId)).limit(1);
 
@@ -324,15 +355,17 @@ export const ragKnowledgeRouter = router({
       const lastIncoming = messages.find(m => m.direction === "incoming");
       const lastMessage = lastIncoming?.message || "";
 
-      // البحث في قاعدة المعرفة
-      const ragContext = await searchKnowledgeBase(lastMessage, 5);
+      // البحث في قاعدة المعرفة (مع المصادر)
+      const ragResults = await searchKnowledgeBase(lastMessage, 6);
+      const ragContextText = ragResultsToText(ragResults);
+      const ragSources = ragResults.map(r => ({ source: r.source, sourceType: r.sourceType, docType: r.docType }));
 
       // جلب شخصية AI
       const [personality] = await db.select().from(aiPersonality).limit(1);
 
       const toneMap = { formal: "رسمي ومحترف جداً", friendly: "ودي ومريح ومتعاطف", direct: "مباشر ومختصر وواضح" };
 
-      const conversationHistory = messages
+      const conversationHistory = [...messages]
         .reverse()
         .map(m => `${m.direction === "outgoing" ? "نحن" : "العميل"}: ${m.message || "[ملف]"}`)
         .join("\n");
@@ -340,12 +373,12 @@ export const ragKnowledgeRouter = router({
       const systemPrompt = [
         personality?.systemPrompt || "أنت مساعد مبيعات ذكي متخصص في السوق السعودي.",
         personality?.businessContext ? `\nمعلومات النشاط التجاري: ${personality.businessContext}` : "",
-        personality?.rules?.length ? `\nالقواعد الواجب اتباعها:\n${personality.rules.map((r, i) => `${i + 1}. ${r}`).join("\n")}` : "",
-        personality?.forbiddenTopics?.length ? `\nمواضيع محظورة: ${personality.forbiddenTopics.join(", ")}` : "",
+        personality?.rules?.length ? `\nالقواعد الواجب اتباعها:\n${personality.rules.map((r: string, i: number) => `${i + 1}. ${r}`).join("\n")}` : "",
+        personality?.forbiddenTopics?.length ? `\nمواضيع محظورة: ${(personality.forbiddenTopics as string[]).join(", ")}` : "",
         `\nأسلوب الرد المطلوب: ${toneMap[input.tone]}`,
-        ragContext.length > 0 ? `\n\n=== معلومات من قاعدة المعرفة (استخدمها في ردودك) ===\n${ragContext.join("\n\n")}` : "",
-        "\n\nمهمتك: اقتراح " + input.count + " ردود مختلفة بالعربية وتحليل نية العميل.",
-        'أعط الرد JSON بهذا الشكل فقط: {"suggestions":["رد 1","رد 2","رد 3"],"intentAnalysis":{"intent":"price_inquiry","urgency":"medium","sentiment":"positive","suggestedAction":"وصف الخطوة","interestScore":75}}',
+        ragContextText ? `\n\n=== معلومات من قاعدة المعرفة (استخدمها في ردودك) ===\n${ragContextText}` : "",
+        `\n\nمهمتك: اقتراح ${input.count} ردود مختلفة بالعربية وتحليل نية العميل.`,
+        `أعط الرد JSON بهذا الشكل فقط: {"suggestions":["رد 1","رد 2","رد 3"],"intentAnalysis":{"intent":"price_inquiry","urgency":"medium","sentiment":"positive","suggestedAction":"وصف الخطوة","interestScore":75}}`,
         "\nأنواع intent: price_inquiry, purchase_intent, complaint, follow_up, general_inquiry, booking, cancellation",
       ].filter(Boolean).join("");
 
@@ -364,10 +397,78 @@ export const ragKnowledgeRouter = router({
         return {
           suggestions: (parsed.suggestions as string[]) || [],
           intentAnalysis: parsed.intentAnalysis || null,
-          ragContext,
+          ragContext: ragResults.map(r => r.text),
+          ragSources,
         };
       } catch {
-        return { suggestions: [], intentAnalysis: null, ragContext };
+        return { suggestions: [], intentAnalysis: null, ragContext: ragResults.map(r => r.text), ragSources };
+      }
+    }),
+
+  // ===== تحسين رد موجود (Regenerate) =====
+  improveReply: protectedProcedure
+    .input(z.object({
+      chatId: z.number(),
+      currentReply: z.string(),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      improvementHint: z.string().optional(), // تلميح اختياري: "أقصر"، "أكثر إقناعاً"، إلخ
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { improvedReply: input.currentReply, alternatives: [] };
+
+      const { whatsappChatMessages, whatsappChats } = await import("../../drizzle/schema");
+      const messages = await db
+        .select()
+        .from(whatsappChatMessages)
+        .where(eq(whatsappChatMessages.chatId, input.chatId))
+        .orderBy(desc(whatsappChatMessages.sentAt))
+        .limit(15);
+
+      const [chatInfo] = await db.select().from(whatsappChats).where(eq(whatsappChats.id, input.chatId)).limit(1);
+      const [personality] = await db.select().from(aiPersonality).limit(1);
+
+      const lastIncoming = messages.find(m => m.direction === "incoming");
+      const lastMessage = lastIncoming?.message || "";
+      const ragResults = await searchKnowledgeBase(lastMessage, 4);
+      const ragContextText = ragResultsToText(ragResults);
+
+      const toneMap = { formal: "رسمي ومحترف جداً", friendly: "ودي ومريح ومتعاطف", direct: "مباشر ومختصر وواضح" };
+
+      const conversationHistory = [...messages]
+        .reverse()
+        .map(m => `${m.direction === "outgoing" ? "نحن" : "العميل"}: ${m.message || "[ملف]"}`)
+        .join("\n");
+
+      const systemPrompt = [
+        personality?.systemPrompt || "أنت مساعد مبيعات ذكي متخصص في السوق السعودي.",
+        personality?.businessContext ? `\nمعلومات النشاط التجاري: ${personality.businessContext}` : "",
+        `\nأسلوب الرد المطلوب: ${toneMap[input.tone]}`,
+        ragContextText ? `\n\n=== معلومات من قاعدة المعرفة ===\n${ragContextText}` : "",
+        `\n\nمهمتك: تحسين الرد المقترح وتقديم 2 بدائل أفضل.`,
+        input.improvementHint ? `\nتوجيه التحسين: ${input.improvementHint}` : "",
+        `\nأعط الرد JSON بهذا الشكل: {"improvedReply":"الرد المحسّن","alternatives":["بديل 1","بديل 2"],"improvements":["ما تم تحسينه"]}`,
+      ].filter(Boolean).join("");
+
+      try {
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `العميل: ${chatInfo?.contactName || "غير محدد"}\n\nسجل المحادثة:\n${conversationHistory}\n\nالرد الحالي المقترح:\n"${input.currentReply}"\n\nحسّن هذا الرد.` },
+          ],
+          response_format: { type: "json_object" },
+        });
+
+        const content = response.choices[0]?.message?.content || "{}";
+        const parsed = JSON.parse(content as string);
+
+        return {
+          improvedReply: (parsed.improvedReply as string) || input.currentReply,
+          alternatives: (parsed.alternatives as string[]) || [],
+          improvements: (parsed.improvements as string[]) || [],
+        };
+      } catch {
+        return { improvedReply: input.currentReply, alternatives: [], improvements: [] };
       }
     }),
 
