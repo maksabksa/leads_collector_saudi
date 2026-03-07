@@ -3,7 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import puppeteer from "puppeteer-core";
 import { invokeLLM } from "../_core/llm";
-import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP } from "./serpSearch";
+import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP, serpRequest, parseGoogleResultsPublic } from "./serpSearch";
 
 // ─── Bright Data Browser API Helper ───────────────────────────────────────────
 const BRIGHT_DATA_WS_ENDPOINT = process.env.BRIGHT_DATA_WS_ENDPOINT || "";
@@ -110,65 +110,57 @@ async function scrapeTikTok(query: string, location: string): Promise<any[]> {
   }
 }
 
-// ─── بحث Twitter/X ─────────────────────────────────────────────────────────────
+// ─── بحث Twitter/X (عبر SERP API - بدلاً من Puppeteer المحظور) ─────────────────
 async function scrapeTwitter(query: string, location: string): Promise<any[]> {
-  const browser = await openBrightDataBrowser();
+  // Twitter يحظر Puppeteer بشكل صارم - نستخدم SERP API للبحث في Google عن حسابات Twitter
+  const queries = [
+    `${query} ${location} site:twitter.com OR site:x.com`,
+    `${query} ${location} twitter`,
+    `${query} site:x.com`,
+  ];
+
   const results: any[] = [];
-  try {
-    const page = await browser.newPage();
-    const searchQuery = location ? `${query} ${location}` : query;
-    await page.goto(
-      `https://twitter.com/search?q=${encodeURIComponent(searchQuery)}&f=user`,
-      { waitUntil: "networkidle2", timeout: 30000 }
-    );
-    await sleep(4000);
+  const seen = new Set<string>();
 
-    const users = await page.evaluate(() => {
-      const items: any[] = [];
-      document.querySelectorAll('[data-testid="UserCell"]').forEach((cell, i) => {
-        if (i >= 15) return;
-        const username =
-          (cell.querySelector('[data-testid="UserName"] span') as HTMLElement)
-            ?.textContent || "";
-        const handle =
-          (cell.querySelector('[data-testid="UserName"] span:last-child') as HTMLElement)
-            ?.textContent || "";
-        const bio =
-          (cell.querySelector('[data-testid="UserDescription"]') as HTMLElement)
-            ?.textContent || "";
-        const followers =
-          (cell.querySelector('[data-testid="UserFollowers"]') as HTMLElement)
-            ?.textContent || "";
-        const avatar =
-          (cell.querySelector('img[src*="profile_images"]') as HTMLImageElement)?.src || "";
-        const verified = !!cell.querySelector('[data-testid="icon-verified"]');
-        const website =
-          (cell.querySelector('[data-testid="UserUrl"] a') as HTMLAnchorElement)?.href || "";
-        const phone = bio?.match(/(?:\+966|05|009665)\d{8,9}/)?.[0] || "";
-        if (username) items.push({ username, handle, bio, followers, avatar, verified, website, phone });
-      });
-      return items;
-    });
+  for (const q of queries) {
+    try {
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const html = await serpRequest(googleUrl);
+      const googleResults = parseGoogleResultsPublic(html, "twitter.com");
 
-    for (const user of users) {
-      results.push({
-        platform: "twitter",
-        username: user.handle?.replace("@", "") || user.username,
-        displayName: user.username,
-        profileUrl: `https://twitter.com/${user.handle?.replace("@", "") || user.username}`,
-        bio: user.bio?.substring(0, 200),
-        followers: user.followers,
-        verified: user.verified,
-        website: user.website,
-        phone: user.phone,
-        thumbnail: user.avatar,
-      });
+      for (const item of googleResults) {
+        // استخراج username من URL
+        const usernameMatch = item.link.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)(?:\/|$)/);
+        if (!usernameMatch) continue;
+        const username = usernameMatch[1];
+        // تجاهل صفحات عامة
+        if (["search", "explore", "home", "i", "hashtag", "intent"].includes(username)) continue;
+        if (seen.has(username)) continue;
+        seen.add(username);
+
+        const phones = (item.snippet + " " + item.title).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
+
+        results.push({
+          platform: "twitter",
+          username,
+          displayName: item.title
+            .replace(/ on X$/, "")
+            .replace(/ \(@[^)]+\)/, "")
+            .replace(/ \| Twitter$/, "")
+            .trim(),
+          profileUrl: `https://x.com/${username}`,
+          bio: item.snippet?.substring(0, 200) || "",
+          phone: phones[0] || "",
+          dataSource: "serp",
+        });
+      }
+    } catch (err) {
+      console.warn(`[Twitter SERP] query failed: ${q}`, err);
     }
-    await page.close();
-  } finally {
-    await browser.close();
+    if (results.length >= 15) break;
   }
-  return results;
+
+  return results.slice(0, 20);
 }
 
 // ─── بحث LinkedIn (عبر SERP API) ───────────────────────────────────
@@ -215,54 +207,49 @@ async function scrapeSnapchat(query: string, location: string): Promise<any[]> {
     return [];
   }
 }
-// ─── بحث Google Search
-// ─── بحث Google Search ─────────────────────────────────────────────────────────
+// ─── بحث Google Search (عبر SERP API - بدلاً من Puppeteer البطيء) ──────────────
 async function scrapeGoogleSearch(query: string, location: string): Promise<any[]> {
-  const browser = await openBrightDataBrowser();
+  // استخدام SERP API مباشرة بدلاً من Puppeteer لتجنب timeout
+  const searchQuery = location ? `${query} ${location}` : query;
+  // استعلامات متعددة لتوسيع النتائج
+  const queries = [
+    searchQuery,
+    `${query} ${location} أعمال`,
+    `${query} ${location} للتواصل`,
+  ];
+
   const results: any[] = [];
-  try {
-    const page = await browser.newPage();
-    const searchQuery = location ? `${query} ${location}` : query;
-    await page.goto(
-      `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&gl=sa&hl=ar&num=20`,
-      { waitUntil: "networkidle2", timeout: 30000 }
-    );
-    await sleep(2000);
+  const seen = new Set<string>();
 
-    const searchResults = await page.evaluate(() => {
-      const items: any[] = [];
-      document.querySelectorAll("div.g, div[data-hveid]").forEach((div, i) => {
-        if (i >= 20) return;
-        const titleEl = div.querySelector("h3");
-        const linkEl = div.querySelector("a") as HTMLAnchorElement | null;
-        const snippetEl = div.querySelector("div.VwiC3b, span.st");
-        if (!titleEl || !linkEl) return;
-        const title = titleEl.textContent?.trim() || "";
-        const url = linkEl.getAttribute("href") || "";
-        const snippet = snippetEl?.textContent?.trim() || "";
-        const phone = snippet.match(/(?:\+966|05|009665)\d{8,9}/)?.[0] || "";
-        if (title && url && !url.includes("google.com")) {
-          items.push({ title, url, snippet, phone });
-        }
-      });
-      return items;
-    });
+  for (const q of queries) {
+    try {
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const html = await serpRequest(googleUrl);
+      const googleResults = parseGoogleResultsPublic(html, ""); // بدون تصفية domain
 
-    for (const result of searchResults) {
-      results.push({
-        platform: "google",
-        displayName: result.title,
-        profileUrl: result.url,
-        bio: result.snippet?.substring(0, 300),
-        phone: result.phone,
-        website: result.url,
-      });
+      for (const item of googleResults) {
+        if (seen.has(item.link)) continue;
+        seen.add(item.link);
+
+        const phones = (item.snippet + " " + item.title).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
+
+        results.push({
+          platform: "google",
+          displayName: item.title,
+          profileUrl: item.link,
+          bio: item.snippet?.substring(0, 300) || "",
+          phone: phones[0] || "",
+          website: item.link,
+          dataSource: "serp",
+        });
+      }
+    } catch (err) {
+      console.warn(`[Google SERP] query failed: ${q}`, err);
     }
-    await page.close();
-  } finally {
-    await browser.close();
+    if (results.length >= 30) break;
   }
-  return results;
+
+  return results.slice(0, 30);
 }
 
 // ─── tRPC Router ───────────────────────────────────────────────────────────────

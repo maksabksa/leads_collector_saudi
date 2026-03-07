@@ -1126,3 +1126,19 @@ export const realSocialSnapshots = mysqlTable("real_social_snapshots", {
 
 export type RealSocialSnapshot = typeof realSocialSnapshots.$inferSelect;
 export type InsertRealSocialSnapshot = typeof realSocialSnapshots.$inferInsert;
+
+// جدول إعدادات الشركة (معلومات عامة)
+export const companySettings = mysqlTable("company_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  companyName: varchar("companyName", { length: 200 }).default("مكسب KSA"),
+  companyDescription: text("companyDescription"),
+  city: varchar("city", { length: 100 }).default("الرياض"),
+  region: varchar("region", { length: 100 }).default("المنطقة الوسطى"),
+  phone: varchar("phone", { length: 30 }),
+  email: varchar("email", { length: 200 }),
+  website: varchar("website", { length: 300 }),
+  logoUrl: text("logoUrl"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type CompanySettings = typeof companySettings.$inferSelect;
+export type InsertCompanySettings = typeof companySettings.$inferInsert;

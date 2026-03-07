@@ -2025,6 +2025,13 @@ const whatsappAutomationRouter = router({
       await disconnectWhatsApp(input?.accountId ?? "default");
       return { success: true };
     }),
+  // إعادة تعيين جلسة واتساب (حذف الجلسة التالفة والبدء من الصفر)
+  resetSession: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .mutation(async ({ input }) => {
+      const { resetWhatsAppSession } = await import("./whatsappAutomation");
+      return resetWhatsAppSession(input?.accountId ?? "default");
+    }),
   // إرسال رسالة لرقم واحد
   sendOne: protectedProcedure
     .input(z.object({
@@ -2439,6 +2446,7 @@ const dataSettingsRouter = router({
     }),
 });
 import { whatsappSettingsRouter } from "./routers/whatsappSettings";
+import { companySettingsRouter } from "./routers/companySettings";
 import { numberHealthRouter } from "./routers/numberHealth";
 import { digitalMarketingRouter } from "./routers/digitalMarketing";
 import { socialSearchRouter } from "./routers/socialSearch";
@@ -2519,5 +2527,6 @@ export const appRouter = router({
   serpSearch: serpSearchRouter,
   noReply: noReplyRouter,
   chatNotes: chatNotesRouter,
+  companySettings: companySettingsRouter,
 });
 export type AppRouter = typeof appRouter;

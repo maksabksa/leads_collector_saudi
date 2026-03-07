@@ -40,7 +40,7 @@ function extractPhones(text: string): string[] {
 // ===== SERP API Request =====
 
 /** إرسال طلب بحث عبر Bright Data SERP API */
-async function serpRequest(googleUrl: string): Promise<string> {
+export async function serpRequest(googleUrl: string): Promise<string> {
   if (!BD_API_TOKEN) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
@@ -80,6 +80,11 @@ interface GoogleResult {
   link: string;
   snippet: string;
   displayLink: string;
+}
+
+/** نسخة عامة من parseGoogleResults بدون تصفية domain (للاستخدام الخارجي) */
+export function parseGoogleResultsPublic(html: string, targetDomain: string): GoogleResult[] {
+  return parseGoogleResults(html, targetDomain);
 }
 
 function parseGoogleResults(html: string, targetDomain: string): GoogleResult[] {
@@ -147,41 +152,52 @@ export interface SnapchatProfile {
 }
 
 export async function searchSnapchatSERP(keyword: string, city: string): Promise<SnapchatProfile[]> {
-  const query = `${keyword} ${city} site:snapchat.com`;
-  const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&hl=ar&gl=sa`;
-
-  const html = await serpRequest(googleUrl);
-  const googleResults = parseGoogleResults(html, "snapchat.com");
+  // استعلامات متعددة لتوسيع نطاق البحث
+  const queries = [
+    `${keyword} ${city} site:snapchat.com`,
+    `${keyword} site:snapchat.com/add`,
+    `${keyword} سناب site:snapchat.com`,
+  ];
 
   const profiles: SnapchatProfile[] = [];
   const seen = new Set<string>();
 
-  for (const item of googleResults) {
-    // استخراج username من URL
-    const usernameMatch = item.link.match(/snapchat\.com\/(?:add|p|discover)\/([a-zA-Z0-9._-]+)/);
-    if (!usernameMatch) continue;
-    const username = usernameMatch[1];
-    if (seen.has(username)) continue;
-    seen.add(username);
+  for (const query of queries) {
+    try {
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&hl=ar&gl=sa`;
+      const html = await serpRequest(googleUrl);
+      const googleResults = parseGoogleResults(html, "snapchat.com");
 
-    const phones = extractPhones(item.snippet + " " + item.title);
+      for (const item of googleResults) {
+        const usernameMatch = item.link.match(/snapchat\.com\/(?:add|p|discover)\/([a-zA-Z0-9._-]+)/);
+        if (!usernameMatch) continue;
+        const username = usernameMatch[1];
+        if (seen.has(username)) continue;
+        seen.add(username);
 
-    profiles.push({
-      id: `sc-${username}`,
-      username,
-      displayName: item.title
-        .replace(` | Snapchat`, "")
-        .replace(` - Snapchat`, "")
-        .replace(`(@${username})`, "")
-        .trim(),
-      description: item.snippet,
-      profileUrl: `https://www.snapchat.com/add/${username}`,
-      phone: phones[0] || "",
-      dataSource: "serp",
-    });
+        const phones = extractPhones(item.snippet + " " + item.title);
+
+        profiles.push({
+          id: `sc-${username}`,
+          username,
+          displayName: item.title
+            .replace(` | Snapchat`, "")
+            .replace(` - Snapchat`, "")
+            .replace(`(@${username})`, "")
+            .trim(),
+          description: item.snippet,
+          profileUrl: `https://www.snapchat.com/add/${username}`,
+          phone: phones[0] || "",
+          dataSource: "serp",
+        });
+      }
+    } catch (err) {
+      console.warn(`[Snapchat SERP] query failed: ${query}`, err);
+    }
+    if (profiles.length >= 20) break;
   }
 
-  return profiles;
+  return profiles.slice(0, 25);
 }
 
 // ===== TikTok Search =====
@@ -198,41 +214,53 @@ export interface TikTokProfile {
 }
 
 export async function searchTikTokSERP(keyword: string, city: string): Promise<TikTokProfile[]> {
-  const query = `${keyword} ${city} site:tiktok.com`;
-  const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&hl=ar&gl=sa`;
-
-  const html = await serpRequest(googleUrl);
-  const googleResults = parseGoogleResults(html, "tiktok.com");
+  // استعلامات متعددة لتوسيع نطاق البحث
+  const queries = [
+    `${keyword} ${city} site:tiktok.com`,
+    `${keyword} site:tiktok.com/@`,
+    `${keyword} تيك توك ${city}`,
+    `${keyword} tiktok ${city} سعودي`,
+  ];
 
   const profiles: TikTokProfile[] = [];
   const seen = new Set<string>();
 
-  for (const item of googleResults) {
-    // استخراج username من URL
-    const usernameMatch = item.link.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
-    if (!usernameMatch) continue;
-    const username = usernameMatch[1];
-    if (seen.has(username)) continue;
-    seen.add(username);
+  for (const query of queries) {
+    try {
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&hl=ar&gl=sa`;
+      const html = await serpRequest(googleUrl);
+      const googleResults = parseGoogleResults(html, "tiktok.com");
 
-    const phones = extractPhones(item.snippet + " " + item.title);
+      for (const item of googleResults) {
+        const usernameMatch = item.link.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
+        if (!usernameMatch) continue;
+        const username = usernameMatch[1];
+        if (seen.has(username)) continue;
+        seen.add(username);
 
-    profiles.push({
-      id: `tt-${username}`,
-      username,
-      displayName: item.title
-        .replace(` | TikTok`, "")
-        .replace(` - TikTok`, "")
-        .replace(`(@${username})`, "")
-        .trim(),
-      description: item.snippet,
-      profileUrl: `https://www.tiktok.com/@${username}`,
-      phone: phones[0] || "",
-      dataSource: "serp",
-    });
+        const phones = extractPhones(item.snippet + " " + item.title);
+
+        profiles.push({
+          id: `tt-${username}`,
+          username,
+          displayName: item.title
+            .replace(` | TikTok`, "")
+            .replace(` - TikTok`, "")
+            .replace(`(@${username})`, "")
+            .trim(),
+          description: item.snippet,
+          profileUrl: `https://www.tiktok.com/@${username}`,
+          phone: phones[0] || "",
+          dataSource: "serp",
+        });
+      }
+    } catch (err) {
+      console.warn(`[TikTok SERP] query failed: ${query}`, err);
+    }
+    if (profiles.length >= 25) break;
   }
 
-  return profiles;
+  return profiles.slice(0, 30);
 }
 
 // ===== Instagram Search =====
@@ -249,45 +277,57 @@ export interface InstagramProfile {
 }
 
 export async function searchInstagramSERP(keyword: string, city: string): Promise<InstagramProfile[]> {
-  const query = `${keyword} ${city} site:instagram.com`;
-  const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&hl=ar&gl=sa`;
-
-  const html = await serpRequest(googleUrl);
-  const googleResults = parseGoogleResults(html, "instagram.com");
+  // استعلامات متعددة لتوسيع نطاق البحث
+  const queries = [
+    `${keyword} ${city} site:instagram.com`,
+    `${keyword} انستغرام ${city}`,
+    `${keyword} instagram ${city} سعودي`,
+    `${keyword} site:instagram.com السعودية`,
+  ];
 
   const profiles: InstagramProfile[] = [];
   const seen = new Set<string>();
+  const skipPaths = new Set(["p", "explore", "reel", "stories", "tv", "reels", "accounts", "tags"]);
 
-  const skipPaths = new Set(["p", "explore", "reel", "stories", "tv", "reels", "accounts"]);
+  for (const query of queries) {
+    try {
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&hl=ar&gl=sa`;
+      const html = await serpRequest(googleUrl);
+      const googleResults = parseGoogleResults(html, "instagram.com");
 
-  for (const item of googleResults) {
-    const usernameMatch = item.link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
-    if (!usernameMatch) continue;
-    const username = usernameMatch[1];
-    if (skipPaths.has(username)) continue;
-    if (seen.has(username)) continue;
-    seen.add(username);
+      for (const item of googleResults) {
+        const usernameMatch = item.link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+        if (!usernameMatch) continue;
+        const username = usernameMatch[1];
+        if (skipPaths.has(username)) continue;
+        if (seen.has(username)) continue;
+        seen.add(username);
 
-    const phones = extractPhones(item.snippet + " " + item.title);
-    const isVerified = item.title.includes("✓") || item.snippet.includes("verified");
+        const phones = extractPhones(item.snippet + " " + item.title);
+        const isVerified = item.title.includes("✓") || item.snippet.includes("verified");
 
-    profiles.push({
-      id: `ig-${username}`,
-      username,
-      displayName: item.title
-        .replace(` • Instagram photos and videos`, "")
-        .replace(` (@${username})`, "")
-        .replace(` | Instagram`, "")
-        .trim(),
-      description: item.snippet,
-      profileUrl: `https://www.instagram.com/${username}/`,
-      phone: phones[0] || "",
-      isVerified,
-      dataSource: "serp",
-    });
+        profiles.push({
+          id: `ig-${username}`,
+          username,
+          displayName: item.title
+            .replace(` • Instagram photos and videos`, "")
+            .replace(` (@${username})`, "")
+            .replace(` | Instagram`, "")
+            .trim(),
+          description: item.snippet,
+          profileUrl: `https://www.instagram.com/${username}/`,
+          phone: phones[0] || "",
+          isVerified,
+          dataSource: "serp",
+        });
+      }
+    } catch (err) {
+      console.warn(`[Instagram SERP] query failed: ${query}`, err);
+    }
+    if (profiles.length >= 25) break;
   }
 
-  return profiles;
+  return profiles.slice(0, 30);
 }
 
 // ===== LinkedIn Search =====

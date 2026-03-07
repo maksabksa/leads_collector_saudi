@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -96,11 +96,45 @@ function SettingCard({
 
 // ===== تبويب عام =====
 function GeneralTab() {
-  const { data: settings } = trpc.waSettings.getSettings.useQuery({ accountId: "default" });
-  const _updateSettings = trpc.waSettings.updateSettings.useMutation({
-    onSuccess: () => toast.success("تم حفظ الإعدادات"),
-    onError: () => toast.error("فشل الحفظ"),
+  const { data: companyData, refetch } = trpc.companySettings.get.useQuery();
+  const [companyName, setCompanyName] = React.useState("");
+  const [companyDescription, setCompanyDescription] = React.useState("");
+  const [city, setCity] = React.useState("");
+  const [region, setRegion] = React.useState("");
+  const [isSavingCompany, setIsSavingCompany] = React.useState(false);
+
+  // تحميل البيانات عند جلبها من السيرفر
+  React.useEffect(() => {
+    if (companyData) {
+      setCompanyName(companyData.companyName || "مكسب KSA");
+      setCompanyDescription(companyData.companyDescription || "");
+      setCity(companyData.city || "الرياض");
+      setRegion(companyData.region || "المنطقة الوسطى");
+    }
+  }, [companyData]);
+
+  const saveCompany = trpc.companySettings.save.useMutation({
+    onSuccess: () => {
+      toast.success("تم حفظ معلومات الشركة بنجاح");
+      refetch();
+    },
+    onError: (e) => toast.error("فشل الحفظ: " + e.message),
   });
+
+  const handleSaveCompany = async () => {
+    if (!companyName.trim()) {
+      toast.error("اسم الشركة مطلوب");
+      return;
+    }
+    setIsSavingCompany(true);
+    await saveCompany.mutateAsync({
+      companyName: companyName.trim(),
+      companyDescription: companyDescription.trim() || undefined,
+      city: city.trim() || undefined,
+      region: region.trim() || undefined,
+    });
+    setIsSavingCompany(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -108,25 +142,50 @@ function GeneralTab() {
         <div className="space-y-3">
           <div>
             <label className="text-sm font-medium mb-1 block">اسم الشركة</label>
-            <Input placeholder="مثال: مكسب KSA" defaultValue="مكسب KSA" />
+            <Input
+              placeholder="مثال: مكسب KSA"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">وصف النشاط التجاري</label>
-            <Textarea placeholder="وصف مختصر للنشاط التجاري..." rows={2} />
+            <Textarea
+              placeholder="وصف مختصر للنشاط التجاري..."
+              rows={2}
+              value={companyDescription}
+              onChange={(e) => setCompanyDescription(e.target.value)}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium mb-1 block">المدينة</label>
-              <Input placeholder="الرياض" />
+              <Input
+                placeholder="الرياض"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+              />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">المنطقة</label>
-              <Input placeholder="المنطقة الوسطى" />
+              <Input
+                placeholder="المنطقة الوسطى"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+              />
             </div>
           </div>
-          <Button size="sm" className="w-full">
-            <Save className="w-4 h-4 ml-2" />
-            حفظ المعلومات
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={handleSaveCompany}
+            disabled={isSavingCompany || saveCompany.isPending}
+          >
+            {isSavingCompany || saveCompany.isPending ? (
+              <><span className="animate-spin ml-2">⏳</span> جاري الحفظ...</>
+            ) : (
+              <><Save className="w-4 h-4 ml-2" />حفظ المعلومات</>
+            )}
           </Button>
         </div>
       </SettingCard>

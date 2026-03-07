@@ -63,9 +63,12 @@ async function createClient(accountId: string) {
       clientId: accountId, // كل حساب له مجلد جلسة منفصل
       dataPath: SESSION_DIR,
     }),
+    // تحديث user-agent ليتوافق مع Chromium 128
+    userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     puppeteer: {
       executablePath: "/usr/bin/chromium-browser",
       headless: true,
+      timeout: 120000, // 2 دقيقة للتحميل
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -73,6 +76,8 @@ async function createClient(accountId: string) {
         "--disable-gpu",
         "--disable-extensions",
         "--window-size=1280,900",
+        "--disable-web-security",
+        "--allow-running-insecure-content",
       ],
     },
   });
@@ -517,6 +522,35 @@ export async function disconnectWhatsApp(accountId = DEFAULT_ACCOUNT): Promise<v
   } catch { /* تجاهل */ }
   session.status = "disconnected";
   session.qrDataUrl = null;
+}
+
+// إعادة تعيين جلسة حساب معين (حذف الجلسة التالفة والبدء من الصفر)
+export async function resetWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise<{ status: WaStatus; qr?: string }> {
+  const session = getSession(accountId);
+  // أولاً: قطع الاتصال وتدمير الـ client
+  session.isInitializing = false;
+  try {
+    if (session.client) {
+      await session.client.destroy();
+      session.client = null;
+    }
+  } catch { /* تجاهل */ }
+  session.status = "disconnected";
+  session.qrDataUrl = null;
+  session.lastError = null;
+
+  // ثانياً: حذف مجلد الجلسة المحفوظة
+  try {
+    const { rm } = await import("fs/promises");
+    const sessionPath = `${SESSION_DIR}/session-${accountId}`;
+    await rm(sessionPath, { recursive: true, force: true });
+    console.log(`[WhatsApp] تم حذف الجلسة التالفة: ${sessionPath}`);
+  } catch (e) {
+    console.warn(`[WhatsApp] تعذر حذف مجلد الجلسة:`, e);
+  }
+
+  // ثالثاً: بدء جلسة جديدة نظيفة
+  return startWhatsAppSession(accountId);
 }
 
 // قطع الاتصال لجميع الحسابات

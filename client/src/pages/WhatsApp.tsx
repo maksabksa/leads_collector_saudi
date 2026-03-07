@@ -110,28 +110,33 @@ function AccountCard({
   sessionQr,
   onConnect,
   onDisconnect,
+  onReset,
   onEdit,
   onDelete,
   onToggleActive,
   isConnecting,
   isDisconnecting,
+  isResetting,
 }: {
   account: any;
   sessionStatus: string;
   sessionQr?: string;
   onConnect: () => void;
   onDisconnect: () => void;
+  onReset?: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onToggleActive: (v: boolean) => void;
   isConnecting: boolean;
   isDisconnecting: boolean;
+  isResetting?: boolean;
 }) {
   const roleInfo = ROLE_LABELS[account.role] ?? ROLE_LABELS.bulk_sender;
   const RoleIcon = roleInfo.icon;
   const isConnected = sessionStatus === "connected";
   const isQrPending = sessionStatus === "qr_pending";
   const isInitializing = sessionStatus === "initializing";
+  const isError = sessionStatus === "error" || sessionStatus === "disconnected";
   const isActive = account.isActive;
 
   return (
@@ -256,6 +261,25 @@ function AccountCard({
                 <Square className="w-3 h-3 ml-1" />
               )}
               قطع الاتصال
+            </Button>
+          )}
+
+          {/* زر إعادة التعيين - عند خطأ أو تعليق في التهيئة */}
+          {(isError || isInitializing) && onReset && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-8 text-xs text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              onClick={onReset}
+              disabled={isResetting}
+              title="حذف الجلسة التالفة وبدء من الصفر لتوليد QR جديد"
+            >
+              {isResetting ? (
+                <Loader2 className="w-3 h-3 animate-spin ml-1" />
+              ) : (
+                <RefreshCw className="w-3 h-3 ml-1" />
+              )}
+              إعادة تعيين
             </Button>
           )}
 
@@ -439,6 +463,11 @@ export default function WhatsApp() {
   const disconnectAccount = trpc.wauto.disconnect.useMutation({
     onSuccess: () => { toast.success("تم قطع الاتصال"); refetchAllSessions(); },
     onError: (e) => toast.error("خطأ", { description: e.message }),
+  });
+
+  const resetAccountSession = trpc.wauto.resetSession.useMutation({
+    onSuccess: () => { toast.success("تم إعادة تعيين الجلسة - اضغط ربط الحساب لتوليد QR جديد"); refetchAllSessions(); },
+    onError: (e) => toast.error("فشل إعادة التعيين", { description: e.message }),
   });
 
   const incrementCount = trpc.waSettings.incrementMessageCount.useMutation();
@@ -698,6 +727,7 @@ export default function WhatsApp() {
                       sessionQr={sessionQr}
                       onConnect={() => startAccountSession.mutate({ accountId: account.accountId })}
                       onDisconnect={() => disconnectAccount.mutate({ accountId: account.accountId })}
+                      onReset={() => resetAccountSession.mutate({ accountId: account.accountId })}
                       onEdit={() => {
                         setEditingAccount(account);
                         setAccountForm({
@@ -714,6 +744,7 @@ export default function WhatsApp() {
                       onToggleActive={(v) => toggleAccountActive.mutate({ id: account.id, isActive: v })}
                       isConnecting={startAccountSession.isPending}
                       isDisconnecting={disconnectAccount.isPending}
+                      isResetting={resetAccountSession.isPending}
                     />
                   );
                 })}
