@@ -141,11 +141,10 @@ export default function LeadDetail() {
         setWaSending(false);
       }
     } else {
-      // لا يوجد اتصال - فتح wa.me كبديل
-      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}`;
-      window.open(waUrl, "_blank");
-      await logWaMessage.mutateAsync({ leadId: id, phone, message: waMessage, messageType: "individual" });
-      toast.info("تم فتح واتساب خارجياً (لا يوجد حساب متصل في النظام)");
+      // لا يوجد اتصال - فتح المحادثة الداخلية
+      const leadName = (lead as any).businessName || lead.companyName || '';
+      navigate(`/chats?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(leadName)}&message=${encodeURIComponent(waMessage)}`);
+      toast.info("تم فتح المحادثة الداخلية");
     }
   };
 

@@ -504,6 +504,7 @@ export default function Chats() {
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const phoneFromUrl = urlParams.get("phone") || "";
   const nameFromUrl = urlParams.get("name") || "";
+  const messageFromUrl = urlParams.get("message") || "";
 
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -511,6 +512,7 @@ export default function Chats() {
   const [newMessage, setNewMessage] = useState("");
   const [newChatPhone, setNewChatPhone] = useState(phoneFromUrl);
   const [newChatName, setNewChatName] = useState(nameFromUrl);
+  const [newChatMessage, setNewChatMessage] = useState(messageFromUrl);
   const [showNewChat, setShowNewChat] = useState(!!phoneFromUrl);
   const [selectedAccountId, setSelectedAccountId] = useState("all");
   const [pendingMedia, setPendingMedia] = useState<{ base64: string; mimetype: string; filename: string; previewUrl: string } | null>(null);
@@ -2181,7 +2183,20 @@ export default function Chats() {
                   placeholder="+966501234567" dir="ltr" className="text-left text-white border-0"
                   style={{ background: "#2a3942" }} />
               </div>
-              <Button className="w-full text-white" onClick={handleNewChat}
+              {newChatMessage && (
+                <div>
+                  <label className="text-sm text-[#8696a0] mb-1 block">الرسالة (اختياري)</label>
+                  <Textarea value={newChatMessage} onChange={e => setNewChatMessage(e.target.value)}
+                    rows={3} className="text-white border-0 resize-none text-sm"
+                    style={{ background: "#2a3942" }} />
+                </div>
+              )}
+              <Button className="w-full text-white" onClick={() => {
+                if (newChatMessage.trim()) {
+                  setNewMessage(newChatMessage);
+                }
+                handleNewChat();
+              }}
                 disabled={!newChatPhone.trim() || sendMessage.isPending}
                 style={{ background: "#25D366" }}>
                 {sendMessage.isPending ? <RefreshCw className="w-4 h-4 animate-spin ml-2" /> : <MessageCircle className="w-4 h-4 ml-2" />}
