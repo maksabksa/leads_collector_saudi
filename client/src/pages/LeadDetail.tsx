@@ -75,14 +75,29 @@ export default function LeadDetail() {
   // تحليل السلوك
   const [behaviorAnalysis, setBehaviorAnalysis] = useState<any>(null);
   const [showBehaviorPanel, setShowBehaviorPanel] = useState(false);
+  const [useRealData, setUseRealData] = useState(true);
   const analyzeBehavior = trpc.behaviorAnalysis.analyzeCustomer.useMutation();
+  const analyzeWithRealData = trpc.behaviorAnalysis.analyzeWithRealData.useMutation();
+
+  const isAnalyzing = analyzeBehavior.isPending || analyzeWithRealData.isPending;
 
   const handleAnalyzeBehavior = async () => {
     try {
       setShowBehaviorPanel(true);
-      const result = await analyzeBehavior.mutateAsync({ leadId: id });
-      setBehaviorAnalysis(result);
-      toast.success("تم تحليل السلوك الرقمي");
+      if (useRealData) {
+        const result = await analyzeWithRealData.mutateAsync({ leadId: id });
+        setBehaviorAnalysis(result);
+        const sources = (result as any).realData?.availableSources || [];
+        if (sources.length > 0) {
+          toast.success(`تحليل بيانات حقيقية: ${sources.join(', ')}`);
+        } else {
+          toast.success("تم التحليل (لا توجد بيانات حقيقية متاحة)");
+        }
+      } else {
+        const result = await analyzeBehavior.mutateAsync({ leadId: id });
+        setBehaviorAnalysis(result);
+        toast.success("تم تحليل السلوك الرقمي");
+      }
     } catch (e: any) {
       toast.error(e.message || "فشل تحليل السلوك");
     }
@@ -604,15 +619,27 @@ export default function LeadDetail() {
                   تحليل السلوك الرقمي
                 </h3>
                 <div className="flex items-center gap-2">
+                  {/* زر تبديل البيانات الحقيقية / AI فقط */}
+                  <button
+                    onClick={() => setUseRealData(!useRealData)}
+                    className="text-xs px-2 py-0.5 rounded-full transition-all"
+                    style={{
+                      background: useRealData ? "oklch(0.65 0.2 145 / 0.15)" : "oklch(0.65 0.05 240 / 0.15)",
+                      color: useRealData ? "oklch(0.65 0.2 145)" : "oklch(0.65 0.05 240)",
+                      border: `1px solid ${useRealData ? "oklch(0.65 0.2 145 / 0.3)" : "oklch(0.65 0.05 240 / 0.3)"}`
+                    }}
+                    title="تبديل بين البيانات الحقيقية والتحليل بالـ AI فقط">
+                    {useRealData ? "📊 بيانات حقيقية" : "🤖 AI فقط"}
+                  </button>
                   {behaviorAnalysis && (
                     <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)" }}>
                       {new Date(behaviorAnalysis.analyzedAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
-                  <button onClick={handleAnalyzeBehavior} disabled={analyzeBehavior.isPending}
+                  <button onClick={handleAnalyzeBehavior} disabled={isAnalyzing}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all"
                     title="إعادة التحليل">
-                    {analyzeBehavior.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    {isAnalyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                   </button>
                   <button onClick={() => setShowBehaviorPanel(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all">
                     <X className="w-3.5 h-3.5" />
@@ -620,14 +647,18 @@ export default function LeadDetail() {
                 </div>
               </div>
 
-              {analyzeBehavior.isPending && !behaviorAnalysis ? (
+              {isAnalyzing && !behaviorAnalysis ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-3">
                   <div className="relative">
                     <Brain className="w-10 h-10" style={{ color: "oklch(0.65 0.18 200 / 0.3)" }} />
                     <Loader2 className="w-5 h-5 animate-spin absolute -top-1 -right-1" style={{ color: "oklch(0.75 0.18 200)" }} />
                   </div>
-                  <p className="text-sm text-muted-foreground">جاري تحليل السلوك الرقمي...</p>
-                  <p className="text-xs text-muted-foreground opacity-60">يستغرق 10-20 ثانية</p>
+                  <p className="text-sm text-muted-foreground">
+                    {useRealData ? "جاري جلب البيانات الحقيقية وتحليلها..." : "جاري تحليل السلوك الرقمي..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground opacity-60">
+                    {useRealData ? "يجلب بيانات TikTok وTwitter والباك لينك ثم يحللها (20-40 ثانية)" : "يستغرق 10-20 ثانية"}
+                  </p>
                 </div>
               ) : behaviorAnalysis ? (
                 <div className="p-5 space-y-4">
@@ -748,6 +779,102 @@ export default function LeadDetail() {
                       </div>
                     )}
                   </div>
+
+                  {/* البيانات الحقيقية من APIs */}
+                  {behaviorAnalysis.realData && (
+                    <div className="space-y-3">
+                      {/* TikTok الحقيقي */}
+                      {behaviorAnalysis.realData.tiktok && (
+                        <div className="rounded-xl p-3" style={{ background: "oklch(0.12 0.02 25 / 0.5)", border: "1px solid oklch(0.7 0.22 25 / 0.3)" }}>
+                          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: "oklch(0.8 0.2 25)" }}>
+                            <span>🎵</span> TikTok - بيانات حقيقية
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-foreground">{behaviorAnalysis.realData.tiktok.followers.toLocaleString('ar-SA')}</p>
+                              <p className="text-xs text-muted-foreground">متابع</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-foreground">{behaviorAnalysis.realData.tiktok.videoCount}</p>
+                              <p className="text-xs text-muted-foreground">فيديو</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-foreground">{behaviorAnalysis.realData.tiktok.avgEngagementRate}%</p>
+                              <p className="text-xs text-muted-foreground">تفاعل</p>
+                            </div>
+                          </div>
+                          {behaviorAnalysis.realData.tiktok.verified && (
+                            <span className="text-xs px-2 py-0.5 rounded-full mt-2 inline-block" style={{ background: "oklch(0.65 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)" }}>✓ موثق</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Twitter الحقيقي */}
+                      {behaviorAnalysis.realData.twitter && (
+                        <div className="rounded-xl p-3" style={{ background: "oklch(0.12 0.02 200 / 0.5)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+                          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: "oklch(0.75 0.18 200)" }}>
+                            <span>𝕏</span> Twitter/X - بيانات حقيقية
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-foreground">{behaviorAnalysis.realData.twitter.followers.toLocaleString('ar-SA')}</p>
+                              <p className="text-xs text-muted-foreground">متابع</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-foreground">{behaviorAnalysis.realData.twitter.tweetsCount.toLocaleString('ar-SA')}</p>
+                              <p className="text-xs text-muted-foreground">تغريدة</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-foreground">{behaviorAnalysis.realData.twitter.following.toLocaleString('ar-SA')}</p>
+                              <p className="text-xs text-muted-foreground">يتابع</p>
+                            </div>
+                          </div>
+                          {(behaviorAnalysis.realData.twitter.verified || behaviorAnalysis.realData.twitter.isBlueVerified) && (
+                            <span className="text-xs px-2 py-0.5 rounded-full mt-2 inline-block" style={{ background: "oklch(0.65 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)" }}>✓ موثق</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* الباك لينك */}
+                      {behaviorAnalysis.realData.backlinks && (
+                        <div className="rounded-xl p-3" style={{ background: "oklch(0.12 0.02 285 / 0.5)", border: "1px solid oklch(0.62 0.18 285 / 0.3)" }}>
+                          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: "oklch(0.72 0.18 285)" }}>
+                            <span>🔗</span> الباك لينك - بيانات حقيقية
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-foreground">{behaviorAnalysis.realData.backlinks.totalBacklinks}</p>
+                              <p className="text-xs text-muted-foreground">رابط خارجي</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold" style={{ color: behaviorAnalysis.realData.backlinks.hasGoogleMyBusiness ? "oklch(0.65 0.2 145)" : "oklch(0.58 0.22 25)" }}>
+                                {behaviorAnalysis.realData.backlinks.hasGoogleMyBusiness ? "✓" : "✗"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Google Maps</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold" style={{ color: behaviorAnalysis.realData.backlinks.hasSocialLinks ? "oklch(0.65 0.2 145)" : "oklch(0.58 0.22 25)" }}>
+                                {behaviorAnalysis.realData.backlinks.hasSocialLinks ? "✓" : "✗"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">سوشيال</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* مصادر البيانات */}
+                      {behaviorAnalysis.realData.availableSources?.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground">مصادر البيانات:</span>
+                          {behaviorAnalysis.realData.availableSources.map((src: string, i: number) => (
+                            <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.2 145 / 0.1)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.65 0.2 145 / 0.2)" }}>
+                              ✓ {src}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* نقاط القوة الرقمية */}
                   {behaviorAnalysis.analysis?.digitalStrengths?.length > 0 && (
