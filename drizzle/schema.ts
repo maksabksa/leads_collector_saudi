@@ -1072,3 +1072,57 @@ export const chatInternalNotes = mysqlTable("chat_internal_notes", {
 });
 export type ChatInternalNote = typeof chatInternalNotes.$inferSelect;
 export type InsertChatInternalNote = typeof chatInternalNotes.$inferInsert;
+
+// ===== REAL SOCIAL SNAPSHOTS TABLE =====
+// يحفظ لقطات البيانات الحقيقية من APIs (TikTok, Twitter, Instagram, Backlinks)
+// مع تاريخ التغيرات لكل عميل
+export const realSocialSnapshots = mysqlTable("real_social_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+
+  // TikTok
+  tiktokUsername: varchar("tiktokUsername", { length: 100 }),
+  tiktokFollowers: int("tiktokFollowers"),
+  tiktokFollowing: int("tiktokFollowing"),
+  tiktokHearts: bigint("tiktokHearts", { mode: "number" }),
+  tiktokVideoCount: int("tiktokVideoCount"),
+  tiktokVerified: boolean("tiktokVerified").default(false),
+  tiktokEngagementRate: float("tiktokEngagementRate"),
+  tiktokDescription: text("tiktokDescription"),
+  tiktokTopVideos: json("tiktokTopVideos"), // Array of top videos
+
+  // Twitter/X
+  twitterUsername: varchar("twitterUsername", { length: 100 }),
+  twitterFollowers: int("twitterFollowers"),
+  twitterFollowing: int("twitterFollowing"),
+  twitterTweetsCount: int("twitterTweetsCount"),
+  twitterVerified: boolean("twitterVerified").default(false),
+  twitterBlueVerified: boolean("twitterBlueVerified").default(false),
+  twitterDescription: text("twitterDescription"),
+  twitterLocation: varchar("twitterLocation", { length: 200 }),
+
+  // Instagram
+  instagramUsername: varchar("instagramUsername", { length: 100 }),
+  instagramFollowers: int("instagramFollowers"),
+  instagramFollowing: int("instagramFollowing"),
+  instagramPostsCount: int("instagramPostsCount"),
+  instagramVerified: boolean("instagramVerified").default(false),
+  instagramEngagementRate: float("instagramEngagementRate"),
+  instagramBio: text("instagramBio"),
+  instagramTopPosts: json("instagramTopPosts"), // Array of top posts
+
+  // Backlinks
+  backlinkDomain: varchar("backlinkDomain", { length: 200 }),
+  backlinkTotal: int("backlinkTotal").default(0),
+  backlinkReferringDomains: json("backlinkReferringDomains"), // Array of domains
+  backlinkHasGMB: boolean("backlinkHasGMB").default(false),
+  backlinkHasSocial: boolean("backlinkHasSocial").default(false),
+
+  // Metadata
+  availableSources: json("availableSources"), // Array of source names
+  fetchedAt: timestamp("fetchedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RealSocialSnapshot = typeof realSocialSnapshots.$inferSelect;
+export type InsertRealSocialSnapshot = typeof realSocialSnapshots.$inferInsert;

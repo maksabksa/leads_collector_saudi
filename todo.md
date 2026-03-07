@@ -1167,3 +1167,21 @@
 - [x] إضافة procedure جديد: analyzeWithRealData يجمع كل البيانات الحقيقية ثم يحللها بالـ AI
 - [x] تحديث واجهة LeadDetail لعرض البيانات الحقيقية مع تحليل AI
 - [x] اختبارات Vitest للـ procedures الجديدة
+
+## الدفعة 77 - Instagram الحقيقي + حفظ البيانات في DB
+
+- [ ] إنشاء جدول real_social_snapshots في schema.ts لحفظ البيانات الحقيقية مع تاريخ التغيرات
+- [ ] تطبيق migration SQL للجدول الجديد
+- [ ] بناء fetchInstagramData عبر Bright Data في realSocialData.ts
+- [ ] تحديث fetchAllRealData ليشمل Instagram
+- [ ] إضافة دوال DB: saveRealSocialSnapshot, getLatestSnapshot, getSnapshotHistory
+- [ ] تحديث analyzeWithRealData: يحفظ البيانات في DB بعد الجلب
+- [ ] إضافة procedure: getRealDataHistory لعرض تاريخ التغيرات
+- [ ] تحديث واجهة LeadDetail: عرض آخر بيانات محفوظة + زر "تحديث البيانات"
+- [ ] إضافة قسم تاريخ التغيرات في واجهة LeadDetail
+- [ ] اختبارات Vitest للـ Instagram وحفظ البيانات
+
+## الدفعة 78 - إصلاح تخطيط شاشة محادثات واتساب
+
+- [x] إصلاح مشكلة عرض شاشة المحادثات - إخفاء الهيدر في صفحة Chats لإعطاء كامل المساحة
+- [x] إصلاح خطأ التحقق من رقم الهاتف في نموذج إضافة حساب واتساب (تخفيض الحد الأدنى إلى 5 أرقام)

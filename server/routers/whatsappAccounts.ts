@@ -164,7 +164,7 @@ export const whatsappAccountsRouter = router({
     .input(
       z.object({
         label: z.string().min(1),
-        phoneNumber: z.string().min(7),
+        phoneNumber: z.string().min(5, "رقم الهاتف يجب أن يكون 5 أرقام على الأقل").max(20, "رقم الهاتف طويل جداً"),
         role: z.enum(["bulk_sender", "human_handoff", "both"]).default("bulk_sender"),
         assignedEmployee: z.string().optional(),
         notes: z.string().optional(),
@@ -199,7 +199,7 @@ export const whatsappAccountsRouter = router({
       z.object({
         id: z.number(),
         label: z.string().min(1).optional(),
-        phoneNumber: z.string().min(7).optional(),
+        phoneNumber: z.string().min(5, "رقم الهاتف يجب أن يكون 5 أرقام على الأقل").max(20).optional(),
         role: z.enum(["bulk_sender", "human_handoff", "both"]).optional(),
         assignedEmployee: z.string().optional(),
         notes: z.string().optional(),

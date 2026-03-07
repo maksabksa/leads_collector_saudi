@@ -332,26 +332,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* ══════════════ Main content ══════════════ */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header
-          className="h-14 border-b border-border flex items-center px-4 gap-3 flex-shrink-0"
-          style={{ background: "oklch(0.11 0.012 240)" }}
-        >
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-muted-foreground hover:text-foreground"
+        {/* Top bar - مخفي في صفحة الشات لإعطاء كامل المساحة */}
+        {!isChatsPage && (
+          <header
+            className="h-14 border-b border-border flex items-center px-4 gap-3 flex-shrink-0"
+            style={{ background: "oklch(0.11 0.012 240)" }}
           >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Globe className="w-4 h-4" />
-            <span>مجمع بيانات الأعمال</span>
-          </div>
-          <div className="mr-auto flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-muted-foreground">النظام يعمل</span>
-          </div>
-        </header>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-muted-foreground hover:text-foreground"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Globe className="w-4 h-4" />
+              <span>مجمع بيانات الأعمال</span>
+            </div>
+            <div className="mr-auto flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-muted-foreground">النظام يعمل</span>
+            </div>
+          </header>
+        )}
 
         {/* Page content */}
         <div className={isChatsPage ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-4 lg:p-6"}>{children}</div>

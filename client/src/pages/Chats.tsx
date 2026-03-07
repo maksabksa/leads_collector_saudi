@@ -1086,7 +1086,7 @@ export default function Chats() {
   };
 
   return (
-    <div className="flex flex-col" style={{ background: "#111b21", position: 'absolute', inset: 0 }}>
+    <div className="flex flex-col" style={{ background: "#111b21", height: "100%", width: "100%" }}>
       {/* ===== شريط علوي ===== */}
       <div className="flex-shrink-0 border-b border-white/10" style={{ background: "#202c33" }}>
         {/* شريط حالة AI الإجمالي */}

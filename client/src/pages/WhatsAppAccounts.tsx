@@ -692,12 +692,16 @@ export default function WhatsAppAccounts() {
               </label>
               <Input
                 value={form.phoneNumber}
-                onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))}
-                placeholder="966501234567+"
+                onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value.replace(/\s+/g, '') }))}
+                placeholder="966501234567"
                 dir="ltr"
+                className={form.phoneNumber && form.phoneNumber.length < 5 ? "border-destructive" : ""}
               />
+              {form.phoneNumber && form.phoneNumber.length < 5 && (
+                <p className="text-xs text-destructive mt-1">⚠️ رقم الهاتف يجب أن يكون 5 أرقام على الأقل</p>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
-                أدخل الرقم مع رمز الدولة بدون مسافات
+                أدخل الرقم مع رمز الدولة بدون مسافات أو رمز + (مثال: 966501234567)
               </p>
             </div>
 
@@ -817,6 +821,7 @@ export default function WhatsAppAccounts() {
               disabled={
                 !form.label ||
                 !form.phoneNumber ||
+                form.phoneNumber.length < 5 ||
                 addAccount.isPending ||
                 updateAccount.isPending
               }

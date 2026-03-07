@@ -3,7 +3,14 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { invokeLLM } from "../_core/llm";
 import { getLeadById } from "../db";
-import { fetchAllRealData, fetchTikTokData, fetchTwitterData, fetchBacklinkData } from "./realSocialData";
+import { fetchAllRealData, fetchTikTokData, fetchTwitterData, fetchBacklinkData, fetchInstagramData } from "./realSocialData";
+import {
+  saveRealSocialSnapshot,
+  getLatestSnapshot,
+  getSnapshotHistory,
+  snapshotToRealData,
+  calculateSnapshotDiff,
+} from "../snapshotDb";
 
 // ─── تحليل سلوك العميل عبر السوشيال ميديا ───────────────────────────────────
 export const behaviorAnalysisRouter = router({
@@ -25,8 +32,16 @@ export const behaviorAnalysisRouter = router({
       const realData = await fetchAllRealData({
         tiktokUrl: lead.tiktokUrl,
         twitterUrl: lead.twitterUrl,
+        instagramUrl: lead.instagramUrl,
         website: lead.website,
       });
+
+      // حفظ البيانات في قاعدة البيانات (بشكل غير متزامن لعدم تأخير الاستجابة)
+      if (realData.availableSources.length > 0) {
+        saveRealSocialSnapshot(input.leadId, realData).catch(e =>
+          console.error("[BehaviorAnalysis] Failed to save snapshot:", e.message)
+        );
+      }
 
       // بناء سياق البيانات الحقيقية للـ AI
       const realDataContext = buildRealDataContext(realData, lead);
@@ -122,6 +137,68 @@ ${realDataContext}
           message: `فشل تحليل السلوك: ${e.message}`,
         });
       }
+    }),
+
+  // ─── جلب آخر بيانات محفوظة لعميل محدد ────────────────────────────────────────────
+  getLatestRealData: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ input }) => {
+      const snapshot = await getLatestSnapshot(input.leadId);
+      if (!snapshot) return null;
+
+      const realData = snapshotToRealData(snapshot);
+      return {
+        ...realData,
+        snapshotId: snapshot.id,
+        savedAt: snapshot.createdAt.toISOString(),
+      };
+    }),
+
+  // ─── جلب تاريخ اللقطات ─────────────────────────────────────────────────────────────
+  getRealDataHistory: protectedProcedure
+    .input(z.object({ leadId: z.number(), limit: z.number().default(10) }))
+    .query(async ({ input }) => {
+      const snapshots = await getSnapshotHistory(input.leadId, input.limit);
+      if (snapshots.length === 0) return { snapshots: [], diffs: [] };
+
+      // حساب التغيرات بين آخر لقطتين
+      const diffs = snapshots.length >= 2
+        ? calculateSnapshotDiff(snapshots[1], snapshots[0]) // الأحدث أولاً
+        : [];
+
+      const formattedSnapshots = snapshots.map(s => ({
+        id: s.id,
+        savedAt: s.createdAt.toISOString(),
+        fetchedAt: s.fetchedAt.toISOString(),
+        availableSources: (s.availableSources as string[]) || [],
+        tiktok: s.tiktokUsername ? {
+          username: s.tiktokUsername,
+          followers: s.tiktokFollowers ?? 0,
+          videoCount: s.tiktokVideoCount ?? 0,
+          engagementRate: s.tiktokEngagementRate ?? 0,
+          verified: s.tiktokVerified ?? false,
+        } : null,
+        twitter: s.twitterUsername ? {
+          username: s.twitterUsername,
+          followers: s.twitterFollowers ?? 0,
+          tweetsCount: s.twitterTweetsCount ?? 0,
+          verified: s.twitterVerified || s.twitterBlueVerified,
+        } : null,
+        instagram: s.instagramUsername ? {
+          username: s.instagramUsername,
+          followers: s.instagramFollowers ?? 0,
+          postsCount: s.instagramPostsCount ?? 0,
+          engagementRate: s.instagramEngagementRate ?? 0,
+          verified: s.instagramVerified ?? false,
+        } : null,
+        backlinks: s.backlinkDomain ? {
+          domain: s.backlinkDomain,
+          total: s.backlinkTotal ?? 0,
+          hasGMB: s.backlinkHasGMB ?? false,
+        } : null,
+      }));
+
+      return { snapshots: formattedSnapshots, diffs };
     }),
 
   // ─── تحليل سلوك العميل (النسخة الأصلية - تعمل بالـ AI فقط) ─────────────────
