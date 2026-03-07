@@ -1122,3 +1122,8 @@
 - [x] استبدال scrapeSnapchat بـ searchSnapchatSERP (SERP API)
 - [x] تسجيل serpSearchRouter في routers.ts
 - [x] 245 اختبار Vitest ناجح (41 اختبار جديد لـ SERP parsing)
+
+## الدفعة 75 - إصلاح خطأ Map container not found في SearchHub (7 مارس 2026)
+
+- [x] تشخيص سبب خطأ "Map container not found" في صفحة /search-hub
+- [x] إصلاح تهيئة خريطة Google Maps في SearchHub

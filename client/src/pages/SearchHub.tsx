@@ -1651,8 +1651,8 @@ export default function SearchHub() {
                   </div>
                 )}
                 {/* ===== لوحة الخريطة التفاعلية - تظهر فقط في تبويب Google Maps ===== */}
-                {p.id === "google" && activeTab === "google" && (
-                  <div className="border border-green-500/30 rounded-xl overflow-hidden bg-card shadow-sm">
+                {p.id === "google" && (
+                  <div className={`border border-green-500/30 rounded-xl overflow-hidden bg-card shadow-sm ${activeTab !== "google" ? "hidden" : ""}`}>
                     {/* شريط التحكم */}
                     <div className="flex items-center justify-between gap-3 px-4 py-3 bg-green-500/5 border-b border-green-500/20">
                       <div className="flex items-center gap-2">

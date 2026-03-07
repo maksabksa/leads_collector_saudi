@@ -149,8 +149,23 @@ export function MapView({
 
   const init = usePersistFn(async () => {
     await loadMapScript();
+    // إذا لم يكن الـ container جاهزاً بعد (مثلاً بسبب تبديل التبويبات)، ننتظر قليلاً ونحاول مجدداً
     if (!mapContainer.current) {
-      console.error("Map container not found");
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!mapContainer.current) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    if (!mapContainer.current) {
+      // المحاولة الأخيرة بعد 600ms
+      await new Promise(resolve => setTimeout(resolve, 600));
+    }
+    if (!mapContainer.current) {
+      return; // لا نُظهر خطأ لأن هذا يحدث عند إخفاء التبويب
+    }
+    // إذا كانت الخريطة مُنشأة بالفعل لنفس الـ container، لا نُعيد الإنشاء
+    if (map.current) {
+      if (onMapReady) onMapReady(map.current);
       return;
     }
     map.current = new window.google.maps.Map(mapContainer.current, {
