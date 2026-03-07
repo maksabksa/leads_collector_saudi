@@ -7,6 +7,7 @@ import {
   Send, X, Loader2, CheckCircle2, XCircle, Pause, Play, Sparkles, Upload,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
+import { BulkImportInline } from "./BulkImport";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 import {
@@ -997,6 +998,60 @@ export default function Leads() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== نافذة تأكيد الحذف الجماعي ===== */}
+      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5" style={{ color: "oklch(0.7 0.22 25)" }} />
+              تأكيد الحذف الجماعي
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-center space-y-3">
+            <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
+              style={{ background: "oklch(0.58 0.22 25 / 0.15)", border: "2px solid oklch(0.58 0.22 25 / 0.3)" }}>
+              <Trash2 className="w-8 h-8" style={{ color: "oklch(0.7 0.22 25)" }} />
+            </div>
+            <p className="text-base font-semibold">هل أنت متأكد من حذف {selectedIds.size} عميل؟</p>
+            <p className="text-sm text-muted-foreground">هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع البيانات المرتبطة بهؤلاء العملاء نهائياً.</p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)}
+              disabled={bulkDelete.isPending}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => bulkDelete.mutate({ ids: Array.from(selectedIds) })}
+              disabled={bulkDelete.isPending}
+              style={{ background: "oklch(0.58 0.22 25)", color: "white" }}
+            >
+              {bulkDelete.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin ml-2" /> جاري الحذف...</>
+              ) : (
+                <><Trash2 className="w-4 h-4 ml-2" /> حذف {selectedIds.size} عميل نهائياً</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== نافذة الرفع الجماعي (BulkImport Dialog) ===== */}
+      <Dialog open={showBulkImportDialog} onOpenChange={setShowBulkImportDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" style={{ color: "oklch(0.85 0.16 75)" }} />
+              رفع عملاء جماعي
+            </DialogTitle>
+          </DialogHeader>
+          <BulkImportInline onClose={() => {
+            setShowBulkImportDialog(false);
+            utils.leads.list.invalidate();
+            utils.leads.stats.invalidate();
+          }} />
         </DialogContent>
       </Dialog>
     </div>

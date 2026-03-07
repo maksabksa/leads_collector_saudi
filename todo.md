@@ -1127,3 +1127,11 @@
 
 - [x] تشخيص سبب خطأ "Map container not found" في صفحة /search-hub
 - [x] إصلاح تهيئة خريطة Google Maps في SearchHub
+
+## الدفعة 76 - إصلاح الحذف الجماعي والرفع الجماعي وLinkedIn (7 مارس 2026)
+
+- [x] إصلاح زر "حذف جماعي": إضافة Dialog تأكيد الحذف في Leads.tsx
+- [x] إصلاح زر "رفع جماعي": تحويل BulkImport من صفحة مستقلة إلى Dialog مدمج في Leads.tsx
+- [x] إصلاح LinkedIn "Failed to fetch": استبدال Puppeteer بـ SERP API مثل باقي المنصات
+- [ ] إصلاح "فشل الإضافة - Failed to fetch" عند إضافة حساب واتساب جديد
+- [ ] إصلاح QR Code ربط حساب واتساب - لا يعمل

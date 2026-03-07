@@ -21,7 +21,7 @@ export async function getDb() {
   const now = Date.now();
   // إعادة الاتصال إذا مر أكثر من 30 دقيقة على آخر اتصال
   if (_db && (now - _lastConnectTime) > 30 * 60 * 1000) {
-    _db = null; // إعادة الاتصال بشكل دوري
+    _db = null;
   }
   if (!_db && process.env.DATABASE_URL) {
     try {

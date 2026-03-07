@@ -1,19 +1,47 @@
 import { protectedProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
-import { leads } from "../../drizzle/schema";
-import { sql, isNotNull, isNull, and, ne } from "drizzle-orm";
+import mysql from "mysql2/promise";
+
+// دالة مساعدة لتنفيذ raw SQL مع إعادة الاتصال
+async function rawQuery<T = Record<string, unknown>>(query: string, params: unknown[] = []): Promise<T[]> {
+  const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+  try {
+    const [rows] = await conn.execute(query, params) as [T[], unknown];
+    return rows;
+  } finally {
+    await conn.end();
+  }
+}
 
 export const dataQualityRouter = router({
-  // إحصائيات جودة البيانات الشاملة
+  // إحصائيات جودة البيانات الشاملة - استعلام واحد سريع
   stats: protectedProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) return null;
+    // استعلام واحد يجمع كل الإحصائيات
+    const rows = await rawQuery<{
+      total: number;
+      withPhone: number;
+      withWebsite: number;
+      withGoogleMaps: number;
+      withInstagram: number;
+      withSnapchat: number;
+      withTiktok: number;
+      withWhatsapp: number;
+      withAnalysis: number;
+    }>(`
+      SELECT
+        count(*) as total,
+        sum(case when verifiedPhone is not null and verifiedPhone != '' then 1 else 0 end) as withPhone,
+        sum(case when website is not null and website != '' then 1 else 0 end) as withWebsite,
+        sum(case when googleMapsUrl is not null and googleMapsUrl != '' then 1 else 0 end) as withGoogleMaps,
+        sum(case when instagramUrl is not null and instagramUrl != '' then 1 else 0 end) as withInstagram,
+        sum(case when snapchatUrl is not null and snapchatUrl != '' then 1 else 0 end) as withSnapchat,
+        sum(case when tiktokUrl is not null and tiktokUrl != '' then 1 else 0 end) as withTiktok,
+        sum(case when hasWhatsapp = 'yes' then 1 else 0 end) as withWhatsapp,
+        sum(case when analysisStatus = 'completed' then 1 else 0 end) as withAnalysis
+      FROM leads
+    `);
 
-    // الإجمالي
-    const [totalRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads);
-    const total = totalRow?.count ?? 0;
+    const r = rows[0];
+    const total = Number(r?.total ?? 0);
 
     if (total === 0) {
       return {
@@ -36,150 +64,65 @@ export const dataQualityRouter = router({
       };
     }
 
-    // أرقام الهواتف
-    const [withPhoneRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(and(isNotNull(leads.verifiedPhone), ne(leads.verifiedPhone, "")));
-    const withPhone = withPhoneRow?.count ?? 0;
+    const withPhone = Number(r.withPhone ?? 0);
+    const withWebsite = Number(r.withWebsite ?? 0);
+    const withGoogleMaps = Number(r.withGoogleMaps ?? 0);
+    const withInstagram = Number(r.withInstagram ?? 0);
+    const withSnapchat = Number(r.withSnapchat ?? 0);
+    const withTiktok = Number(r.withTiktok ?? 0);
+    const withWhatsapp = Number(r.withWhatsapp ?? 0);
+    const withAnalysis = Number(r.withAnalysis ?? 0);
 
-    // المواقع الإلكترونية
-    const [withWebsiteRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(and(isNotNull(leads.website), ne(leads.website, "")));
-    const withWebsite = withWebsiteRow?.count ?? 0;
+    // استعلامات موازية للبيانات التفصيلية
+    const [byCityRaw, byBusinessTypeRaw, byStageRaw, monthlyRaw, qualityRaw] = await Promise.all([
+      rawQuery<{city: string; total: number; withPhone: number; withWebsite: number}>(
+        `SELECT city,
+          count(*) as total,
+          sum(case when verifiedPhone is not null and verifiedPhone != '' then 1 else 0 end) as withPhone,
+          sum(case when website is not null and website != '' then 1 else 0 end) as withWebsite
+         FROM leads GROUP BY city ORDER BY total desc LIMIT 10`
+      ),
+      rawQuery<{businessType: string; total: number; withPhone: number}>(
+        `SELECT businessType,
+          count(*) as total,
+          sum(case when verifiedPhone is not null and verifiedPhone != '' then 1 else 0 end) as withPhone
+         FROM leads GROUP BY businessType ORDER BY total desc LIMIT 10`
+      ),
+      rawQuery<{stage: string; count: number}>(
+        `SELECT stage, count(*) as count FROM leads GROUP BY stage ORDER BY count desc`
+      ),
+      rawQuery<{month: string; cnt: number; withPhone: number}>(
+        `SELECT DATE_FORMAT(createdAt, '%Y-%m') as month, count(*) as cnt,
+         sum(case when verifiedPhone is not null and verifiedPhone != '' then 1 else 0 end) as withPhone
+         FROM leads WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+         GROUP BY DATE_FORMAT(createdAt, '%Y-%m') ORDER BY month asc`
+      ),
+      rawQuery<{score: number; cnt: number}>(
+        `SELECT (
+          case when verifiedPhone is not null and verifiedPhone != '' then 1 else 0 end +
+          case when website is not null and website != '' then 1 else 0 end +
+          case when googleMapsUrl is not null and googleMapsUrl != '' then 1 else 0 end +
+          case when instagramUrl is not null and instagramUrl != '' then 1 else 0 end +
+          case when snapchatUrl is not null and snapchatUrl != '' then 1 else 0 end +
+          case when tiktokUrl is not null and tiktokUrl != '' then 1 else 0 end
+        ) as score, count(*) as cnt
+        FROM leads
+        GROUP BY score`
+      ),
+    ]);
 
-    // Google Maps
-    const [withGoogleMapsRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(and(isNotNull(leads.googleMapsUrl), ne(leads.googleMapsUrl, "")));
-    const withGoogleMaps = withGoogleMapsRow?.count ?? 0;
-
-    // Instagram
-    const [withInstagramRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(and(isNotNull(leads.instagramUrl), ne(leads.instagramUrl, "")));
-    const withInstagram = withInstagramRow?.count ?? 0;
-
-    // Snapchat
-    const [withSnapchatRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(and(isNotNull(leads.snapchatUrl), ne(leads.snapchatUrl, "")));
-    const withSnapchat = withSnapchatRow?.count ?? 0;
-
-    // TikTok
-    const [withTiktokRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(and(isNotNull(leads.tiktokUrl), ne(leads.tiktokUrl, "")));
-    const withTiktok = withTiktokRow?.count ?? 0;
-
-    // واتساب مؤكد
-    const [withWhatsappRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(sql`${leads.hasWhatsapp} = 'yes'`);
-    const withWhatsapp = withWhatsappRow?.count ?? 0;
-
-    // تحليل مكتمل
-    const [withAnalysisRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(sql`${leads.analysisStatus} = 'completed'`);
-    const withAnalysis = withAnalysisRow?.count ?? 0;
-
-    // توزيع حسب المدينة
-    const byCity = await db
-      .select({
-        city: leads.city,
-        total: sql<number>`count(*)`,
-        withPhone: sql<number>`sum(case when ${leads.verifiedPhone} is not null and ${leads.verifiedPhone} != '' then 1 else 0 end)`,
-        withWebsite: sql<number>`sum(case when ${leads.website} is not null and ${leads.website} != '' then 1 else 0 end)`,
-      })
-      .from(leads)
-      .groupBy(leads.city)
-      .orderBy(sql`count(*) desc`)
-      .limit(10);
-
-    // توزيع حسب نوع النشاط
-    const byBusinessType = await db
-      .select({
-        businessType: leads.businessType,
-        total: sql<number>`count(*)`,
-        withPhone: sql<number>`sum(case when ${leads.verifiedPhone} is not null and ${leads.verifiedPhone} != '' then 1 else 0 end)`,
-      })
-      .from(leads)
-      .groupBy(leads.businessType)
-      .orderBy(sql`count(*) desc`)
-      .limit(10);
-
-    // توزيع حسب المرحلة
-    const byStage = await db
-      .select({
-        stage: leads.stage,
-        count: sql<number>`count(*)`,
-      })
-      .from(leads)
-      .groupBy(leads.stage)
-      .orderBy(sql`count(*) desc`);
-
-    // نسبة الأرقام حسب المدينة (للمخطط البياني)
-    const phoneByCity = byCity.map(row => ({
-      city: row.city,
-      phoneRate: row.total > 0 ? Math.round((Number(row.withPhone) / Number(row.total)) * 100) : 0,
-      total: Number(row.total),
-    }));
-
-    // الإضافات الشهرية (آخر 12 شهر)
-    const monthlyAdded = await db
-      .select({
-        month: sql<string>`DATE_FORMAT(${leads.createdAt}, '%Y-%m')`,
-        count: sql<number>`count(*)`,
-        withPhone: sql<number>`sum(case when ${leads.verifiedPhone} is not null and ${leads.verifiedPhone} != '' then 1 else 0 end)`,
-      })
-      .from(leads)
-      .where(sql`${leads.createdAt} >= DATE_SUB(NOW(), INTERVAL 12 MONTH)`)
-      .groupBy(sql`DATE_FORMAT(${leads.createdAt}, '%Y-%m')`)
-      .orderBy(sql`DATE_FORMAT(${leads.createdAt}, '%Y-%m') asc`);
-
-    // توزيع جودة البيانات (عدد الحقول المكتملة)
-    const qualityRows = await db
-      .select({
-        score: sql<number>`(
-          case when ${leads.verifiedPhone} is not null and ${leads.verifiedPhone} != '' then 1 else 0 end +
-          case when ${leads.website} is not null and ${leads.website} != '' then 1 else 0 end +
-          case when ${leads.googleMapsUrl} is not null and ${leads.googleMapsUrl} != '' then 1 else 0 end +
-          case when ${leads.instagramUrl} is not null and ${leads.instagramUrl} != '' then 1 else 0 end +
-          case when ${leads.snapchatUrl} is not null and ${leads.snapchatUrl} != '' then 1 else 0 end +
-          case when ${leads.tiktokUrl} is not null and ${leads.tiktokUrl} != '' then 1 else 0 end
-        )`,
-        count: sql<number>`count(*)`,
-      })
-      .from(leads)
-      .groupBy(sql`(
-        case when ${leads.verifiedPhone} is not null and ${leads.verifiedPhone} != '' then 1 else 0 end +
-        case when ${leads.website} is not null and ${leads.website} != '' then 1 else 0 end +
-        case when ${leads.googleMapsUrl} is not null and ${leads.googleMapsUrl} != '' then 1 else 0 end +
-        case when ${leads.instagramUrl} is not null and ${leads.instagramUrl} != '' then 1 else 0 end +
-        case when ${leads.snapchatUrl} is not null and ${leads.snapchatUrl} != '' then 1 else 0 end +
-        case when ${leads.tiktokUrl} is not null and ${leads.tiktokUrl} != '' then 1 else 0 end
-      )`);
-
+    // توزيع الجودة
     let excellent = 0, good = 0, fair = 0, poor = 0;
-    for (const row of qualityRows) {
+    for (const row of qualityRaw) {
       const s = Number(row.score);
-      const c = Number(row.count);
+      const c = Number(row.cnt);
       if (s >= 5) excellent += c;
       else if (s >= 3) good += c;
       else if (s >= 1) fair += c;
       else poor += c;
     }
 
-    // درجة الاكتمال الإجمالية (متوسط مرجّح)
+    // درجة الاكتمال الإجمالية
     const completenessScore = total > 0
       ? Math.round(
           ((withPhone * 30 + withWebsite * 15 + withGoogleMaps * 15 +
@@ -200,47 +143,47 @@ export const dataQualityRouter = router({
       withWhatsapp, whatsappRate: Math.round((withWhatsapp / total) * 100),
       withAnalysis, analysisRate: Math.round((withAnalysis / total) * 100),
       completenessScore,
-      byCity: byCity.map(r => ({
+      byCity: byCityRaw.map(r => ({
         city: r.city,
         total: Number(r.total),
         withPhone: Number(r.withPhone),
         withWebsite: Number(r.withWebsite),
         phoneRate: Number(r.total) > 0 ? Math.round((Number(r.withPhone) / Number(r.total)) * 100) : 0,
       })),
-      byBusinessType: byBusinessType.map(r => ({
+      byBusinessType: byBusinessTypeRaw.map(r => ({
         businessType: r.businessType,
         total: Number(r.total),
         withPhone: Number(r.withPhone),
         phoneRate: Number(r.total) > 0 ? Math.round((Number(r.withPhone) / Number(r.total)) * 100) : 0,
       })),
-      byStage: byStage.map(r => ({ stage: r.stage, count: Number(r.count) })),
-      phoneByCity,
-      monthlyAdded: monthlyAdded.map(r => ({
+      byStage: byStageRaw.map(r => ({ stage: r.stage, count: Number(r.count) })),
+      phoneByCity: byCityRaw.map(row => ({
+        city: row.city,
+        phoneRate: Number(row.total) > 0 ? Math.round((Number(row.withPhone) / Number(row.total)) * 100) : 0,
+        total: Number(row.total),
+      })),
+      monthlyAdded: monthlyRaw.map(r => ({
         month: r.month,
-        count: Number(r.count),
+        count: Number(r.cnt),
         withPhone: Number(r.withPhone),
       })),
       qualityDistribution: { excellent, good, fair, poor },
     };
   }),
 
+
   // قائمة العملاء بدون أرقام هواتف
   leadsWithoutPhone: protectedProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) return [];
-    return db
-      .select({
-        id: leads.id,
-        companyName: leads.companyName,
-        businessType: leads.businessType,
-        city: leads.city,
-        googleMapsUrl: leads.googleMapsUrl,
-        instagramUrl: leads.instagramUrl,
-        createdAt: leads.createdAt,
-      })
-      .from(leads)
-      .where(sql`(${leads.verifiedPhone} is null or ${leads.verifiedPhone} = '')`)
-      .orderBy(sql`${leads.createdAt} desc`)
-      .limit(50);
+    const rows = await rawQuery<{
+      id: number; companyName: string; businessType: string;
+      city: string; googleMapsUrl: string; instagramUrl: string; createdAt: string;
+    }>(
+      `SELECT id, companyName, businessType, city, googleMapsUrl, instagramUrl, createdAt
+       FROM leads
+       WHERE verifiedPhone IS NULL OR verifiedPhone = ''
+       ORDER BY createdAt DESC
+       LIMIT 50`
+    );
+    return rows;
   }),
 });

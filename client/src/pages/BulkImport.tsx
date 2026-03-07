@@ -148,6 +148,198 @@ function parseFile(file: File): Promise<ImportRow[]> {
   });
 }
 
+// ===== مكوّن Inline للاستخدام داخل Dialog =====
+export function BulkImportInline({ onClose }: { onClose: () => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [parsedRows, setParsedRows] = useState<ImportRow[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; failed: number; errors: string[] } | null>(null);
+  const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
+
+  const bulkImport = trpc.leads.bulkImport.useMutation({
+    onSuccess: (data) => {
+      setImportResult(data);
+      setStep("done");
+      if (data.created > 0) toast.success(`تم رفع ${data.created} عميل بنجاح`);
+      if (data.failed > 0) toast.error(`فشل رفع ${data.failed} عميل`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const validRows = parsedRows.filter(r => !r._error);
+  const errorRows = parsedRows.filter(r => r._error);
+
+  const handleFile = async (file: File) => {
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      toast.error("يُقبل فقط ملفات Excel (.xlsx, .xls) أو CSV");
+      return;
+    }
+    setFileName(file.name);
+    try {
+      const rows = await parseFile(file);
+      setParsedRows(rows);
+      setStep("preview");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "خطأ في قراءة الملف");
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const handleImport = () => {
+    if (validRows.length === 0) return;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const leads = validRows.map(({ _rowIndex, _error, ...rest }) => rest);
+    bulkImport.mutate({ leads });
+  };
+
+  return (
+    <div className="space-y-4" dir="rtl">
+      {step === "upload" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl p-4 border text-sm space-y-2"
+            style={{ background: "oklch(0.13 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.2)" }}>
+            <div className="flex items-center gap-2 font-semibold text-foreground">
+              <Info className="w-4 h-4" style={{ color: "oklch(0.75 0.18 200)" }} />
+              تعليمات الرفع
+            </div>
+            <ul className="text-muted-foreground space-y-1 list-disc list-inside text-xs">
+              <li>حمّل نموذج Excel أولاً واملأ البيانات</li>
+              <li>الحقول المطلوبة: اسم النشاط، نوع النشاط، المدينة</li>
+              <li>يمكن رفع حتى 1000 عميل في المرة الواحدة</li>
+            </ul>
+          </div>
+          <Button variant="outline" onClick={downloadTemplate} className="gap-2">
+            <Download className="w-4 h-4" />
+            تحميل نموذج Excel
+          </Button>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all"
+            style={{
+              borderColor: isDragging ? "oklch(0.65 0.18 145)" : "oklch(0.25 0.02 240)",
+              background: isDragging ? "oklch(0.65 0.18 145 / 0.05)" : "oklch(0.11 0.015 240)",
+            }}
+          >
+            <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-base font-medium">اسحب الملف هنا أو اضغط للاختيار</p>
+            <p className="text-sm text-muted-foreground mt-1">Excel (.xlsx, .xls) أو CSV</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+            />
+          </div>
+        </div>
+      )}
+
+      {step === "preview" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl p-3 border border-border bg-card text-center">
+              <div className="text-xl font-bold">{parsedRows.length}</div>
+              <div className="text-xs text-muted-foreground">إجمالي الصفوف</div>
+            </div>
+            <div className="rounded-xl p-3 border border-green-500/20 bg-green-500/5 text-center">
+              <div className="text-xl font-bold text-green-400">{validRows.length}</div>
+              <div className="text-xs text-muted-foreground">صالح للرفع</div>
+            </div>
+            <div className="rounded-xl p-3 border border-red-500/20 bg-red-500/5 text-center">
+              <div className="text-xl font-bold text-red-400">{errorRows.length}</div>
+              <div className="text-xs text-muted-foreground">بها أخطاء</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>{fileName}</span>
+          </div>
+          {errorRows.length > 0 && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between p-3 text-sm font-medium text-red-400"
+                onClick={() => setShowErrors(!showErrors)}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {errorRows.length} صف بها أخطاء
+                </div>
+                {showErrors ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showErrors && (
+                <div className="border-t border-red-500/20 p-3 space-y-1 max-h-32 overflow-y-auto">
+                  {errorRows.map((r) => (
+                    <div key={r._rowIndex} className="text-xs text-muted-foreground">
+                      <span className="text-red-400">صف {r._rowIndex}:</span> {r._error}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button
+              onClick={handleImport}
+              disabled={validRows.length === 0 || bulkImport.isPending}
+              className="gap-2 flex-1"
+            >
+              {bulkImport.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> جاري الرفع...</>
+              ) : (
+                <><Upload className="w-4 h-4" /> رفع {validRows.length} عميل</>
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => { setStep("upload"); setParsedRows([]); setFileName(""); }}>
+              رجوع
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === "done" && importResult && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border p-8 text-center space-y-4"
+            style={{ background: "oklch(0.11 0.015 240)", borderColor: "oklch(0.25 0.02 240)" }}>
+            {importResult.created > 0 ? (
+              <CheckCircle2 className="w-14 h-14 mx-auto text-green-400" />
+            ) : (
+              <XCircle className="w-14 h-14 mx-auto text-red-400" />
+            )}
+            <div>
+              <h2 className="text-xl font-bold">اكتمل الرفع</h2>
+              <p className="text-muted-foreground mt-1">
+                تم رفع <span className="text-green-400 font-bold">{importResult.created}</span> عميل بنجاح
+                {importResult.failed > 0 && (
+                  <> وفشل <span className="text-red-400 font-bold">{importResult.failed}</span> عميل</>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={onClose} className="flex-1 gap-2">
+              العودة لقائمة العملاء
+            </Button>
+            <Button variant="outline" onClick={() => { setStep("upload"); setParsedRows([]); setFileName(""); setImportResult(null); }}>
+              رفع ملف آخر
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== الصفحة الرئيسية =====
 export default function BulkImport() {
   const [, navigate] = useLocation();

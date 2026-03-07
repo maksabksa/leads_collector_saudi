@@ -3,7 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import puppeteer from "puppeteer-core";
 import { invokeLLM } from "../_core/llm";
-import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP } from "./serpSearch";
+import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP } from "./serpSearch";
 
 // ─── Bright Data Browser API Helper ───────────────────────────────────────────
 const BRIGHT_DATA_WS_ENDPOINT = process.env.BRIGHT_DATA_WS_ENDPOINT || "";
@@ -171,59 +171,28 @@ async function scrapeTwitter(query: string, location: string): Promise<any[]> {
   return results;
 }
 
-// ─── بحث LinkedIn ──────────────────────────────────────────────────────────────
+// ─── بحث LinkedIn (عبر SERP API) ───────────────────────────────────
 async function scrapeLinkedIn(query: string, location: string): Promise<any[]> {
-  const browser = await openBrightDataBrowser();
-  const results: any[] = [];
+  // استخدام SERP API بدلاً من Puppeteer (لينكدإن يحتاج تسجيل دخول)
   try {
-    const page = await browser.newPage();
-    const searchQuery = location ? `${query} ${location}` : query;
-    await page.goto(
-      `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(searchQuery)}`,
-      { waitUntil: "networkidle2", timeout: 30000 }
-    );
-    await sleep(4000);
-
-    const companies = await page.evaluate(() => {
-      const items: any[] = [];
-      document
-        .querySelectorAll(".entity-result__item, .search-result__wrapper")
-        .forEach((card, i) => {
-          if (i >= 15) return;
-          const name =
-            (card.querySelector(".entity-result__title-text a") as HTMLElement)
-              ?.textContent?.trim() || "";
-          const url =
-            (card.querySelector(".entity-result__title-text a") as HTMLAnchorElement)
-              ?.href || "";
-          const subtitle =
-            (card.querySelector(".entity-result__primary-subtitle") as HTMLElement)
-              ?.textContent?.trim() || "";
-          const description =
-            (card.querySelector(".entity-result__summary") as HTMLElement)
-              ?.textContent?.trim() || "";
-          const logo =
-            (card.querySelector("img.EntityPhoto-circle") as HTMLImageElement)?.src || "";
-          if (name) items.push({ name, url, subtitle, description, logo });
-        });
-      return items;
-    });
-
-    for (const company of companies) {
-      results.push({
-        platform: "linkedin",
-        displayName: company.name,
-        profileUrl: company.url,
-        bio: company.description?.substring(0, 200),
-        subtitle: company.subtitle,
-        thumbnail: company.logo,
-      });
-    }
-    await page.close();
-  } finally {
-    await browser.close();
+    const serpResults = await searchLinkedInSERP(query, location);
+    return serpResults.map(r => ({
+      platform: "linkedin",
+      name: r.name,
+      displayName: r.name,
+      profileUrl: r.profileUrl,
+      bio: r.description?.substring(0, 200),
+      description: r.description?.substring(0, 200),
+      subtitle: r.industry || r.type,
+      phone: r.phone || "",
+      id: r.id,
+      type: r.type,
+      dataSource: "serp",
+    }));
+  } catch (e) {
+    console.error("[LinkedIn SERP] Error:", e);
+    return [];
   }
-  return results;
 }
 
 // ─── بحث Snapchat ──────────────────────────────────────────────────────────────

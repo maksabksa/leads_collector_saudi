@@ -113,6 +113,8 @@ const menuGroups = [
     icon: Settings,
     items: [
       { icon: Settings, label: "الإعدادات الموحدة", path: "/settings", badge: null },
+      { icon: Shield, label: "إدارة المستخدمين", path: "/users", badge: null },
+      { icon: FileText, label: "سجل التدقيق", path: "/audit-log", badge: null },
     ]
   },
 ];
