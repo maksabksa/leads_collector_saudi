@@ -194,7 +194,22 @@ export const staffAuthRouter = router({
         lastSignedIn: new Date(),
       });
 
-      const newUserId = Number((result as any).insertId);
+      // جلب الـ insertId بالطريقة الصحيحة لـ Drizzle + MySQL
+      const rawInsertId = (result as any)?.[0]?.insertId ?? (result as any)?.insertId;
+      let newUserId = rawInsertId ? Number(rawInsertId) : 0;
+
+      // fallback: جلب المستخدم من قاعدة البيانات إذا كان insertId غير صالح
+      if (!newUserId || isNaN(newUserId)) {
+        const [createdUser] = await db.select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, invitation.email))
+          .limit(1);
+        newUserId = createdUser?.id ?? 0;
+      }
+
+      if (!newUserId || isNaN(newUserId)) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "خطأ في إنشاء الحساب" });
+      }
 
       // إضافة الصلاحيات إن وجدت
       if (invitation.permissions && Array.isArray(invitation.permissions) && invitation.permissions.length > 0) {
