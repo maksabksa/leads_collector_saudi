@@ -1093,3 +1093,32 @@
 - [x] إضافة شريط تقدم مرئي للرسائل المرسلة
 - [x] تحذير تلقائي عند التأخير القصير (أقل من 15 ثانية)
 - [x] 220 اختبار Vitest تمر بنجاح (16 اختبار جديد لتحليل السلوك)
+
+## الدفعة 73 - الحذف الجماعي للعملاء (7 مارس 2026)
+
+- [ ] إضافة procedure leads.bulkDelete في backend
+- [ ] إضافة checkboxes لتحديد عملاء متعددين في جدول Leads
+- [ ] زر "تحديد الكل" / "إلغاء التحديد"
+- [ ] شريط إجراءات يظهر عند تحديد عملاء (عدد المحددين + زر حذف)
+- [ ] نافذة تأكيد قبل الحذف الجماعي
+- [ ] اختبارات Vitest للـ bulkDelete
+
+## الدفعة 74 - إصلاح مشكلة نتائج البحث (7 مارس 2026)
+
+- [ ] تشخيص سبب عدم ظهور نتائج البحث في جميع المنصات
+- [ ] إصلاح Bright Data WebSocket/API connection
+- [ ] إصلاح Google Maps search
+- [ ] إصلاح Instagram/TikTok/Snapchat search
+- [ ] اختبار النتائج والتحقق من الإصلاح
+
+## الدفعة 74 - إصلاح البحث في المنصات بـ SERP API (7 مارس 2026)
+
+- [x] تشخيص مشكلة عدم ظهور نتائج TikTok وSnapchat وInstagram (محظورة على Browser API)
+- [x] إنشاء SERP API zone (serp_api1) في Bright Data
+- [x] إضافة SERP API credentials كـ secrets (BRIGHT_DATA_SERP_HOST/PORT/USERNAME/PASSWORD)
+- [x] بناء serpSearch.ts - محرك بحث موحد لكل المنصات عبر Google SERP
+- [x] استبدال scrapeInstagram بـ searchInstagramSERP (SERP API)
+- [x] استبدال scrapeTikTok بـ searchTikTokSERP (SERP API)
+- [x] استبدال scrapeSnapchat بـ searchSnapchatSERP (SERP API)
+- [x] تسجيل serpSearchRouter في routers.ts
+- [x] 245 اختبار Vitest ناجح (41 اختبار جديد لـ SERP parsing)

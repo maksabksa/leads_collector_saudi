@@ -13,6 +13,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { TRPCError } from "@trpc/server";
 import { searchTikTokWithPuppeteer, searchSnapchatWithPuppeteer, scrapeTikTokProfile, scrapeSnapchatProfile } from "./puppeteerScraper";
+import { searchTikTokSERP, searchSnapchatSERP } from "./serpSearch";
 
 // ===== أنماط التحقق من البيانات =====
 /** نمط أرقام الهواتف السعودية والخليجية الحقيقية */
@@ -240,10 +241,36 @@ async function generateSearchHashtags(keyword: string, city: string, platform: s
   }
 }
 
-// ===== TikTok Search - Puppeteer متقدم =====
+// ===== TikTok Search - SERP API (Bright Data) أولاً =====
 async function searchTikTok(keyword: string, city: string): Promise<any[]> {
+  // المحاولة الأولى: Bright Data SERP API (الأسرع والأكثر موثوقية)
   try {
-    // المحاولة الأولى: Puppeteer (الأدق)
+    const serpResults = await searchTikTokSERP(keyword, city);
+    if (serpResults.length > 0) {
+      console.log(`[TikTok SERP] Found ${serpResults.length} results`);
+      return serpResults.map((r: any) => ({
+        name: r.displayName || r.title || "",
+        username: r.username || "",
+        bio: r.description || r.snippet || "",
+        followers: r.followers || 0,
+        businessType: "",
+        phone: r.phone || "",
+        website: "",
+        city: city,
+        profileUrl: r.profileUrl || r.link || "",
+        engagementLevel: "normal",
+        availablePhones: r.phone ? [r.phone] : [],
+        availableWebsites: [],
+        dataSource: "tiktok_serp",
+        verified: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("[TikTok] SERP API failed, falling back to puppeteer:", err);
+  }
+
+  // المحاولة الثانية: Puppeteer
+  try {
     const puppeteerResults = await searchTikTokWithPuppeteer(keyword, city);
     if (puppeteerResults.length > 0) {
       return puppeteerResults.map(r => ({
@@ -263,35 +290,40 @@ async function searchTikTok(keyword: string, city: string): Promise<any[]> {
         verified: r.verified,
       }));
     }
-  } catch (err) {
-    console.warn("[TikTok] Puppeteer failed, falling back to fetch:", err);
-  }
-
-  // الاحتياط: fetch عادي
-  const hashtag = keyword.replace(/\s+/g, "") + city.replace(/\s+/g, "");
-  const urls = [
-    `https://www.tiktok.com/search?q=${encodeURIComponent(keyword + " " + city)}`,
-    `https://www.tiktok.com/tag/${encodeURIComponent(hashtag)}`,
-  ];
-  let combinedRawHtml = "";
-  for (const url of urls) {
-    try {
-      const html = await fetchLikeHuman(url, {
-        "Referer": "https://www.tiktok.com/",
-        "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120"',
-      });
-      combinedRawHtml += " " + html;
-      await humanDelay(1500, 3000);
-    } catch { /* تجاهل */ }
-  }
-  if (combinedRawHtml.trim().length < 100) return [];
-  return extractBusinessesFromRealText(combinedRawHtml, "TikTok", keyword + " " + city);
+  } catch { /* تجاهل */ }
+  return [];
 }
 
-// ===== Snapchat Search - Puppeteer متقدم =====
+// ===== Snapchat Search - SERP API (Bright Data) أولاً =====
 async function searchSnapchat(keyword: string, city: string): Promise<any[]> {
+  // المحاولة الأولى: Bright Data SERP API (الأسرع والأكثر موثوقية)
   try {
-    // المحاولة الأولى: Puppeteer (الأدق)
+    const serpResults = await searchSnapchatSERP(keyword, city);
+    if (serpResults.length > 0) {
+      console.log(`[Snapchat SERP] Found ${serpResults.length} results`);
+      return serpResults.map((r: any) => ({
+        name: r.displayName || r.title || "",
+        username: r.username || "",
+        bio: r.description || r.snippet || "",
+        followers: r.subscribers || 0,
+        businessType: "",
+        phone: r.phone || "",
+        website: "",
+        city: city,
+        profileUrl: r.profileUrl || r.link || "",
+        engagementLevel: "normal",
+        availablePhones: r.phone ? [r.phone] : [],
+        availableWebsites: [],
+        dataSource: "snapchat_serp",
+        verified: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("[Snapchat] SERP API failed, falling back to puppeteer:", err);
+  }
+
+  // المحاولة الثانية: Puppeteer
+  try {
     const puppeteerResults = await searchSnapchatWithPuppeteer(keyword, city);
     if (puppeteerResults.length > 0) {
       return puppeteerResults.map(r => ({
@@ -311,25 +343,8 @@ async function searchSnapchat(keyword: string, city: string): Promise<any[]> {
         verified: false,
       }));
     }
-  } catch (err) {
-    console.warn("[Snapchat] Puppeteer failed, falling back to fetch:", err);
-  }
-
-  // الاحتياط: fetch عادي
-  const urls = [
-    `https://www.snapchat.com/search?q=${encodeURIComponent(keyword)}`,
-    `https://story.snapchat.com/search?q=${encodeURIComponent(keyword + " " + city)}`,
-  ];
-  let combinedRawHtml = "";
-  for (const url of urls) {
-    try {
-      const html = await fetchLikeHuman(url, { "Referer": "https://www.snapchat.com/" });
-      combinedRawHtml += " " + html;
-      await humanDelay(1200, 2500);
-    } catch { /* تجاهل */ }
-  }
-  if (combinedRawHtml.trim().length < 100) return [];
-  return extractBusinessesFromRealText(combinedRawHtml, "Snapchat", keyword + " " + city);
+  } catch { /* تجاهل */ }
+  return [];
 }
 
 // ===== Telegram Search =====

@@ -182,6 +182,15 @@ export async function deleteLead(id: number): Promise<void> {
   if (lead?.zoneId) await updateZoneLeadsCount(lead.zoneId);
 }
 
+export async function bulkDeleteLeads(ids: number[]): Promise<{ deleted: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  if (ids.length === 0) return { deleted: 0 };
+  // حذف العملاء المحددين
+  await db.delete(leads).where(inArray(leads.id, ids));
+  return { deleted: ids.length };
+}
+
 export async function getLeadsStats() {
   const db = await getDb();
   if (!db) return { total: 0, analyzed: 0, pending: 0, byCity: [], byZone: [] };

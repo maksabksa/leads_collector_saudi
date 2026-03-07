@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import puppeteer from "puppeteer-core";
 import { invokeLLM } from "../_core/llm";
+import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP } from "./serpSearch";
 
 // ─── Bright Data Browser API Helper ───────────────────────────────────────────
 const BRIGHT_DATA_WS_ENDPOINT = process.env.BRIGHT_DATA_WS_ENDPOINT || "";
@@ -67,134 +68,46 @@ ${JSON.stringify(results.slice(0, 10), null, 2)}
   return results;
 }
 
-// ─── بحث Instagram ─────────────────────────────────────────────────────────────
+// ─── بحث Instagram (SERP API) ─────────────────────────────────────────────────
 async function scrapeInstagram(query: string, location: string): Promise<any[]> {
-  const browser = await openBrightDataBrowser();
-  const results: any[] = [];
+  // استخدام SERP API بدلاً من Puppeteer المباشر (محظور على Instagram)
   try {
-    const page = await browser.newPage();
-    await page.setUserAgent(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-    );
-
-    const hashtag = encodeURIComponent(query.replace(/\s+/g, ""));
-    await page.goto(`https://www.instagram.com/explore/tags/${hashtag}/`, {
-      waitUntil: "networkidle2",
-      timeout: 30000,
-    });
-    await sleep(3000);
-
-    const posts = await page.evaluate(() => {
-      const items: { url: string; thumbnail: string }[] = [];
-      document.querySelectorAll("article a, div[role='button'] a").forEach((el, i) => {
-        if (i >= 20) return;
-        const a = el as HTMLAnchorElement;
-        const img = a.querySelector("img") as HTMLImageElement | null;
-        if (a.href) items.push({ url: a.href, thumbnail: img?.src || "" });
-      });
-      return items;
-    });
-
-    for (const post of posts.slice(0, 8)) {
-      try {
-        if (!post.url) continue;
-        await page.goto(post.url, { waitUntil: "networkidle2", timeout: 20000 });
-        await sleep(2000);
-
-        const detail = await page.evaluate(() => {
-          const username =
-            (document.querySelector("header a") as HTMLElement)?.textContent?.trim() || "";
-          const bio =
-            (document.querySelector("div.-vDIg span") as HTMLElement)?.textContent?.trim() ||
-            (document.querySelector("div[data-testid='user-description']") as HTMLElement)
-              ?.textContent?.trim() ||
-            "";
-          const website =
-            (document.querySelector("a[rel='me noopener noreferrer']") as HTMLAnchorElement)
-              ?.href || "";
-          const phone = bio.match(/(?:\+966|05|009665)\d{8,9}/)?.[0] || "";
-          return { username, bio, website, phone };
-        });
-
-        if (detail.username) {
-          results.push({
-            platform: "instagram",
-            username: detail.username,
-            profileUrl: `https://www.instagram.com/${detail.username}/`,
-            bio: detail.bio?.substring(0, 200),
-            website: detail.website,
-            phone: detail.phone,
-            thumbnail: post.thumbnail,
-          });
-        }
-      } catch {
-        // تجاهل أخطاء المنشورات الفردية
-      }
-    }
-    await page.close();
-  } finally {
-    await browser.close();
+    const serpResults = await searchInstagramSERP(query, location);
+    return serpResults.map(r => ({
+      platform: "instagram",
+      username: r.username,
+      name: r.displayName,
+      profileUrl: r.profileUrl,
+      bio: r.description,
+      website: "",
+      phone: r.phone || "",
+      dataSource: "serp",
+    }));
+  } catch (err) {
+    console.warn("[Instagram SERP] failed:", err);
+    return [];
   }
-  return results;
 }
 
-// ─── بحث TikTok ────────────────────────────────────────────────────────────────
+// ─── بحث TikTok (SERP API) ─────────────────────────────────────────────────────
 async function scrapeTikTok(query: string, location: string): Promise<any[]> {
-  const browser = await openBrightDataBrowser();
-  const results: any[] = [];
+  // استخدام SERP API بدلاً من Puppeteer المباشر (محظور على TikTok)
   try {
-    const page = await browser.newPage();
-    const searchQuery = location ? `${query} ${location}` : query;
-    await page.goto(
-      `https://www.tiktok.com/search/user?q=${encodeURIComponent(searchQuery)}`,
-      { waitUntil: "networkidle2", timeout: 30000 }
-    );
-    await sleep(4000);
-
-    const users = await page.evaluate(() => {
-      const items: any[] = [];
-      document
-        .querySelectorAll("[data-e2e='search-user-container']")
-        .forEach((card, i) => {
-          if (i >= 15) return;
-          const username =
-            (card.querySelector("[data-e2e='search-user-unique-id']") as HTMLElement)
-              ?.textContent || "";
-          const nickname =
-            (card.querySelector("[data-e2e='search-user-name']") as HTMLElement)
-              ?.textContent || "";
-          const followers =
-            (card.querySelector("[data-e2e='search-user-fans-count']") as HTMLElement)
-              ?.textContent || "";
-          const avatar =
-            (card.querySelector("img[data-e2e='search-user-avatar']") as HTMLImageElement)
-              ?.src || "";
-          const bio =
-            (card.querySelector("[data-e2e='search-user-desc']") as HTMLElement)
-              ?.textContent || "";
-          if (username) items.push({ username, nickname, followers, avatar, bio });
-        });
-      return items;
-    });
-
-    for (const user of users) {
-      const phone = user.bio?.match(/(?:\+966|05|009665)\d{8,9}/)?.[0] || "";
-      results.push({
-        platform: "tiktok",
-        username: user.username,
-        displayName: user.nickname,
-        profileUrl: `https://www.tiktok.com/@${user.username}`,
-        bio: user.bio?.substring(0, 200),
-        followers: user.followers,
-        phone,
-        thumbnail: user.avatar,
-      });
-    }
-    await page.close();
-  } finally {
-    await browser.close();
+    const serpResults = await searchTikTokSERP(query, location);
+    return serpResults.map(r => ({
+      platform: "tiktok",
+      username: r.username,
+      displayName: r.displayName,
+      profileUrl: r.profileUrl,
+      bio: r.description,
+      followers: r.followers,
+      phone: r.phone || "",
+      dataSource: "serp",
+    }));
+  } catch (err) {
+    console.warn("[TikTok SERP] failed:", err);
+    return [];
   }
-  return results;
 }
 
 // ─── بحث Twitter/X ─────────────────────────────────────────────────────────────
@@ -315,62 +228,25 @@ async function scrapeLinkedIn(query: string, location: string): Promise<any[]> {
 
 // ─── بحث Snapchat ──────────────────────────────────────────────────────────────
 async function scrapeSnapchat(query: string, location: string): Promise<any[]> {
-  const browser = await openBrightDataBrowser();
-  const results: any[] = [];
+  // استخدام SERP API بدلاً من Puppeteer المباشر (محظور على Snapchat)
   try {
-    const page = await browser.newPage();
-    const searchQuery = location ? `${query} ${location}` : query;
-    await page.goto(
-      `https://www.snapchat.com/search?q=${encodeURIComponent(searchQuery)}`,
-      { waitUntil: "networkidle2", timeout: 30000 }
-    );
-    await sleep(4000);
-
-    const users = await page.evaluate(() => {
-      const items: any[] = [];
-      document
-        .querySelectorAll("[data-testid='SearchResult'], .PublicProfileCard")
-        .forEach((card, i) => {
-          if (i >= 15) return;
-          const username =
-            (card.querySelector("[data-testid='username'], .username") as HTMLElement)
-              ?.textContent?.trim() || "";
-          const displayName =
-            (card.querySelector("[data-testid='display-name'], .display-name") as HTMLElement)
-              ?.textContent?.trim() || "";
-          const bio =
-            (card.querySelector("[data-testid='bio'], .bio") as HTMLElement)
-              ?.textContent?.trim() || "";
-          const avatar =
-            (card.querySelector("img[data-testid='avatar']") as HTMLImageElement)?.src || "";
-          const subscribers =
-            (card.querySelector("[data-testid='subscribers']") as HTMLElement)
-              ?.textContent?.trim() || "";
-          if (username || displayName) items.push({ username, displayName, bio, avatar, subscribers });
-        });
-      return items;
-    });
-
-    for (const user of users) {
-      const phone = user.bio?.match(/(?:\+966|05|009665)\d{8,9}/)?.[0] || "";
-      results.push({
-        platform: "snapchat",
-        username: user.username,
-        displayName: user.displayName,
-        profileUrl: user.username ? `https://www.snapchat.com/add/${user.username}` : "",
-        bio: user.bio?.substring(0, 200),
-        followers: user.subscribers,
-        phone,
-        thumbnail: user.avatar,
-      });
-    }
-    await page.close();
-  } finally {
-    await browser.close();
+    const serpResults = await searchSnapchatSERP(query, location);
+    return serpResults.map(r => ({
+      platform: "snapchat",
+      username: r.username,
+      displayName: r.displayName,
+      profileUrl: r.profileUrl,
+      bio: r.description,
+      followers: r.subscribers,
+      phone: r.phone || "",
+      dataSource: "serp",
+    }));
+  } catch (err) {
+    console.warn("[Snapchat SERP] failed:", err);
+    return [];
   }
-  return results;
 }
-
+// ─── بحث Google Search
 // ─── بحث Google Search ─────────────────────────────────────────────────────────
 async function scrapeGoogleSearch(query: string, location: string): Promise<any[]> {
   const browser = await openBrightDataBrowser();

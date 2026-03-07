@@ -6,7 +6,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   getAllZones, getZoneById, createZone, updateZone, deleteZone,
-  getAllLeads, getLeadById, createLead, updateLead, deleteLead, getLeadsStats,
+  getAllLeads, getLeadById, createLead, updateLead, deleteLead, getLeadsStats, bulkDeleteLeads,
   getWebsiteAnalysisByLeadId, createWebsiteAnalysis,
   getSocialAnalysesByLeadId, createSocialAnalysis,
   getTopGaps, getDb,
@@ -382,6 +382,13 @@ const leadsRouter = router({
     .mutation(async ({ input }) => {
       await deleteLead(input.id);
       return { success: true };
+    }),
+
+  bulkDelete: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
+    .mutation(async ({ input }) => {
+      const result = await bulkDeleteLeads(input.ids);
+      return { success: true, deleted: result.deleted };
     }),
 
   stats: protectedProcedure.query(async () => {
@@ -2455,7 +2462,9 @@ import { messageLimitsRouter } from "./routers/messageLimits";
 import { followUpRouter } from "./routers/followUp";
 import { googleSearchRouter } from "./routers/googleSearch";
 import { brightDataSearchRouter } from "./routers/brightDataSearch";
+import { brightDataDatasetRouter } from "./routers/brightDataDatasetAPI";
 import { behaviorAnalysisRouter } from "./routers/behaviorAnalysis";
+import { serpSearchRouter } from "./routers/serpSearch";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2504,5 +2513,7 @@ export const appRouter = router({
   googleSearch: googleSearchRouter,
   brightDataSearch: brightDataSearchRouter,
   behaviorAnalysis: behaviorAnalysisRouter,
+  bdDataset: brightDataDatasetRouter,
+  serpSearch: serpSearchRouter,
 });
 export type AppRouter = typeof appRouter;

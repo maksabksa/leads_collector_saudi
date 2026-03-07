@@ -43,6 +43,7 @@ export default function Leads() {
   const [showSegmentDialog, setShowSegmentDialog] = useState(false);
   const [targetSegmentId, setTargetSegmentId] = useState<string>("");
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // === Bulk WhatsApp Send State ===
   const [showBulkWaDialog, setShowBulkWaDialog] = useState(false);
@@ -80,6 +81,16 @@ export default function Leads() {
   const { data: waAllStatus } = trpc.wauto.allStatus.useQuery();
 
   const deleteLead = trpc.leads.delete.useMutation();
+  const bulkDelete = trpc.leads.bulkDelete.useMutation({
+    onSuccess: (data) => {
+      toast.success(`✅ تم حذف ${data.deleted} عميل بنجاح`);
+      setSelectedIds(new Set());
+      setShowBulkDeleteConfirm(false);
+      utils.leads.list.invalidate();
+      utils.leads.stats.invalidate();
+    },
+    onError: (e) => toast.error("فشل الحذف: " + e.message),
+  });
   const exportCSV = trpc.export.exportCSV.useMutation();
   const bulkAnalyze = trpc.analysis.bulkAnalyze.useMutation({
     onSuccess: (data) => {
@@ -325,6 +336,14 @@ export default function Leads() {
               >
                 <Layers className="w-4 h-4" />
                 إضافة {selectedIds.size} للشريحة
+              </button>
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                style={{ background: "oklch(0.58 0.22 25 / 0.15)", color: "oklch(0.7 0.22 25)", border: "1px solid oklch(0.58 0.22 25 / 0.3)" }}
+              >
+                <Trash2 className="w-4 h-4" />
+                حذف {selectedIds.size} عميل
               </button>
             </>
           )}
