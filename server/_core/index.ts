@@ -50,6 +50,26 @@ async function restoreWhatsAppSessions() {
     const { whatsappAccounts } = await import("../../drizzle/schema");
     const { eq } = await import("drizzle-orm");
     const { startWhatsAppSession, setIncomingMessageHandler } = await import("../whatsappAutomation");
+
+    // تنظيف جميع ملفات قفل Chromium العالقة عند بدء الخادم
+    try {
+      const { readdirSync, unlinkSync, existsSync } = await import("fs");
+      const path = await import("path");
+      const authDir = path.join(process.cwd(), ".wwebjs_auth");
+      if (existsSync(authDir)) {
+        const sessionDirs = readdirSync(authDir);
+        for (const dir of sessionDirs) {
+          const lockFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"];
+          for (const lockFile of lockFiles) {
+            const lockPath = path.join(authDir, dir, lockFile);
+            if (existsSync(lockPath)) {
+              unlinkSync(lockPath);
+              console.log(`[WhatsApp] 🔓 حذف ملف قفل عالق: ${dir}/${lockFile}`);
+            }
+          }
+        }
+      }
+    } catch (e) { /* تجاهل */ }
     const { storagePut } = await import("../storage");
 
     // تسجيل معالج الرسائل الواردة

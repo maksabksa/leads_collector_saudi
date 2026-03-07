@@ -1217,3 +1217,11 @@
 - [x] تحديث LeadDetail.tsx: إضافة زر PDF مع modal للتحميل والإرسال
 - [x] إنشاء Tutorial.tsx: نظام تعليمي تفاعلي بـ 6 خطوات
 - [x] تحديث Layout.tsx: إضافة زر "كيف يعمل النظام؟" في الـ sidebar
+
+## إصلاح عاجل - QR Code لا يظهر (7 مارس 2026)
+
+- [x] تشخيص المشكلة: ملفات SingletonLock عالقة تمنع Chromium من البدء
+- [x] إضافة cleanupSessionLocks() في startWhatsAppSession قبل إنشاء الـ client
+- [x] تنظيف جميع ملفات القفل عند بدء الخادم في restoreWhatsAppSessions
+- [x] إضافة لوج logs لتأكيد استقبال QR Code
+- [x] اختبار ناجح: QR يظهر بعد ~9 ثواني من بدء الجلسة

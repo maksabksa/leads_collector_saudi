@@ -5,8 +5,26 @@
  */
 
 import path from "path";
+import fs from "fs";
 
 const SESSION_DIR = path.join(process.cwd(), ".wwebjs_auth");
+
+// تنظيف ملفات القفل التي تتركها Chromium عند إيقافها بشكل غير نظيف
+function cleanupSessionLocks(accountId: string): void {
+  try {
+    const sessionPath = path.join(SESSION_DIR, `session-${accountId}`);
+    const lockFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"];
+    for (const lockFile of lockFiles) {
+      const lockPath = path.join(sessionPath, lockFile);
+      if (fs.existsSync(lockPath)) {
+        fs.unlinkSync(lockPath);
+        console.log(`[${accountId}] 🔓 تم حذف ملف القفل: ${lockFile}`);
+      }
+    }
+  } catch (e) {
+    // تجاهل أخطاء الحذف
+  }
+}
 
 export type WaStatus =
   | "disconnected"
@@ -119,13 +137,18 @@ export async function startWhatsAppSession(accountId = DEFAULT_ACCOUNT): Promise
       session.client = null;
     }
 
+    // تنظيف ملفات القفل التي تمنع Chromium من البدء (تتركها عند إيقاف غير نظيف)
+    cleanupSessionLocks(accountId);
+
     session.client = await createClient(accountId);
 
     session.client.on("qr", async (qr: string) => {
       try {
+        console.log(`[WhatsApp] 📱 QR Code وصل لـ ${accountId} - جاري تحويله لصورة...`);
         session.qrDataUrl = await generateQrDataUrl(qr);
         session.status = "qr_pending";
         session.isInitializing = false;
+        console.log(`[WhatsApp] ✅ QR جاهز للمسح - ${accountId}`);
       } catch (e) {
         console.error(`[${accountId}] QR generation error:`, e);
       }
