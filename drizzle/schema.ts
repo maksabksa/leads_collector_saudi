@@ -1138,6 +1138,11 @@ export const companySettings = mysqlTable("company_settings", {
   email: varchar("email", { length: 200 }),
   website: varchar("website", { length: 300 }),
   logoUrl: text("logoUrl"),
+  primaryColor: varchar("primaryColor", { length: 20 }).default("#1a56db"),
+  secondaryColor: varchar("secondaryColor", { length: 20 }).default("#0e9f6e"),
+  reportHeaderText: text("reportHeaderText"),
+  reportFooterText: text("reportFooterText"),
+  reportIntroText: text("reportIntroText"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type CompanySettings = typeof companySettings.$inferSelect;

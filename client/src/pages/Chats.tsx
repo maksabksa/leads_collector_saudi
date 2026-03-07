@@ -1039,16 +1039,17 @@ export default function Chats() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = (overrideMessage?: string) => {
     if (!newChatPhone.trim()) return;
     const accountId = waAccounts[0]?.accountId || "default";
+    const msgToSend = overrideMessage?.trim() || newChatMessage?.trim() || "مرحباً";
     sendMessage.mutate(
       {
         chatId: 0,
         accountId,
         phone: newChatPhone.trim(),
         contactName: newChatName.trim() || undefined,
-        message: "مرحباً",
+        message: msgToSend,
       },
       {
         onSuccess: () => {
@@ -2192,10 +2193,7 @@ export default function Chats() {
                 </div>
               )}
               <Button className="w-full text-white" onClick={() => {
-                if (newChatMessage.trim()) {
-                  setNewMessage(newChatMessage);
-                }
-                handleNewChat();
+                handleNewChat(newChatMessage.trim() || undefined);
               }}
                 disabled={!newChatPhone.trim() || sendMessage.isPending}
                 style={{ background: "#25D366" }}>

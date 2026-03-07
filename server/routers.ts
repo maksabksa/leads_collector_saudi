@@ -2475,6 +2475,7 @@ import { behaviorAnalysisRouter } from "./routers/behaviorAnalysis";
 import { serpSearchRouter } from "./routers/serpSearch";
 import { noReplyRouter } from "./routers/noReply";
 import { chatNotesRouter } from "./routers/chatNotes";
+import { reportRouter } from "./routers/reportRouter";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2528,5 +2529,6 @@ export const appRouter = router({
   noReply: noReplyRouter,
   chatNotes: chatNotesRouter,
   companySettings: companySettingsRouter,
+  report: reportRouter,
 });
 export type AppRouter = typeof appRouter;

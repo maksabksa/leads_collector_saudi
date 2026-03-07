@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import Tutorial from "./Tutorial";
 
 // ─────────────────────────────────────────────
 // تعريف الأقسام الأربعة للقائمة الجانبية
@@ -124,6 +125,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = () => setSidebarOpen(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // صلاحيات المستخدم
   const { data: myPerms } = trpc.invitations.myPermissions.useQuery(undefined, {
@@ -188,6 +190,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   // ─── Layout ───
   return (
+    <>
     <div className={isChatsPage ? "h-screen flex bg-background overflow-hidden" : "min-h-screen flex bg-background"} dir="rtl">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -321,6 +324,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <button
+            onClick={() => setShowTutorial(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all mb-1"
+          >
+            <Brain className="w-4 h-4" />
+            كيف يعمل النظام؟
+          </button>
+          <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
           >
@@ -359,5 +369,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className={isChatsPage ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-4 lg:p-6"}>{children}</div>
       </main>
     </div>
+    {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+    </>
   );
 }

@@ -5,7 +5,7 @@ import {
   ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
   Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown, MessagesSquare,
-  Activity, Users, Clock, Brain, ChevronUp, Sparkles
+  Activity, Users, Clock, Brain, ChevronUp, Sparkles, FileText, Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -71,6 +71,54 @@ export default function LeadDetail() {
   const sendOneWa = trpc.wauto.sendOne.useMutation();
   const { data: allSessionsData } = trpc.wauto.allStatus.useQuery(undefined, { refetchInterval: 5000 });
   const [waSending, setWaSending] = useState(false);
+
+  // PDF Report state
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfSending, setPdfSending] = useState(false);
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfCustomMessage, setPdfCustomMessage] = useState("");
+  const generatePDF = trpc.report.generatePDF.useMutation();
+  const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
+
+  const handleGeneratePDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const result = await generatePDF.mutateAsync({ leadId: id });
+      setPdfUrl(result.url);
+      setShowPdfModal(true);
+      toast.success("تم توليد التقرير بنجاح");
+    } catch (e: any) {
+      toast.error("فشل توليد التقرير", { description: e.message });
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
+  const handleSendPDFViaWhatsApp = async () => {
+    if (!connectedSession) {
+      toast.error("لا يوجد حساب واتساب متصل");
+      return;
+    }
+    if (!lead.verifiedPhone) {
+      toast.error("لا يوجد رقم هاتف للعميل");
+      return;
+    }
+    setPdfSending(true);
+    try {
+      await sendPDFViaWhatsApp.mutateAsync({
+        leadId: id,
+        accountId: connectedSession.accountId,
+        customMessage: pdfCustomMessage || undefined,
+      });
+      toast.success("تم إرسال التقرير عبر واتساب بنجاح");
+      setShowPdfModal(false);
+    } catch (e: any) {
+      toast.error("فشل إرسال التقرير", { description: e.message });
+    } finally {
+      setPdfSending(false);
+    }
+  };
 
   // تحليل السلوك
   const [behaviorAnalysis, setBehaviorAnalysis] = useState<any>(null);
@@ -274,6 +322,7 @@ export default function LeadDetail() {
   ].filter(p => p.url);
 
   return (
+    <>
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -320,6 +369,12 @@ export default function LeadDetail() {
             style={{ background: "oklch(0.62 0.18 285 / 0.15)", color: "var(--brand-purple)", border: "1px solid oklch(0.62 0.18 285 / 0.3)" }}>
             {generateReport.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             تقرير شامل
+          </button>
+          <button onClick={handleGeneratePDF} disabled={pdfGenerating}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "oklch(0.65 0.18 25 / 0.15)", color: "oklch(0.75 0.18 25)", border: "1px solid oklch(0.65 0.18 25 / 0.3)" }}>
+            {pdfGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+            PDF
           </button>
           <button onClick={handleEdit} className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all">
             <Edit2 className="w-4 h-4" />
@@ -1064,5 +1119,61 @@ export default function LeadDetail() {
         </div>
       </div>
     </div>
+
+    {/* PDF Report Modal */}
+    {showPdfModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+        <div className="rounded-2xl p-6 w-full max-w-md space-y-4" style={{ background: "oklch(0.12 0.015 240)", border: "1px solid oklch(0.65 0.18 25 / 0.3)" }}>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-foreground flex items-center gap-2">
+              <FileText className="w-5 h-5" style={{ color: "oklch(0.75 0.18 25)" }} />
+              تقرير PDF جاهز
+            </h3>
+            <button onClick={() => setShowPdfModal(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="rounded-xl p-4 space-y-2" style={{ background: "oklch(0.65 0.18 145 / 0.08)", border: "1px solid oklch(0.65 0.18 145 / 0.2)" }}>
+            <p className="text-xs text-muted-foreground">تم توليد التقرير بنجاح لـ</p>
+            <p className="font-semibold text-foreground">{lead.companyName}</p>
+            {pdfUrl && (
+              <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs px-3 py-2 rounded-xl mt-2 transition-all"
+                style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+                <Download className="w-3.5 h-3.5" />
+                تحميل التقرير
+              </a>
+            )}
+          </div>
+
+          {isWaConnected && lead.verifiedPhone && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground">إرسال عبر واتساب</p>
+              <textarea
+                value={pdfCustomMessage}
+                onChange={e => setPdfCustomMessage(e.target.value)}
+                placeholder="رسالة مخصصة (اختياري - سيتم استخدام رسالة افتراضية إذا تركتها فارغة)"
+                rows={3}
+                className="w-full px-3 py-2 rounded-xl text-xs border border-border bg-background text-foreground resize-none focus:outline-none focus:border-primary"
+              />
+              <button onClick={handleSendPDFViaWhatsApp} disabled={pdfSending}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "oklch(0.55 0.2 145)", color: "white", opacity: pdfSending ? 0.7 : 1 }}>
+                {pdfSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                إرسال التقرير عبر واتساب
+              </button>
+            </div>
+          )}
+
+          {!isWaConnected && (
+            <div className="rounded-xl p-3 text-xs" style={{ background: "oklch(0.65 0.18 60 / 0.08)", border: "1px solid oklch(0.65 0.18 60 / 0.2)", color: "oklch(0.75 0.18 60)" }}>
+              لإرسال التقرير عبر واتساب، يرجى توصيل حساب واتساب أولاً من صفحة الإعدادات
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
