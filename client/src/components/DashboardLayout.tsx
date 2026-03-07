@@ -250,13 +250,11 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
               </button>
               {!isCollapsed && (
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                    <Zap className="w-3.5 h-3.5 text-primary-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm truncate leading-none">CRM Pro</p>
-                    <p className="text-[10px] text-muted-foreground truncate mt-0.5">نظام إدارة العملاء</p>
-                  </div>
+                  <img
+                    src="https://files.manuscdn.com/user_upload_by_module/session_file/310419663029364550/bjAWeFtzhIGmIQTl.png"
+                    alt="مكسب"
+                    className="h-8 w-auto object-contain max-w-[140px]"
+                  />
                 </div>
               )}
             </div>
@@ -371,9 +369,9 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
         />
       </div>
 
-      <SidebarInset>
+      <SidebarInset className="!flex !flex-col !overflow-hidden" style={{ height: '100vh' }}>
         {isMobile && (
-          <div className="flex border-b h-12 items-center justify-between bg-background/95 px-3 backdrop-blur sticky top-0 z-40">
+          <div className="flex border-b h-12 items-center justify-between bg-background/95 px-3 backdrop-blur sticky top-0 z-40 flex-shrink-0">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-8 w-8 rounded-lg" />
               <span className="text-sm font-medium">{activeItem?.label ?? "القائمة"}</span>
@@ -383,7 +381,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
             )}
           </div>
         )}
-        <main className="flex-1 p-4 min-h-screen">{children}</main>
+        <div className="flex-1 overflow-hidden min-h-0" style={{ position: 'relative' }}>{children}</div>
       </SidebarInset>
     </>
   );

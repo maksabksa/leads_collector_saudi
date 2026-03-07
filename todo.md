@@ -1135,3 +1135,25 @@
 - [x] إصلاح LinkedIn "Failed to fetch": استبدال Puppeteer بـ SERP API مثل باقي المنصات
 - [ ] إصلاح "فشل الإضافة - Failed to fetch" عند إضافة حساب واتساب جديد
 - [ ] إصلاح QR Code ربط حساب واتساب - لا يعمل
+
+## الدفعة 77 - تحليل الحضور الرقمي الشامل (7 مارس 2026)
+- [ ] بناء digitalPresence.ts router: تحليل الموقع (SimilarWeb: ترتيب + زيارات + مصادر)
+- [ ] بناء digitalPresence.ts: تحليل واجهة الموقع (Bright Data Scraper: screenshot + title + description)
+- [ ] بناء digitalPresence.ts: تحليل SEO (meta tags + headings + schema + mobile-friendly)
+- [ ] بناء digitalPresence.ts: تحليل الباك لينك (SERP: عدد الروابط الخارجية + domain authority)
+- [ ] بناء digitalPresence.ts: تحليل إنستغرام (Bright Data Dataset API: followers + posts + engagement)
+- [ ] بناء digitalPresence.ts: تحليل تويتر/X (Manus API Hub: profile + tweets + engagement)
+- [ ] بناء digitalPresence.ts: تحليل سناب شات (Bright Data SERP: profile data)
+- [ ] بناء digitalPresence.ts: تحليل تيك توك (Bright Data Dataset API + Manus API Hub)
+- [ ] تسجيل digitalPresenceRouter في routers.ts
+- [ ] بناء صفحة DigitalPresence.tsx: تبويبات لكل منصة مع عرض البيانات بشكل احترافي
+- [ ] إضافة زر تحليل الحضور الرقمي في صفحة تفاصيل العميل LeadDetail.tsx
+- [ ] تسجيل المسار /digital-presence/:leadId في App.tsx
+- [ ] كتابة Vitest tests لـ digitalPresence router
+
+## الدفعة 78 - إصلاح SMTP + لوجو مكسب (7 مارس 2026)
+- [x] إصلاح App Password لـ Gmail (maksabksa9@gmail.com) - كانت منتهية الصلاحية
+- [x] اختبار الاتصال بـ SMTP - ناجح
+- [x] اختبار إرسال إيميل تجريبي - ناجح
+- [x] إضافة لوجو مكسب الحقيقي في Layout.tsx (sidebar)
+- [x] إضافة لوجو مكسب الحقيقي في DashboardLayout.tsx (sidebar)

@@ -11,7 +11,8 @@ import {
   Paperclip, FileText, Download, Smile, Mic, MicOff, Sparkles,
   Copy, Plus, Check, Zap, ChevronDown, UserPlus, BarChart2, AlertTriangle, TrendingUp,
   Volume2, VolumeX, Settings, Image, Film, Music, File, ZoomIn, CheckSquare, Square,
-  Tag, GitFork, CalendarClock,
+  Tag, GitFork, CalendarClock, StickyNote, Pin, PinOff, ChevronRight, Info, Bell,
+  MapPin, Globe, Building2, Star, User,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -550,6 +551,10 @@ export default function Chats() {
   const [filterLabelId, setFilterLabelId] = useState<number | null>(null);
   // ===== حالة Stage Filter =====
   const [filterStage, setFilterStage] = useState<string | null>(null);
+  // ===== حالة العمود الثالث (بيانات العميل) =====
+  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [rightPanelTab, setRightPanelTab] = useState<"info" | "notes" | "reminders">("info");
+  const [newNoteContent, setNewNoteContent] = useState("");
   // ===== حالة فلتر المنصة (دمج صندوق الوارد) =====
   const [filterPlatform, setFilterPlatform] = useState<"all" | "whatsapp" | "instagram" | "tiktok" | "snapchat">("whatsapp");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -581,6 +586,28 @@ export default function Chats() {
   const { data: chatLabels = [], refetch: refetchChatLabels } = trpc.labels.getChatLabels.useQuery(
     { chatId: selectedChatId! },
     { enabled: selectedChatId !== null && selectedChatId > 0 }
+  );
+  // ===== ملاحظات داخلية =====
+  const { data: chatNotes = [], refetch: refetchChatNotes } = trpc.chatNotes.list.useQuery(
+    { chatId: selectedChatId! },
+    { enabled: selectedChatId !== null && selectedChatId > 0 }
+  );
+  const addChatNote = trpc.chatNotes.add.useMutation({
+    onSuccess: () => { setNewNoteContent(""); refetchChatNotes(); toast.success("تمت إضافة الملاحظة"); },
+    onError: (e) => toast.error("خطأ في إضافة الملاحظة", { description: e.message }),
+  });
+  const deleteChatNote = trpc.chatNotes.delete.useMutation({
+    onSuccess: () => { refetchChatNotes(); toast.success("تم حذف الملاحظة"); },
+    onError: (e) => toast.error("خطأ في الحذف", { description: e.message }),
+  });
+  const togglePinNote = trpc.chatNotes.togglePin.useMutation({
+    onSuccess: () => refetchChatNotes(),
+  });
+  // ===== بيانات العميل المرتبط =====
+  const selectedChatLeadId = useMemo(() => (chats as Chat[]).find(c => c.id === selectedChatId)?.leadId, [chats, selectedChatId]);
+  const { data: selectedLead } = trpc.leads.getById.useQuery(
+    { id: selectedChatLeadId! },
+    { enabled: selectedChatLeadId != null }
   );
   const utils = trpc.useUtils();
   const assignLabel = trpc.labels.assignLabel.useMutation({
@@ -1057,7 +1084,7 @@ export default function Chats() {
   };
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: "#111b21" }}>
+    <div className="flex flex-col" style={{ background: "#111b21", position: 'absolute', inset: 0 }}>
       {/* ===== شريط علوي ===== */}
       <div className="flex-shrink-0 border-b border-white/10" style={{ background: "#202c33" }}>
         {/* شريط حالة AI الإجمالي */}
@@ -1109,7 +1136,7 @@ export default function Chats() {
       {/* ===== المحتوى الرئيسي ===== */}
       <div className="flex flex-1 overflow-hidden">
         {/* ===== قائمة المحادثات ===== */}
-        <div className="w-72 flex-shrink-0 flex flex-col border-l border-white/10" style={{ background: "#111b21" }}>
+        <div className="w-64 flex-shrink-0 flex flex-col border-l border-white/10" style={{ background: "#111b21" }}>
           {/* تبويبات المنصات - دمج صندوق الوارد */}
           <div className="flex items-center gap-0.5 px-2 pt-2 pb-1 border-b border-white/10 overflow-x-auto">
             {([
@@ -1329,7 +1356,9 @@ export default function Chats() {
 
         {/* ===== منطقة الشات ===== */}
         {selectedChat ? (
-          <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#0b141a" }}>
+          <div className="flex-1 flex overflow-hidden" style={{ background: "#0b141a" }}>
+          {/* عمود الشات الرئيسي */}
+          <div className="flex-1 flex flex-col overflow-hidden" style={{ minWidth: 0 }}>
             {/* رأس الشات */}
             <div className="flex items-center justify-between px-4 py-2.5 flex-shrink-0 border-b border-white/10" style={{ background: "#202c33" }}>
               <div className="flex items-center gap-3">
@@ -1913,9 +1942,193 @@ export default function Chats() {
                 )}
               </div>
             </div>
+          </div>{/* إغلاق عمود الشات الرئيسي */}
+
+          {/* ===== العمود الثالث: بيانات العميل والملاحظات ===== */}
+          {showRightPanel && (
+            <div className="w-64 flex-shrink-0 flex flex-col border-r border-white/10 overflow-hidden" style={{ background: "#111b21" }}>
+              {/* رأس العمود الثالث */}
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/10 flex-shrink-0" style={{ background: "#202c33" }}>
+                <div className="flex gap-1">
+                  {(["info", "notes", "reminders"] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setRightPanelTab(tab)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
+                      style={rightPanelTab === tab
+                        ? { background: "rgba(37,211,102,0.15)", color: "#25D366", border: "1px solid rgba(37,211,102,0.3)" }
+                        : { color: "#8696a0", border: "1px solid transparent" }
+                      }
+                    >
+                      {tab === "info" ? <><Info className="w-3 h-3" /> بيانات</> : tab === "notes" ? <><StickyNote className="w-3 h-3" /> ملاحظات</> : <><Bell className="w-3 h-3" /> تذكيرات</>}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setShowRightPanel(false)} className="text-[#8696a0] hover:text-white p-1 rounded">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* محتوى العمود الثالث */}
+              <div className="flex-1 overflow-y-auto">
+
+                {/* تبويب: بيانات العميل */}
+                {rightPanelTab === "info" && (
+                  <div className="p-3 space-y-3">
+                    {/* معلومات المحادثة */}
+                    <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                          style={{ background: getAccountColor(selectedChat.accountId).light, color: getAccountColor(selectedChat.accountId).text }}>
+                          {getDisplayName(selectedChat).slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-white">{getDisplayName(selectedChat)}</p>
+                          <p className="text-xs text-[#8696a0]" dir="ltr">{selectedChat.phone}</p>
+                        </div>
+                      </div>
+                      {/* Stage badge */}
+                      {(selectedChat as any).stage && (
+                        <div className="mt-2">
+                          {(() => {
+                            const stageLabels: Record<string,string> = { new:"جديد", contacted:"تم التواصل", interested:"مهتم", price_offer:"عرض سعر", meeting:"اجتماع", won:"عميل", lost:"خسرنا" };
+                            const stageColors: Record<string,string> = { new:"#8696a0", contacted:"#34B7F1", interested:"#f0a55a", price_offer:"#9B59B6", meeting:"#E67E22", won:"#25D366", lost:"#e74c3c" };
+                            const s = (selectedChat as any).stage;
+                            return <span className="text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: stageColors[s]+"22", color: stageColors[s], border: `1px solid ${stageColors[s]}44` }}>{stageLabels[s] || s}</span>;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* بيانات Lead المرتبط */}
+                    {selectedLead ? (
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(37,211,102,0.05)", border: "1px solid rgba(37,211,102,0.15)" }}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] font-semibold text-[#25D366] flex items-center gap-1"><User className="w-3 h-3" /> ملف العميل</span>
+                          <a href={`/leads/${selectedLead.id}`} className="text-[10px] text-[#25D366] underline opacity-70 hover:opacity-100">عرض الكامل</a>
+                        </div>
+                        {selectedLead.companyName && <div className="flex items-center gap-1.5"><Building2 className="w-3 h-3 text-[#8696a0] flex-shrink-0" /><span className="text-xs text-white truncate">{selectedLead.companyName}</span></div>}
+                        {selectedLead.city && <div className="flex items-center gap-1.5"><MapPin className="w-3 h-3 text-[#8696a0] flex-shrink-0" /><span className="text-xs text-[#8696a0]">{selectedLead.city}</span></div>}
+                        {selectedLead.website && <div className="flex items-center gap-1.5"><Globe className="w-3 h-3 text-[#8696a0] flex-shrink-0" /><a href={selectedLead.website} target="_blank" rel="noreferrer" className="text-xs text-[#34B7F1] truncate hover:underline">{selectedLead.website.replace(/^https?:\/\//, "")}</a></div>}
+                        {(selectedLead as any).rating && <div className="flex items-center gap-1.5"><Star className="w-3 h-3 text-yellow-400 flex-shrink-0" /><span className="text-xs text-[#8696a0]">{(selectedLead as any).rating}</span></div>}
+                        {selectedLead.notes && <div className="mt-1 text-[11px] text-[#8696a0] bg-white/5 rounded-lg p-2 leading-relaxed">{selectedLead.notes}</div>}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <User className="w-8 h-8 text-[#8696a0] mx-auto mb-2 opacity-40" />
+                        <p className="text-xs text-[#8696a0] mb-2">لم يُربط بعميل</p>
+                        <a href={`/leads/new?phone=${encodeURIComponent(selectedChat.phone)}&name=${encodeURIComponent(selectedChat.contactName || "")}`}
+                          className="text-[11px] text-[#25D366] underline">إضافة كعميل جديد</a>
+                      </div>
+                    )}
+
+                    {/* التصنيفات */}
+                    {(chatLabels as any[]).length > 0 && (
+                      <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <p className="text-[11px] text-[#8696a0] mb-2 flex items-center gap-1"><Tag className="w-3 h-3" /> التصنيفات</p>
+                        <div className="flex flex-wrap gap-1">
+                          {(chatLabels as any[]).map((cl: any) => (
+                            <span key={cl.labelId} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: cl.color+"22", border: `1px solid ${cl.color}`, color: cl.color }}>{cl.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* الموظف المعيّن */}
+                    {(selectedChat as any).assignedUserName && (
+                      <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <p className="text-[11px] text-[#8696a0] mb-1 flex items-center gap-1"><UserPlus className="w-3 h-3" /> الموظف المعيّن</p>
+                        <p className="text-xs text-white">{(selectedChat as any).assignedUserName}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* تبويب: الملاحظات الداخلية */}
+                {rightPanelTab === "notes" && (
+                  <div className="p-3 space-y-2">
+                    {/* إضافة ملاحظة جديدة */}
+                    <div className="rounded-xl p-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <textarea
+                        value={newNoteContent}
+                        onChange={e => setNewNoteContent(e.target.value)}
+                        placeholder="ملاحظة داخلية... (لا يراها العميل)"
+                        rows={3}
+                        className="w-full bg-transparent text-xs text-white placeholder-[#8696a0] resize-none focus:outline-none"
+                      />
+                      <div className="flex justify-end mt-1">
+                        <button
+                          onClick={() => { if (newNoteContent.trim() && selectedChatId) addChatNote.mutate({ chatId: selectedChatId, content: newNoteContent.trim() }); }}
+                          disabled={!newNoteContent.trim() || addChatNote.isPending}
+                          className="text-[11px] px-3 py-1 rounded-lg font-medium transition-all disabled:opacity-40"
+                          style={{ background: "rgba(37,211,102,0.2)", color: "#25D366", border: "1px solid rgba(37,211,102,0.3)" }}
+                        >
+                          {addChatNote.isPending ? "..." : "+ إضافة"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* قائمة الملاحظات */}
+                    {(chatNotes as any[]).length === 0 ? (
+                      <div className="text-center py-8">
+                        <StickyNote className="w-8 h-8 text-[#8696a0] mx-auto mb-2 opacity-30" />
+                        <p className="text-xs text-[#8696a0] opacity-60">لا توجد ملاحظات بعد</p>
+                      </div>
+                    ) : (
+                      (chatNotes as any[]).map((note: any) => (
+                        <div key={note.id} className="rounded-xl p-2.5 group" style={{ background: note.isPinned ? "rgba(37,211,102,0.08)" : "rgba(255,255,255,0.04)", border: note.isPinned ? "1px solid rgba(37,211,102,0.2)" : "1px solid rgba(255,255,255,0.06)" }}>
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-white leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                              <p className="text-[10px] text-[#8696a0] mt-1">{note.authorName} · {new Date(note.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                            </div>
+                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              <button onClick={() => togglePinNote.mutate({ noteId: note.id, pinned: !note.isPinned })} className="p-1 rounded hover:bg-white/10" title={note.isPinned ? "إلغاء التثبيت" : "تثبيت"}>
+                                {note.isPinned ? <PinOff className="w-3 h-3 text-[#25D366]" /> : <Pin className="w-3 h-3 text-[#8696a0]" />}
+                              </button>
+                              <button onClick={() => deleteChatNote.mutate({ noteId: note.id })} className="p-1 rounded hover:bg-red-500/10" title="حذف">
+                                <Trash2 className="w-3 h-3 text-red-400" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* تبويب: التذكيرات */}
+                {rightPanelTab === "reminders" && (
+                  <div className="p-3">
+                    <div className="text-center py-8">
+                      <Bell className="w-8 h-8 text-[#8696a0] mx-auto mb-2 opacity-30" />
+                      <p className="text-xs text-[#8696a0] mb-3">إضافة تذكير لهذا العميل</p>
+                      <a href={`/reminders?chatId=${selectedChat.id}&phone=${encodeURIComponent(selectedChat.phone)}`}
+                        className="text-[11px] px-3 py-1.5 rounded-lg font-medium"
+                        style={{ background: "rgba(37,211,102,0.15)", color: "#25D366", border: "1px solid rgba(37,211,102,0.3)" }}
+                      >+ إضافة تذكير</a>
+                    </div>
+                  </div>
+                )}
+
+              </div>{/* إغلاق overflow-y-auto */}
+            </div>
+          )}
+
+          {/* زر فتح العمود الثالث عند إغلاقه */}
+          {!showRightPanel && (
+            <button
+              onClick={() => setShowRightPanel(true)}
+              className="flex-shrink-0 w-8 flex items-center justify-center border-r border-white/10 hover:bg-white/5 transition-colors"
+              style={{ background: "#111b21" }}
+              title="عرض بيانات العميل"
+            >
+              <ChevronRight className="w-4 h-4 text-[#8696a0] rotate-180" />
+            </button>
+          )}
+
           </div>
         ) : (
-          /* حالة عدم اختيار محادثة */
           <div className="flex-1 flex flex-col items-center justify-center text-[#8696a0]">
             <div className="w-28 h-28 rounded-full flex items-center justify-center mb-5" style={{ background: "rgba(37,211,102,0.08)" }}>
               <MessageCircle className="w-14 h-14 text-[#25D366] opacity-30" />
@@ -2204,3 +2417,4 @@ export default function Chats() {
     </div>
   );
 }
+

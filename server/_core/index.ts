@@ -550,6 +550,10 @@ async function startServer() {
     setTimeout(() => {
       import("../routers/reportScheduler").then(m => m.startReportSchedulerCron()).catch(console.error);
     }, 10000);
+    // تشغيل مدقق عدم الرد بعد 15 ثانية
+    setTimeout(() => {
+      import("../noReplyChecker").then(m => m.startNoReplyChecker()).catch(console.error);
+    }, 15000);
   });
 }
 

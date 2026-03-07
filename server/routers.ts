@@ -2465,6 +2465,8 @@ import { brightDataSearchRouter } from "./routers/brightDataSearch";
 import { brightDataDatasetRouter } from "./routers/brightDataDatasetAPI";
 import { behaviorAnalysisRouter } from "./routers/behaviorAnalysis";
 import { serpSearchRouter } from "./routers/serpSearch";
+import { noReplyRouter } from "./routers/noReply";
+import { chatNotesRouter } from "./routers/chatNotes";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2515,5 +2517,7 @@ export const appRouter = router({
   behaviorAnalysis: behaviorAnalysisRouter,
   bdDataset: brightDataDatasetRouter,
   serpSearch: serpSearchRouter,
+  noReply: noReplyRouter,
+  chatNotes: chatNotesRouter,
 });
 export type AppRouter = typeof appRouter;

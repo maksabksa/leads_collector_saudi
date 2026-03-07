@@ -305,9 +305,11 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       z.object({
         accountId: z.string().default("all"),
         includeArchived: z.boolean().default(false),
+        // فلتر الرؤية: "mine" = المعيّنة لي فقط، "all" = الكل (للأدمن)
+        viewMode: z.enum(["mine", "all"]).default("all"),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
 
@@ -323,6 +325,18 @@ ${input.businessContext ? `سياق العمل: ${input.businessContext}` : ""}`
       if (!input.includeArchived) {
         conditions.push(eq(whatsappChats.isArchived, false));
       }
+
+      // ===== منطق الرؤية حسب الدور =====
+      const isAdmin = ctx.user.role === "admin";
+
+      if (!isAdmin) {
+        // الموظف يرى فقط المحادثات المعيّنة له
+        conditions.push(eq(whatsappChats.assignedUserId, ctx.user.id));
+      } else if (input.viewMode === "mine") {
+        // الأدمن اختار رؤية محادثاته فقط
+        conditions.push(eq(whatsappChats.assignedUserId, ctx.user.id));
+      }
+      // إذا viewMode === "all" والمستخدم أدمن → يرى الكل بدون قيود
 
       const chats = await db
         .select()

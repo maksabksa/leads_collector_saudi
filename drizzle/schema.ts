@@ -1058,3 +1058,17 @@ export const aiReferenceUsers = mysqlTable("ai_reference_users", {
 });
 export type AiReferenceUser = typeof aiReferenceUsers.$inferSelect;
 export type InsertAiReferenceUser = typeof aiReferenceUsers.$inferInsert;
+
+// ===== CHAT INTERNAL NOTES TABLE (ملاحظات داخلية لا يراها العميل) =====
+export const chatInternalNotes = mysqlTable("chat_internal_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  chatId: int("chatId").notNull(),
+  authorId: int("authorId").notNull(),
+  authorName: varchar("authorName", { length: 100 }).notNull(),
+  content: text("content").notNull(),
+  isPinned: boolean("isPinned").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ChatInternalNote = typeof chatInternalNotes.$inferSelect;
+export type InsertChatInternalNote = typeof chatInternalNotes.$inferInsert;
