@@ -262,6 +262,7 @@ export default function LeadDetail() {
         if (platform === "instagram") result = await bdAnalyzeInstagram.mutateAsync({ leadId: id, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
         else if (platform === "twitter") result = await bdAnalyzeTwitter.mutateAsync({ leadId: id, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
         else if (platform === "tiktok") result = await bdAnalyzeTikTok.mutateAsync({ leadId: id, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
+        else if (platform === "linkedin") result = await bdAnalyzeLinkedIn.mutateAsync({ leadId: id, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
         else await analyzeSocial.mutateAsync({ leadId: id, platform, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
         if (result) {
           setBdResults(prev => ({ ...prev, [platform]: result }));
@@ -1243,6 +1244,75 @@ export default function LeadDetail() {
                   <div className="col-span-2 flex items-center gap-2 text-sm" style={{ color: "oklch(0.65 0.18 145)" }}>
                     <CheckCircle className="w-4 h-4" />
                     <span>حساب موثّق</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* LinkedIn Companies API Results Card */}
+          {bdResults.linkedin && (bdResults.linkedin.followersCount > 0 || bdResults.linkedin.employeesCount) && (
+            <div className="rounded-2xl p-5 border space-y-4" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.55 0.18 220 / 0.4)" }}>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.55 0.18 220 / 0.15)" }}>
+                  <span className="text-xs font-bold" style={{ color: "oklch(0.65 0.18 220)" }}>in</span>
+                </div>
+                <h3 className="font-semibold text-foreground text-sm">بيانات LinkedIn الحقيقية</h3>
+                <span className="text-xs px-2 py-0.5 rounded-full ml-auto" style={{ background: bdResults.linkedin.dataSource === "api" ? "oklch(0.65 0.18 145 / 0.15)" : "oklch(0.65 0.18 200 / 0.15)", color: bdResults.linkedin.dataSource === "api" ? "oklch(0.65 0.18 145)" : "oklch(0.65 0.18 200)" }}>
+                  {bdResults.linkedin.dataSource === "api" ? "✓ Companies API" : bdResults.linkedin.dataSource === "scraper_fallback" ? "✓ Scraper" : "AI تقدير"}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {bdResults.linkedin.followersCount > 0 && (
+                  <div className="rounded-xl p-3 text-center" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">المتابعون</p>
+                    <p className="text-xl font-bold" style={{ color: "oklch(0.65 0.18 220)" }}>{bdResults.linkedin.followersCount.toLocaleString("ar-SA")}</p>
+                  </div>
+                )}
+                {bdResults.linkedin.employeesCount && (
+                  <div className="rounded-xl p-3 text-center" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">الموظفون</p>
+                    <p className="text-sm font-bold" style={{ color: "oklch(0.65 0.18 220)" }}>{bdResults.linkedin.employeesCount}</p>
+                  </div>
+                )}
+                {bdResults.linkedin.industry && (
+                  <div className="rounded-xl p-3 col-span-2" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">القطاع</p>
+                    <p className="text-sm font-semibold" style={{ color: "oklch(0.78 0.16 75)" }}>{bdResults.linkedin.industry}</p>
+                  </div>
+                )}
+                {bdResults.linkedin.headquarters && (
+                  <div className="rounded-xl p-3" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">المقر الرئيسي</p>
+                    <p className="text-xs font-medium text-foreground">{bdResults.linkedin.headquarters}</p>
+                  </div>
+                )}
+                {bdResults.linkedin.founded && (
+                  <div className="rounded-xl p-3" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">تأسست</p>
+                    <p className="text-sm font-bold" style={{ color: "oklch(0.65 0.18 220)" }}>{bdResults.linkedin.founded}</p>
+                  </div>
+                )}
+                {bdResults.linkedin.companySize && (
+                  <div className="rounded-xl p-3" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">حجم الشركة</p>
+                    <p className="text-xs font-medium text-foreground">{bdResults.linkedin.companySize}</p>
+                  </div>
+                )}
+                {bdResults.linkedin.specialties?.length > 0 && (
+                  <div className="rounded-xl p-3 col-span-2" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-2">التخصصات</p>
+                    <div className="flex flex-wrap gap-1">
+                      {bdResults.linkedin.specialties.slice(0, 5).map((s: string, i: number) => (
+                        <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.55 0.18 220 / 0.15)", color: "oklch(0.65 0.18 220)" }}>{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {bdResults.linkedin.about && (
+                  <div className="rounded-xl p-3 col-span-2" style={{ background: "oklch(0.55 0.18 220 / 0.08)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">عن الشركة</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{bdResults.linkedin.about}</p>
                   </div>
                 )}
               </div>

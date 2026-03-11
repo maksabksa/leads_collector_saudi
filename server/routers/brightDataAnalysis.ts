@@ -22,6 +22,11 @@ import {
   type InstagramDatasetProfile,
 } from "../lib/brightDataInstagram";
 import {
+  analyzeLinkedInCompany,
+  buildLinkedInSearchUrl,
+  type LinkedInCompanyData,
+} from "../lib/brightDataLinkedIn";
+import {
   getLeadById,
   updateLead,
   createWebsiteAnalysis,
@@ -350,30 +355,49 @@ const analyzeLinkedInWithBrightData = protectedProcedure
   }))
   .mutation(async ({ input }) => {
     try {
-      let realData = "";
-      let linkedinStats = { followersCount: 0, employeesCount: "", industry: "" };
+      // ===== المحاولة الأولى: Bright Data LinkedIn Companies API =====
+      let linkedinApiResult = await analyzeLinkedInCompany(
+        input.profileUrl,
+        input.companyName
+      );
 
-      try {
-        const scraped = await scrapeLinkedIn(input.profileUrl);
-        if (scraped.loadedSuccessfully) {
-          realData = `
-=== بيانات لينكد إن الحقيقية (Bright Data) ===
-اسم الشركة: ${scraped.companyName}
-الوصف: ${scraped.about?.slice(0, 400)}
-المتابعون: ${scraped.followersCount.toLocaleString()}
-الموظفون: ${scraped.employeesCount}
-القطاع: ${scraped.industry}
-=== نهاية البيانات الحقيقية ===`;
-
-          linkedinStats = {
-            followersCount: scraped.followersCount,
-            employeesCount: scraped.employeesCount,
-            industry: scraped.industry,
-          };
-        }
-      } catch (scrapeErr) {
-        console.warn("[BD analyzeLinkedIn] Scrape failed:", scrapeErr);
+      // إذا فشل API، حاول بناء URL من اسم الشركة
+      if (!linkedinApiResult.success && input.companyName) {
+        const guessedUrl = buildLinkedInSearchUrl(input.companyName);
+        console.log(`[BD analyzeLinkedIn] Trying guessed URL: ${guessedUrl}`);
+        linkedinApiResult = await analyzeLinkedInCompany(guessedUrl, input.companyName);
       }
+
+      const companyData = linkedinApiResult.companyData;
+      const dataSource = linkedinApiResult.dataSource;
+
+      // بناء context للـ LLM من البيانات الحقيقية
+      let realData = "";
+      if (linkedinApiResult.success && companyData) {
+        realData = `
+=== بيانات لينكد إن الحقيقية (Bright Data ${dataSource === "api" ? "Companies API" : "Scraper"}) ===
+اسم الشركة: ${companyData.name || input.companyName}
+الوصف: ${(companyData.about || companyData.description || "").slice(0, 500)}
+الشعار: ${companyData.slogan || ""}
+المتابعون: ${(companyData.followers || 0).toLocaleString()}
+الموظفون على LinkedIn: ${companyData.employees_in_linkedin || companyData.employees || "غير محدد"}
+حجم الشركة: ${companyData.company_size || "غير محدد"}
+القطاع: ${companyData.industries?.join(", ") || "غير محدد"}
+المقر الرئيسي: ${companyData.headquarters || ""}
+تأسست: ${companyData.founded || ""}
+نوع المنظمة: ${companyData.organization_type || ""}
+التخصصات: ${companyData.specialties?.slice(0, 5).join(", ") || ""}
+الموقع: ${companyData.website || ""}
+=== نهاية البيانات الحقيقية ===`;
+      }
+
+      const linkedinStats = {
+        followersCount: linkedinApiResult.followersCount,
+        employeesCount: linkedinApiResult.employeesCount > 0
+          ? linkedinApiResult.employeesCount.toLocaleString()
+          : (companyData?.company_size || "غير محدد"),
+        industry: linkedinApiResult.industry || companyData?.industries?.[0] || "غير محدد",
+      };
 
       const prompt = `أنت خبير تحليل سوشيال ميديا B2B متخصص في السوق السعودي.
 قم بتحليل حساب لينكد إن التالي:
@@ -386,8 +410,8 @@ ${realData}
 {
   "hasAccount": true,
   "followersCount": ${linkedinStats.followersCount || 0},
-  "employeesCount": "${linkedinStats.employeesCount || "غير محدد"}",
-  "industry": "${linkedinStats.industry || "غير محدد"}",
+  "employeesCount": "${linkedinStats.employeesCount}",
+  "industry": "${linkedinStats.industry}",
   "postingFrequencyScore": 5,
   "engagementScore": 4,
   "contentQualityScore": 5,
@@ -435,7 +459,23 @@ ${realData}
         rawAnalysis: content,
       });
 
-      return { success: true, analysisId, usedRealData: !!realData };
+      return {
+        success: true,
+        analysisId,
+        usedRealData: !!realData,
+        dataSource,
+        followersCount: linkedinStats.followersCount,
+        employeesCount: linkedinStats.employeesCount,
+        industry: linkedinStats.industry,
+        headquarters: linkedinApiResult.headquarters,
+        founded: linkedinApiResult.founded,
+        companySize: linkedinApiResult.companySize,
+        specialties: linkedinApiResult.specialties,
+        about: linkedinApiResult.about,
+        companyName: companyData?.name || input.companyName,
+        organizationType: companyData?.organization_type,
+        logo: companyData?.logo,
+      };
     } catch (error) {
       throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل تحليل لينكد إن" });
     }

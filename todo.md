@@ -1278,3 +1278,10 @@
 - [x] تحديث analyzeInstagram في brightDataAnalysis router لاستخدام Dataset API
 - [x] حفظ بيانات Instagram في قاعدة البيانات (followers, posts, engagement)
 - [x] تحديث واجهة LeadDetail لعرض بيانات Instagram الحقيقية
+
+## Bright Data Dataset API لـ LinkedIn (مارس 2026)
+
+- [x] البحث عن LinkedIn Company Profiles dataset ID الرسمي (Companies API: POST /linkedin/companies/collect)
+- [x] server/lib/brightDataLinkedIn.ts: Companies API layer مع fallback Scraper
+- [x] تحديث analyzeLinkedIn في brightDataAnalysis router لاستخدام Companies API أولاً
+- [x] تحديث واجهة LeadDetail لعرض بيانات LinkedIn الحقيقية (followers, employees, industry, headquarters, founded, specialties)
