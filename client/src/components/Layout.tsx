@@ -33,8 +33,9 @@ const MAIN_NAV = [
 
 /** قسم المتابعة — متاح لجميع المستخدمين */
 const FOLLOWUP_NAV = [
-  { path: "/follow-up",  label: "المتابعة التلقائية", icon: CalendarClock },
-  { path: "/reminders",  label: "التذكيرات",          icon: Bell },
+  { path: "/follow-up",       label: "المتابعة التلقائية", icon: CalendarClock },
+  { path: "/reminders",      label: "التذكيرات",          icon: Bell },
+  { path: "/smart-analysis", label: "التحليل الذكي",      icon: Brain },
 ];
 
 /** قسم الإعدادات — للأدمن فقط */

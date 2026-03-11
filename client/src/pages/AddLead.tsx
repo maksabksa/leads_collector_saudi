@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import PreSaveReviewModal from "@/components/PreSaveReviewModal";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown } from "lucide-react";
@@ -48,6 +49,7 @@ export default function AddLead() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   const STAGE_OPTIONS = [
     { value: "new", label: "جديد", color: "oklch(0.65 0.05 240)" },
@@ -81,15 +83,25 @@ export default function AddLead() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    // فتح نافذة المراجعة بدلاً من الحفظ المباشر
+    setShowReviewModal(true);
+  };
+
+  const handleConfirmSave = async () => {
     const selectedZone = zones?.find(z => z.id === form.zoneId);
-    const result = await createLead.mutateAsync({
-      ...form,
-      zoneName: selectedZone?.name || form.zoneName || undefined,
-    });
-    toast.success("تم إضافة العميل — جاري التحليل التلقائي في الخلفية...");
-    utils.leads.list.invalidate();
-    utils.leads.stats.invalidate();
-    navigate(`/leads/${result.id}`);
+    try {
+      const result = await createLead.mutateAsync({
+        ...form,
+        zoneName: selectedZone?.name || form.zoneName || undefined,
+      });
+      toast.success("تم إضافة العميل — جاري التحليل التلقائي في الخلفية...");
+      utils.leads.list.invalidate();
+      utils.leads.stats.invalidate();
+      setShowReviewModal(false);
+      navigate(`/leads/${result.id}`);
+    } catch (err) {
+      toast.error("حدث خطأ أثناء الحفظ");
+    }
   };
 
   const set = (field: string, value: any) => {
@@ -373,6 +385,29 @@ export default function AddLead() {
           </button>
         </div>
       </form>
+
+      {/* نافذة المراجعة اليدوية قبل الحفظ */}
+      <PreSaveReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        onConfirmSave={handleConfirmSave}
+        formData={{
+          companyName: form.companyName,
+          businessType: form.businessType,
+          city: form.city,
+          verifiedPhone: form.verifiedPhone || undefined,
+          website: form.website || undefined,
+          instagramUrl: form.instagramUrl || undefined,
+          twitterUrl: form.twitterUrl || undefined,
+          snapchatUrl: form.snapchatUrl || undefined,
+          tiktokUrl: form.tiktokUrl || undefined,
+          facebookUrl: form.facebookUrl || undefined,
+          googleMapsUrl: form.googleMapsUrl || undefined,
+          reviewCount: form.reviewCount || undefined,
+          notes: form.notes || undefined,
+        }}
+        isSaving={createLead.isPending}
+      />
     </div>
   );
 }

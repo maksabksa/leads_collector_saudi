@@ -12,25 +12,34 @@ export const searchBehaviorRouter = router({
     .input(z.object({
       platform: z.string(),
       query: z.string(),
-      filters: z.string().optional(),
+      filters: z.union([z.string(), z.record(z.string(), z.any())]).optional(),
       resultsCount: z.number().default(0),
-      selectedResults: z.string().optional(),
+      selectedResults: z.union([z.string(), z.record(z.string(), z.any()), z.array(z.any())]).optional(),
       addedToLeads: z.number().default(0),
       sessionDuration: z.number().default(0),
       scrollDepth: z.number().default(0),
       searchSuccess: z.boolean().default(true),
+      clickPattern: z.any().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+      // تحويل filters وselectedResults إلى string إذا كانت object
+      const filtersStr = input.filters
+        ? (typeof input.filters === "string" ? input.filters : JSON.stringify(input.filters))
+        : undefined;
+      const selectedStr = input.selectedResults
+        ? (typeof input.selectedResults === "string" ? input.selectedResults : JSON.stringify(input.selectedResults))
+        : undefined;
+
       await db.insert(searchBehaviorLogs).values({
         userId: ctx.user!.id,
         platform: input.platform,
         query: input.query,
-        filters: input.filters,
+        filters: filtersStr,
         resultsCount: input.resultsCount,
-        selectedResults: input.selectedResults,
+        selectedResults: selectedStr,
         addedToLeads: input.addedToLeads,
         sessionDuration: input.sessionDuration,
         scrollDepth: input.scrollDepth,

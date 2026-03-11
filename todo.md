@@ -1225,3 +1225,38 @@
 - [x] تنظيف جميع ملفات القفل عند بدء الخادم في restoreWhatsAppSessions
 - [x] إضافة لوج logs لتأكيد استقبال QR Code
 - [x] اختبار ناجح: QR يظهر بعد ~9 ثواني من بدء الجلسة
+
+## الدفعة الجديدة - منظومة الذكاء البيعي والتحليلي (مارس 2026)
+
+### المرحلة 1: طبقة تنظيف البيانات + اكتشاف التكرار
+- [x] إضافة حقول DB جديدة: normalizedPhone, normalizedName, dataQualityScore, isDuplicate, duplicateOf
+- [x] lib/dataNormalization.ts: تطبيع الهاتف والاسم والموقع
+- [x] lib/duplicateDetection.ts: كشف التكرار بنسبة ثقة + Levenshtein distance
+- [x] deduplication router: checkDuplicates, preSaveCheck, mergeDuplicates, getDuplicates
+
+### المرحلة 2: شاشة المراجعة اليدوية قبل الحفظ
+- [x] deduplication.preSaveCheck procedure: فحص شامل قبل الحفظ
+- [x] PreSaveReviewModal.tsx: نافذة modal مع نتائج التكرار + جودة البيانات + بيانات مطبّعة
+- [x] دمج PreSaveReviewModal في AddLead.tsx
+
+### المرحلة 3: محرك التحليل القطاعي
+- [x] lib/sectorAnalysisEngine.ts: 5 قطاعات + Dynamic Prompts + AnalysisLanguageEngine
+- [x] sectorAnalysis router: analyzeLead, getSectorStats, getAnalysisQueue, batchAnalyze
+- [x] إضافة حقول DB: sectorMain, marketingGapSummary, competitivePosition, urgencyLevel, etc.
+- [x] migration SQL لحقول التحليل القطاعي
+
+### المرحلة 4: تقرير PDF احترافي
+- [x] lib/pdfReportEngine.ts: HTML/CSS RTL مع header/footer/watermark
+- [x] pdfReport router: generatePreview, generateAndSave, getReportUrl
+- [x] إضافة حقول DB: pdfGenerationStatus, pdfFileUrl, pdfGeneratedAt, reportTemplateType
+
+### المرحلة 5: التحليل الجماعي + Queue Management
+- [x] bulkAnalysis router: startBatch, pauseBatch, resumeBatch, getBatchStatus
+- [x] bulkAnalysis router: getUnanalyzedLeads, getBulkStats, analyzeAllPending
+- [x] In-memory queue management مع pause/resume
+- [x] إضافة حقول DB: bulkAnalysisBatchId, bulkAnalysisStatus
+
+### المرحلة 6: واجهة المستخدم - صفحة التحليل الذكي
+- [x] SmartAnalysis.tsx: صفحة شاملة مع tabs (تحليل جماعي + إحصائيات القطاعات + تقارير)
+- [x] مؤشر تقدم حي للدفعات مع pause/resume
+- [x] إضافة /smart-analysis في App.tsx وLayout.tsx sidebar

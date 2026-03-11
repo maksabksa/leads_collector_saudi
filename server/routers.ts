@@ -47,6 +47,10 @@ import { activationRouter } from "./routers/activation";
 import { followUpRouter } from "./routers/followUp";
 import { searchBehaviorRouter } from "./routers/searchBehavior";
 import { reportSchedulerRouter } from "./routers/reportScheduler";
+import { deduplicationRouter } from "./routers/deduplication";
+import { sectorAnalysisRouter } from "./routers/sectorAnalysis";
+import { pdfReportRouter } from "./routers/pdfReport";
+import { bulkAnalysisRouter } from "./routers/bulkAnalysis";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -2084,5 +2088,9 @@ export const appRouter = router({
   followUp: followUpRouter,
   searchBehavior: searchBehaviorRouter,
   reportScheduler: reportSchedulerRouter,
+  deduplication: deduplicationRouter,
+  sectorAnalysis: sectorAnalysisRouter,
+  pdfReport: pdfReportRouter,
+  bulkAnalysis: bulkAnalysisRouter,
 });
 export type AppRouter = typeof appRouter;

@@ -87,6 +87,93 @@ export const leads = mysqlTable("leads", {
   nextStep: text("next_step"),
   nextFollowup: bigint("next_followup", { mode: "number" }),
   ownerUserId: int("owner_user_id"),
+
+  // ===== Phase 1: Data Normalization & Deduplication =====
+  normalizedBusinessName: varchar("normalized_business_name", { length: 300 }),
+  normalizedPhone: varchar("normalized_phone", { length: 30 }),
+  normalizedDomain: varchar("normalized_domain", { length: 500 }),
+  duplicateConfidenceScore: float("duplicate_confidence_score").default(0),
+  duplicateCandidateIds: json("duplicate_candidate_ids").$type<number[]>(),
+  deduplicationStatus: mysqlEnum("deduplication_status", ["unchecked", "no_duplicate", "possible_duplicate", "confirmed_duplicate", "merged_manually"]).default("unchecked"),
+  dataQualityScore: float("data_quality_score").default(0),
+
+  // ===== Phase 1: Manual Review Layer =====
+  manualReviewStatus: mysqlEnum("manual_review_status", ["pending", "in_review", "approved", "rejected", "draft"]).default("pending"),
+  reviewedByUserId: int("reviewed_by_user_id"),
+  reviewedAt: timestamp("reviewed_at"),
+
+  // ===== Phase 1: Sector Classification =====
+  sectorMain: mysqlEnum("sector_main", ["restaurants", "medical", "ecommerce", "digital_products", "general"]).default("general"),
+  sectorSub: varchar("sector_sub", { length: 100 }),
+
+  // ===== Phase 1: Analysis Settings =====
+  analysisLanguageMode: mysqlEnum("analysis_language_mode", ["msa_formal", "saudi_sales_tone", "arabic_sales_brief"]).default("saudi_sales_tone"),
+  analysisType: varchar("analysis_type", { length: 50 }).default("full"),
+  analysisSalesGoal: varchar("analysis_sales_goal", { length: 200 }),
+  recommendedOfferType: mysqlEnum("recommended_offer_type", ["seo", "ads", "social", "design", "bundle", "none"]),
+  recommendedServiceBundle: json("recommended_service_bundle").$type<string[]>(),
+  reportStatus: mysqlEnum("report_status", ["not_generated", "generating", "ready", "failed"]).default("not_generated"),
+  reportTemplateType: mysqlEnum("report_template_type", ["internal", "client_facing"]).default("internal"),
+  clientFacingReport: boolean("client_facing_report").default(false),
+  watermarkEnabled: boolean("watermark_enabled").default(true),
+
+  // ===== Phase 1: LLM Tracking =====
+  llmModelName: varchar("llm_model_name", { length: 100 }),
+  llmPromptTemplateId: varchar("llm_prompt_template_id", { length: 100 }),
+  llmAnalysisVersion: varchar("llm_analysis_version", { length: 20 }),
+  llmGenerationStatus: mysqlEnum("llm_generation_status", ["idle", "queued", "generating", "done", "failed"]).default("idle"),
+  llmGenerationError: text("llm_generation_error"),
+  autoAnalysisEnabled: boolean("auto_analysis_enabled").default(false),
+  autoAnalysisStatus: mysqlEnum("auto_analysis_status", ["idle", "queued", "running", "done", "failed"]).default("idle"),
+  analysisReadyFlag: boolean("analysis_ready_flag").default(false),
+  analysisConfidenceScore: float("analysis_confidence_score").default(0),
+
+  // ===== Phase 2: Sector Analysis Results =====
+  marketingGapSummary: text("marketing_gap_summary"),
+  competitivePosition: text("competitive_position"),
+  primaryOpportunity: text("primary_opportunity"),
+  secondaryOpportunity: text("secondary_opportunity"),
+  urgencyLevel: mysqlEnum("urgency_level", ["high", "medium", "low"]).default("medium"),
+  recommendedServices: json("recommended_services").$type<Array<{ service: string; priority: string; reason: string; expectedImpact: string }>>(),
+  salesEntryAngle: text("sales_entry_angle"),
+  iceBreaker: text("ice_breaker"),
+  sectorInsights: text("sector_insights"),
+  benchmarkComparison: text("benchmark_comparison"),
+  aiConfidenceScore: float("ai_confidence_score").default(0),
+  lastAnalyzedAt: bigint("last_analyzed_at", { mode: "number" }),
+
+  // ===== Phase 1: Bulk Analysis =====
+  bulkAnalysisBatchId: varchar("bulk_analysis_batch_id", { length: 100 }),
+  bulkAnalysisStatus: mysqlEnum("bulk_analysis_status", ["idle", "queued", "processing", "done", "failed", "skipped"]).default("idle"),
+  processingStatus: mysqlEnum("processing_status", ["pending", "in_progress", "completed", "failed", "skipped"]).default("pending"),
+  processingErrorMessage: text("processing_error_message"),
+  jobQueueStatus: mysqlEnum("job_queue_status", ["idle", "queued", "running", "done", "failed"]).default("idle"),
+  jobStartedAt: timestamp("job_started_at"),
+  jobCompletedAt: timestamp("job_completed_at"),
+  retryCount: int("retry_count").default(0),
+  lastRetryAt: timestamp("last_retry_at"),
+
+  // ===== Phase 1: PDF Report =====
+  pdfGenerationStatus: mysqlEnum("pdf_generation_status", ["not_generated", "generating", "ready", "failed"]).default("not_generated"),
+  pdfTemplateVersion: varchar("pdf_template_version", { length: 20 }),
+  pdfRenderEngine: varchar("pdf_render_engine", { length: 50 }),
+  pdfFileUrl: varchar("pdf_file_url", { length: 1000 }),
+  pdfGeneratedAt: timestamp("pdf_generated_at"),
+
+  // ===== Phase 1: Security & Audit =====
+  createdByUserId: int("created_by_user_id"),
+  lastModifiedByUserId: int("last_modified_by_user_id"),
+  accessScope: mysqlEnum("access_scope", ["all", "owner_only", "team"]).default("all"),
+
+  // ===== Phase 1: External Integrations Status =====
+  gscConnected: boolean("gsc_connected").default(false),
+  ga4Connected: boolean("ga4_connected").default(false),
+  metaConnected: boolean("meta_connected").default(false),
+  externalAnalysisStatus: mysqlEnum("external_analysis_status", ["idle", "running", "done", "partial", "failed"]).default("idle"),
+  externalAnalysisLastRunAt: timestamp("external_analysis_last_run_at"),
+  missingDataFlags: json("missing_data_flags").$type<string[]>(),
+  partialAnalysisFlag: boolean("partial_analysis_flag").default(false),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

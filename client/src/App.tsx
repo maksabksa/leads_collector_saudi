@@ -43,6 +43,7 @@ import AdminGuard from "./components/AdminGuard";
 import AuditLog from "./pages/AuditLog";
 import LabelsManager from "./pages/LabelsManager";
 import FollowUp from "./pages/FollowUp";
+import SmartAnalysis from "./pages/SmartAnalysis";
 function Router() {
   return (
     <Switch>
@@ -88,6 +89,7 @@ function Router() {
         <Route path="/audit-log">{() => <AdminGuard><AuditLog /></AdminGuard>}</Route>
         <Route path="/labels" component={LabelsManager} />
         <Route path="/follow-up" component={FollowUp} />
+        <Route path="/smart-analysis" component={SmartAnalysis} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>
