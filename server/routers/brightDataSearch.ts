@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import puppeteer from "puppeteer-core";
 import { invokeLLM } from "../_core/llm";
 import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP, serpRequest, parseGoogleResultsPublic } from "./serpSearch";
+import { searchInstagramByKeyword } from "../lib/brightDataInstagram";
 
 // ─── Bright Data Browser API Helper ───────────────────────────────────────────
 const BRIGHT_DATA_WS_ENDPOINT = process.env.BRIGHT_DATA_WS_ENDPOINT || "";
@@ -256,6 +257,47 @@ async function scrapeGoogleSearch(query: string, location: string): Promise<any[
 
 // ─── tRPC Router ───────────────────────────────────────────────────────────────
 export const brightDataSearchRouter = router({
+  // ===== Instagram Dataset API Search (أكثر موثوقية من SERP) =====
+  searchInstagramDataset: protectedProcedure
+    .input(z.object({
+      keyword: z.string().min(1),
+      location: z.string().optional(),
+      limit: z.number().min(1).max(50).default(20),
+    }))
+    .mutation(async ({ input }) => {
+      const result = await searchInstagramByKeyword(
+        input.keyword,
+        input.location,
+        input.limit
+      );
+      // تحليل النتائج بالذكاء الاصطناعي إذا نجح
+      if (result.success && result.results.length > 0) {
+        const analyzed = await analyzeResultsWithAI(
+          result.results.map(r => ({
+            platform: "instagram",
+            username: r.username,
+            name: r.full_name,
+            profileUrl: r.profile_url,
+            bio: r.biography,
+            followers: r.followers,
+            posts: r.posts_count,
+            isVerified: r.is_verified,
+            isBusiness: r.is_business_account,
+            businessCategory: r.business_category,
+            businessEmail: r.business_email,
+            businessPhone: r.business_phone,
+            website: r.website,
+            avgEngagement: r.avg_engagement,
+            dataSource: "dataset_api",
+          })),
+          input.keyword,
+          "Instagram Dataset API"
+        );
+        return { ...result, results: analyzed };
+      }
+      return result;
+    }),
+
   // فحص حالة الربط
   checkConnection: protectedProcedure.query(async () => {
     const hasKey = !!BRIGHT_DATA_WS_ENDPOINT;

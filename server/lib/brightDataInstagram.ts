@@ -300,3 +300,125 @@ function normalizeInstagramUrl(input: string): string {
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+// ===== Keyword Search: البحث في إنستغرام بكلمة مفتاحية =====
+// يستخدم dataset_id مخصص للبحث بكلمة مفتاحية بدلاً من URL محدد
+// dataset_id: gd_lyclm2p67xgu9o5v0 = Instagram Keyword Search
+const INSTAGRAM_KEYWORD_DATASET_ID = "gd_lyclm2p67xgu9o5v0";
+
+export interface InstagramSearchResult {
+  username: string;
+  full_name: string;
+  biography: string;
+  profile_url: string;
+  followers: number;
+  posts_count: number;
+  is_verified: boolean;
+  is_business_account: boolean;
+  business_category?: string;
+  business_email?: string;
+  business_phone?: string;
+  website?: string;
+  avg_engagement?: number;
+  profile_image_link?: string;
+}
+
+export interface InstagramKeywordSearchResult {
+  success: boolean;
+  results: InstagramSearchResult[];
+  total: number;
+  keyword: string;
+  error?: string;
+}
+
+/**
+ * البحث في إنستغرام بكلمة مفتاحية عبر Bright Data Dataset API
+ * يجلب حسابات تجارية مرتبطة بالكلمة المفتاحية والموقع
+ */
+export async function searchInstagramByKeyword(
+  keyword: string,
+  location?: string,
+  limit = 20
+): Promise<InstagramKeywordSearchResult> {
+  const searchQuery = location ? `${keyword} ${location}` : keyword;
+
+  try {
+    // المحاولة الأولى: Dataset Keyword Search API
+    const apiKey = ENV.brightDataApiToken;
+    if (!apiKey) {
+      throw new Error("BRIGHT_DATA_API_TOKEN not configured");
+    }
+
+    console.log(`[BD Instagram Search] Searching for: "${searchQuery}"`);
+
+    // Trigger keyword search
+    const triggerRes = await fetch(
+      `${BRIGHT_DATA_API_BASE}/datasets/v3/trigger?dataset_id=${INSTAGRAM_KEYWORD_DATASET_ID}&format=json`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify([{ keyword: searchQuery, count: limit }]),
+        signal: AbortSignal.timeout(30000),
+      }
+    );
+
+    if (!triggerRes.ok) {
+      const errText = await triggerRes.text();
+      throw new Error(`Trigger failed: ${triggerRes.status} - ${errText}`);
+    }
+
+    const triggerData = await triggerRes.json() as { snapshot_id: string };
+    const snapshotId = triggerData.snapshot_id;
+
+    if (!snapshotId) {
+      throw new Error("No snapshot_id returned");
+    }
+
+    console.log(`[BD Instagram Search] Snapshot: ${snapshotId}`);
+
+    // Poll for results (max 90 seconds)
+    const profiles = await pollInstagramSnapshot(snapshotId, 90000, 5000);
+
+    const results: InstagramSearchResult[] = profiles
+      .filter(p => p.username && !p.error)
+      .slice(0, limit)
+      .map(p => ({
+        username: p.username,
+        full_name: p.full_name || p.username,
+        biography: p.biography || "",
+        profile_url: p.profile_url || `https://www.instagram.com/${p.username}/`,
+        followers: p.followers || 0,
+        posts_count: p.posts_count || 0,
+        is_verified: p.is_verified || false,
+        is_business_account: p.is_business_account || false,
+        business_category: p.business_category,
+        business_email: p.business_email,
+        business_phone: p.business_phone,
+        website: p.website,
+        avg_engagement: p.avg_engagement,
+        profile_image_link: p.profile_image_link,
+      }));
+
+    return {
+      success: true,
+      results,
+      total: results.length,
+      keyword: searchQuery,
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    console.error(`[BD Instagram Search] Error: ${error}`);
+
+    // Fallback: إرجاع نتيجة فارغة مع رسالة الخطأ
+    return {
+      success: false,
+      results: [],
+      total: 0,
+      keyword: searchQuery,
+      error,
+    };
+  }
+}

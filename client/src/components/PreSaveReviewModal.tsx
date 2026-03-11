@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle, CheckCircle2, XCircle, Shield, Zap,
   Phone, Globe, Building2, MapPin, ChevronRight, Loader2,
-  Star, Copy, ExternalLink, Info, AlertCircle
+  Star, Copy, ExternalLink, Info, AlertCircle, Brain, Flame, MessageSquare, Target
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -42,8 +42,10 @@ export default function PreSaveReviewModal({
 }: PreSaveReviewModalProps) {
   const [, navigate] = useLocation();
   const [checked, setChecked] = useState(false);
+  const [aiAnalyzed, setAiAnalyzed] = useState(false);
 
   const preSaveCheck = trpc.deduplication.preSaveCheck.useMutation();
+  const quickAnalyze = trpc.sectorAnalysis.previewAnalysis.useMutation();
 
   // تشغيل الفحص عند فتح النافذة
   const runCheck = () => {
@@ -65,6 +67,24 @@ export default function PreSaveReviewModal({
         threshold: 55,
       });
       setChecked(true);
+
+      // تشغيل التحليل الذكي الفوري بالتوازي
+      if (!aiAnalyzed && formData.companyName) {
+        setAiAnalyzed(true);
+        quickAnalyze.mutate({
+          companyName: formData.companyName,
+          businessType: formData.businessType,
+          city: formData.city,
+          hasWebsite: !!formData.website,
+          hasInstagram: !!formData.instagramUrl,
+          hasTwitter: !!formData.twitterUrl,
+          hasTiktok: !!formData.tiktokUrl,
+          hasFacebook: !!formData.facebookUrl,
+          hasSnapchat: !!formData.snapchatUrl,
+          hasGoogleMaps: !!formData.googleMapsUrl,
+          reviewCount: formData.reviewCount,
+        });
+      }
     }
   };
 
@@ -347,6 +367,99 @@ export default function PreSaveReviewModal({
                     <p className="text-sm font-medium text-foreground">لا توجد تكرارات</p>
                     <p className="text-xs text-muted-foreground">هذا العميل جديد ولم يُضف مسبقاً</p>
                   </div>
+                </div>
+              )}
+
+              {/* AI Quick Analysis Results */}
+              {(quickAnalyze.isPending || quickAnalyze.data) && (
+                <div
+                  className="rounded-xl p-4 border border-border"
+                  style={{ background: "oklch(0.12 0.015 240)" }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <Brain className="w-4 h-4" style={{ color: "oklch(0.75 0.18 280)" }} />
+                    <span className="text-sm font-semibold text-foreground">التحليل الذكي الفوري</span>
+                    {quickAnalyze.isPending && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+
+                  {quickAnalyze.isPending && (
+                    <p className="text-xs text-muted-foreground">جاري تحليل فرصة البيع والأولوية...</p>
+                  )}
+
+                  {quickAnalyze.data && (() => {
+                    const ai = quickAnalyze.data as any;
+                    const urgencyColors: Record<string, string> = {
+                      critical: "oklch(0.65 0.18 25)",
+                      high: "oklch(0.65 0.18 45)",
+                      medium: "oklch(0.65 0.18 60)",
+                      low: "oklch(0.65 0.18 145)",
+                    };
+                    const urgencyLabels: Record<string, string> = {
+                      critical: "حرج جداً",
+                      high: "عالية",
+                      medium: "متوسطة",
+                      low: "منخفضة",
+                    };
+                    const urgencyColor = urgencyColors[ai.urgencyLevel] || urgencyColors.medium;
+                    return (
+                      <div className="space-y-3">
+                        {/* Priority + Urgency */}
+                        <div className="flex items-center gap-3">
+                          {ai.leadPriorityScore && (
+                            <div
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
+                              style={{ background: "oklch(0.75 0.18 280 / 0.12)" }}
+                            >
+                              <Target className="w-3.5 h-3.5" style={{ color: "oklch(0.75 0.18 280)" }} />
+                              <span className="text-xs font-bold" style={{ color: "oklch(0.75 0.18 280)" }}>
+                                أولوية: {ai.leadPriorityScore}/10
+                              </span>
+                            </div>
+                          )}
+                          {ai.urgencyLevel && (
+                            <div
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
+                              style={{ background: `${urgencyColor}15` }}
+                            >
+                              <Flame className="w-3.5 h-3.5" style={{ color: urgencyColor }} />
+                              <span className="text-xs font-bold" style={{ color: urgencyColor }}>
+                                إلحاحية: {urgencyLabels[ai.urgencyLevel] || ai.urgencyLevel}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Primary Opportunity */}
+                        {ai.primaryOpportunity && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">الفرصة الرئيسية</p>
+                            <p className="text-xs text-foreground font-medium">{ai.primaryOpportunity}</p>
+                          </div>
+                        )}
+
+                        {/* Ice Breaker */}
+                        {ai.iceBreaker && (
+                          <div
+                            className="rounded-lg p-3 border"
+                            style={{
+                              background: "oklch(0.75 0.18 280 / 0.06)",
+                              borderColor: "oklch(0.75 0.18 280 / 0.2)",
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <MessageSquare className="w-3.5 h-3.5" style={{ color: "oklch(0.75 0.18 280)" }} />
+                              <span className="text-xs font-semibold" style={{ color: "oklch(0.75 0.18 280)" }}>
+                                نص التواصل المقترح
+                              </span>
+                            </div>
+                            <p className="text-xs text-foreground leading-relaxed">{ai.iceBreaker}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

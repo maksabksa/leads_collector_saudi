@@ -1234,3 +1234,32 @@ export const companySettings = mysqlTable("company_settings", {
 });
 export type CompanySettings = typeof companySettings.$inferSelect;
 export type InsertCompanySettings = typeof companySettings.$inferInsert;
+
+// ===== AI Agent Tables =====
+// جدول مهام الوكيل الذكي
+export const agentTasks = mysqlTable("agent_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  taskType: varchar("taskType", { length: 50 }).notNull(),
+  status: mysqlEnum("status", ["pending", "running", "completed", "failed", "paused"]).default("pending").notNull(),
+  context: json("context"),
+  leadIds: json("leadIds"),
+  result: json("result"),
+  startedAt: bigint("startedAt", { mode: "number" }),
+  completedAt: bigint("completedAt", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AgentTask = typeof agentTasks.$inferSelect;
+export type InsertAgentTask = typeof agentTasks.$inferInsert;
+
+// جدول سجلات الوكيل الذكي
+export const agentLogs = mysqlTable("agent_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  taskId: int("taskId").notNull(),
+  userId: int("userId").notNull(),
+  action: varchar("action", { length: 100 }).notNull(),
+  details: json("details"),
+  timestamp: bigint("timestamp", { mode: "number" }).notNull(),
+});
+export type AgentLog = typeof agentLogs.$inferSelect;
+export type InsertAgentLog = typeof agentLogs.$inferInsert;

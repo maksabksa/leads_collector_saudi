@@ -12,6 +12,7 @@ import {
   Shield, ShieldAlert, ShieldCheck, ShieldX, AlertTriangle,
   Download, Phone, Smartphone, CheckCheck, MessageCircle,
   Award, Target, ChevronDown, Ban, Flag, History,
+  ExternalLink, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1408,6 +1409,178 @@ function WeeklyReportTab() {
   );
 }
 
+// ===== تبويب التقارير الذكية (PDF) =====
+function SmartReportsTab() {
+  const [search, setSearch] = useState("");
+  const [reportType, setReportType] = useState<"internal" | "client_facing">("internal");
+  const [generatingId, setGeneratingId] = useState<number | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewLeadName, setPreviewLeadName] = useState("");
+
+  const { data: analyzedLeads = [], refetch, isLoading } = trpc.pdfReport.listAnalyzedLeads.useQuery();
+
+  const generateAndSave = trpc.pdfReport.generateAndSave.useMutation({
+    onSuccess: (data) => {
+      toast.success(`تم توليد تقرير ${data.leadName}`);
+      refetch();
+      setGeneratingId(null);
+    },
+    onError: (err) => {
+      toast.error(`فشل التوليد: ${err.message}`);
+      setGeneratingId(null);
+    },
+  });
+
+  const filtered = analyzedLeads.filter((l) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return l.companyName.toLowerCase().includes(q) || (l.city || "").toLowerCase().includes(q);
+  });
+
+  const handleGenerate = (leadId: number) => {
+    setGeneratingId(leadId);
+    generateAndSave.mutate({ leadId, reportType });
+  };
+
+  const handleDownload = (url: string, name: string) => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `تقرير-${name}.html`;
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const urgencyColors: Record<string, string> = {
+    critical: "bg-red-500/20 text-red-400",
+    high: "bg-orange-500/20 text-orange-400",
+    medium: "bg-yellow-500/20 text-yellow-400",
+    low: "bg-green-500/20 text-green-400",
+  };
+  const urgencyLabels: Record<string, string> = { critical: "حرج", high: "عالي", medium: "متوسط", low: "منخفض" };
+
+  return (
+    <div className="space-y-5" dir="rtl">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              placeholder="ابحث..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pr-9 pl-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white placeholder:text-gray-500 outline-none"
+            />
+          </div>
+        </div>
+        <Select value={reportType} onValueChange={(v) => setReportType(v as any)}>
+          <SelectTrigger className="w-40 bg-white/5 border-white/10 text-white text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="internal">تقرير داخلي</SelectItem>
+            <SelectItem value="client_facing">تقرير للعميل</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="border-white/10 text-white hover:bg-white/5 text-xs">
+          <RefreshCw className="w-3.5 h-3.5 ml-1" /> تحديث
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: "إجمالي المحللين", value: analyzedLeads.length, color: "text-blue-400" },
+          { label: "تقارير جاهزة", value: analyzedLeads.filter(l => l.pdfGenerationStatus === "ready").length, color: "text-green-400" },
+          { label: "أولوية حرجة", value: analyzedLeads.filter(l => l.urgencyLevel === "critical").length, color: "text-red-400" },
+          { label: "أولوية عالية", value: analyzedLeads.filter(l => l.urgencyLevel === "high").length, color: "text-orange-400" },
+        ].map(s => (
+          <div key={s.label} className="rounded-xl p-4 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-[#8696a0] mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="text-center text-gray-400 py-10"><RefreshCw className="w-6 h-6 animate-spin mx-auto" /></div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center text-gray-400 py-10">
+          <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">لا يوجد عملاء محللون بعد — قم بتحليل عملاء من صفحة التحليل الذكي</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((lead) => (
+            <div key={lead.id} className="rounded-xl p-4 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-white truncate">{lead.companyName}</p>
+                <p className="text-xs text-[#8696a0]">{lead.businessType || "—"} {lead.city ? `• ${lead.city}` : ""}</p>
+                {lead.primaryOpportunity && (
+                  <p className="text-xs text-green-400 mt-1 truncate">الفرصة: {lead.primaryOpportunity}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {lead.urgencyLevel && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${urgencyColors[lead.urgencyLevel] || "bg-gray-700 text-gray-300"}`}>
+                    {urgencyLabels[lead.urgencyLevel] || lead.urgencyLevel}
+                  </span>
+                )}
+                {lead.leadPriorityScore && (
+                  <span className="text-xs font-bold text-yellow-400">{lead.leadPriorityScore}/10</span>
+                )}
+                {lead.pdfGenerationStatus === "ready" && (
+                  <span className="text-xs text-green-400">✓ جاهز</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button size="sm" variant="outline" className="text-xs border-purple-500/30 text-purple-400 hover:bg-purple-500/10 h-8"
+                  onClick={() => handleGenerate(lead.id)}
+                  disabled={generatingId === lead.id}>
+                  {generatingId === lead.id ? <RefreshCw className="w-3 h-3 ml-1 animate-spin" /> : <FileText className="w-3 h-3 ml-1" />}
+                  {lead.pdfGenerationStatus === "ready" ? "إعادة توليد" : "توليد"}
+                </Button>
+                {lead.pdfFileUrl && (
+                  <>
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs"
+                      onClick={() => handleDownload(lead.pdfFileUrl!, lead.companyName)}>
+                      <Download className="w-3 h-3 ml-1" /> تحميل
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 px-2 text-gray-400 hover:text-white"
+                      onClick={() => window.open(lead.pdfFileUrl!, "_blank")}>
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {previewHtml && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+              <h3 className="font-bold text-gray-800">معاينة — {previewLeadName}</h3>
+              <div className="flex gap-2">
+                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => {
+                  const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a"); a.href = url; a.download = `تقرير-${previewLeadName}.html`; a.click();
+                  URL.revokeObjectURL(url);
+                }}><Download className="w-4 h-4 ml-1" /> تحميل</Button>
+                <Button size="sm" variant="ghost" onClick={() => setPreviewHtml(null)} className="text-gray-500">✕</Button>
+              </div>
+            </div>
+            <iframe srcDoc={previewHtml} className="w-full flex-1 min-h-[600px]" title="معاينة" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== الصفحة الرئيسية =====
 export default function Reports() {
   const [activeTab, setActiveTab] = useState("whatsapp");
@@ -1450,6 +1623,10 @@ export default function Reports() {
                 <Calendar className="w-3.5 h-3.5" />
                 أسبوعي
               </TabsTrigger>
+              <TabsTrigger value="smart-reports" className="text-xs gap-1.5 data-[state=active]:text-white data-[state=active]:bg-[#2a3942]">
+                <FileText className="w-3.5 h-3.5" />
+                تقارير PDF
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -1468,6 +1645,9 @@ export default function Reports() {
             </TabsContent>
             <TabsContent value="weekly" className="p-6 m-0">
               <WeeklyReportTab />
+            </TabsContent>
+            <TabsContent value="smart-reports" className="p-6 m-0">
+              <SmartReportsTab />
             </TabsContent>
           </div>
         </Tabs>

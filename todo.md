@@ -1285,3 +1285,53 @@
 - [x] server/lib/brightDataLinkedIn.ts: Companies API layer مع fallback Scraper
 - [x] تحديث analyzeLinkedIn في brightDataAnalysis router لاستخدام Companies API أولاً
 - [x] تحديث واجهة LeadDetail لعرض بيانات LinkedIn الحقيقية (followers, employees, industry, headquarters, founded, specialties)
+
+## الدفعة الكبيرة - مارس 2026 (تطوير شامل)
+
+### إصلاح SERP 429 + Rate Limiting
+- [ ] إضافة retry logic مع exponential backoff في serpRequest
+- [ ] إضافة rate limiter: حد أقصى 3 طلبات/ثانية لكل IP
+- [ ] إضافة request queue لتسلسل الطلبات بدلاً من التوازي
+- [ ] إضافة caching للنتائج (TTL 30 دقيقة) لتجنب إعادة نفس الطلب
+
+### Bright Data Dataset API للبحث في إنستغرام
+- [ ] استخدام Instagram Profiles Dataset API للبحث بكلمة مفتاحية
+- [ ] endpoint: POST /datasets/v3/trigger?dataset_id=gd_l1vikfch901nx3by4 مع keyword بدلاً من URL
+- [ ] polling حتى اكتمال النتائج ثم عرضها في مركز البحث
+- [ ] دمج النتائج مع نتائج SERP في تبويب موحد
+
+### Google Maps Scraping المباشر
+- [ ] استخدام Bright Data Scraping Browser لفتح Google Maps مباشرة
+- [ ] استخراج: الاسم، الهاتف، العنوان، التقييم، عدد المراجعات، ساعات العمل، الموقع
+- [ ] استخراج بيانات إضافية غير متاحة في Places API: صور، Q&A، منشورات
+- [ ] fallback لـ Places API إذا فشل Scraping
+
+### شاشة المراجعة قبل الحفظ (Pre-Save Review)
+- [ ] modal يظهر عند الضغط "أضف كـ Lead" في نتائج البحث
+- [ ] يعرض: بيانات العميل المكتشفة + نتيجة كشف التكرار + درجة الجودة
+- [ ] تحليل فوري بـ AI: urgencyLevel + iceBreaker + salesEntryAngle
+- [ ] خيار: حفظ مباشر / تعديل / دمج مع موجود / تجاهل
+
+### AI Agent - الموظف الرقمي
+- [ ] صفحة /ai-agent: واجهة الموظف الرقمي
+- [ ] Agent يستقبل مهمة: "ابحث عن 50 مطعم في الرياض وحللهم"
+- [ ] Agent يُنفذ تلقائياً: بحث → تصفية → تحليل → تقرير
+- [ ] Agent يُرسل تقرير نهائي: عدد العملاء، أفضل 10، الثغرات المشتركة
+- [ ] Agent يتابع: يُذكّر بالعملاء غير المتواصل معهم منذ 7 أيام
+- [ ] Agent يقترح: "هذا الأسبوع ركّز على قطاع المطاعم في جدة"
+- [ ] دمج AI Agent في sidebar تحت "الذكاء الاصطناعي"
+
+## إصلاح صفحة التحليل الذكي وPDF (مارس 2026)
+- [ ] إضافة إعدادات التأسيس في صفحة التحليل الذكي: أسلوب البيع + نوع التقرير + القطاع + هدف المبيعات
+- [ ] إصلاح تبويب التقارير: عرض قائمة العملاء المحللين مع زر "توليد PDF" لكل عميل
+- [ ] إصلاح زر تحميل PDF: يفتح HTML في نافذة جديدة مع زر طباعة/حفظ
+- [ ] إصلاح TypeScript errors المتبقية في aiAgent.ts
+
+## إصلاح صفحة التحليل الذكي وPDF (مارس 2026)
+
+- [x] إضافة تبويب "تقارير PDF" في صفحة التقارير مع زر تحميل يعمل
+- [x] إضافة listAnalyzedLeads procedure في pdfReport router
+- [x] عرض العملاء المحللين مع urgencyLevel ولون الأولوية
+- [x] زر "توليد" و"تحميل" و"معاينة" لكل عميل
+- [x] خيار نوع التقرير (داخلي / للعميل)
+- [ ] إضافة إعدادات التأسيس في صفحة التحليل الذكي (أسلوب البيع + القطاع + هدف المبيعات)

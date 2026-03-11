@@ -1243,6 +1243,18 @@ const searchRouter = router({
       };
     }),
 
+  // بحث Google Maps Scraping المباشر (بيانات أكثر من Places API)
+  scrapeGoogleMaps: protectedProcedure
+    .input(z.object({
+      query: z.string().min(1),
+      location: z.string().min(1),
+      preferScraping: z.boolean().default(true),
+    }))
+    .mutation(async ({ input }) => {
+      const { scrapeGoogleMaps } = await import("./lib/googleMapsScraper");
+      return scrapeGoogleMaps(input.query, input.location, input.preferScraping);
+    }),
+
   // تحويل اسم المدينة أو العنوان إلى إحداثيات جغرافية
   geocodeAddress: protectedProcedure
     .input(z.object({
