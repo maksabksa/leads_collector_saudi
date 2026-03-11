@@ -51,8 +51,10 @@ import { deduplicationRouter } from "./routers/deduplication";
 import { sectorAnalysisRouter } from "./routers/sectorAnalysis";
 import { pdfReportRouter } from "./routers/pdfReport";
 import { bulkAnalysisRouter } from "./routers/bulkAnalysis";
+import { analysisSettingsRouter } from "./routers/analysisSettings";
 import { scrapeWebsite, scrapeInstagram, scrapeLinkedIn, scrapeTwitter, scrapeTikTok, formatScrapedDataForLLM } from "./lib/brightDataScraper";
 import { brightDataAnalysisRouter } from "./routers/brightDataAnalysis";
+import { aiAgentRouter } from "./routers/aiAgent";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -393,6 +395,7 @@ const leadsRouter = router({
       snapchatUrl: z.string().optional(),
       tiktokUrl: z.string().optional(),
       facebookUrl: z.string().optional(),
+      linkedinUrl: z.string().optional(),
       reviewCount: z.number().optional(),
       brandingQualityScore: z.number().optional(),
       seasonalReadinessScore: z.number().optional(),
@@ -2078,6 +2081,7 @@ export const appRouter = router({
   aiConfig: aiSettingsRouter,
   brightDataSearch: brightDataSearchRouter,
   brightDataAnalysis: brightDataAnalysisRouter,
+  aiAgent: aiAgentRouter,
   googleSearch: googleSearchRouter,
   socialSearch: socialSearchRouter,
   segments: segmentsRouter,
@@ -2107,5 +2111,6 @@ export const appRouter = router({
   sectorAnalysis: sectorAnalysisRouter,
   pdfReport: pdfReportRouter,
   bulkAnalysis: bulkAnalysisRouter,
+  analysisSettings: analysisSettingsRouter,
 });
 export type AppRouter = typeof appRouter;

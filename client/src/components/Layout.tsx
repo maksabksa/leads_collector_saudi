@@ -11,6 +11,7 @@ import {
   Zap,
   Globe,
   Brain,
+  Bot,
   Settings2,
   ClipboardList,
   CalendarClock,
@@ -36,6 +37,7 @@ const FOLLOWUP_NAV = [
   { path: "/follow-up",       label: "المتابعة التلقائية", icon: CalendarClock },
   { path: "/reminders",      label: "التذكيرات",          icon: Bell },
   { path: "/smart-analysis", label: "التحليل الذكي",      icon: Brain },
+  { path: "/ai-agent",       label: "وكيل الذكاء الاصطناعي", icon: Bot },
 ];
 
 /** قسم الإعدادات — للأدمن فقط */

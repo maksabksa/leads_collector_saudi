@@ -67,6 +67,7 @@ export const leads = mysqlTable("leads", {
   snapchatUrl: varchar("snapchatUrl", { length: 500 }),
   tiktokUrl: varchar("tiktokUrl", { length: 500 }),
   facebookUrl: varchar("facebookUrl", { length: 500 }),
+  linkedinUrl: varchar("linkedinUrl", { length: 500 }),
   reviewCount: int("reviewCount").default(0),
   brandingQualityScore: float("brandingQualityScore"),
   seasonalReadinessScore: float("seasonalReadinessScore"),
@@ -1263,3 +1264,21 @@ export const agentLogs = mysqlTable("agent_logs", {
 });
 export type AgentLog = typeof agentLogs.$inferSelect;
 export type InsertAgentLog = typeof agentLogs.$inferInsert;
+
+// ===== ANALYSIS SETTINGS TABLE (إعدادات التأسيس للتحليل الذكي) =====
+export const analysisSettings = mysqlTable("analysis_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  salesGoalMonthly: int("salesGoalMonthly").default(50),
+  primarySector: varchar("primarySector", { length: 100 }).default("general"),
+  communicationStyle: varchar("communicationStyle", { length: 50 }).default("professional"),
+  targetCities: text("targetCities"),
+  salesApproach: varchar("salesApproach", { length: 50 }).default("sa_arabic"),
+  reportLanguage: varchar("reportLanguage", { length: 20 }).default("arabic"),
+  autoAnalyzeOnAdd: boolean("autoAnalyzeOnAdd").default(true),
+  priorityThreshold: int("priorityThreshold").default(7),
+  customInstructions: text("customInstructions"),
+  updatedAt: bigint("updatedAt", { mode: "number" }),
+});
+export type AnalysisSettings = typeof analysisSettings.$inferSelect;
+export type InsertAnalysisSettings = typeof analysisSettings.$inferInsert;

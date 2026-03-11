@@ -328,6 +328,10 @@ export default function LeadDetail() {
       googleMapsUrl: lead.googleMapsUrl || "",
       instagramUrl: lead.instagramUrl || "",
       twitterUrl: lead.twitterUrl || "",
+      snapchatUrl: (lead as any).snapchatUrl || "",
+      tiktokUrl: (lead as any).tiktokUrl || "",
+      facebookUrl: (lead as any).facebookUrl || "",
+      linkedinUrl: (lead as any).linkedinUrl || "",
       notes: lead.notes || "",
       stage: (lead as any).stage || "new",
       priority: (lead as any).priority || "medium",
@@ -434,6 +438,10 @@ export default function LeadDetail() {
               { field: "website", label: "الموقع", type: "text" },
               { field: "instagramUrl", label: "إنستغرام", type: "text" },
               { field: "twitterUrl", label: "تويتر", type: "text" },
+              { field: "snapchatUrl", label: "سناب شات", type: "text" },
+              { field: "tiktokUrl", label: "تيك توك", type: "text" },
+              { field: "facebookUrl", label: "فيسبوك", type: "text" },
+              { field: "linkedinUrl", label: "لينكد إن", type: "text" },
               { field: "googleMapsUrl", label: "Google Maps", type: "text" },
             ].map(({ field, label }) => (
               <div key={field}>

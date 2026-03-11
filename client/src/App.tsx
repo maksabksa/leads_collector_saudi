@@ -44,6 +44,7 @@ import AuditLog from "./pages/AuditLog";
 import LabelsManager from "./pages/LabelsManager";
 import FollowUp from "./pages/FollowUp";
 import SmartAnalysis from "./pages/SmartAnalysis";
+import AIAgent from "./pages/AIAgent";
 function Router() {
   return (
     <Switch>
@@ -90,6 +91,7 @@ function Router() {
         <Route path="/labels" component={LabelsManager} />
         <Route path="/follow-up" component={FollowUp} />
         <Route path="/smart-analysis" component={SmartAnalysis} />
+        <Route path="/ai-agent" component={AIAgent} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

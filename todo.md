@@ -1335,3 +1335,34 @@
 - [x] زر "توليد" و"تحميل" و"معاينة" لكل عميل
 - [x] خيار نوع التقرير (داخلي / للعميل)
 - [ ] إضافة إعدادات التأسيس في صفحة التحليل الذكي (أسلوب البيع + القطاع + هدف المبيعات)
+
+## الميزات الثلاث الكبرى (مارس 2026 - الدفعة الثانية)
+
+### 1. إعدادات التأسيس في صفحة التحليل الذكي
+- [ ] جدول analysis_settings في قاعدة البيانات (هدف المبيعات، القطاع، أسلوب التواصل)
+- [ ] backend: CRUD لإعدادات التأسيس (حفظ/جلب)
+- [ ] تمرير الإعدادات للـ LLM في كل تحليل قطاعي
+- [ ] panel جانبي في SmartAnalysis لضبط الإعدادات
+- [ ] حفظ الإعدادات تلقائياً عند التغيير
+
+### 2. تفعيل AI Agent كاملاً
+- [ ] ربط واجهة "مهام الـ Agent" بـ aiAgent router
+- [ ] صفحة /ai-agent مع قائمة المهام وحالتها
+- [ ] أزرار: إنشاء مهمة، إيقاف، متابعة، حذف
+- [ ] تتبع حي للتقدم (polling كل 3 ثوانٍ)
+- [ ] عرض logs المهمة في real-time
+- [ ] إضافة رابط AI Agent في الـ sidebar
+
+### 3. تصدير PDF حقيقي بـ Puppeteer
+- [ ] تثبيت puppeteer-core على الـ server
+- [ ] endpoint: POST /api/pdf/generate يستقبل HTML ويُعيد PDF
+- [ ] تحديث pdfReport router لاستخدام Puppeteer بدلاً من HTML فقط
+- [ ] زر "تحميل PDF" في تبويب التقارير يُنزّل ملف .pdf حقيقي
+
+## الدفعة 87 - إضافة حقول السوشيال ميديا في نموذج التعديل
+
+- [x] إضافة عمود linkedinUrl في قاعدة البيانات (ALTER TABLE)
+- [x] تحديث schema.ts لإضافة linkedinUrl
+- [x] إضافة linkedinUrl في leads.update procedure في routers.ts
+- [x] إضافة حقول snapchatUrl, tiktokUrl, facebookUrl, linkedinUrl في handleEdit state
+- [x] إضافة حقول snapchatUrl, tiktokUrl, facebookUrl, linkedinUrl في نموذج التعديل (LeadDetail.tsx)
