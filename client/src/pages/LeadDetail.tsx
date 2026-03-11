@@ -55,6 +55,15 @@ export default function LeadDetail() {
   const generateReport = trpc.analysis.generateFullReport.useMutation();
   const updateLead = trpc.leads.update.useMutation();
   const utils = trpc.useUtils();
+  // ===== Bright Data Real Analysis =====
+  const bdAnalyzeWebsite = trpc.brightDataAnalysis.analyzeWebsite.useMutation();
+  const bdAnalyzeInstagram = trpc.brightDataAnalysis.analyzeInstagram.useMutation();
+  const bdAnalyzeLinkedIn = trpc.brightDataAnalysis.analyzeLinkedIn.useMutation();
+  const bdAnalyzeTwitter = trpc.brightDataAnalysis.analyzeTwitter.useMutation();
+  const bdAnalyzeTikTok = trpc.brightDataAnalysis.analyzeTikTok.useMutation();
+  const bdAnalyzeAll = trpc.brightDataAnalysis.analyzeAllPlatforms.useMutation();
+  const [useBrightData, setUseBrightData] = useState(true);
+  const [bdResults, setBdResults] = useState<Record<string, any>>({});
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -228,25 +237,56 @@ export default function LeadDetail() {
 
   const { lead, websiteAnalysis, socialAnalyses } = data;
 
-  const handleAnalyzeWebsite = async () => {
+   const handleAnalyzeWebsite = async () => {
     if (!lead.website) { toast.error("لا يوجد موقع إلكتروني لهذا النشاط"); return; }
     setAnalyzingPlatform("website");
     try {
-      await analyzeWebsite.mutateAsync({ leadId: id, url: lead.website, companyName: lead.companyName, businessType: lead.businessType });
-      toast.success("تم تحليل الموقع بنجاح");
+      if (useBrightData) {
+        const result = await bdAnalyzeWebsite.mutateAsync({ leadId: id, url: lead.website, companyName: lead.companyName, businessType: lead.businessType });
+        setBdResults(prev => ({ ...prev, website: result }));
+        toast.success(result.usedRealData ? "✓ تحليل بيانات حقيقية من Bright Data" : "تحليل بتقدير AI (تعذّر جلب الموقع)");
+      } else {
+        await analyzeWebsite.mutateAsync({ leadId: id, url: lead.website, companyName: lead.companyName, businessType: lead.businessType });
+        toast.success("تم تحليل الموقع بنجاح");
+      }
       utils.leads.getFullDetails.invalidate({ id });
       utils.leads.list.invalidate();
     } catch { toast.error("فشل تحليل الموقع"); }
     finally { setAnalyzingPlatform(null); }
   };
-
   const handleAnalyzeSocial = async (platform: "instagram" | "twitter" | "snapchat" | "tiktok" | "facebook", url: string) => {
     setAnalyzingPlatform(platform);
     try {
-      await analyzeSocial.mutateAsync({ leadId: id, platform, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
-      toast.success(`تم تحليل ${platform} بنجاح`);
+      if (useBrightData) {
+        let result: any = null;
+        if (platform === "instagram") result = await bdAnalyzeInstagram.mutateAsync({ leadId: id, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
+        else if (platform === "twitter") result = await bdAnalyzeTwitter.mutateAsync({ leadId: id, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
+        else if (platform === "tiktok") result = await bdAnalyzeTikTok.mutateAsync({ leadId: id, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
+        else await analyzeSocial.mutateAsync({ leadId: id, platform, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
+        if (result) {
+          setBdResults(prev => ({ ...prev, [platform]: result }));
+          toast.success(result.usedRealData ? `✓ بيانات حقيقية من ${platform} عبر Bright Data` : `تحليل ${platform} بتقدير AI`);
+        } else {
+          toast.success(`تم تحليل ${platform} بنجاح`);
+        }
+      } else {
+        await analyzeSocial.mutateAsync({ leadId: id, platform, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
+        toast.success(`تم تحليل ${platform} بنجاح`);
+      }
       utils.leads.getFullDetails.invalidate({ id });
     } catch { toast.error("فشل التحليل"); }
+    finally { setAnalyzingPlatform(null); }
+  };
+  const handleAnalyzeAllPlatforms = async () => {
+    setAnalyzingPlatform("all");
+    try {
+      const result = await bdAnalyzeAll.mutateAsync({ leadId: id });
+      setBdResults(prev => ({ ...prev, all: result }));
+      const { scrapedData } = result;
+      const loaded = [scrapedData.websiteLoaded && "موقع", scrapedData.instagramLoaded && "إنستغرام", scrapedData.twitterLoaded && "تويتر", scrapedData.tiktokLoaded && "تيك توك", scrapedData.linkedinLoaded && "لينكد إن"].filter(Boolean);
+      toast.success(loaded.length > 0 ? `✓ تم جلب بيانات حقيقية: ${loaded.join("، ")}` : "تحليل شامل بتقدير AI");
+      utils.leads.getFullDetails.invalidate({ id });
+    } catch (e: any) { toast.error(e.message || "فشل التحليل الشامل"); }
     finally { setAnalyzingPlatform(null); }
   };
 
@@ -572,6 +612,29 @@ export default function LeadDetail() {
           {/* Digital presence */}
           <div className="rounded-2xl p-4 border border-border space-y-3" style={{ background: "oklch(0.12 0.015 240)" }}>
             <h3 className="text-sm font-semibold text-foreground">الحضور الرقمي</h3>
+            {/* Bright Data Toggle + Analyze All Button */}
+            <div className="flex items-center justify-between mb-2">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <div
+                  onClick={() => setUseBrightData(v => !v)}
+                  className="relative w-8 h-4 rounded-full transition-colors cursor-pointer"
+                  style={{ background: useBrightData ? "oklch(0.65 0.18 145)" : "oklch(0.25 0.02 240)" }}
+                >
+                  <div className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all" style={{ left: useBrightData ? "calc(100% - 14px)" : "2px" }} />
+                </div>
+                <span className="text-xs" style={{ color: useBrightData ? "oklch(0.65 0.18 145)" : "var(--muted-foreground)" }}>
+                  {useBrightData ? "✓ Bright Data" : "AI فقط"}
+                </span>
+              </label>
+              <button
+                onClick={handleAnalyzeAllPlatforms}
+                disabled={analyzingPlatform === "all"}
+                className="text-xs px-2 py-0.5 rounded-lg font-medium transition-all"
+                style={{ background: "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)", border: "1px solid oklch(0.65 0.18 145 / 0.3)" }}
+              >
+                {analyzingPlatform === "all" ? <Loader2 className="w-3 h-3 animate-spin" /> : "تحليل شامل"}
+              </button>
+            </div>
             {lead.website ? (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -659,6 +722,92 @@ export default function LeadDetail() {
             </div>
           )}
 
+          {/* Bright Data Results Panel */}
+          {bdResults.all && (
+            <div className="rounded-2xl border overflow-hidden" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 145 / 0.3)" }}>
+              <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "oklch(0.65 0.18 145 / 0.2)", background: "oklch(0.65 0.18 145 / 0.06)" }}>
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Zap className="w-4 h-4" style={{ color: "oklch(0.65 0.18 145)" }} />
+                  تقرير Bright Data الشامل
+                </h3>
+                <div className="flex items-center gap-2">
+                  {/* مؤشرات المنصات المُجلَبة */}
+                  {[{key: "websiteLoaded", label: "موقع"}, {key: "instagramLoaded", label: "IG"}, {key: "twitterLoaded", label: "X"}, {key: "tiktokLoaded", label: "TT"}, {key: "linkedinLoaded", label: "LI"}].map(p => (
+                    <span key={p.key} className="text-xs px-1.5 py-0.5 rounded" style={{ background: bdResults.all.scrapedData[p.key] ? "oklch(0.65 0.18 145 / 0.2)" : "oklch(0.25 0.02 240)", color: bdResults.all.scrapedData[p.key] ? "oklch(0.65 0.18 145)" : "oklch(0.4 0.02 240)" }}>
+                      {bdResults.all.scrapedData[p.key] ? "✓" : "—"} {p.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                {bdResults.all.report?.executiveSummary && (
+                  <div className="p-3 rounded-xl" style={{ background: "oklch(0.65 0.18 145 / 0.06)", border: "1px solid oklch(0.65 0.18 145 / 0.15)" }}>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "oklch(0.65 0.18 145)" }}>الملخص التنفيذي</p>
+                    <p className="text-sm text-foreground leading-relaxed">{bdResults.all.report.executiveSummary}</p>
+                  </div>
+                )}
+                {bdResults.all.report?.salesScript && (
+                  <div className="p-3 rounded-xl" style={{ background: "oklch(0.78 0.16 75 / 0.06)", border: "1px solid oklch(0.78 0.16 75 / 0.2)" }}>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "oklch(0.78 0.16 75)" }}>نص التواصل المقترح</p>
+                    <p className="text-sm text-foreground leading-relaxed">{bdResults.all.report.salesScript}</p>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(bdResults.all.report.salesScript); toast.success("تم النسخ"); }}
+                      className="mt-2 text-xs px-2 py-0.5 rounded flex items-center gap-1"
+                      style={{ background: "oklch(0.78 0.16 75 / 0.15)", color: "oklch(0.78 0.16 75)" }}
+                    >
+                      <Copy className="w-3 h-3" /> نسخ
+                    </button>
+                  </div>
+                )}
+                {bdResults.all.report?.criticalGaps?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: "oklch(0.58 0.22 25)" }}>الثغرات الحرجة</p>
+                    <ul className="space-y-1">
+                      {bdResults.all.report.criticalGaps.map((gap: string, i: number) => (
+                        <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                          <span style={{ color: "oklch(0.58 0.22 25)" }}>•</span> {gap}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {/* أرقام المتابعين الحقيقية */}
+                {(bdResults.all.scrapedData.instagramFollowers > 0 || bdResults.all.scrapedData.twitterFollowers > 0 || bdResults.all.scrapedData.tiktokFollowers > 0) && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {bdResults.all.scrapedData.instagramFollowers > 0 && (
+                      <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.18 0.02 240)" }}>
+                        <p className="text-xs text-muted-foreground">IG متابعون</p>
+                        <p className="text-sm font-bold text-foreground">{bdResults.all.scrapedData.instagramFollowers.toLocaleString()}</p>
+                      </div>
+                    )}
+                    {bdResults.all.scrapedData.twitterFollowers > 0 && (
+                      <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.18 0.02 240)" }}>
+                        <p className="text-xs text-muted-foreground">X متابعون</p>
+                        <p className="text-sm font-bold text-foreground">{bdResults.all.scrapedData.twitterFollowers.toLocaleString()}</p>
+                      </div>
+                    )}
+                    {bdResults.all.scrapedData.tiktokFollowers > 0 && (
+                      <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.18 0.02 240)" }}>
+                        <p className="text-xs text-muted-foreground">TT متابعون</p>
+                        <p className="text-sm font-bold text-foreground">{bdResults.all.scrapedData.tiktokFollowers.toLocaleString()}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* أرقام الهاتف المكتشفة */}
+                {bdResults.all.scrapedData.discoveredPhones?.length > 0 && (
+                  <div className="p-3 rounded-xl" style={{ background: "oklch(0.65 0.18 200 / 0.06)", border: "1px solid oklch(0.65 0.18 200 / 0.2)" }}>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "var(--brand-cyan)" }}>أرقام هاتف مكتشفة من الموقع</p>
+                    <div className="flex flex-wrap gap-2">
+                      {bdResults.all.scrapedData.discoveredPhones.map((phone: string, i: number) => (
+                        <span key={i} className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)" }}>{phone}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {/* Behavior Analysis Panel */}
           {showBehaviorPanel && (
             <div className="rounded-2xl border overflow-hidden" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.3)" }}>

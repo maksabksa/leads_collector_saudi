@@ -8,4 +8,11 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   googlePagespeedApiKey: process.env.GOOGLE_PAGESPEED_API_KEY ?? "",
+  // Bright Data
+  brightDataWsEndpoint: process.env.BRIGHT_DATA_WS_ENDPOINT ?? "",
+  brightDataApiToken: process.env.BRIGHT_DATA_API_TOKEN ?? "",
+  brightDataSerpHost: process.env.BRIGHT_DATA_SERP_HOST ?? "brd.superproxy.io",
+  brightDataSerpPort: parseInt(process.env.BRIGHT_DATA_SERP_PORT ?? "33335"),
+  brightDataSerpUsername: process.env.BRIGHT_DATA_SERP_USERNAME ?? "",
+  brightDataSerpPassword: process.env.BRIGHT_DATA_SERP_PASSWORD ?? "",
 };

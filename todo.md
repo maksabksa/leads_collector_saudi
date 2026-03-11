@@ -1260,3 +1260,14 @@
 - [x] SmartAnalysis.tsx: صفحة شاملة مع tabs (تحليل جماعي + إحصائيات القطاعات + تقارير)
 - [x] مؤشر تقدم حي للدفعات مع pause/resume
 - [x] إضافة /smart-analysis في App.tsx وLayout.tsx sidebar
+
+## ربط Bright Data بالتحليلات الحقيقية (مارس 2026)
+
+- [x] lib/brightDataScraper.ts: طبقة جلب البيانات الحقيقية (موقع + إنستغرام + لينكد إن + تويتر + تيك توك)
+- [x] تحديث analyzeWebsite: جلب HTML الموقع الحقيقي بـ Bright Data قبل التحليل
+- [x] تحليل Instagram الحقيقي: followers, posts, bio, engagement
+- [x] تحليل LinkedIn الحقيقي: company size, employees, about, posts
+- [x] تحليل Twitter/X الحقيقي: followers, tweets, engagement
+- [x] تحليل TikTok الحقيقي: followers, videos, likes, bio
+- [x] تحديث واجهة LeadDetail لعرض البيانات الحقيقية المجلوبة
+- [x] إضافة BRIGHT_DATA_WS_ENDPOINT و BRIGHT_DATA_SERP_* في env.ts

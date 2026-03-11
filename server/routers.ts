@@ -51,6 +51,8 @@ import { deduplicationRouter } from "./routers/deduplication";
 import { sectorAnalysisRouter } from "./routers/sectorAnalysis";
 import { pdfReportRouter } from "./routers/pdfReport";
 import { bulkAnalysisRouter } from "./routers/bulkAnalysis";
+import { scrapeWebsite, scrapeInstagram, scrapeLinkedIn, scrapeTwitter, scrapeTikTok, formatScrapedDataForLLM } from "./lib/brightDataScraper";
+import { brightDataAnalysisRouter } from "./routers/brightDataAnalysis";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -2063,6 +2065,7 @@ export const appRouter = router({
   invitations: invitationsRouter,
   aiConfig: aiSettingsRouter,
   brightDataSearch: brightDataSearchRouter,
+  brightDataAnalysis: brightDataAnalysisRouter,
   googleSearch: googleSearchRouter,
   socialSearch: socialSearchRouter,
   segments: segmentsRouter,
