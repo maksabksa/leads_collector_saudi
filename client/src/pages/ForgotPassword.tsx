@@ -36,7 +36,6 @@ export default function ForgotPassword() {
     setError("");
     forgotPasswordMutation.mutate({
       email: email.trim().toLowerCase(),
-      origin: import.meta.env.VITE_APP_URL || window.location.origin,
     });
   };
 

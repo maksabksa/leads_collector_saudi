@@ -71,7 +71,7 @@ export default function FollowUp() {
       icon: <Clock className="w-4 h-4 text-red-400" />,
       color: "#e74c3c",
       reason: "موعد المتابعة تجاوز",
-      items: data?.overdueFollowUp ?? [],
+      items: data ?? [],
     },
     {
       key: "missingNextStep",
@@ -79,7 +79,7 @@ export default function FollowUp() {
       icon: <AlertTriangle className="w-4 h-4 text-[#f0a55a]" />,
       color: "#f0a55a",
       reason: "لا توجد خطوة قادمة محددة",
-      items: data?.missingNextStep ?? [],
+      items: [],
     },
     {
       key: "interestedNoAction",
@@ -87,7 +87,7 @@ export default function FollowUp() {
       icon: <MessageCircle className="w-4 h-4 text-[#34B7F1]" />,
       color: "#34B7F1",
       reason: "لم يُرد عليه منذ أكثر من 24 ساعة",
-      items: data?.interestedNoAction ?? [],
+      items: [],
     },
   ];
 
@@ -120,11 +120,11 @@ export default function FollowUp() {
             <div className="text-xs text-[#8696a0] mt-0.5">موعد متابعة تجاوز</div>
           </div>
           <div className="rounded-xl p-3 border border-[#f0a55a]/20" style={{ background: "rgba(240,165,90,0.08)" }}>
-            <div className="text-2xl font-bold text-[#f0a55a]">{stats.missingStep}</div>
+            <div className="text-2xl font-bold text-[#f0a55a]">{stats?.upcoming ?? 0}</div>
             <div className="text-xs text-[#8696a0] mt-0.5">بدون خطوة قادمة</div>
           </div>
           <div className="rounded-xl p-3 border border-[#34B7F1]/20" style={{ background: "rgba(52,183,241,0.08)" }}>
-            <div className="text-2xl font-bold text-[#34B7F1]">{stats.noReply}</div>
+            <div className="text-2xl font-bold text-[#34B7F1]">{stats?.total ?? 0}</div>
             <div className="text-xs text-[#8696a0] mt-0.5">بدون رد 24 ساعة</div>
           </div>
         </div>

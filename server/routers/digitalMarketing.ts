@@ -5,8 +5,6 @@ import { sql, and } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import {
   leads,
-  whatsappChats,
-  whatsappChatMessages,
   campaigns,
 } from "../../drizzle/schema";
 
@@ -37,21 +35,6 @@ export const digitalMarketingRouter = router({
       hasWhatsapp: sql<number>`SUM(CASE WHEN ${leads.hasWhatsapp} = 1 THEN 1 ELSE 0 END)`,
     }).from(leads);
 
-    // إحصائيات المحادثات
-    const [chatsStats] = await db.select({
-      totalChats: sql<number>`COUNT(*)`,
-      totalUnread: sql<number>`SUM(${whatsappChats.unreadCount})`,
-      aiEnabled: sql<number>`SUM(CASE WHEN ${whatsappChats.aiAutoReplyEnabled} = 1 THEN 1 ELSE 0 END)`,
-      closedDeals: sql<number>`SUM(CASE WHEN ${whatsappChats.closedAt} IS NOT NULL THEN 1 ELSE 0 END)`,
-    }).from(whatsappChats);
-
-    // إحصائيات الرسائل (آخر 30 يوم) - استخدام execute لتجنب مشكلة Drizzle مع DATE()
-    const startDate30 = daysAgoStr(30);
-    const [msgsResult] = await db.execute(
-      sql`SELECT COUNT(*) as totalMessages, COUNT(DISTINCT chatId) as uniqueContacts FROM whatsapp_chat_messages WHERE sentAt >= ${startDate30}`
-    );
-    const msgsStats = (msgsResult as unknown as any[])[0] ?? { totalMessages: 0, uniqueContacts: 0 };
-
     // أنواع الأعمال الأكثر شيوعاً
     const businessTypes = await db.select({
       businessType: leads.businessType,
@@ -74,31 +57,16 @@ export const digitalMarketingRouter = router({
 
     return {
       leads: leadsStats,
-      chats: chatsStats,
-      messages: msgsStats,
+      chats: { totalChats: 0, totalUnread: 0, aiEnabled: 0, closedDeals: 0 },
+      messages: { totalMessages: 0, uniqueContacts: 0 },
       businessTypes,
       zones,
     };
   }),
 
-  // تحليل الرسائل اليومية آخر 14 يوم
+  // تحليل الرسائل اليومية آخر 14 يوم (تم إزالة واتساب)
   getDailyMessageStats: protectedProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) return [];
-
-    const startDate14 = daysAgoStr(14);
-    // استخدام db.execute مباشرة لتجنب مشكلة Drizzle مع GROUP BY DATE()
-    const [result] = await db.execute(
-      sql`SELECT DATE(sentAt) as msgDate, COUNT(*) as total, SUM(CASE WHEN isAutoReply = 1 THEN 1 ELSE 0 END) as aiMessages, COUNT(DISTINCT chatId) as uniqueContacts FROM whatsapp_chat_messages WHERE sentAt >= ${startDate14} GROUP BY DATE(sentAt) ORDER BY DATE(sentAt) ASC`
-    );
-
-    const rows = result as unknown as Array<{ msgDate: string; total: number; aiMessages: number; uniqueContacts: number }>
-    return rows.map((r) => ({
-      date: r.msgDate ? new Date(r.msgDate).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' }) : '',
-      total: Number(r.total),
-      aiMessages: Number(r.aiMessages),
-      uniqueContacts: Number(r.uniqueContacts),
-    }));
+    return [];
   }),
 
   // تحليل فجوات التسويق الرقمي
@@ -180,7 +148,6 @@ export const digitalMarketingRouter = router({
 - متوسط درجة الأولوية: ${Number(data.avgScore || 0).toFixed(1)}/10
 - لديهم موقع إلكتروني: ${data.hasWebsite} (${Math.round(Number(data.hasWebsite)/total*100)}%)
 - لديهم إنستغرام: ${data.hasInstagram} (${Math.round(Number(data.hasInstagram)/total*100)}%)
-- لديهم واتساب: ${data.hasWhatsapp} (${Math.round(Number(data.hasWhatsapp)/total*100)}%)
 - أنواع الأعمال: ${data.types}
 ${input.businessType ? `- التركيز على: ${input.businessType}` : ''}
 ${input.zone ? `- المنطقة: ${input.zone}` : ''}

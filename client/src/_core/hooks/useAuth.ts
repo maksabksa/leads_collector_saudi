@@ -29,14 +29,14 @@ export function useAuth(options?: UseAuthOptions) {
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
+      utils.auth.me.setData(undefined, undefined);
     },
   });
 
   const staffLogoutMutation = trpc.staffAuth.logout.useMutation({
     onSuccess: () => {
-      utils.staffAuth.me.setData(undefined, null);
-      utils.auth.me.setData(undefined, null);
+      utils.staffAuth.me.setData(undefined, undefined);
+      utils.auth.me.setData(undefined, undefined);
     },
   });
 
@@ -53,8 +53,8 @@ export function useAuth(options?: UseAuthOptions) {
         return;
       }
     } finally {
-      utils.auth.me.setData(undefined, null);
-      utils.staffAuth.me.setData(undefined, null);
+      utils.auth.me.setData(undefined, undefined);
+      utils.staffAuth.me.setData(undefined, undefined);
       await utils.auth.me.invalidate();
       await utils.staffAuth.me.invalidate();
     }

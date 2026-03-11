@@ -1,104 +1,98 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { auditLogs } from "../../drizzle/schema";
-import { desc, eq, and, gte } from "drizzle-orm";
-
-const dbError = () =>
-  new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "قاعدة البيانات غير متاحة" });
-
-// Helper: تسجيل عملية في سجل التدقيق
-export async function logAudit(params: {
-  userId?: number;
-  userName?: string;
-  action: string;
-  entityType?: string;
-  entityId?: string;
-  details?: Record<string, unknown>;
-  ipAddress?: string;
-}) {
-  try {
-    const db = await getDb();
-    if (!db) return;
-    await db.insert(auditLogs).values({
-      userId: params.userId,
-      userName: params.userName,
-      action: params.action,
-      entityType: params.entityType,
-      entityId: params.entityId,
-      details: params.details,
-      ipAddress: params.ipAddress,
-    });
-  } catch {
-    // لا نوقف العملية الأصلية إذا فشل التسجيل
-  }
-}
+import { desc, eq, and, gte, lte, like, sql } from "drizzle-orm";
 
 export const auditLogRouter = router({
-  // جلب سجل التدقيق (للمدير فقط)
   getAll: protectedProcedure
-    .input(
-      z.object({
-        limit: z.number().min(1).max(200).default(50),
-        userId: z.number().optional(),
-        action: z.string().optional(),
-        entityType: z.string().optional(),
-        fromDate: z.string().optional(), // ISO string
-      })
-    )
-    .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "غير مصرح" });
-      }
+    .input(z.object({
+      page: z.number().default(1),
+      limit: z.number().default(50),
+      userId: z.number().optional(),
+      action: z.string().optional(),
+      dateFrom: z.number().optional(),
+      dateTo: z.number().optional(),
+      search: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw dbError();
+      if (!db) return { logs: [], total: 0 };
+
+      const page = input?.page ?? 1;
+      const limit = input?.limit ?? 50;
+      const offset = (page - 1) * limit;
 
       const conditions = [];
-      if (input.userId) conditions.push(eq(auditLogs.userId, input.userId));
-      if (input.action) conditions.push(eq(auditLogs.action, input.action));
-      if (input.entityType) conditions.push(eq(auditLogs.entityType, input.entityType));
-      if (input.fromDate) {
-        conditions.push(gte(auditLogs.createdAt, new Date(input.fromDate)));
-      }
+      if (input?.userId) conditions.push(eq(auditLogs.userId, input.userId));
+      if (input?.action) conditions.push(eq(auditLogs.action, input.action));
+      if (input?.dateFrom) conditions.push(gte(auditLogs.createdAt, new Date(input.dateFrom)));
+      if (input?.dateTo) conditions.push(lte(auditLogs.createdAt, new Date(input.dateTo)));
+      if (input?.search) conditions.push(like(auditLogs.details, `%${input.search}%`));
 
-      const query = db
-        .select()
-        .from(auditLogs)
-        .orderBy(desc(auditLogs.createdAt))
-        .limit(input.limit);
+      const query = db.select().from(auditLogs);
+      if (conditions.length > 0) query.where(and(...conditions));
 
-      if (conditions.length > 0) {
-        return query.where(and(...conditions));
-      }
-      return query;
+      const [logs, countResult] = await Promise.all([
+        db.select().from(auditLogs)
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` }).from(auditLogs)
+          .where(conditions.length > 0 ? and(...conditions) : undefined),
+      ]);
+
+      return { logs, total: countResult[0]?.count ?? 0 };
     }),
 
-  // إحصائيات سريعة
-  getStats: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== "admin") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "غير مصرح" });
-    }
+  getStats: protectedProcedure.query(async () => {
     const db = await getDb();
-    if (!db) throw dbError();
+    if (!db) return { total: 0, today: 0, thisWeek: 0, byAction: [] };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const todayLogs = await db
-      .select()
-      .from(auditLogs)
-      .where(gte(auditLogs.createdAt, today));
+    const [total, today, thisWeek, byAction] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(auditLogs),
+      db.select({ count: sql<number>`count(*)` }).from(auditLogs).where(gte(auditLogs.createdAt, todayStart)),
+      db.select({ count: sql<number>`count(*)` }).from(auditLogs).where(gte(auditLogs.createdAt, weekStart)),
+      db.select({ action: auditLogs.action, count: sql<number>`count(*)` })
+        .from(auditLogs)
+        .groupBy(auditLogs.action)
+        .orderBy(desc(sql<number>`count(*)`))
+        .limit(10),
+    ]);
 
     return {
-      todayCount: todayLogs.length,
-      actionBreakdown: todayLogs.reduce(
-        (acc, log) => {
-          acc[log.action] = (acc[log.action] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>
-      ),
+      total: total[0]?.count ?? 0,
+      today: today[0]?.count ?? 0,
+      thisWeek: thisWeek[0]?.count ?? 0,
+      byAction,
     };
   }),
+
+  log: protectedProcedure
+    .input(z.object({
+      action: z.string(),
+      entityType: z.string().optional(),
+      entityId: z.number().optional(),
+      details: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) return { success: false };
+
+      await db.insert(auditLogs).values({
+        userId: ctx.user.id,
+        userName: ctx.user.name || undefined,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ? String(input.entityId) : undefined,
+        details: input.details ? { note: input.details } : undefined,
+      });
+
+      return { success: true };
+    }),
 });

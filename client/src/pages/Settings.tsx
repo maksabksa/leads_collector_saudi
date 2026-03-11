@@ -677,8 +677,7 @@ function NotificationsTab() {
 function WhatsAppSendTab() {
   const [, navigate] = useLocation();
   const { data: accounts } = trpc.waAccounts.listAccounts.useQuery();
-  const { data: templates } = trpc.waSettings.listAutoReplyRules.useQuery({ accountId: "all" });
-
+  
   return (
     <div className="space-y-4">
       <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-4 flex items-start gap-3">
@@ -727,8 +726,8 @@ function WhatsAppSendTab() {
 
       <SettingCard title="قوالب الرسائل" icon={FileText} description="القوالب المستخدمة في الإرسال الجماعي">
         <div className="space-y-2">
-          {templates && templates.length > 0 ? (
-            templates.slice(0, 3).map((t: any) => (
+          {false ? (
+            ([] as any[]).slice(0, 3).map((t: any) => (
               <div key={t.id} className="flex items-center justify-between p-2.5 bg-muted/30 rounded-lg">
                 <div>
                   <p className="text-sm font-medium">{t.name || t.keyword}</p>

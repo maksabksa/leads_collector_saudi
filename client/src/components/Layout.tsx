@@ -7,16 +7,11 @@ import {
   Menu,
   X,
   Search,
-  MessageCircle,
-  MessagesSquare,
   Shield,
   Zap,
   Globe,
   Brain,
-  Smartphone,
   Settings2,
-  Share2,
-  Tag,
   ClipboardList,
   CalendarClock,
   Bell,
@@ -32,8 +27,6 @@ import Tutorial from "./Tutorial";
 /** القسم الرئيسي — متاح لجميع المستخدمين (مع فلترة الصلاحيات) */
 const MAIN_NAV = [
   { path: "/",              label: "لوحة التحكم",      icon: BarChart3,     permission: null },
-  { path: "/chats",         label: "محادثات واتساب",   icon: MessagesSquare, permission: "whatsapp.send" },
-  { path: "/whatsapp",      label: "إرسال واتساب",     icon: MessageCircle, permission: "whatsapp.send" },
   { path: "/leads",         label: "قائمة العملاء",    icon: Users,         permission: "leads.view" },
   { path: "/search-hub",    label: "مركز البحث",       icon: Search,        permission: "search.use" },
 ];
@@ -134,20 +127,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const userPermissionsList = myPerms?.permissions ?? [];
   const isAdmin = user?.role === "admin";
 
-  // عداد الرسائل غير المقروءة
-  const { data: unreadData } = trpc.waSettings.getTotalUnread.useQuery(undefined, {
-    enabled: isAuthenticated,
-    refetchInterval: 10000,
-  });
-  const totalUnread = unreadData?.total ?? 0;
-
-  // عداد تنبيهات المتابعة
-  const { data: followUpStats } = trpc.followUp.getFollowUpStats.useQuery(undefined, {
-    enabled: isAuthenticated,
-    refetchInterval: 60000,
-  });
-  const totalFollowUp = followUpStats?.total ?? 0;
-
   // فلترة القسم الرئيسي حسب الصلاحيات
   const visibleMain = MAIN_NAV.filter((item) => {
     if (isAdmin) return true;
@@ -185,13 +164,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) =>
     path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
 
-  // صفحة الشات تحتاج layout خاص بدون padding
-  const isChatsPage = location === "/chats";
-
   // ─── Layout ───
   return (
     <>
-    <div className={isChatsPage ? "h-screen flex bg-background overflow-hidden" : "min-h-screen flex bg-background"} dir="rtl">
+    <div className="min-h-screen flex bg-background" dir="rtl">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -202,31 +178,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* ══════════════ Sidebar ══════════════ */}
       <aside
-        className={`fixed top-0 right-0 h-full z-50 flex flex-col border-l border-border transition-all duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed top-0 right-0 h-full z-50 flex flex-col border-l border-border transition-all duration-300 lg:static lg:translate-x-0 w-64 ${
           sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-        } ${isChatsPage ? "lg:w-14" : "w-64"}`}
+        }`}
         style={{ background: "oklch(0.11 0.012 240)" }}
       >
         {/* ── Logo ── */}
-        <div className={`border-b border-border flex items-center justify-between flex-shrink-0 ${isChatsPage ? "p-2 justify-center" : "p-4"}`}>
+        <div className="border-b border-border flex items-center justify-between flex-shrink-0 p-4">
           <div className="flex items-center gap-3">
-            {isChatsPage ? (
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  background: "oklch(0.65 0.18 200 / 0.2)",
-                  border: "1px solid oklch(0.65 0.18 200 / 0.3)",
-                }}
-              >
-                <Zap className="w-5 h-5" style={{ color: "var(--brand-cyan)" }} />
-              </div>
-            ) : (
-              <img
-                src="https://files.manuscdn.com/user_upload_by_module/session_file/310419663029364550/bjAWeFtzhIGmIQTl.png"
-                alt="مكسب"
-                className="h-10 w-auto object-contain max-w-[160px]"
-              />
-            )}
+            <img
+              src="https://files.manuscdn.com/user_upload_by_module/session_file/310419663029364550/bjAWeFtzhIGmIQTl.png"
+              alt="مكسب"
+              className="h-10 w-auto object-contain max-w-[160px]"
+            />
           </div>
           <button
             onClick={closeSidebar}
@@ -241,32 +205,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* ── القسم الرئيسي ── */}
           {visibleMain.map((item) => (
-            isChatsPage ? (
-              <Link key={item.path} href={item.path} onClick={closeSidebar}>
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-xl mx-auto mb-1 transition-all cursor-pointer ${
-                    isActive(item.path) ? "text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                  }`}
-                  style={isActive(item.path) ? { background: "oklch(0.65 0.18 200 / 0.12)", border: "1px solid oklch(0.65 0.18 200 / 0.2)", color: "var(--brand-cyan)" } : {}}
-                  title={item.label}
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.path === "/chats" && totalUnread > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 rounded-full text-xs text-white flex items-center justify-center" style={{ background: "oklch(0.55 0.22 25)", fontSize: "9px" }}>{totalUnread > 9 ? "9+" : totalUnread}</span>
-                  )}
-                </div>
-              </Link>
-            ) : (
-              <NavItem
-                key={item.path}
-                path={item.path}
-                label={item.label}
-                icon={item.icon}
-                isActive={isActive(item.path)}
-                badge={item.path === "/chats" ? totalUnread : undefined}
-                onClick={closeSidebar}
-              />
-            )
+            <NavItem
+              key={item.path}
+              path={item.path}
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive(item.path)}
+              onClick={closeSidebar}
+            />
           ))}
 
           {/* ── قسم المتابعة ── */}
@@ -278,7 +224,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               label={item.label}
               icon={item.icon}
               isActive={isActive(item.path)}
-              badge={item.path === "/follow-up" ? totalFollowUp : undefined}
+              badge={undefined}
               onClick={closeSidebar}
             />
           ))}
@@ -342,31 +288,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* ══════════════ Main content ══════════════ */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar - مخفي في صفحة الشات لإعطاء كامل المساحة */}
-        {!isChatsPage && (
-          <header
-            className="h-14 border-b border-border flex items-center px-4 gap-3 flex-shrink-0"
-            style={{ background: "oklch(0.11 0.012 240)" }}
+        {/* Top bar */}
+        <header
+          className="h-14 border-b border-border flex items-center px-4 gap-3 flex-shrink-0"
+          style={{ background: "oklch(0.11 0.012 240)" }}
+        >
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden text-muted-foreground hover:text-foreground"
           >
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-muted-foreground hover:text-foreground"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Globe className="w-4 h-4" />
-              <span>مجمع بيانات الأعمال</span>
-            </div>
-            <div className="mr-auto flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs text-muted-foreground">النظام يعمل</span>
-            </div>
-          </header>
-        )}
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Globe className="w-4 h-4" />
+            <span>مجمع بيانات الأعمال</span>
+          </div>
+          <div className="mr-auto flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs text-muted-foreground">النظام يعمل</span>
+          </div>
+        </header>
 
         {/* Page content */}
-        <div className={isChatsPage ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-4 lg:p-6"}>{children}</div>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
       </main>
     </div>
     {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}

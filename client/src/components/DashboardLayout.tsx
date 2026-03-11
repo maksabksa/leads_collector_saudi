@@ -57,18 +57,7 @@ const menuGroups = [
 
     ]
   },
-  {
-    group: "مركز الرسائل",
-    icon: MessageSquare,
-    items: [
-      { icon: MessageSquare, label: "المحادثات", path: "/chats", badge: "unread" },
-      { icon: Send, label: "إرسال جماعي", path: "/bulk-whatsapp", badge: null },
-      { icon: Smartphone, label: "حسابات واتساب", path: "/whatsapp-accounts", badge: null },
-      { icon: Bell, label: "تنبيهات الاهتمام", path: "/whatsapp-auto", badge: null },
-      { icon: Shield, label: "صحة الأرقام", path: "/number-health", badge: null },
-      { icon: BarChart2, label: "تقرير الإرسال", path: "/whatsapp-report", badge: null },
-    ]
-  },
+
   {
     group: "التسويق الرقمي",
     icon: TrendingUp,
@@ -194,11 +183,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  // جلب عدد الرسائل غير المقروءة
-  const { data: unreadData } = trpc.waSettings.getTotalUnread.useQuery(undefined, {
-    refetchInterval: 10000,
-  });
-  const unreadCount = (unreadData as any)?.total ?? 0;
+  const unreadCount = 0;
 
   const activeItem = menuGroups.flatMap(g => g.items).find(item => {
     if (item.path === "/") return location === "/";

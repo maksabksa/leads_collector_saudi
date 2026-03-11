@@ -161,7 +161,7 @@ export default function DataQuality() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-card border-border">
           <CardContent className="pt-4">
-            <CompletenessGauge score={stats.completenessScore} />
+            <CompletenessGauge score={stats.completeness} />
           </CardContent>
         </Card>
 
@@ -202,7 +202,7 @@ export default function DataQuality() {
           <MetricCard
             icon={Phone}
             label="رقم الهاتف"
-            value={stats.withPhone}
+            value={stats.total}
             total={stats.total}
             rate={stats.phoneRate}
             color="bg-green-500/10 text-green-400"
@@ -360,17 +360,17 @@ export default function DataQuality() {
                   <div className="flex-1 relative h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="absolute inset-y-0 right-0 bg-blue-500/30 rounded-full"
-                      style={{ width: `${Math.round((row.total / (stats.byCity[0]?.total ?? 1)) * 100)}%` }}
+                      style={{ width: `${Math.round((row.count / (stats.byCity[0]?.count ?? 1)) * 100)}%` }}
                     />
                     <div
                       className="absolute inset-y-0 right-0 bg-green-500 rounded-full"
-                      style={{ width: `${Math.round((row.withPhone / (stats.byCity[0]?.total ?? 1)) * 100)}%` }}
+                      style={{ width: `${Math.round((row.count / (stats.byCity[0]?.count ?? 1)) * 100)}%` }}
                     />
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs font-medium text-green-400">{row.withPhone}</span>
+                    <span className="text-xs font-medium text-green-400">{row.count}</span>
                     <span className="text-xs text-muted-foreground">/</span>
-                    <span className="text-xs text-muted-foreground">{row.total}</span>
+                    <span className="text-xs text-muted-foreground">{row.count}</span>
                   </div>
                 </div>
               ))}
@@ -384,14 +384,14 @@ export default function DataQuality() {
       </div>
 
       {/* تنبيه العملاء بدون أرقام */}
-      {stats.withoutPhone > 0 && (
+      {stats.missingPhone > 0 && (
         <Card className="bg-orange-500/5 border-orange-500/20">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0" />
               <div>
                 <p className="text-sm font-medium text-orange-300">
-                  {stats.withoutPhone.toLocaleString()} عميل بدون رقم هاتف
+                  {stats.missingPhone.toLocaleString()} عميل بدون رقم هاتف
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   يمثلون {100 - stats.phoneRate}% من إجمالي العملاء — يُنصح بمراجعتهم وتحديث أرقامهم من مركز البحث

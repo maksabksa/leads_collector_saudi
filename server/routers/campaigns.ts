@@ -1,98 +1,93 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import {
-  getCampaigns, getCampaignById, createCampaign, updateCampaign, deleteCampaign
-} from "../db";
+import { TRPCError } from "@trpc/server";
+import { getDb } from "../db";
+import { campaigns } from "../../drizzle/schema";
+import { eq, desc, sql } from "drizzle-orm";
 
 export const campaignsRouter = router({
-  // قائمة الحملات
-  list: protectedProcedure.query(async () => {
-    return getCampaigns();
+  stats: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { total: 0, running: 0, completed: 0, draft: 0, totalSent: 0, totalReplied: 0 };
+
+    const [total, running, completed, draft, totals] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(campaigns),
+      db.select({ count: sql<number>`count(*)` }).from(campaigns).where(eq(campaigns.status, "running")),
+      db.select({ count: sql<number>`count(*)` }).from(campaigns).where(eq(campaigns.status, "completed")),
+      db.select({ count: sql<number>`count(*)` }).from(campaigns).where(eq(campaigns.status, "draft")),
+      db.select({
+        totalSent: sql<number>`SUM(totalSent)`,
+        totalReplied: sql<number>`SUM(totalReplied)`,
+      }).from(campaigns),
+    ]);
+
+    return {
+      total: total[0]?.count ?? 0,
+      running: running[0]?.count ?? 0,
+      completed: completed[0]?.count ?? 0,
+      draft: draft[0]?.count ?? 0,
+      totalSent: totals[0]?.totalSent ?? 0,
+      totalReplied: totals[0]?.totalReplied ?? 0,
+    };
   }),
 
-  // تفاصيل حملة
-  getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+  list: protectedProcedure
+    .input(z.object({
+      status: z.enum(["draft", "running", "completed", "paused", "failed"]).optional(),
+    }).optional())
     .query(async ({ input }) => {
-      return getCampaignById(input.id);
+      const db = await getDb();
+      if (!db) return [];
+
+      const query = db.select().from(campaigns).orderBy(desc(campaigns.createdAt)).limit(100);
+      if (input?.status) {
+        return db.select().from(campaigns).where(eq(campaigns.status, input.status)).orderBy(desc(campaigns.createdAt)).limit(100);
+      }
+      return query;
     }),
 
-  // إنشاء حملة جديدة
   create: protectedProcedure
     .input(z.object({
       name: z.string().min(1),
       description: z.string().optional(),
-      accountId: z.string().optional(),
-      totalSent: z.number().default(0),
-      totalDelivered: z.number().default(0),
-      totalReplied: z.number().default(0),
-      totalFailed: z.number().default(0),
-      responseRate: z.number().default(0),
-      status: z.enum(["draft", "running", "completed", "paused", "failed"]).default("draft"),
     }))
     .mutation(async ({ input, ctx }) => {
-      return createCampaign({
-        ...input,
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const result = await db.insert(campaigns).values({
+        name: input.name,
+        description: input.description,
+        status: "draft",
         createdBy: ctx.user.id,
       });
+
+      return { id: (result as any).insertId };
     }),
 
-  // تحديث حملة
-  update: protectedProcedure
-    .input(z.object({
-      id: z.number(),
-      name: z.string().min(1).optional(),
-      description: z.string().optional(),
-      totalSent: z.number().optional(),
-      totalDelivered: z.number().optional(),
-      totalReplied: z.number().optional(),
-      totalFailed: z.number().optional(),
-      responseRate: z.number().optional(),
-      status: z.enum(["draft", "running", "completed", "paused", "failed"]).optional(),
-    }))
-    .mutation(async ({ input }) => {
-      const { id, ...data } = input;
-      await updateCampaign(id, data);
-      return { success: true };
-    }),
-
-  // حذف حملة
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      await deleteCampaign(input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db.delete(campaigns).where(eq(campaigns.id, input.id));
       return { success: true };
     }),
 
-  // إحصائيات الحملات (للرسم البياني)
-  stats: protectedProcedure.query(async () => {
-    const all = await getCampaigns();
-    const total = all.length;
-    const completed = all.filter(c => c.status === "completed").length;
-    const running = all.filter(c => c.status === "running").length;
-    const totalSent = all.reduce((s, c) => s + c.totalSent, 0);
-    const totalReplied = all.reduce((s, c) => s + c.totalReplied, 0);
-    const avgResponseRate = total > 0
-      ? all.reduce((s, c) => s + (c.responseRate ?? 0), 0) / total
-      : 0;
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      description: z.string().optional(),
+      status: z.enum(["draft", "running", "completed", "paused", "failed"]).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-    // بيانات الرسم البياني (آخر 10 حملات)
-    const chartData = all.slice(0, 10).reverse().map(c => ({
-      name: c.name.length > 15 ? c.name.substring(0, 15) + "..." : c.name,
-      sent: c.totalSent,
-      replied: c.totalReplied,
-      failed: c.totalFailed,
-      responseRate: Math.round(c.responseRate ?? 0),
-    }));
-
-    return {
-      total,
-      completed,
-      running,
-      totalSent,
-      totalReplied,
-      avgResponseRate: Math.round(avgResponseRate * 10) / 10,
-      chartData,
-    };
-  }),
+      const { id, ...data } = input;
+      await db.update(campaigns).set(data).where(eq(campaigns.id, id));
+      return { success: true };
+    }),
 });

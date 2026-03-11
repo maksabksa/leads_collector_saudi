@@ -318,7 +318,6 @@ export default function UsersManagement() {
 
   const { data: invitations, isLoading: loadingInvitations } = trpc.invitations.listInvitations.useQuery();
   const { data: allUsers, isLoading: loadingUsers } = trpc.invitations.listUsers.useQuery();
-  const { data: waAccounts = [] } = trpc.waAccounts.listAccounts.useQuery();
 
   const utils = trpc.useUtils();
 
@@ -558,13 +557,7 @@ export default function UsersManagement() {
                             </div>
                           )}
 
-                          {/* حساب واتساب */}
-                          {(u as { defaultWhatsappAccountId?: string | null }).defaultWhatsappAccountId && (
-                            <div className="flex items-center gap-1 mt-1.5 text-xs text-green-400">
-                              <Smartphone className="h-3 w-3" />
-                              {waAccounts.find(a => a.accountId === (u as { defaultWhatsappAccountId?: string | null }).defaultWhatsappAccountId)?.label || "حساب واتساب"}
-                            </div>
-                          )}
+
                         </div>
 
                         {/* أزرار الإجراءات */}
@@ -730,31 +723,7 @@ export default function UsersManagement() {
                 </div>
               </div>
 
-              {/* حساب واتساب */}
-              {waAccounts.length > 0 && (
-                <div>
-                  <Label className="mb-1 block flex items-center gap-2">
-                    <Smartphone className="h-4 w-4 text-green-500" />
-                    حساب واتساب الإرسال الافتراضي
-                  </Label>
-                  <Select
-                    value={editingUser.defaultWhatsappAccountId || "none"}
-                    onValueChange={(v) => setEditingUser({ ...editingUser, defaultWhatsappAccountId: v === "none" ? null : v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="غير محدد" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">غير محدد (الافتراضي للنظام)</SelectItem>
-                      {waAccounts.map(acc => (
-                        <SelectItem key={acc.accountId} value={acc.accountId}>
-                          {acc.label} — {acc.phoneNumber || acc.accountId}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+
 
               {/* الصلاحيات */}
               {editingUser.role !== "admin" && (

@@ -1,118 +1,80 @@
-/**
- * نظام المتابعة التلقائية - Follow-up System
- * يعرض العملاء المهتمين بدون خطوة قادمة أو موعد متابعة
- */
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { TRPCError } from "@trpc/server";
-import { eq, and, or, isNull, lt, sql } from "drizzle-orm";
-import { whatsappChats } from "../../drizzle/schema";
+import { leads } from "../../drizzle/schema";
+import { isNotNull, desc, eq, lte } from "drizzle-orm";
 
 export const followUpRouter = router({
-  // جلب المحادثات التي تحتاج متابعة
-  getFollowUpNeeded: protectedProcedure
-    .query(async () => {
+  // العملاء الذين يحتاجون متابعة (nextFollowup أقل من أو يساوي الوقت الحالي)
+  getFollowUpNeeded: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+
+    const now = Date.now();
+    const allLeads = await db.select().from(leads)
+      .where(isNotNull(leads.nextFollowup))
+      .orderBy(leads.nextFollowup)
+      .limit(100);
+
+    return allLeads.filter(l => l.nextFollowup && l.nextFollowup <= now);
+  }),
+
+  // إحصائيات المتابعة
+  getFollowUpStats: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { overdue: 0, today: 0, upcoming: 0, total: 0 };
+
+    const now = Date.now();
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayEndMs = todayEnd.getTime();
+    const weekEndMs = now + 7 * 24 * 60 * 60 * 1000;
+
+    const allFollowUps = await db.select({
+      nextFollowup: leads.nextFollowup,
+    }).from(leads).where(isNotNull(leads.nextFollowup));
+
+    const overdue = allFollowUps.filter(l => l.nextFollowup && l.nextFollowup < now).length;
+    const today = allFollowUps.filter(l => l.nextFollowup && l.nextFollowup >= now && l.nextFollowup <= todayEndMs).length;
+    const upcoming = allFollowUps.filter(l => l.nextFollowup && l.nextFollowup > todayEndMs && l.nextFollowup <= weekEndMs).length;
+    const total = allFollowUps.length;
+
+    return { overdue, today, upcoming, total };
+  }),
+
+  // تحديث تاريخ المتابعة
+  updateFollowUpDate: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      followUpDate: z.number().nullable(), // timestamp in ms
+    }))
+    .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { missingNextStep: [], overdueFollowUp: [], interestedNoAction: [] };
+      if (!db) return { success: false };
 
-      const now = new Date();
+      await db.update(leads)
+        .set({ nextFollowup: input.followUpDate })
+        .where(eq(leads.id, input.leadId));
 
-      // 1. عملاء مهتمون بدون خطوة قادمة
-      const interestedNoStep = await db.select()
-        .from(whatsappChats)
-        .where(
-          and(
-            sql`${whatsappChats.stage} IN ('interested', 'price_offer', 'meeting')`,
-            isNull(whatsappChats.nextStep),
-            eq(whatsappChats.isArchived, false)
-          )
-        )
-        .limit(50);
-
-      // 2. عملاء تجاوزوا موعد المتابعة
-      const overdueFollowUp = await db.select()
-        .from(whatsappChats)
-        .where(
-          and(
-            sql`${whatsappChats.followUpDate} IS NOT NULL`,
-            lt(whatsappChats.followUpDate, now),
-            sql`${whatsappChats.stage} NOT IN ('won', 'lost')`,
-            eq(whatsappChats.isArchived, false)
-          )
-        )
-        .limit(50);
-
-      // 3. عملاء مهتمون لم يُرد عليهم منذ 24 ساعة
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const interestedNoReply = await db.select()
-        .from(whatsappChats)
-        .where(
-          and(
-            sql`${whatsappChats.stage} IN ('interested', 'price_offer')`,
-            sql`${whatsappChats.lastMessageAt} IS NOT NULL`,
-            lt(whatsappChats.lastMessageAt, yesterday),
-            eq(whatsappChats.isArchived, false)
-          )
-        )
-        .limit(50);
-
-      return {
-        missingNextStep: interestedNoStep,
-        overdueFollowUp: overdueFollowUp,
-        interestedNoAction: interestedNoReply,
-      };
+      return { success: true };
     }),
 
-  // إحصائيات سريعة للـ dashboard
-  getFollowUpStats: protectedProcedure
-    .query(async () => {
+  // تأجيل المتابعة
+  snoozeFollowUp: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      days: z.number().default(1),
+    }))
+    .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { total: 0, overdue: 0, missingStep: 0, noReply: 0 };
+      if (!db) return { success: false };
 
-      const now = new Date();
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const newDate = Date.now() + input.days * 24 * 60 * 60 * 1000;
 
-      const [overdueCount] = await db.select({ count: sql<number>`COUNT(*)` })
-        .from(whatsappChats)
-        .where(
-          and(
-            sql`${whatsappChats.followUpDate} IS NOT NULL`,
-            lt(whatsappChats.followUpDate, now),
-            sql`${whatsappChats.stage} NOT IN ('won', 'lost')`,
-            eq(whatsappChats.isArchived, false)
-          )
-        );
+      await db.update(leads)
+        .set({ nextFollowup: newDate })
+        .where(eq(leads.id, input.leadId));
 
-      const [missingStepCount] = await db.select({ count: sql<number>`COUNT(*)` })
-        .from(whatsappChats)
-        .where(
-          and(
-            sql`${whatsappChats.stage} IN ('interested', 'price_offer', 'meeting')`,
-            isNull(whatsappChats.nextStep),
-            eq(whatsappChats.isArchived, false)
-          )
-        );
-
-      const [noReplyCount] = await db.select({ count: sql<number>`COUNT(*)` })
-        .from(whatsappChats)
-        .where(
-          and(
-            sql`${whatsappChats.stage} IN ('interested', 'price_offer')`,
-            lt(whatsappChats.lastMessageAt, yesterday),
-            eq(whatsappChats.isArchived, false)
-          )
-        );
-
-      const overdue = Number(overdueCount?.count ?? 0);
-      const missingStep = Number(missingStepCount?.count ?? 0);
-      const noReply = Number(noReplyCount?.count ?? 0);
-
-      return {
-        total: overdue + missingStep + noReply,
-        overdue,
-        missingStep,
-        noReply,
-      };
+      return { success: true, newDate };
     }),
 });

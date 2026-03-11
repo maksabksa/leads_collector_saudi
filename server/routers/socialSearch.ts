@@ -12,8 +12,9 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { TRPCError } from "@trpc/server";
-import { searchTikTokWithPuppeteer, searchSnapchatWithPuppeteer, scrapeTikTokProfile, scrapeSnapchatProfile } from "./puppeteerScraper";
 import { searchTikTokSERP, searchSnapchatSERP } from "./serpSearch";
+
+
 
 // ===== أنماط التحقق من البيانات =====
 /** نمط أرقام الهواتف السعودية والخليجية الحقيقية */
@@ -269,28 +270,6 @@ async function searchTikTok(keyword: string, city: string): Promise<any[]> {
     console.warn("[TikTok] SERP API failed, falling back to puppeteer:", err);
   }
 
-  // المحاولة الثانية: Puppeteer
-  try {
-    const puppeteerResults = await searchTikTokWithPuppeteer(keyword, city);
-    if (puppeteerResults.length > 0) {
-      return puppeteerResults.map(r => ({
-        name: r.displayName,
-        username: r.username,
-        bio: r.bio,
-        followers: r.followers,
-        businessType: "",
-        phone: r.phones[0] || "",
-        website: r.websites[0] || "",
-        city: city,
-        profileUrl: r.profileUrl,
-        engagementLevel: r.verified ? "verified" : "normal",
-        availablePhones: r.phones,
-        availableWebsites: r.websites,
-        dataSource: "tiktok_puppeteer",
-        verified: r.verified,
-      }));
-    }
-  } catch { /* تجاهل */ }
   return [];
 }
 
@@ -322,28 +301,6 @@ async function searchSnapchat(keyword: string, city: string): Promise<any[]> {
     console.warn("[Snapchat] SERP API failed, falling back to puppeteer:", err);
   }
 
-  // المحاولة الثانية: Puppeteer
-  try {
-    const puppeteerResults = await searchSnapchatWithPuppeteer(keyword, city);
-    if (puppeteerResults.length > 0) {
-      return puppeteerResults.map(r => ({
-        name: r.displayName,
-        username: r.username,
-        bio: r.bio,
-        followers: r.subscribers,
-        businessType: "",
-        phone: r.phones[0] || "",
-        website: r.websites[0] || "",
-        city: city,
-        profileUrl: r.profileUrl,
-        engagementLevel: "normal",
-        availablePhones: r.phones,
-        availableWebsites: r.websites,
-        dataSource: "snapchat_puppeteer",
-        verified: false,
-      }));
-    }
-  } catch { /* تجاهل */ }
   return [];
 }
 
@@ -381,38 +338,12 @@ export const socialSearchRouter = router({
       }
     }),
 
-  // جلب تفاصيل ملف تعريف TikTok مباشرة بـ Puppeteer
-  getTikTokProfile: protectedProcedure
-    .input(z.object({ username: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      try {
-        const profile = await scrapeTikTokProfile(input.username);
-        if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "لم يُعثر على الملف الشخصي" });
-        return profile;
-      } catch (err: any) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
-      }
-    }),
-
   searchSnapchat: protectedProcedure
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
         const results = await searchSnapchat(input.keyword, input.city);
         return { results, platform: "Snapchat", total: results.length };
-      } catch (err: any) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
-      }
-    }),
-
-  // جلب تفاصيل ملف تعريف Snapchat مباشرة بـ Puppeteer
-  getSnapchatProfile: protectedProcedure
-    .input(z.object({ username: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      try {
-        const profile = await scrapeSnapchatProfile(input.username);
-        if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "لم يُعثر على الملف الشخصي" });
-        return profile;
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
       }

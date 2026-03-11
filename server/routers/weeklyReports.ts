@@ -1,185 +1,120 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import {
-  getWeeklyReports, getWeeklyReportById, createWeeklyReport, updateWeeklyReport,
-  getReminders
-} from "../db";
+import { TRPCError } from "@trpc/server";
+import { getDb } from "../db";
+import { weeklyReports, leads, reminders, reportSchedules } from "../../drizzle/schema";
+import { desc, eq, gte, lte, sql, and } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 
 export const weeklyReportsRouter = router({
-  // قائمة التقارير
-  list: protectedProcedure.query(async () => {
-    return getWeeklyReports();
+  list: protectedProcedure
+    .input(z.object({ limit: z.number().default(10) }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(weeklyReports)
+        .orderBy(desc(weeklyReports.weekStart))
+        .limit(input?.limit || 10);
+    }),
+
+  getLatest: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return null;
+    const [report] = await db.select().from(weeklyReports)
+      .orderBy(desc(weeklyReports.weekStart))
+      .limit(1);
+    return report || null;
   }),
 
-  // تفاصيل تقرير
-  getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
-      return getWeeklyReportById(input.id);
-    }),
+  generate: protectedProcedure.mutation(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-  // توليد تقرير أسبوعي جديد
-  generate: protectedProcedure
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay()); // بداية الأسبوع (الأحد)
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const [totalLeads, newLeads, hotLeads] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(leads),
+      db.select({ count: sql<number>`count(*)` }).from(leads).where(gte(leads.createdAt, weekStart)),
+      db.select({ count: sql<number>`count(*)` }).from(leads).where(eq(leads.priority, "high")),
+    ]);
+
+    const totalCount = totalLeads[0]?.count ?? 0;
+    const newCount = newLeads[0]?.count ?? 0;
+    const hotCount = hotLeads[0]?.count ?? 0;
+
+    // إنشاء ملخص بالذكاء الاصطناعي
+    const summaryResponse = await invokeLLM({
+      messages: [
+        { role: "system", content: "أنت مدير مبيعات خبير. قدم ملخصاً أسبوعياً احترافياً." },
+        { role: "user", content: `ملخص الأسبوع:\n- إجمالي العملاء: ${totalCount}\n- عملاء جدد هذا الأسبوع: ${newCount}\n- عملاء ذوو أولوية عالية: ${hotCount}\n\nقدم ملخصاً موجزاً ومفيداً.` },
+      ],
+    });
+
+    const summaryText = String(summaryResponse.choices[0]?.message?.content || "لا يمكن إنشاء الملخص");
+
+    const result = await db.insert(weeklyReports).values({
+      weekStart,
+      weekEnd,
+      totalLeads: totalCount,
+      newLeads: newCount,
+      hotLeads: hotCount,
+      messagesSent: 0,
+      messagesReceived: 0,
+      analyzedLeads: 0,
+      completedReminders: 0,
+      pendingReminders: 0,
+      summaryText,
+      sentViaWhatsapp: false,
+    });
+
+    return { id: (result as any).insertId, summaryText };
+  }),
+
+  getSchedule: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return null;
+    const [schedule] = await db.select().from(reportSchedules).limit(1);
+    return schedule || { isEnabled: false, dayOfWeek: 0, hour: 8, minute: 0, timezone: "Asia/Riyadh" };
+  }),
+
+  saveSchedule: protectedProcedure
     .input(z.object({
-      weekStart: z.string().optional(), // ISO date string, defaults to last Monday
+      isEnabled: z.boolean(),
+      dayOfWeek: z.number().min(0).max(6),
+      hour: z.number().min(0).max(23),
+      minute: z.number().min(0).max(59),
+      timezone: z.string().optional(),
     }))
-    .mutation(async ({ input, ctx }) => {
-      const { getDb } = await import("../db");
-      const { leads, whatsappMessages, whatsappChatMessages } = await import("../../drizzle/schema");
-      const { sql, and, gte, lt, count, eq } = await import("drizzle-orm");
-      const db = await getDb();
-      if (!db) throw new Error("DB not available");
-
-      // حساب نطاق الأسبوع
-      const now = new Date();
-      let weekStart: Date;
-      if (input.weekStart) {
-        weekStart = new Date(input.weekStart);
-      } else {
-        // الاثنين الماضي
-        const day = now.getDay();
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        weekStart = new Date(now.setDate(diff));
-        weekStart.setHours(0, 0, 0, 0);
-      }
-      const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-      // جمع الإحصائيات
-      const allLeads = await db.select().from(leads);
-      const totalLeads = allLeads.length;
-      const newLeads = allLeads.filter(l =>
-        l.createdAt >= weekStart && l.createdAt < weekEnd
-      ).length;
-      const analyzedLeads = allLeads.filter(l => l.analysisStatus === "completed").length;
-
-      // رسائل الأسبوع
-      const sentMsgs = await db.select().from(whatsappMessages)
-        .where(and(gte(whatsappMessages.sentAt, weekStart), lt(whatsappMessages.sentAt, weekEnd)));
-      const messagesSent = sentMsgs.length;
-
-      // رسائل واردة
-      const receivedMsgs = await db.select().from(whatsappChatMessages)
-        .where(and(
-          eq(whatsappChatMessages.direction, "incoming"),
-          gte(whatsappChatMessages.sentAt, weekStart),
-          lt(whatsappChatMessages.sentAt, weekEnd)
-        ));
-      const messagesReceived = receivedMsgs.length;
-
-      // معدل الاستجابة
-      const responseRate = messagesSent > 0
-        ? Math.round((messagesReceived / messagesSent) * 100 * 10) / 10
-        : 0;
-
-      // عملاء ساخنون (score >= 8)
-      const hotLeads = allLeads.filter(l => (l.leadPriorityScore ?? 0) >= 8).length;
-
-      // التذكيرات
-      const allReminders = await getReminders();
-      const completedReminders = allReminders.filter(r =>
-        r.status === "done" && r.completedAt && r.completedAt >= weekStart && r.completedAt < weekEnd
-      ).length;
-      const pendingReminders = allReminders.filter(r => r.status === "pending").length;
-
-      // أكثر المدن
-      const cityMap: Record<string, number> = {};
-      allLeads.forEach(l => { cityMap[l.city] = (cityMap[l.city] || 0) + 1; });
-      const topCities = Object.entries(cityMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([city, count]) => ({ city, count }));
-
-      // أكثر الأنشطة
-      const typeMap: Record<string, number> = {};
-      allLeads.forEach(l => { typeMap[l.businessType] = (typeMap[l.businessType] || 0) + 1; });
-      const topBusinessTypes = Object.entries(typeMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([type, count]) => ({ type, count }));
-
-      // توليد ملخص AI
-      let summaryText = "";
-      try {
-        const aiResponse = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content: "أنت محلل تسويق رقمي محترف. اكتب ملخصاً موجزاً وعملياً للتقرير الأسبوعي باللغة العربية."
-            },
-            {
-              role: "user",
-              content: `ملخص أسبوع ${weekStart.toLocaleDateString('ar-SA')} - ${weekEnd.toLocaleDateString('ar-SA')}:
-- إجمالي العملاء: ${totalLeads} (جديد هذا الأسبوع: ${newLeads})
-- رسائل مرسلة: ${messagesSent} | ردود مستلمة: ${messagesReceived} | معدل الاستجابة: ${responseRate}%
-- عملاء ساخنون: ${hotLeads}
-- تذكيرات مكتملة: ${completedReminders} | معلقة: ${pendingReminders}
-- أكثر المدن: ${topCities.slice(0, 3).map(c => c.city).join(', ')}
-
-اكتب ملخصاً من 3-4 جمل يبرز الإنجازات والتحديات والتوصيات للأسبوع القادم.`
-            }
-          ]
-        });
-        summaryText = (aiResponse as any)?.choices?.[0]?.message?.content || "";
-      } catch (e) {
-        summaryText = `تقرير أسبوع ${weekStart.toLocaleDateString('ar-SA')}: تم إرسال ${messagesSent} رسالة، معدل الاستجابة ${responseRate}%، ${newLeads} عميل جديد.`;
-      }
-
-      // حفظ التقرير
-      const report = await createWeeklyReport({
-        weekStart,
-        weekEnd,
-        totalLeads,
-        newLeads,
-        analyzedLeads,
-        messagesSent,
-        messagesReceived,
-        responseRate,
-        hotLeads,
-        completedReminders,
-        pendingReminders,
-        topCities,
-        topBusinessTypes,
-        summaryText,
-      });
-
-      return report;
-    }),
-
-  // إرسال التقرير عبر واتساب
-  sendViaWhatsapp: protectedProcedure
-    .input(z.object({ reportId: z.number() }))
     .mutation(async ({ input }) => {
-      const report = await getWeeklyReportById(input.reportId);
-      if (!report) throw new Error("التقرير غير موجود");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      const { sendWhatsAppMessage } = await import("../whatsappAutomation");
-      const { ENV } = await import("../_core/env");
-
-      // بناء رسالة التقرير
-      const weekLabel = `${new Date(report.weekStart).toLocaleDateString('ar-SA')} - ${new Date(report.weekEnd).toLocaleDateString('ar-SA')}`;
-      const message = `📊 *التقرير الأسبوعي*\n📅 ${weekLabel}\n\n` +
-        `👥 إجمالي العملاء: *${report.totalLeads}* (جديد: ${report.newLeads})\n` +
-        `📤 رسائل مرسلة: *${report.messagesSent}*\n` +
-        `📥 ردود مستلمة: *${report.messagesReceived}*\n` +
-        `📈 معدل الاستجابة: *${report.responseRate}%*\n` +
-        `🔥 عملاء ساخنون: *${report.hotLeads}*\n` +
-        `✅ تذكيرات مكتملة: *${report.completedReminders}*\n` +
-        `⏰ تذكيرات معلقة: *${report.pendingReminders}*\n\n` +
-        (report.summaryText ? `💡 *الملخص:*\n${report.summaryText}` : "");
-
-      // إرسال للمالك
-      const ownerPhone = ENV.ownerOpenId || "";
-      if (!ownerPhone) {
-        return { success: false, error: "لم يُحدد رقم المالك" };
+      const [existing] = await db.select().from(reportSchedules).limit(1);
+      if (existing) {
+        await db.update(reportSchedules).set({
+          isEnabled: input.isEnabled,
+          dayOfWeek: input.dayOfWeek,
+          hour: input.hour,
+          minute: input.minute,
+          timezone: input.timezone || "Asia/Riyadh",
+        }).where(eq(reportSchedules.id, existing.id));
+      } else {
+        await db.insert(reportSchedules).values({
+          isEnabled: input.isEnabled,
+          dayOfWeek: input.dayOfWeek,
+          hour: input.hour,
+          minute: input.minute,
+          timezone: input.timezone || "Asia/Riyadh",
+        });
       }
 
-      try {
-        await sendWhatsAppMessage(ownerPhone, message);
-        await updateWeeklyReport(input.reportId, { sentViaWhatsapp: true, sentAt: new Date() });
-        return { success: true };
-      } catch (e: any) {
-        return { success: false, error: e.message };
-      }
+      return { success: true };
     }),
 });

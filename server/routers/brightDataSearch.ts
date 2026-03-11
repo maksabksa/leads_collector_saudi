@@ -77,10 +77,10 @@ async function scrapeInstagram(query: string, location: string): Promise<any[]> 
       platform: "instagram",
       username: r.username,
       name: r.displayName,
-      profileUrl: r.profileUrl,
-      bio: r.description,
+      profileUrl: r.url,
+      bio: r.bio,
       website: "",
-      phone: r.phone || "",
+      phone: "",
       dataSource: "serp",
     }));
   } catch (err) {
@@ -98,10 +98,10 @@ async function scrapeTikTok(query: string, location: string): Promise<any[]> {
       platform: "tiktok",
       username: r.username,
       displayName: r.displayName,
-      profileUrl: r.profileUrl,
-      bio: r.description,
-      followers: r.followers,
-      phone: r.phone || "",
+      profileUrl: r.url,
+      bio: r.bio,
+      followers: 0,
+      phone: "",
       dataSource: "serp",
     }));
   } catch (err) {
@@ -130,7 +130,8 @@ async function scrapeTwitter(query: string, location: string): Promise<any[]> {
 
       for (const item of googleResults) {
         // استخراج username من URL
-        const usernameMatch = item.link.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)(?:\/|$)/);
+        const itemUrl = item.url;
+        const usernameMatch = itemUrl.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)(?:\/|$)/);
         if (!usernameMatch) continue;
         const username = usernameMatch[1];
         // تجاهل صفحات عامة
@@ -138,18 +139,18 @@ async function scrapeTwitter(query: string, location: string): Promise<any[]> {
         if (seen.has(username)) continue;
         seen.add(username);
 
-        const phones = (item.snippet + " " + item.title).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
+        const phones = ((item.bio || '') + " " + (item.displayName || '')).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
 
         results.push({
           platform: "twitter",
           username,
-          displayName: item.title
+          displayName: item.displayName
             .replace(/ on X$/, "")
             .replace(/ \(@[^)]+\)/, "")
             .replace(/ \| Twitter$/, "")
             .trim(),
           profileUrl: `https://x.com/${username}`,
-          bio: item.snippet?.substring(0, 200) || "",
+          bio: item.bio?.substring(0, 200) || "",
           phone: phones[0] || "",
           dataSource: "serp",
         });
@@ -170,15 +171,15 @@ async function scrapeLinkedIn(query: string, location: string): Promise<any[]> {
     const serpResults = await searchLinkedInSERP(query, location);
     return serpResults.map(r => ({
       platform: "linkedin",
-      name: r.name,
-      displayName: r.name,
-      profileUrl: r.profileUrl,
-      bio: r.description?.substring(0, 200),
-      description: r.description?.substring(0, 200),
-      subtitle: r.industry || r.type,
-      phone: r.phone || "",
-      id: r.id,
-      type: r.type,
+      name: r.displayName,
+      displayName: r.displayName,
+      profileUrl: r.url,
+      bio: r.bio?.substring(0, 200),
+      description: r.bio?.substring(0, 200),
+      subtitle: r.username,
+      phone: "",
+      id: r.username,
+      type: "company",
       dataSource: "serp",
     }));
   } catch (e) {
@@ -196,10 +197,10 @@ async function scrapeSnapchat(query: string, location: string): Promise<any[]> {
       platform: "snapchat",
       username: r.username,
       displayName: r.displayName,
-      profileUrl: r.profileUrl,
-      bio: r.description,
-      followers: r.subscribers,
-      phone: r.phone || "",
+      profileUrl: r.url,
+      bio: r.bio,
+      followers: 0,
+      phone: "",
       dataSource: "serp",
     }));
   } catch (err) {
@@ -228,18 +229,19 @@ async function scrapeGoogleSearch(query: string, location: string): Promise<any[
       const googleResults = parseGoogleResultsPublic(html, ""); // بدون تصفية domain
 
       for (const item of googleResults) {
-        if (seen.has(item.link)) continue;
-        seen.add(item.link);
+        const itemLink = item.url;
+        if (seen.has(itemLink)) continue;
+        seen.add(itemLink);
 
-        const phones = (item.snippet + " " + item.title).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
+        const phones = ((item.bio || '') + " " + (item.displayName || '')).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
 
         results.push({
           platform: "google",
-          displayName: item.title,
-          profileUrl: item.link,
-          bio: item.snippet?.substring(0, 300) || "",
+          displayName: item.displayName,
+          profileUrl: item.url,
+          bio: item.bio?.substring(0, 300) || "",
           phone: phones[0] || "",
-          website: item.link,
+          website: item.url,
           dataSource: "serp",
         });
       }

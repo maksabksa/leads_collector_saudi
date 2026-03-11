@@ -66,7 +66,7 @@ export default function ResetPassword() {
       return;
     }
 
-    resetPasswordMutation.mutate({ token, newPassword });
+    resetPasswordMutation.mutate({ token, password: newPassword });
   };
 
   // قوة كلمة المرور

@@ -13,22 +13,16 @@ import Search from "./pages/Search";
 import Scout from "./pages/Scout";
 import SearchEngine from "./pages/SearchEngine";
 import Layout from "./components/Layout";
-import BulkWhatsapp from "./pages/BulkWhatsapp";
-import WhatsAppAuto from "./pages/WhatsAppAuto";
 import InstagramSearch from "./pages/InstagramSearch";
-import WhatsApp from "./pages/WhatsApp";
 import SearchHub from "./pages/SearchHub";
 import UsersManagement from "./pages/UsersManagement";
 import JoinPage from "./pages/JoinPage";
-import Chats from "./pages/Chats";
 import AISettings from "./pages/AISettings";
-import WhatsAppAccounts from "./pages/WhatsAppAccounts";
 import InterestKeywords from "./pages/InterestKeywords";
 import Segments from "./pages/Segments";
 import DataSettings from "./pages/DataSettings";
 import BulkImport from "./pages/BulkImport";
 import KnowledgeBase from "./pages/KnowledgeBase";
-import WhatsAppReport from "./pages/WhatsAppReport";
 import NumberHealth from "./pages/NumberHealth";
 import EmployeePerformance from "./pages/EmployeePerformance";
 import DigitalMarketing from "./pages/DigitalMarketing";
@@ -70,22 +64,16 @@ function Router() {
         <Route path="/search" component={Search} />
         <Route path="/scout" component={Scout} />
         <Route path="/engine" component={SearchEngine} />
-        <Route path="/bulk-whatsapp" component={BulkWhatsapp} />
-        <Route path="/whatsapp-auto" component={WhatsAppAuto} />
         <Route path="/instagram" component={InstagramSearch} />
-        <Route path="/whatsapp" component={WhatsApp} />
         <Route path="/search-hub" component={SearchHub} />
         <Route path="/users">{() => <AdminGuard><UsersManagement /></AdminGuard>}</Route>
         <Route path="/join" component={JoinPage} />
-        <Route path="/chats" component={Chats} />
         <Route path="/ai-settings">{() => <AdminGuard><AISettings /></AdminGuard>}</Route>
-        <Route path="/whatsapp-accounts">{() => <AdminGuard><WhatsAppAccounts /></AdminGuard>}</Route>
         <Route path="/interest-keywords" component={InterestKeywords} />
         <Route path="/segments" component={Segments} />
         <Route path="/data-settings">{() => <AdminGuard><DataSettings /></AdminGuard>}</Route>
         <Route path="/bulk-import" component={BulkImport} />
         <Route path="/knowledge-base" component={KnowledgeBase} />
-        <Route path="/whatsapp-report" component={WhatsAppReport} />
         <Route path="/number-health" component={NumberHealth} />
         <Route path="/employee-performance" component={EmployeePerformance} />
         <Route path="/digital-marketing" component={DigitalMarketing} />

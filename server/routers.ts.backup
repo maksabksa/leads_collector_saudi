@@ -16,38 +16,9 @@ import {
   markInstagramAccountAsLead,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { dataSettings, aiSettings } from "../drizzle/schema";
-import { eq, and, asc, sql, desc, like, or, gte, lte, inArray } from "drizzle-orm";
+import { whatsappMessages, dataSettings, aiSettings } from "../drizzle/schema";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { invitationsRouter } from "./routers/invitations";
-import { aiSettingsRouter } from "./routers/aiSettings";
-import { brightDataSearchRouter } from "./routers/brightDataSearch";
-import { googleSearchRouter } from "./routers/googleSearch";
-import { socialSearchRouter } from "./routers/socialSearch";
-import { segmentsRouter } from "./routers/segments";
-import { companySettingsRouter } from "./routers/companySettings";
-import { digitalMarketingRouter } from "./routers/digitalMarketing";
-import { staffAuthRouter } from "./routers/staffAuth";
-import { auditLogRouter } from "./routers/auditLog";
-import { remindersRouter } from "./routers/reminders";
-import { labelsRouter } from "./routers/labels";
-import { interestKwRouter } from "./routers/interestKw";
-import { ragKnowledgeRouter } from "./routers/ragKnowledge";
-import { dataQualityRouter } from "./routers/dataQuality";
-import { campaignsRouter } from "./routers/campaigns";
-import { behaviorAnalysisRouter } from "./routers/behaviorAnalysis";
-import { reportRouter } from "./routers/report";
-import { weeklyReportsRouter } from "./routers/weeklyReports";
-import { inboxRouter } from "./routers/inbox";
-import { whatsappRouter } from "./routers/whatsapp";
-import { waAccountsRouter } from "./routers/waAccounts";
-import { wautoRouter } from "./routers/wauto";
-import { numberHealthRouter } from "./routers/numberHealth";
-import { activationRouter } from "./routers/activation";
-import { followUpRouter } from "./routers/followUp";
-import { searchBehaviorRouter } from "./routers/searchBehavior";
-import { reportSchedulerRouter } from "./routers/reportScheduler";
-
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
   list: protectedProcedure.query(async () => {
@@ -142,8 +113,6 @@ const zonesRouter = router({
     return { message: "تم إنشاء المناطق بنجاح", count: defaultZones.length };
   }),
 });
-
-// ===== LEADS ROUTER =====
 
 // ===== LEADS ROUTER =====
 const leadsRouter = router({
@@ -475,8 +444,6 @@ const leadsRouter = router({
 });
 
 // ===== ANALYSIS ROUTER =====
-
-// ===== ANALYSIS ROUTER =====
 const analysisRouter = router({
   analyzeWebsite: protectedProcedure
     .input(z.object({
@@ -780,8 +747,6 @@ const analysisRouter = router({
     }),
 });
 // ===== AI SYSTEM INSIGHTS =====
-
-// ===== AI REPORT ROUTER =====
 const aiReportRouter = router({
   getSystemInsights: protectedProcedure
     .input(z.object({ period: z.number().min(7).max(90).default(30) }))
@@ -790,7 +755,7 @@ const aiReportRouter = router({
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'قاعدة البيانات غير متاحة' });
 
       // جلب إحصائيات العملاء باستخدام Drizzle ORM
-      const { leads: leadsTable } = await import('../drizzle/schema');
+      const { leads: leadsTable, whatsappChatMessages, whatsappAccounts } = await import('../drizzle/schema');
       const { count, sum, countDistinct } = await import('drizzle-orm');
 
       const totalLeads = await db.select({ c: sql<number>`count(*)` }).from(leadsTable);
@@ -817,6 +782,31 @@ const aiReportRouter = router({
         withWebsite: Number(withWebsite[0]?.c) || 0,
       };
 
+      // إحصائيات الرسائل
+      const periodMs = input.period * 24 * 60 * 60 * 1000;
+      const sinceDate = new Date(Date.now() - periodMs);
+      const sinceStr = sinceDate.toISOString().slice(0, 19).replace('T', ' ');
+
+      const totalMsgs = await db.select({ c: sql<number>`count(*)` }).from(whatsappChatMessages).where(sql`${whatsappChatMessages.sentAt} >= ${sinceStr}`);
+      const sentMsgs = await db.select({ c: sql<number>`count(*)` }).from(whatsappChatMessages).where(sql`${whatsappChatMessages.direction} = 'outbound' AND ${whatsappChatMessages.sentAt} >= ${sinceStr}`);
+      const recvMsgs = await db.select({ c: sql<number>`count(*)` }).from(whatsappChatMessages).where(sql`${whatsappChatMessages.direction} = 'inbound' AND ${whatsappChatMessages.sentAt} >= ${sinceStr}`);
+
+      const msgs = {
+        total: Number(totalMsgs[0]?.c) || 0,
+        sent: Number(sentMsgs[0]?.c) || 0,
+        received: Number(recvMsgs[0]?.c) || 0,
+        replyRate: Number(sentMsgs[0]?.c) > 0 ? Math.round((Number(recvMsgs[0]?.c) / Number(sentMsgs[0]?.c)) * 100) : 0,
+      };
+
+      // إحصائيات الحسابات
+      const { whatsappAccounts: waAccTable } = await import('../drizzle/schema');
+      const totalAccs = await db.select({ c: sql<number>`count(*)` }).from(waAccTable);
+      const activeAccs = await db.select({ c: sql<number>`count(*)` }).from(waAccTable).where(eq(waAccTable.isActive, true));
+      const accs = {
+        total: Number(totalAccs[0]?.c) || 0,
+        connected: Number(activeAccs[0]?.c) || 0,
+      };
+
       const systemSummary = {
         leads: {
           total: Number(leads.total) || 0,
@@ -830,6 +820,16 @@ const aiReportRouter = router({
           withPhone: Number(leads.withPhone) || 0,
           withWebsite: Number(leads.withWebsite) || 0,
           conversionRate: Number(leads.total) > 0 ? Math.round((Number(leads.client) / Number(leads.total)) * 100) : 0,
+        },
+        messages: {
+          total: Number(msgs.total) || 0,
+          sent: Number(msgs.sent) || 0,
+          received: Number(msgs.received) || 0,
+          replyRate: Number(msgs.sent) > 0 ? Math.round((Number(msgs.received) / Number(msgs.sent)) * 100) : 0,
+        },
+        accounts: {
+          total: Number(accs.total) || 0,
+          connected: Number(accs.connected) || 0,
         },
         period: input.period,
       };
@@ -876,8 +876,6 @@ ${JSON.stringify(systemSummary, null, 2)}
 });
 
 // ===== EXPORT ROUTER ======
-
-// ===== EXPORT ROUTER =====
 const exportRouter = router({
   exportCSV: protectedProcedure
     .input(z.object({
@@ -952,8 +950,6 @@ const exportRouter = router({
 });
 
 // ===== SEARCH ROUTER (Google Places) =====
-
-// ===== SEARCH ROUTER =====
 const searchRouter = router({
   // Text search: returns list of places matching query + city
   searchPlaces: protectedProcedure
@@ -1275,8 +1271,6 @@ const searchRouter = router({
 // خريطة المهام الجارية في الذاكرة (jobId -> AbortController)
 const runningJobs = new Map<number, { abort: boolean }>();
 
-
-// ===== SEARCH JOBS ROUTER =====
 const searchJobsRouter = router({
   list: protectedProcedure.query(async () => {
     return getAllSearchJobs();
@@ -1560,8 +1554,6 @@ async function runSearchJobInBackground(jobId: number): Promise<void> {
 
 // ===== MAIN ROUTER =====
 // ====== AI Search Assistant Router ======
-
-// ===== AI SEARCH ROUTER =====
 const aiSearchRouter = router({
   // يولد استراتيجية بحث ذكية مخصصة لكل منصة ونشاط
   generateStrategy: protectedProcedure
@@ -1684,6 +1676,423 @@ const aiSearchRouter = router({
 });
 
 // ===== WHATSAPP ROUTER =====
+const whatsappRouter = router({
+  // ===== TEMPLATES =====
+  // جلب كل القوالب
+  listTemplates: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const { whatsappTemplates } = await import("../drizzle/schema");
+    const { desc } = await import("drizzle-orm");
+    return db.select().from(whatsappTemplates).orderBy(desc(whatsappTemplates.isDefault), desc(whatsappTemplates.usageCount));
+  }),
+
+  // إنشاء قالب جديد
+  createTemplate: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      content: z.string().min(1),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      isDefault: z.boolean().default(false),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const [result] = await db.insert(whatsappTemplates).values(input);
+      return { id: (result as any).insertId };
+    }),
+
+  // تحديث قالب
+  updateTemplate: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      content: z.string().optional(),
+      tone: z.enum(["formal", "friendly", "direct"]).optional(),
+      isDefault: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const { id, ...data } = input;
+      await db.update(whatsappTemplates).set({ ...data, updatedAt: new Date() }).where(eq(whatsappTemplates.id, id));
+      return { success: true };
+    }),
+
+  // حذف قالب
+  deleteTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.delete(whatsappTemplates).where(eq(whatsappTemplates.id, input.id));
+      return { success: true };
+    }),
+
+  // توليد قالب بالذكاء الاصطناعي
+  generateTemplate: protectedProcedure
+    .input(z.object({
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      businessType: z.string().optional(),
+      serviceType: z.string().optional(),
+      senderName: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const prompt = `أنت خبير تسويق رقمي سعودي. اكتب قالب رسالة واتساب احترافي لبيع خدمات التسويق الرقمي.
+
+الأسلوب: ${input.tone === "formal" ? "رسمي محترم" : input.tone === "friendly" ? "ودي ومحفّز" : "مباشر وواضح"}
+${input.businessType ? `نوع النشاط المستهدف: ${input.businessType}` : ""}
+${input.serviceType ? `الخدمة المقدمة: ${input.serviceType}` : ""}
+
+استخدم هذه المتغيرات في القالب:
+- {{اسم_النشاط}} = اسم الشركة/النشاط
+- {{نوع_النشاط}} = نوع العمل
+- {{المدينة}} = المدينة
+- {{اسمي}} = اسم المرسل
+- {{شركتي}} = اسم شركة المرسل
+- {{الثغرة}} = الثغرة التسويقية المكتشفة
+
+القالب يجب أن:
+- يكون بين 80-150 كلمة
+- يبدأ بتحية مناسبة
+- يذكر قيمة محددة أو فرصة
+- ينتهي بدعوة للتواصل
+- يكون باللغة العربية
+
+أعطني القالب فقط بدون أي شرح.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "أنت خبير تسويق رقمي متخصص في كتابة رسائل مبيعات فعّالة." },
+          { role: "user", content: prompt },
+        ],
+      });
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل توليد القالب" });
+      return { content: typeof content === "string" ? content : JSON.stringify(content) };
+    }),
+
+  // تطبيق قالب على عميل (استبدال المتغيرات)
+  applyTemplate: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      leadId: z.number(),
+      senderName: z.string().optional(),
+      senderCompany: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [template] = await db.select().from(whatsappTemplates).where(eq(whatsappTemplates.id, input.templateId));
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "القالب غير موجود" });
+      const lead = await getLeadById(input.leadId);
+      if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
+      let message = template.content
+        .replace(/\{\{اسم_النشاط\}\}/g, lead.companyName)
+        .replace(/\{\{نوع_النشاط\}\}/g, lead.businessType)
+        .replace(/\{\{المدينة\}\}/g, lead.city)
+        .replace(/\{\{اسمي\}\}/g, input.senderName || "")
+        .replace(/\{\{شركتي\}\}/g, input.senderCompany || "")
+        .replace(/\{\{الثغرة\}\}/g, lead.biggestMarketingGap || "");
+      // زيادة عداد الاستخدام
+      await db.update(whatsappTemplates).set({ usageCount: template.usageCount + 1 }).where(eq(whatsappTemplates.id, input.templateId));
+      const phone = (lead.verifiedPhone || "").replace(/[^0-9]/g, "");
+      return { message, phone, waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}` };
+    }),
+
+  // تطبيق قالب على قائمة عملاء (مجمع)
+  bulkApplyTemplate: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      leadIds: z.array(z.number()),
+      senderName: z.string().optional(),
+      senderCompany: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { whatsappTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [template] = await db.select().from(whatsappTemplates).where(eq(whatsappTemplates.id, input.templateId));
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      const results: Array<{ leadId: number; companyName: string; phone: string; message: string; waUrl: string }> = [];
+      for (const leadId of input.leadIds) {
+        const lead = await getLeadById(leadId);
+        if (!lead || !lead.verifiedPhone) continue;
+        const message = template.content
+          .replace(/\{\{اسم_النشاط\}\}/g, lead.companyName)
+          .replace(/\{\{نوع_النشاط\}\}/g, lead.businessType)
+          .replace(/\{\{المدينة\}\}/g, lead.city)
+          .replace(/\{\{اسمي\}\}/g, input.senderName || "")
+          .replace(/\{\{شركتي\}\}/g, input.senderCompany || "")
+          .replace(/\{\{الثغرة\}\}/g, lead.biggestMarketingGap || "");
+        const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+        results.push({ leadId, companyName: lead.companyName, phone, message, waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}` });
+      }
+      await db.update(whatsappTemplates).set({ usageCount: template.usageCount + results.length }).where(eq(whatsappTemplates.id, input.templateId));
+      return { results };
+    }),
+
+  // فحص وجود واتساب لرقم هاتف
+  check: protectedProcedure
+    .input(z.object({ leadId: z.number(), phone: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // نحدّث حالة الواتساب في قاعدة البيانات
+      // الفحص الفعلي يتم من المتصفح عبر wa.me - هنا نسجّل النتيجة
+      const { leads } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(leads)
+        .set({ whatsappCheckedAt: new Date() })
+        .where(eq(leads.id, input.leadId));
+      return { phone: input.phone, waUrl: `https://wa.me/${input.phone.replace(/[^0-9]/g, "")}` };
+    }),
+
+  // تحديث حالة واتساب بعد الفحص اليدوي
+  updateStatus: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      hasWhatsapp: z.enum(["yes", "no", "unknown"]),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { leads } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(leads)
+        .set({ hasWhatsapp: input.hasWhatsapp, whatsappCheckedAt: new Date() })
+        .where(eq(leads.id, input.leadId));
+      return { success: true };
+    }),
+
+  // توليد رسالة واتساب مخصصة بالذكاء الاصطناعي
+  generateMessage: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      companyName: z.string(),
+      businessType: z.string(),
+      city: z.string(),
+      biggestGap: z.string().optional(),
+      salesAngle: z.string().optional(),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+    }))
+    .mutation(async ({ input }) => {
+      const prompt = `أنت خبير تسويق رقمي سعودي. اكتب رسالة واتساب احترافية وقصيرة (لا تتجاوز 150 كلمة) لصاحب النشاط التالي:
+
+اسم النشاط: ${input.companyName}
+نوع النشاط: ${input.businessType}
+المدينة: ${input.city}
+${input.biggestGap ? `أبرز ثغرة تسويقية: ${input.biggestGap}` : ""}
+${input.salesAngle ? `زاوية البيع المقترحة: ${input.salesAngle}` : ""}
+
+الأسلوب المطلوب: ${input.tone === "formal" ? "رسمي محترم" : input.tone === "friendly" ? "ودي ومحفّز" : "مباشر وواضح"}
+
+الرسالة يجب أن:
+- تبدأ بالسلام والتعريف بنفسك كمزود خدمات تسويق رقمي
+- تذكر ثغرة محددة أو فرصة تحسين
+- تنتهي بدعوة واضحة للتواصل
+- تكون باللغة العربية الفصحى السهلة
+
+أعطني الرسالة فقط بدون أي مقدمات أو شرح.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "أنت خبير تسويق رقمي متخصص في السوق السعودي." },
+          { role: "user", content: prompt },
+        ],
+      });
+      const message = response.choices[0]?.message?.content;
+      if (!message) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل توليد الرسالة" });
+      return { message: typeof message === "string" ? message : JSON.stringify(message) };
+    }),
+
+  // تسجيل رسالة مُرسلة
+  logMessage: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      phone: z.string(),
+      message: z.string(),
+      messageType: z.enum(["individual", "bulk"]).default("individual"),
+      bulkJobId: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { leads } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.insert(whatsappMessages).values({
+        leadId: input.leadId,
+        phone: input.phone,
+        message: input.message,
+        messageType: input.messageType,
+        bulkJobId: input.bulkJobId,
+        status: "sent",
+      });
+      await db.update(leads)
+        .set({ lastWhatsappSentAt: new Date() })
+        .where(eq(leads.id, input.leadId));
+      return { success: true };
+    }),
+
+  // جلب سجل الرسائل لعميل معين
+  getMessages: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const { eq, desc } = await import("drizzle-orm");
+      return db.select().from(whatsappMessages)
+        .where(eq(whatsappMessages.leadId, input.leadId))
+        .orderBy(desc(whatsappMessages.sentAt))
+        .limit(20);
+    }),
+
+  // إرسال مجمع: توليد رسائل لقائمة عملاء
+  bulkGenerate: protectedProcedure
+    .input(z.object({
+      leadIds: z.array(z.number()),
+      tone: z.enum(["formal", "friendly", "direct"]).default("friendly"),
+      customTemplate: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const results: Array<{ leadId: number; companyName: string; phone: string; message: string; waUrl: string }> = [];
+      for (const leadId of input.leadIds) {
+        const lead = await getLeadById(leadId);
+        if (!lead || !lead.verifiedPhone) continue;
+        let message = input.customTemplate || "";
+        if (!message) {
+          const prompt = `اكتب رسالة واتساب قصيرة (80-100 كلمة) لـ ${lead.companyName} (${lead.businessType}) في ${lead.city}. ${lead.biggestMarketingGap ? `الثغرة: ${lead.biggestMarketingGap}` : ""}. الأسلوب: ${input.tone === "formal" ? "رسمي" : input.tone === "friendly" ? "ودي" : "مباشر"}. أعطني الرسالة فقط.`;
+          const resp = await invokeLLM({
+            messages: [{ role: "user", content: prompt }],
+          });
+          const content = resp.choices[0]?.message?.content;
+          message = typeof content === "string" ? content : "";
+        } else {
+          message = message
+            .replace("{{اسم_النشاط}}", lead.companyName)
+            .replace("{{نوع_النشاط}}", lead.businessType)
+            .replace("{{المدينة}}", lead.city);
+        }
+        const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+        results.push({
+          leadId,
+          companyName: lead.companyName,
+          phone,
+          message,
+          waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+        });
+        // تأخير بشري بين الطلبات
+        await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000));
+      }
+      return { results, bulkJobId: nanoid(10) };
+    }),
+});
+
+// ===== WHATSAPP AUTOMATION ROUTER =====
+const whatsappAutomationRouter = router({
+  // جلب حالة جلسة حساب معين
+  status: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .query(async ({ input }) => {
+      const { getSessionStatus } = await import("./whatsappAutomation");
+      return getSessionStatus(input?.accountId ?? "default");
+    }),
+  // جلب حالة جميع الحسابات
+  allStatus: protectedProcedure.query(async () => {
+    const { getAllSessionsStatus } = await import("./whatsappAutomation");
+    return getAllSessionsStatus();
+  }),
+  // بدء جلسة واتساب لحساب معين
+  startSession: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .mutation(async ({ input }) => {
+      const { startWhatsAppSession } = await import("./whatsappAutomation");
+      return startWhatsAppSession(input?.accountId ?? "default");
+    }),
+  // قطع الاتصال لحساب معين
+  disconnect: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .mutation(async ({ input }) => {
+      const { disconnectWhatsApp } = await import("./whatsappAutomation");
+      await disconnectWhatsApp(input?.accountId ?? "default");
+      return { success: true };
+    }),
+  // إعادة تعيين جلسة واتساب (حذف الجلسة التالفة والبدء من الصفر)
+  resetSession: protectedProcedure
+    .input(z.object({ accountId: z.string().default("default") }).optional())
+    .mutation(async ({ input }) => {
+      const { resetWhatsAppSession } = await import("./whatsappAutomation");
+      return resetWhatsAppSession(input?.accountId ?? "default");
+    }),
+  // إرسال رسالة لرقم واحد
+  sendOne: protectedProcedure
+    .input(z.object({
+      phone: z.string(),
+      message: z.string(),
+      leadId: z.number().optional(),
+      accountId: z.string().default("default"),
+    }))
+    .mutation(async ({ input }) => {
+      const { sendWhatsAppMessage } = await import("./whatsappAutomation");
+      const result = await sendWhatsAppMessage(input.phone, input.message, input.accountId);
+      if (result.success && input.leadId) {
+        const db = await getDb();
+        if (db) {
+          const { whatsappMessages } = await import("../drizzle/schema");
+          await db.insert(whatsappMessages).values({
+            leadId: input.leadId,
+            phone: input.phone,
+            message: input.message,
+            messageType: "individual",
+            status: "sent",
+          });
+        }
+      }
+      return result;
+    }),
+  // إرسال مجمع تلقائي
+  sendBulk: protectedProcedure
+    .input(z.object({
+      messages: z.array(z.object({
+        phone: z.string(),
+        message: z.string(),
+        leadId: z.number(),
+        companyName: z.string(),
+      })),
+      accountId: z.string().default("default"),
+      delayMs: z.number().default(10000),
+    }))
+    .mutation(async ({ input }) => {
+      const { sendBulkMessages } = await import("./whatsappAutomation");
+      const results = await sendBulkMessages(input.messages, undefined, input.accountId, input.delayMs);
+      const db = await getDb();
+      if (db) {
+        const { whatsappMessages } = await import("../drizzle/schema");
+        const bulkJobId = nanoid(10);
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i];
+          const m = input.messages[i];
+          await db.insert(whatsappMessages).values({
+            leadId: m.leadId,
+            phone: m.phone,
+            message: m.message,
+            messageType: "bulk",
+            bulkJobId,
+            status: r.success ? "sent" : "failed",
+          });
+        }
+      }
+      return { results };
+    }),
+});
 
 // ===== INSTAGRAM ROUTER =====
 const instagramRouter = router({
@@ -1962,7 +2371,7 @@ const instagramRouter = router({
     }),
 });
 
-// ===== DATA SETTINGS ROUTER =====
+import { invitationsRouter } from "./routers/invitations";
 
 // ===== DATA SETTINGS ROUTER =====
 const dataSettingsRouter = router({
@@ -2036,6 +2445,37 @@ const dataSettingsRouter = router({
       return { success: true };
     }),
 });
+import { whatsappSettingsRouter } from "./routers/whatsappSettings";
+import { companySettingsRouter } from "./routers/companySettings";
+import { numberHealthRouter } from "./routers/numberHealth";
+import { digitalMarketingRouter } from "./routers/digitalMarketing";
+import { socialSearchRouter } from "./routers/socialSearch";
+import { aiSettingsRouter } from "./routers/aiSettings";
+import { ragKnowledgeRouter } from "./routers/ragKnowledge";
+import { whatsappAccountsRouter } from "./routers/whatsappAccounts";
+import { segmentsRouter } from "./routers/segments";
+import { interestKeywordsRouter } from "./routers/interestKeywords";
+import { campaignsRouter } from "./routers/campaigns";
+import { remindersRouter } from "./routers/reminders";
+import { weeklyReportsRouter } from "./routers/weeklyReports";
+import { activationRouter } from "./routers/activation";
+import { reportSchedulerRouter } from "./routers/reportScheduler";
+import { searchBehaviorRouter } from "./routers/searchBehavior";
+import { dataQualityRouter } from "./routers/dataQuality";
+import { unifiedInboxRouter } from "./routers/unifiedInbox";
+import { staffAuthRouter } from "./routers/staffAuth";
+import { labelsRouter } from "./routers/labels";
+import { auditLogRouter } from "./routers/auditLog";
+import { messageLimitsRouter } from "./routers/messageLimits";
+import { followUpRouter } from "./routers/followUp";
+import { googleSearchRouter } from "./routers/googleSearch";
+import { brightDataSearchRouter } from "./routers/brightDataSearch";
+import { brightDataDatasetRouter } from "./routers/brightDataDatasetAPI";
+import { behaviorAnalysisRouter } from "./routers/behaviorAnalysis";
+import { serpSearchRouter } from "./routers/serpSearch";
+import { noReplyRouter } from "./routers/noReply";
+import { chatNotesRouter } from "./routers/chatNotes";
+import { reportRouter } from "./routers/reportRouter";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2049,40 +2489,46 @@ export const appRouter = router({
   zones: zonesRouter,
   leads: leadsRouter,
   analysis: analysisRouter,
-  aiReport: aiReportRouter,
   export: exportRouter,
   search: searchRouter,
   searchJobs: searchJobsRouter,
   aiSearch: aiSearchRouter,
-  instagram: instagramRouter,
-  dataSettings: dataSettingsRouter,
-  invitations: invitationsRouter,
-  aiConfig: aiSettingsRouter,
-  brightDataSearch: brightDataSearchRouter,
-  googleSearch: googleSearchRouter,
-  socialSearch: socialSearchRouter,
-  segments: segmentsRouter,
-  companySettings: companySettingsRouter,
-  digitalMarketing: digitalMarketingRouter,
-  staffAuth: staffAuthRouter,
-  auditLog: auditLogRouter,
-  reminders: remindersRouter,
-  labels: labelsRouter,
-  interestKw: interestKwRouter,
-  ragKnowledge: ragKnowledgeRouter,
-  dataQuality: dataQualityRouter,
-  campaigns: campaignsRouter,
-  behaviorAnalysis: behaviorAnalysisRouter,
-  report: reportRouter,
-  weeklyReports: weeklyReportsRouter,
-  inbox: inboxRouter,
   whatsapp: whatsappRouter,
-  waAccounts: waAccountsRouter,
-  wauto: wautoRouter,
+  wauto: whatsappAutomationRouter,
+  instagram: instagramRouter,
+  invitations: invitationsRouter,
+  waSettings: whatsappSettingsRouter,
+  aiConfig: aiSettingsRouter,
+  ragKnowledge: ragKnowledgeRouter,
+  waAccounts: whatsappAccountsRouter,
+  interestKw: interestKeywordsRouter,
+  segments: segmentsRouter,
+  dataSettings: dataSettingsRouter,
+  socialSearch: socialSearchRouter,
   numberHealth: numberHealthRouter,
+  digitalMarketing: digitalMarketingRouter,
+  campaigns: campaignsRouter,
+  reminders: remindersRouter,
+  weeklyReports: weeklyReportsRouter,
   activation: activationRouter,
-  followUp: followUpRouter,
-  searchBehavior: searchBehaviorRouter,
   reportScheduler: reportSchedulerRouter,
+  searchBehavior: searchBehaviorRouter,
+  dataQuality: dataQualityRouter,
+  inbox: unifiedInboxRouter,
+  staffAuth: staffAuthRouter,
+  labels: labelsRouter,
+  auditLog: auditLogRouter,
+  messageLimits: messageLimitsRouter,
+  followUp: followUpRouter,
+  aiReport: aiReportRouter,
+  googleSearch: googleSearchRouter,
+  brightDataSearch: brightDataSearchRouter,
+  behaviorAnalysis: behaviorAnalysisRouter,
+  bdDataset: brightDataDatasetRouter,
+  serpSearch: serpSearchRouter,
+  noReply: noReplyRouter,
+  chatNotes: chatNotesRouter,
+  companySettings: companySettingsRouter,
+  report: reportRouter,
 });
 export type AppRouter = typeof appRouter;
