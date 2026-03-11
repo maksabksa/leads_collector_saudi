@@ -17,6 +17,11 @@ import {
   formatScrapedDataForLLM,
 } from "../lib/brightDataScraper";
 import {
+  fetchInstagramViaDatasetAPI,
+  formatInstagramDataForLLM,
+  type InstagramDatasetProfile,
+} from "../lib/brightDataInstagram";
+import {
   getLeadById,
   updateLead,
   createWebsiteAnalysis,
@@ -191,12 +196,37 @@ const analyzeInstagramWithBrightData = protectedProcedure
       // جلب البيانات الحقيقية
       let realData = "";
       let instagramStats = { followersCount: 0, postsCount: 0, isVerified: false };
+      let datasetProfile: InstagramDatasetProfile | undefined;
+      let dataSource = "none";
 
+      // المحاولة الأولى: Dataset API (الأكثر موثوقية)
       try {
-        const scraped = await scrapeInstagram(input.profileUrl);
-        if (scraped.loadedSuccessfully) {
-          realData = `
-=== بيانات إنستغرام الحقيقية (Bright Data) ===
+        console.log(`[BD Instagram] Trying Dataset API for ${input.profileUrl}`);
+        const datasetResult = await fetchInstagramViaDatasetAPI(input.profileUrl);
+        if (datasetResult.success && datasetResult.profile) {
+          datasetProfile = datasetResult.profile;
+          realData = formatInstagramDataForLLM(datasetProfile);
+          instagramStats = {
+            followersCount: datasetProfile.followers || 0,
+            postsCount: datasetProfile.posts_count || 0,
+            isVerified: datasetProfile.is_verified || false,
+          };
+          dataSource = "dataset_api";
+          console.log(`[BD Instagram] Dataset API success: ${instagramStats.followersCount} followers`);
+        } else {
+          console.warn(`[BD Instagram] Dataset API failed: ${datasetResult.error}, trying scraper...`);
+        }
+      } catch (datasetErr) {
+        console.warn(`[BD Instagram] Dataset API error: ${datasetErr}, trying scraper...`);
+      }
+
+      // المحاولة الثانية: Scraping Browser (fallback)
+      if (!realData) {
+        try {
+          const scraped = await scrapeInstagram(input.profileUrl);
+          if (scraped.loadedSuccessfully) {
+            realData = `
+=== بيانات إنستغرام الحقيقية (Bright Data Scraper) ===
 الاسم الكامل: ${scraped.fullName}
 البيو: ${scraped.bio}
 المتابعون: ${scraped.followersCount.toLocaleString()}
@@ -205,14 +235,16 @@ const analyzeInstagramWithBrightData = protectedProcedure
 موثّق: ${scraped.isVerified ? "نعم ✓" : "لا"}
 === نهاية البيانات الحقيقية ===`;
 
-          instagramStats = {
-            followersCount: scraped.followersCount,
-            postsCount: scraped.postsCount,
-            isVerified: scraped.isVerified,
-          };
+            instagramStats = {
+              followersCount: scraped.followersCount,
+              postsCount: scraped.postsCount,
+              isVerified: scraped.isVerified,
+            };
+            dataSource = "scraper";
+          }
+        } catch (scrapeErr) {
+          console.warn("[BD analyzeInstagram] Scrape also failed:", scrapeErr);
         }
-      } catch (scrapeErr) {
-        console.warn("[BD analyzeInstagram] Scrape failed:", scrapeErr);
       }
 
       const prompt = `أنت خبير تحليل سوشيال ميديا متخصص في السوق السعودي.
@@ -281,13 +313,27 @@ ${realData ? "ملاحظة: لديك بيانات حقيقية — استخدم�
         rawAnalysis: content,
       });
 
-      // تحديث بيانات الـ lead (بدون instagramFollowers لأنه غير موجود في schema)
+      // تحديث بيانات الـ lead ببيانات إنستغرام الحقيقية
+      if (datasetProfile?.business_phone) {
+        const lead = await getLeadById(input.leadId);
+        if (lead && !lead.verifiedPhone) {
+          await updateLead(input.leadId, { verifiedPhone: datasetProfile.business_phone });
+        }
+      }
 
       return {
         success: true,
         analysisId,
         usedRealData: !!realData,
+        dataSource,
         followersCount: instagramStats.followersCount,
+        postsCount: instagramStats.postsCount,
+        isVerified: instagramStats.isVerified,
+        businessEmail: datasetProfile?.business_email || null,
+        businessPhone: datasetProfile?.business_phone || null,
+        businessCategory: datasetProfile?.business_category || null,
+        avgEngagement: datasetProfile?.avg_engagement || null,
+        website: datasetProfile?.website || null,
       };
     } catch (error) {
       throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل تحليل إنستغرام" });

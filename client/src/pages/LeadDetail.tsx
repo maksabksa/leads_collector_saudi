@@ -265,7 +265,9 @@ export default function LeadDetail() {
         else await analyzeSocial.mutateAsync({ leadId: id, platform, profileUrl: url, companyName: lead.companyName, businessType: lead.businessType });
         if (result) {
           setBdResults(prev => ({ ...prev, [platform]: result }));
-          toast.success(result.usedRealData ? `✓ بيانات حقيقية من ${platform} عبر Bright Data` : `تحليل ${platform} بتقدير AI`);
+          const srcLabel = result.dataSource === "dataset_api" ? "✓ Dataset API (موثوق)" : result.dataSource === "scraper" ? "✓ Scraper" : "تقدير AI";
+          const followInfo = result.followersCount > 0 ? ` — ${result.followersCount.toLocaleString("ar-SA")} متابع` : "";
+          toast.success(`${srcLabel}${followInfo}`);
         } else {
           toast.success(`تم تحليل ${platform} بنجاح`);
         }
@@ -1193,6 +1195,59 @@ export default function LeadDetail() {
               ) : null}
             </div>
           ))}
+
+          {/* Instagram Dataset API Results Card */}
+          {bdResults.instagram && bdResults.instagram.followersCount > 0 && (
+            <div className="rounded-2xl border overflow-hidden" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.62 0.18 285 / 0.35)" }}>
+              <div className="flex items-center gap-2 px-5 py-3 border-b" style={{ borderColor: "oklch(0.62 0.18 285 / 0.2)", background: "oklch(0.62 0.18 285 / 0.06)" }}>
+                <Instagram className="w-4 h-4" style={{ color: "oklch(0.72 0.18 285)" }} />
+                <span className="font-semibold text-foreground text-sm">بيانات إنستغرام الحقيقية</span>
+                <span className="text-xs px-2 py-0.5 rounded-full ml-auto" style={{ background: bdResults.instagram.dataSource === "dataset_api" ? "oklch(0.65 0.18 145 / 0.15)" : "oklch(0.65 0.18 200 / 0.15)", color: bdResults.instagram.dataSource === "dataset_api" ? "oklch(0.65 0.18 145)" : "oklch(0.65 0.18 200)" }}>
+                  {bdResults.instagram.dataSource === "dataset_api" ? "Dataset API" : bdResults.instagram.dataSource === "scraper" ? "Scraper" : "AI"}
+                </span>
+              </div>
+              <div className="p-5 grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl" style={{ background: "oklch(0.62 0.18 285 / 0.06)", border: "1px solid oklch(0.62 0.18 285 / 0.15)" }}>
+                  <p className="text-xs text-muted-foreground mb-1">المتابعون</p>
+                  <p className="text-xl font-bold" style={{ color: "oklch(0.72 0.18 285)" }}>{bdResults.instagram.followersCount.toLocaleString("ar-SA")}</p>
+                </div>
+                <div className="p-3 rounded-xl" style={{ background: "oklch(0.62 0.18 285 / 0.06)", border: "1px solid oklch(0.62 0.18 285 / 0.15)" }}>
+                  <p className="text-xs text-muted-foreground mb-1">المنشورات</p>
+                  <p className="text-xl font-bold" style={{ color: "oklch(0.72 0.18 285)" }}>{bdResults.instagram.postsCount?.toLocaleString("ar-SA") || "—"}</p>
+                </div>
+                {bdResults.instagram.avgEngagement && (
+                  <div className="p-3 rounded-xl" style={{ background: "oklch(0.65 0.18 145 / 0.06)", border: "1px solid oklch(0.65 0.18 145 / 0.15)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">متوسط التفاعل</p>
+                    <p className="text-xl font-bold" style={{ color: "oklch(0.65 0.18 145)" }}>{(bdResults.instagram.avgEngagement * 100).toFixed(2)}%</p>
+                  </div>
+                )}
+                {bdResults.instagram.businessCategory && (
+                  <div className="p-3 rounded-xl" style={{ background: "oklch(0.78 0.16 75 / 0.06)", border: "1px solid oklch(0.78 0.16 75 / 0.15)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">الفئة التجارية</p>
+                    <p className="text-sm font-semibold" style={{ color: "oklch(0.78 0.16 75)" }}>{bdResults.instagram.businessCategory}</p>
+                  </div>
+                )}
+                {bdResults.instagram.businessEmail && (
+                  <div className="col-span-2 p-3 rounded-xl" style={{ background: "oklch(0.65 0.18 200 / 0.06)", border: "1px solid oklch(0.65 0.18 200 / 0.15)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">البريد الإلكتروني التجاري</p>
+                    <p className="text-sm font-mono" style={{ color: "oklch(0.75 0.18 200)" }}>{bdResults.instagram.businessEmail}</p>
+                  </div>
+                )}
+                {bdResults.instagram.businessPhone && (
+                  <div className="col-span-2 p-3 rounded-xl" style={{ background: "oklch(0.65 0.18 200 / 0.06)", border: "1px solid oklch(0.65 0.18 200 / 0.15)" }}>
+                    <p className="text-xs text-muted-foreground mb-1">رقم الهاتف التجاري</p>
+                    <p className="text-sm font-mono" style={{ color: "oklch(0.75 0.18 200)" }}>{bdResults.instagram.businessPhone}</p>
+                  </div>
+                )}
+                {bdResults.instagram.isVerified && (
+                  <div className="col-span-2 flex items-center gap-2 text-sm" style={{ color: "oklch(0.65 0.18 145)" }}>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>حساب موثّق</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Full report */}
           {report && (

@@ -1271,3 +1271,10 @@
 - [x] تحليل TikTok الحقيقي: followers, videos, likes, bio
 - [x] تحديث واجهة LeadDetail لعرض البيانات الحقيقية المجلوبة
 - [x] إضافة BRIGHT_DATA_WS_ENDPOINT و BRIGHT_DATA_SERP_* في env.ts
+
+## Bright Data Dataset API لإنستغرام (مارس 2026)
+
+- [x] server/lib/brightDataInstagram.ts: Dataset API layer (trigger + polling + get results)
+- [x] تحديث analyzeInstagram في brightDataAnalysis router لاستخدام Dataset API
+- [x] حفظ بيانات Instagram في قاعدة البيانات (followers, posts, engagement)
+- [x] تحديث واجهة LeadDetail لعرض بيانات Instagram الحقيقية
