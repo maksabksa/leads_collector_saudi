@@ -1377,3 +1377,20 @@
 - [x] إصلاح PDF generation في report.ts (Puppeteer + S3)
 - [x] تحسين PDF modal بزر تحميل مباشر
 - [x] إضافة snapchatUrl, tiktokUrl, facebookUrl, linkedinUrl في leads table وفي نموذج التعديل
+
+## الدفعة 89 - مقارنة بين منصات السوشيال ميديا (12 مارس 2026)
+- [ ] بناء مكوّن SocialPlatformComparison.tsx (جدول مقارنة + رسوم بيانية)
+- [ ] رسم بياني أعمدة: مقارنة المتابعين عبر المنصات
+- [ ] رسم بياني شعاعي/radar: مقارنة الأداء (تفاعل، محتوى، تكرار النشر)
+- [ ] جدول مقارنة شامل: كل منصة في صف مع جميع المقاييس
+- [ ] دمج المكوّن في LeadDetail.tsx
+
+## الدفعة 89 - التحقق من Dataset IDs وزر تحليل كل المنصات (12 مارس 2026)
+- [ ] التحقق من Dataset IDs الصحيحة لـ TikTok وSnapchat وTwitter وFacebook في Bright Data API
+- [ ] تحديث brightDataSocialDatasets.ts بالـ IDs الصحيحة
+- [ ] إضافة زر "تحليل كل المنصات" في LeadDetail.tsx
+- [ ] procedure جديد analyzeAllSocialPlatforms في routers.ts
+
+## الدفعة 90 - إصلاح PDF
+- [x] إصلاح توليد PDF - كان المشكلة في الـ server القديم المتوقف، بعد إعادة التشغيل يعمل بشكل صحيح
+- [x] التحقق من وجود زر تحميل PDF في النافذة المنبثقة

@@ -1378,6 +1378,140 @@ export default function LeadDetail() {
             </div>
           )}
 
+          {/* ===== مقارنة المنصات ===== */}
+          {(() => {
+            const PLATFORM_META: Record<string, { label: string; color: string; icon: string }> = {
+              instagram: { label: "إنستغرام", color: "oklch(0.62 0.18 285)", icon: "📸" },
+              tiktok:    { label: "تيك توك",   color: "oklch(0.58 0.22 25)",  icon: "🎵" },
+              snapchat:  { label: "سناب شات",  color: "oklch(0.85 0.18 95)",  icon: "👻" },
+              twitter:   { label: "تويتر/X",   color: "oklch(0.75 0.05 240)", icon: "𝕏" },
+              facebook:  { label: "فيسبوك",    color: "oklch(0.55 0.18 250)", icon: "📘" },
+              linkedin:  { label: "لينكد إن",  color: "oklch(0.55 0.18 220)", icon: "💼" },
+            };
+            const rows: Array<{ platform: string; label: string; color: string; icon: string; followers: number; posts: number; engagement: number; avgLikes: number; score: number; }> = [];
+            for (const sa of socialAnalyses) {
+              const meta = PLATFORM_META[sa.platform];
+              if (!meta) continue;
+              rows.push({ platform: sa.platform, label: meta.label, color: meta.color, icon: meta.icon, followers: (sa as any).followersCount || 0, posts: (sa as any).postsCount || 0, engagement: (sa as any).engagementRate || 0, avgLikes: (sa as any).avgLikes || 0, score: sa.overallScore || 0 });
+            }
+            for (const [key, val] of Object.entries(bdResults)) {
+              if (key === "all" || !val || typeof val !== "object") continue;
+              const meta = PLATFORM_META[key];
+              if (!meta || rows.find(r => r.platform === key)) continue;
+              rows.push({ platform: key, label: meta.label, color: meta.color, icon: meta.icon, followers: (val as any).followersCount || 0, posts: (val as any).postsCount || 0, engagement: (val as any).engagementRate || ((val as any).avgEngagement ? (val as any).avgEngagement * 100 : 0), avgLikes: (val as any).avgLikes || 0, score: (val as any).overallScore || 0 });
+            }
+            if (rows.length < 2) return null;
+            const maxFollowers = Math.max(...rows.map(r => r.followers), 1);
+            const maxEngagement = Math.max(...rows.map(r => r.engagement), 1);
+            const best = rows.reduce((a, b) => ((b.followers > 0 ? 3 : 0) + (b.engagement > 2 ? 2 : b.engagement > 0 ? 1 : 0) + (b.score > 7 ? 2 : b.score > 5 ? 1 : 0)) >= ((a.followers > 0 ? 3 : 0) + (a.engagement > 2 ? 2 : a.engagement > 0 ? 1 : 0) + (a.score > 7 ? 2 : a.score > 5 ? 1 : 0)) ? b : a);
+            const weakest = rows.reduce((a, b) => ((b.followers > 0 ? 3 : 0) + (b.engagement > 2 ? 2 : b.engagement > 0 ? 1 : 0) + (b.score > 7 ? 2 : b.score > 5 ? 1 : 0)) <= ((a.followers > 0 ? 3 : 0) + (a.engagement > 2 ? 2 : a.engagement > 0 ? 1 : 0) + (a.score > 7 ? 2 : a.score > 5 ? 1 : 0)) ? b : a);
+            return (
+              <div className="rounded-2xl p-5 border space-y-5" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.25)" }}>
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" style={{ color: "oklch(0.65 0.18 200)" }} />
+                  <h3 className="font-semibold text-foreground">مقارنة المنصات</h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full mr-auto" style={{ background: "oklch(0.65 0.18 200 / 0.1)", color: "oklch(0.65 0.18 200)" }}>{rows.length} منصات</span>
+                </div>
+                {/* جدول المقارنة */}
+                <div className="overflow-x-auto -mx-1">
+                  <table className="w-full text-xs min-w-[480px]">
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid oklch(0.2 0.02 240)" }}>
+                        <th className="text-right py-2 pr-2 text-muted-foreground font-medium">المنصة</th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium">المتابعون</th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium">المنشورات</th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium">التفاعل %</th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium">متوسط إعجاب</th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium">الدرجة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.sort((a, b) => b.followers - a.followers).map(row => (
+                        <tr key={row.platform} style={{ borderBottom: "1px solid oklch(0.15 0.01 240)" }}>
+                          <td className="py-2.5 pr-2"><div className="flex items-center gap-2"><span className="text-base">{row.icon}</span><span className="font-medium" style={{ color: row.color }}>{row.label}</span></div></td>
+                          <td className="text-center py-2.5 px-2">{row.followers > 0 ? <span className="font-bold text-foreground">{row.followers >= 1000000 ? `${(row.followers/1000000).toFixed(1)}M` : row.followers >= 1000 ? `${(row.followers/1000).toFixed(1)}K` : row.followers}</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="text-center py-2.5 px-2">{row.posts > 0 ? <span className="text-foreground">{row.posts}</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="text-center py-2.5 px-2">{row.engagement > 0 ? <span className="font-medium" style={{ color: row.engagement >= 3 ? "oklch(0.65 0.18 145)" : row.engagement >= 1 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)" }}>{row.engagement.toFixed(2)}%</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="text-center py-2.5 px-2">{row.avgLikes > 0 ? <span className="text-foreground">{row.avgLikes >= 1000 ? `${(row.avgLikes/1000).toFixed(1)}K` : row.avgLikes}</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="text-center py-2.5 px-2">{row.score > 0 ? <span className="font-bold" style={{ color: row.score >= 7 ? "oklch(0.65 0.18 145)" : row.score >= 5 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)" }}>{row.score.toFixed(1)}</span> : <span className="text-muted-foreground">—</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* شريط المتابعين */}
+                {rows.some(r => r.followers > 0) && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">المتابعون بالمقارنة</p>
+                    <div className="space-y-2">
+                      {rows.filter(r => r.followers > 0).sort((a, b) => b.followers - a.followers).map(row => (
+                        <div key={row.platform} className="flex items-center gap-3">
+                          <span className="text-xs w-20 text-right flex-shrink-0" style={{ color: row.color }}>{row.icon} {row.label}</span>
+                          <div className="flex-1 h-5 rounded-lg overflow-hidden" style={{ background: "oklch(0.15 0.01 240)" }}>
+                            <div className="h-full rounded-lg flex items-center px-2 transition-all duration-700" style={{ width: `${(row.followers / maxFollowers) * 100}%`, background: `color-mix(in oklch, ${row.color} 60%, transparent)`, minWidth: "2rem" }}>
+                              <span className="text-xs font-bold text-white truncate">{row.followers >= 1000000 ? `${(row.followers/1000000).toFixed(1)}M` : row.followers >= 1000 ? `${(row.followers/1000).toFixed(1)}K` : row.followers}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* شريط التفاعل */}
+                {rows.some(r => r.engagement > 0) && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">معدل التفاعل %</p>
+                    <div className="space-y-2">
+                      {rows.filter(r => r.engagement > 0).sort((a, b) => b.engagement - a.engagement).map(row => (
+                        <div key={row.platform} className="flex items-center gap-3">
+                          <span className="text-xs w-20 text-right flex-shrink-0" style={{ color: row.color }}>{row.icon} {row.label}</span>
+                          <div className="flex-1 h-5 rounded-lg overflow-hidden" style={{ background: "oklch(0.15 0.01 240)" }}>
+                            <div className="h-full rounded-lg flex items-center px-2 transition-all duration-700" style={{ width: `${Math.min((row.engagement / Math.max(maxEngagement, 5)) * 100, 100)}%`, background: row.engagement >= 3 ? "oklch(0.55 0.18 145 / 0.7)" : row.engagement >= 1 ? "oklch(0.65 0.16 75 / 0.7)" : "oklch(0.5 0.18 25 / 0.7)", minWidth: "2.5rem" }}>
+                              <span className="text-xs font-bold text-white">{row.engagement.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* شريط الدرجات */}
+                {rows.some(r => r.score > 0) && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">درجة التحليل / 10</p>
+                    <div className="space-y-2">
+                      {rows.filter(r => r.score > 0).sort((a, b) => b.score - a.score).map(row => (
+                        <div key={row.platform} className="flex items-center gap-3">
+                          <span className="text-xs w-20 text-right flex-shrink-0" style={{ color: row.color }}>{row.icon} {row.label}</span>
+                          <div className="flex-1 h-5 rounded-lg overflow-hidden" style={{ background: "oklch(0.15 0.01 240)" }}>
+                            <div className="h-full rounded-lg flex items-center px-2 transition-all duration-700" style={{ width: `${(row.score / 10) * 100}%`, background: row.score >= 7 ? "oklch(0.55 0.18 145 / 0.7)" : row.score >= 5 ? "oklch(0.65 0.16 75 / 0.7)" : "oklch(0.5 0.18 25 / 0.7)", minWidth: "2rem" }}>
+                              <span className="text-xs font-bold text-white">{row.score.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* أفضل وأضعف منصة */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl" style={{ background: `color-mix(in oklch, ${best.color} 8%, transparent)`, border: `1px solid color-mix(in oklch, ${best.color} 20%, transparent)` }}>
+                    <p className="text-xs text-muted-foreground mb-1">★ الأقوى حضوراً</p>
+                    <p className="font-bold" style={{ color: best.color }}>{best.icon} {best.label}</p>
+                    {best.followers > 0 && <p className="text-xs text-muted-foreground mt-0.5">{best.followers >= 1000 ? `${(best.followers/1000).toFixed(1)}K` : best.followers} متابع</p>}
+                  </div>
+                  {weakest.platform !== best.platform && (
+                    <div className="p-3 rounded-xl" style={{ background: "oklch(0.58 0.22 25 / 0.06)", border: "1px solid oklch(0.58 0.22 25 / 0.15)" }}>
+                      <p className="text-xs text-muted-foreground mb-1">⚠️ يحتاج تطوير</p>
+                      <p className="font-bold" style={{ color: weakest.color }}>{weakest.icon} {weakest.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">فرصة للتحسين</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Full report */}
           {report && (
             <div className="rounded-2xl p-5 border space-y-4" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.62 0.18 285 / 0.3)" }}>

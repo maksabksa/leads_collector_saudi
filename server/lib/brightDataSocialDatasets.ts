@@ -23,11 +23,11 @@ const BRIGHT_DATA_API_BASE = "https://api.brightdata.com";
 
 // ===== Dataset IDs =====
 export const DATASET_IDS = {
-  TIKTOK_PROFILES:    "gd_l1vikfnt1wgvvqz95w",
-  TIKTOK_POSTS:       "gd_lu702nij2f790tmv24",
-  SNAPCHAT_POSTS:     "gd_lkf0u1882c7ywfz3y",
-  TWITTER_POSTS:      "gd_lwxkxvnf1cynvib9co",
-  FACEBOOK_PAGE_POSTS: "gd_ltppn6ug2l8oo3fj4",
+  TIKTOK_PROFILES:    "gd_l1villgoiiidt09ci",  // ✅ confirmed working - TikTok Profiles
+  TIKTOK_POSTS:       "gd_l1villgoiiidt09ci",  // same dataset, posts via profile URL
+  SNAPCHAT_POSTS:     "gd_lkf0u1882c7ywfz3y",  // may need activation
+  TWITTER_POSTS:      "gd_lwxkxvnf1cynvib9co", // ✅ confirmed working - Twitter/X Posts
+  FACEBOOK_PAGE_POSTS: "gd_ltppn6ug2l8oo3fj4", // may need activation
 } as const;
 
 // ===== Types =====
@@ -261,9 +261,11 @@ function normalizeSnapchatUrl(input: string): string {
 function normalizeTwitterUrl(input: string): string {
   if (!input) return input;
   const clean = input.trim().replace(/\s+/g, "");
-  if (clean.startsWith("http")) return clean;
-  const handle = clean.replace(/^@/, "");
-  return `https://x.com/${handle}`;
+  // Twitter/X Posts dataset requires URL format: https://x.com/username/status/
+  if (clean.includes("/status/")) return clean.replace("twitter.com", "x.com");
+  const handle = clean.replace(/^@/, "").replace(/.*twitter\.com\//, "").replace(/.*x\.com\//, "").replace(/\/.*$/, "");
+  // Use profile posts discovery format
+  return `https://x.com/${handle}/status/`;
 }
 
 function normalizeFacebookUrl(input: string): string {
