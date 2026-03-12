@@ -4,10 +4,51 @@ import { TRPCError } from "@trpc/server";
 import { getLeadById, getWebsiteAnalysisByLeadId, getSocialAnalysesByLeadId } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { storagePut } from "../storage";
-import puppeteer from "puppeteer-core";
 import { nanoid } from "nanoid";
+import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer-core";
 
-// ===== HTML Template for PDF =====
+async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses: any[]): Promise<Buffer> {
+  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses);
+  
+  // Try system chromium first (dev), then sparticuz (production)
+  let executablePath: string;
+  try {
+    const { execSync } = await import("child_process");
+    const sysChrome = execSync("which chromium-browser || which chromium || which google-chrome 2>/dev/null", { encoding: "utf8" }).trim().split("\n")[0];
+    if (sysChrome) {
+      executablePath = sysChrome;
+    } else {
+      executablePath = await chromium.executablePath();
+    }
+  } catch {
+    executablePath = await chromium.executablePath();
+  }
+
+  const browser = await puppeteer.launch({
+    executablePath,
+    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+    headless: true,
+    defaultViewport: { width: 1200, height: 900 },
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
+}
+
+
+
+// ===== HTML Template for PDF (kept for reference) =====
 function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): string {
   const stageLabels: Record<string, string> = {
     new: "جديد", contacted: "تم التواصل", interested: "مهتم",
@@ -201,21 +242,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
 </html>`;
 }
 
-async function generatePDFBuffer(html: string): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    executablePath: "/usr/bin/chromium-browser",
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--no-first-run", "--no-zygote", "--single-process"],
-    headless: true,
-  });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
-    const pdfBuffer = await page.pdf({ format: "A4", printBackground: true, margin: { top: "0", right: "0", bottom: "0", left: "0" } });
-    return Buffer.from(pdfBuffer);
-  } finally {
-    await browser.close();
-  }
-}
+// generatePDFBuffer is now defined above using PDFKit
 
 export const reportRouter = router({
   generatePDF: protectedProcedure
@@ -227,13 +254,11 @@ export const reportRouter = router({
       const websiteAnalysis = await getWebsiteAnalysisByLeadId(input.leadId);
       const socialAnalyses = await getSocialAnalysesByLeadId(input.leadId);
 
-      const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses);
-
       let pdfBuffer: Buffer;
       try {
-        pdfBuffer = await generatePDFBuffer(html);
+        pdfBuffer = await generatePDFBuffer(lead, websiteAnalysis, socialAnalyses);
       } catch (err: any) {
-        console.error("[PDF] Puppeteer error:", err.message);
+        console.error("[PDF] PDFKit error:", err.message);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `فشل توليد PDF: ${err.message}` });
       }
 
