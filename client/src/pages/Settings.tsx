@@ -101,94 +101,235 @@ function GeneralTab() {
   const [companyDescription, setCompanyDescription] = React.useState("");
   const [city, setCity] = React.useState("");
   const [region, setRegion] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [website, setWebsite] = React.useState("");
+  const [address, setAddress] = React.useState("");
+  const [licenseNumber, setLicenseNumber] = React.useState("");
+  const [logoUrl, setLogoUrl] = React.useState("");
+  const [primaryColor, setPrimaryColor] = React.useState("#1a56db");
+  const [secondaryColor, setSecondaryColor] = React.useState("#0e9f6e");
+  const [reportHeaderText, setReportHeaderText] = React.useState("");
+  const [reportFooterText, setReportFooterText] = React.useState("");
+  const [reportIntroText, setReportIntroText] = React.useState("");
+  const [instagramUrl, setInstagramUrl] = React.useState("");
+  const [twitterUrl, setTwitterUrl] = React.useState("");
+  const [linkedinUrl, setLinkedinUrl] = React.useState("");
+  const [isUploadingLogo, setIsUploadingLogo] = React.useState(false);
   const [isSavingCompany, setIsSavingCompany] = React.useState(false);
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
 
-  // تحميل البيانات عند جلبها من السيرفر
   React.useEffect(() => {
     if (companyData) {
       setCompanyName(companyData.companyName || "مكسب KSA");
       setCompanyDescription(companyData.companyDescription || "");
       setCity(companyData.city || "الرياض");
       setRegion(companyData.region || "المنطقة الوسطى");
+      setPhone(companyData.phone || "");
+      setEmail(companyData.email || "");
+      setWebsite(companyData.website || "");
+      setAddress(companyData.address || "");
+      setLicenseNumber(companyData.licenseNumber || "");
+      setLogoUrl(companyData.logoUrl || "");
+      setPrimaryColor(companyData.primaryColor || "#1a56db");
+      setSecondaryColor(companyData.secondaryColor || "#0e9f6e");
+      setReportHeaderText(companyData.reportHeaderText || "");
+      setReportFooterText(companyData.reportFooterText || "");
+      setReportIntroText(companyData.reportIntroText || "");
+      setInstagramUrl(companyData.instagramUrl || "");
+      setTwitterUrl(companyData.twitterUrl || "");
+      setLinkedinUrl(companyData.linkedinUrl || "");
     }
   }, [companyData]);
 
-  const saveCompany = trpc.companySettings.save.useMutation({
-    onSuccess: () => {
-      toast.success("تم حفظ معلومات الشركة بنجاح");
+  const uploadLogo = trpc.companySettings.uploadLogo.useMutation({
+    onSuccess: (data) => {
+      setLogoUrl(data.url);
+      toast.success("تم رفع الشعار بنجاح ✅");
       refetch();
     },
+    onError: (e) => toast.error("فشل رفع الشعار: " + e.message),
+  });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error("حجم الشعار يجب أن يكون أقل من 2MB"); return; }
+    setIsUploadingLogo(true);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target?.result as string;
+      await uploadLogo.mutateAsync({ base64, mimeType: file.type });
+      setIsUploadingLogo(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveCompany = trpc.companySettings.save.useMutation({
+    onSuccess: () => { toast.success("تم حفظ معلومات الشركة بنجاح ✅"); refetch(); },
     onError: (e) => toast.error("فشل الحفظ: " + e.message),
   });
 
   const handleSaveCompany = async () => {
-    if (!companyName.trim()) {
-      toast.error("اسم الشركة مطلوب");
-      return;
-    }
+    if (!companyName.trim()) { toast.error("اسم الشركة مطلوب"); return; }
     setIsSavingCompany(true);
     await saveCompany.mutateAsync({
       companyName: companyName.trim(),
       companyDescription: companyDescription.trim() || undefined,
       city: city.trim() || undefined,
       region: region.trim() || undefined,
+      phone: phone.trim() || undefined,
+      email: email.trim() || undefined,
+      website: website.trim() || undefined,
+      address: address.trim() || undefined,
+      licenseNumber: licenseNumber.trim() || undefined,
+      logoUrl: logoUrl || undefined,
+      primaryColor: primaryColor || undefined,
+      secondaryColor: secondaryColor || undefined,
+      reportHeaderText: reportHeaderText.trim() || undefined,
+      reportFooterText: reportFooterText.trim() || undefined,
+      reportIntroText: reportIntroText.trim() || undefined,
+      instagramUrl: instagramUrl.trim() || undefined,
+      twitterUrl: twitterUrl.trim() || undefined,
+      linkedinUrl: linkedinUrl.trim() || undefined,
     });
     setIsSavingCompany(false);
   };
 
   return (
     <div className="space-y-4">
-      <SettingCard title="معلومات الشركة" description="اسم الشركة والمعلومات الأساسية" icon={Building2}>
+      {/* بطاقة الشعار والهوية */}
+      <SettingCard title="شعار الشركة" description="الشعار الذي يظهر في التقارير والواجهة" icon={Image}>
+        <div className="flex items-center gap-4">
+          <div className="w-20 h-20 rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/30 overflow-hidden shrink-0">
+            {logoUrl ? (
+              <img src={logoUrl} alt="شعار" className="w-full h-full object-contain" />
+            ) : (
+              <Building2 className="w-8 h-8 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex-1 space-y-2">
+            <p className="text-sm font-medium">صورة الشعار</p>
+            <p className="text-xs text-muted-foreground">PNG, JPG, SVG - حجم أقصى 2MB</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => logoInputRef.current?.click()} disabled={isUploadingLogo}>
+                {isUploadingLogo ? <><span className="animate-spin ml-1">⏳</span> جاري الرفع...</> : <><Upload className="w-3.5 h-3.5 ml-1.5" />رفع شعار</>}
+              </Button>
+              {logoUrl && (
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setLogoUrl("")}>
+                  حذف
+                </Button>
+              )}
+            </div>
+            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+          </div>
+        </div>
+      </SettingCard>
+
+      {/* معلومات الشركة الأساسية */}
+      <SettingCard title="معلومات الشركة" description="البيانات الأساسية التي تظهر في التقارير" icon={Building2}>
         <div className="space-y-3">
-          <div>
-            <label className="text-sm font-medium mb-1 block">اسم الشركة</label>
-            <Input
-              placeholder="مثال: مكسب KSA"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1 block">وصف النشاط التجاري</label>
-            <Textarea
-              placeholder="وصف مختصر للنشاط التجاري..."
-              rows={2}
-              value={companyDescription}
-              onChange={(e) => setCompanyDescription(e.target.value)}
-            />
-          </div>
           <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1 block">اسم الشركة *</label>
+              <Input placeholder="مثال: مكسب KSA" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1 block">وصف النشاط التجاري</label>
+              <Textarea placeholder="وصف مختصر للنشاط التجاري..." rows={2} value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">رقم الجوال</label>
+              <Input placeholder="+966 5x xxx xxxx" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">البريد الإلكتروني</label>
+              <Input placeholder="info@company.com" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">الموقع الإلكتروني</label>
+              <Input placeholder="https://company.com" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">رقم الترخيص / السجل التجاري</label>
+              <Input placeholder="1010xxxxxx" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
+            </div>
             <div>
               <label className="text-sm font-medium mb-1 block">المدينة</label>
-              <Input
-                placeholder="الرياض"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-              />
+              <Input placeholder="الرياض" value={city} onChange={(e) => setCity(e.target.value)} />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">المنطقة</label>
-              <Input
-                placeholder="المنطقة الوسطى"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-              />
+              <Input placeholder="المنطقة الوسطى" value={region} onChange={(e) => setRegion(e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1 block">العنوان الكامل</label>
+              <Input placeholder="الرياض, حي الملقا, شارع الأمير..." value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
           </div>
-          <Button
-            size="sm"
-            className="w-full"
-            onClick={handleSaveCompany}
-            disabled={isSavingCompany || saveCompany.isPending}
-          >
-            {isSavingCompany || saveCompany.isPending ? (
-              <><span className="animate-spin ml-2">⏳</span> جاري الحفظ...</>
-            ) : (
-              <><Save className="w-4 h-4 ml-2" />حفظ المعلومات</>
-            )}
-          </Button>
         </div>
       </SettingCard>
+
+      {/* حسابات السوشيال ميديا */}
+      <SettingCard title="حسابات السوشيال ميديا" description="روابط حسابات الشركة على منصات التواصل" icon={Link}>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium mb-1 flex items-center gap-1.5"><Instagram className="w-4 h-4 text-pink-500" />إنستجرام</label>
+            <Input placeholder="https://instagram.com/yourcompany" value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 flex items-center gap-1.5"><AtSign className="w-4 h-4 text-sky-500" />تويتر / X</label>
+            <Input placeholder="https://x.com/yourcompany" value={twitterUrl} onChange={(e) => setTwitterUrl(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 flex items-center gap-1.5"><Link className="w-4 h-4 text-blue-600" />لينكد إن</label>
+            <Input placeholder="https://linkedin.com/company/yourcompany" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} />
+          </div>
+        </div>
+      </SettingCard>
+
+      {/* تخصيص التقارير */}
+      <SettingCard title="تخصيص التقارير" description="النصوص والألوان التي تظهر في تقارير PDF" icon={FileText}>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">اللون الرئيسي</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-10 h-9 rounded border border-border cursor-pointer" />
+                <Input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="font-mono text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">اللون الثانوي</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-10 h-9 rounded border border-border cursor-pointer" />
+                <Input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="font-mono text-sm" />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">نص رأس التقرير</label>
+            <Input placeholder="مثال: تقرير تحليل العميل - سري" value={reportHeaderText} onChange={(e) => setReportHeaderText(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">مقدمة التقرير</label>
+            <Textarea placeholder="نص يظهر في بداية كل تقرير..." rows={2} value={reportIntroText} onChange={(e) => setReportIntroText(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">نص تذييل التقرير</label>
+            <Input placeholder="مثال: جميع الحقوق محفوظة لشركة مكسب 2025" value={reportFooterText} onChange={(e) => setReportFooterText(e.target.value)} />
+          </div>
+        </div>
+      </SettingCard>
+
+      {/* زر الحفظ الشامل */}
+      <Button className="w-full" size="lg" onClick={handleSaveCompany} disabled={isSavingCompany || saveCompany.isPending}>
+        {isSavingCompany || saveCompany.isPending ? (
+          <><span className="animate-spin ml-2">⏳</span> جاري الحفظ...</>
+        ) : (
+          <><Save className="w-4 h-4 ml-2" />حفظ جميع بيانات الشركة</>
+        )}
+      </Button>
 
       <SettingCard title="إعدادات اللغة والمنطقة الزمنية" icon={Globe}>
         <div className="space-y-3">

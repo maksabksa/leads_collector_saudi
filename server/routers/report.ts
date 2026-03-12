@@ -1,15 +1,26 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getLeadById, getWebsiteAnalysisByLeadId, getSocialAnalysesByLeadId } from "../db";
+import { getLeadById, getWebsiteAnalysisByLeadId, getSocialAnalysesByLeadId, getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { storagePut } from "../storage";
 import { nanoid } from "nanoid";
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
 
+async function getCompanySettingsData() {
+  try {
+    const db = await getDb();
+    if (!db) return null;
+    const { companySettings } = await import("../../drizzle/schema");
+    const [row] = await db.select().from(companySettings).limit(1);
+    return row || null;
+  } catch { return null; }
+}
+
 async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses: any[]): Promise<Buffer> {
-  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses);
+  const company = await getCompanySettingsData();
+  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company);
   
   // Try system chromium first (dev), then sparticuz (production)
   let executablePath: string;
@@ -49,7 +60,7 @@ async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses
 
 
 // ===== HTML Template for PDF (kept for reference) =====
-function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): string {
+function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any): string {
   const stageLabels: Record<string, string> = {
     new: "جديد", contacted: "تم التواصل", interested: "مهتم",
     price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه",
@@ -71,6 +82,19 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
     </div>
   `).join("");
 
+  const companyName = company?.companyName || "مكسب KSA";
+  const companyLogo = company?.logoUrl || "";
+  const companyPhone = company?.phone || "";
+  const companyEmail = company?.email || "";
+  const companyWebsite = company?.website || "";
+  const companyAddress = company?.address || "";
+  const companyLicense = company?.licenseNumber || "";
+  const primaryColor = company?.primaryColor || "#1a56db";
+  const secondaryColor = company?.secondaryColor || "#0e9f6e";
+  const reportHeaderText = company?.reportHeaderText || "تقرير تحليل العميل";
+  const reportFooterText = company?.reportFooterText || `جميع الحقوق محفوظة لـ ${companyName} ${new Date().getFullYear()}`;
+  const reportIntroText = company?.reportIntroText || "";
+
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -87,7 +111,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
   }
   .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: white; position: relative; }
   .header {
-    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    background: linear-gradient(135deg, #0f172a 0%, ${primaryColor}cc 100%);
     color: white;
     padding: 32px 40px;
   }
@@ -107,7 +131,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
   .scores-row { display: flex; background: #0f172a; }
   .score-item { flex: 1; padding: 16px; text-align: center; border-left: 1px solid rgba(255,255,255,0.08); }
   .score-item:last-child { border-left: none; }
-  .score-value { font-size: 22px; font-weight: 700; color: #60a5fa; }
+  .score-value { font-size: 22px; font-weight: 700; color: ${secondaryColor}; }
   .score-label { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; }
   .body { padding: 28px 40px; }
   .section { margin-bottom: 24px; }
@@ -148,6 +172,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
     background: #0f172a; color: rgba(255,255,255,0.5);
     padding: 14px 40px; display: flex; justify-content: space-between;
     align-items: center; font-size: 10px;
+    border-top: 2px solid ${primaryColor}44;
   }
   .footer-brand { color: rgba(255,255,255,0.8); font-weight: 600; font-size: 12px; }
   .watermark {
@@ -160,14 +185,24 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
 </head>
 <body>
 <div class="page">
-  <div class="watermark">MAKSAB</div>
+  <div class="watermark">${companyName.toUpperCase().substring(0,8)}</div>
   <div class="header">
     <div class="header-top">
-      <div>
-        <div class="company-name">${lead.companyName}</div>
-        <div class="company-meta">${lead.businessType} · ${lead.city}${lead.district ? ` · ${lead.district}` : ""}</div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        ${companyLogo ? `<img src="${companyLogo}" alt="شعار" style="width:56px;height:56px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,0.1);padding:4px;">` : ""}
+        <div>
+          <div class="company-name">${companyName}</div>
+          <div class="company-meta">${[companyPhone, companyEmail, companyWebsite].filter(Boolean).join(" · ") || ""}</div>
+          ${reportHeaderText ? `<div style="font-size:11px;opacity:0.7;margin-top:4px;">${reportHeaderText}</div>` : ""}
+        </div>
       </div>
-      <div class="report-badge"><strong>تقرير تحليلي</strong>${now}</div>
+      <div class="report-badge"><strong>تقرير تحليلي</strong>${now}${companyLicense ? `<br><span style="font-size:9px;opacity:0.7;">رقم الترخيص: ${companyLicense}</span>` : ""}</div>
+    </div>
+    ${reportIntroText ? `<div style="margin-top:12px;padding:10px 14px;background:rgba(255,255,255,0.08);border-radius:8px;font-size:11px;opacity:0.85;">${reportIntroText}</div>` : ""}
+  </div>
+  <div style="background:#0a0f1e;padding:8px 40px;border-bottom:2px solid ${primaryColor};">
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);">
+      ${lead.companyName} · ${lead.businessType} · ${lead.city}${lead.district ? ` · ${lead.district}` : ""}
     </div>
   </div>
   <div class="scores-row">
@@ -201,7 +236,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
         ${lead.snapchatUrl ? `<div class="info-item"><div class="info-label">سناب شات</div><div class="info-value">${lead.snapchatUrl}</div></div>` : ""}
         ${lead.tiktokUrl ? `<div class="info-item"><div class="info-label">تيك توك</div><div class="info-value">${lead.tiktokUrl}</div></div>` : ""}
         ${lead.facebookUrl ? `<div class="info-item"><div class="info-label">فيسبوك</div><div class="info-value">${lead.facebookUrl}</div></div>` : ""}
-        ${(lead as any).linkedinUrl ? `<div class="info-item"><div class="info-label">لينكد إن</div><div class="info-value">${(lead as any).linkedinUrl}</div></div>` : ""}
+        ${lead.linkedinUrl ? `<div class="info-item"><div class="info-label">لينكد إن</div><div class="info-value">${lead.linkedinUrl}</div></div>` : ""}
       </div>
     </div>
     ${(lead.iceBreaker || lead.salesEntryAngle || lead.marketingGapSummary) ? `
@@ -233,9 +268,9 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[]): s
     </div>` : ""}
   </div>
   <div class="footer">
-    <div class="footer-brand">مكسب - نظام تجميع بيانات العملاء</div>
-    <div>تقرير سري · ${now}</div>
-    <div>maksab-sales.xyz</div>
+    <div class="footer-brand">${companyName}</div>
+    <div>${reportFooterText} · ${now}</div>
+    ${companyWebsite ? `<div style="font-size:9px;opacity:0.5;">${companyWebsite}</div>` : ""}
   </div>
 </div>
 </body>

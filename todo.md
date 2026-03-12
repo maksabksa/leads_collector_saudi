@@ -1398,3 +1398,16 @@
 ## الدفعة 91 - إصلاح PDF في Production
 - [x] استبدال Puppeteer بـ @sparticuz/chromium الذي يعمل في production بدون تثبيت Chromium محلي
 - [x] اختبار PDF في dev server - يعمل بنجاح مع زر تحميل واضح
+
+## الدفعة 92 - تخصيص بيانات الشركة في الإعدادات وPDF (12 مارس 2026)
+- [ ] إضافة جدول company_settings في قاعدة البيانات (اسم، شعار، هاتف، إيميل، موقع، عنوان، ترخيص، وصف)
+- [ ] DB helpers: getCompanySettings, upsertCompanySettings
+- [ ] tRPC procedures: settings.getCompany, settings.updateCompany, settings.uploadLogo
+- [ ] قسم "بيانات الشركة" في صفحة الإعدادات مع رفع الشعار
+- [ ] ربط بيانات الشركة بتقرير PDF (رأس الصفحة + تذييل)
+
+## الدفعة 92 - تخصيص بيانات الشركة في التقارير
+- [x] إضافة حقول licenseNumber, address, instagramUrl, twitterUrl, linkedinUrl في جدول company_settings
+- [x] تحديث companySettings router ليدعم جميع الحقول الجديدة ورفع الشعار
+- [x] بناء واجهة تخصيص الشركة الكاملة في صفحة الإعدادات (شعار + معلومات + سوشيال + تخصيص التقارير)
+- [x] ربط بيانات الشركة بتقرير PDF (شعار، اسم، ألوان، نصوص رأس وتذييل الصفحة)

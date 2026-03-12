@@ -1239,6 +1239,11 @@ export const companySettings = mysqlTable("company_settings", {
   reportHeaderText: text("reportHeaderText"),
   reportFooterText: text("reportFooterText"),
   reportIntroText: text("reportIntroText"),
+  licenseNumber: varchar("licenseNumber", { length: 100 }),
+  address: text("address"),
+  instagramUrl: varchar("instagramUrl", { length: 300 }),
+  twitterUrl: varchar("twitterUrl", { length: 300 }),
+  linkedinUrl: varchar("linkedinUrl", { length: 300 }),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type CompanySettings = typeof companySettings.$inferSelect;

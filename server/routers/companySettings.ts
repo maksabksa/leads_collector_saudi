@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { companySettings } from "../../drizzle/schema";
+import { storagePut } from "../storage";
+import { nanoid } from "nanoid";
 
 export const companySettingsRouter = router({
   // جلب إعدادات الشركة
@@ -35,44 +37,70 @@ export const companySettingsRouter = router({
         email: z.string().max(200).optional().or(z.literal("")),
         website: z.string().max(300).optional(),
         logoUrl: z.string().max(2000).optional(),
+        primaryColor: z.string().max(20).optional(),
+        secondaryColor: z.string().max(20).optional(),
+        reportHeaderText: z.string().max(500).optional(),
+        reportFooterText: z.string().max(500).optional(),
+        reportIntroText: z.string().max(1000).optional(),
+        licenseNumber: z.string().max(100).optional(),
+        address: z.string().max(500).optional(),
+        instagramUrl: z.string().max(300).optional(),
+        twitterUrl: z.string().max(300).optional(),
+        linkedinUrl: z.string().max(300).optional(),
       })
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
-
-      const [existing] = await db
-        .select({ id: companySettings.id })
-        .from(companySettings)
-        .limit(1);
-
+      const [existing] = await db.select({ id: companySettings.id }).from(companySettings).limit(1);
+      const data = {
+        companyName: input.companyName,
+        companyDescription: input.companyDescription || null,
+        city: input.city || null,
+        region: input.region || null,
+        phone: input.phone || null,
+        email: input.email || null,
+        website: input.website || null,
+        logoUrl: input.logoUrl || null,
+        primaryColor: input.primaryColor || "#1a56db",
+        secondaryColor: input.secondaryColor || "#0e9f6e",
+        reportHeaderText: input.reportHeaderText || null,
+        reportFooterText: input.reportFooterText || null,
+        reportIntroText: input.reportIntroText || null,
+        licenseNumber: input.licenseNumber || null,
+        address: input.address || null,
+        instagramUrl: input.instagramUrl || null,
+        twitterUrl: input.twitterUrl || null,
+        linkedinUrl: input.linkedinUrl || null,
+      };
       if (existing) {
-        await db
-          .update(companySettings)
-          .set({
-            companyName: input.companyName,
-            companyDescription: input.companyDescription || null,
-            city: input.city || null,
-            region: input.region || null,
-            phone: input.phone || null,
-            email: input.email || null,
-            website: input.website || null,
-            logoUrl: input.logoUrl || null,
-          })
-          .where(eq(companySettings.id, existing.id));
+        await db.update(companySettings).set(data).where(eq(companySettings.id, existing.id));
       } else {
-        await db.insert(companySettings).values({
-          companyName: input.companyName,
-          companyDescription: input.companyDescription || undefined,
-          city: input.city || undefined,
-          region: input.region || undefined,
-          phone: input.phone || undefined,
-          email: input.email || undefined,
-          website: input.website || undefined,
-          logoUrl: input.logoUrl || undefined,
-        });
+        await db.insert(companySettings).values(data);
       }
-
       return { success: true };
+    }),
+
+  // رفع شعار الشركة إلى S3
+  uploadLogo: protectedProcedure
+    .input(z.object({
+      base64: z.string(),
+      mimeType: z.string().default("image/png"),
+    }))
+    .mutation(async ({ input }) => {
+      const base64Data = input.base64.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const ext = input.mimeType.split("/")[1] || "png";
+      const key = `company-logos/logo-${nanoid(8)}.${ext}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const [existing] = await db.select({ id: companySettings.id }).from(companySettings).limit(1);
+      if (existing) {
+        await db.update(companySettings).set({ logoUrl: url }).where(eq(companySettings.id, existing.id));
+      } else {
+        await db.insert(companySettings).values({ companyName: "مكسب KSA", logoUrl: url });
+      }
+      return { url };
     }),
 });
