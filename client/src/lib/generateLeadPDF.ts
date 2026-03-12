@@ -1,354 +1,358 @@
-import jsPDF from "jspdf";
+// PDF Generation using HTML + window.print
+// Supports full Arabic text with Tajawal font - no server needed, no Chromium needed
 
-interface LeadPDFData {
-  lead: any;
+interface GeneratePDFOptions {
+  lead?: any;
   websiteAnalysis?: any;
   socialAnalyses?: any[];
   report?: any;
   company?: any;
 }
 
-function scoreBar(value: number | null | undefined, max = 10): string {
-  if (!value) return "—";
-  const pct = Math.round((Number(value) / max) * 100);
-  return `${Number(value).toFixed(1)} / ${max}`;
+function scoreColor(val: number | null | undefined): string {
+  if (!val) return "#94a3b8";
+  if (val >= 7) return "#22c55e";
+  if (val >= 5) return "#eab308";
+  return "#ef4444";
 }
 
-function rtlText(text: string): string {
-  return text || "";
+function scoreLabel(val: number | null | undefined): string {
+  if (!val) return "—";
+  return Number(val).toFixed(1);
 }
 
-export async function generateLeadPDF(data: LeadPDFData): Promise<void> {
-  const { lead, websiteAnalysis, socialAnalyses = [], report, company } = data;
+function platformIcon(platform: string): string {
+  const icons: Record<string, string> = {
+    instagram: "📸",
+    twitter: "🐦",
+    tiktok: "🎵",
+    snapchat: "👻",
+    facebook: "📘",
+    linkedin: "💼",
+  };
+  return icons[platform?.toLowerCase()] || "📱";
+}
 
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
+function platformName(platform: string): string {
+  const names: Record<string, string> = {
+    instagram: "إنستغرام",
+    twitter: "تويتر / X",
+    tiktok: "تيك توك",
+    snapchat: "سناب شات",
+    facebook: "فيسبوك",
+    linkedin: "لينكد إن",
+  };
+  return names[platform?.toLowerCase()] || platform;
+}
+
+function cleanMarkdown(text: string): string {
+  return text
+    .replace(/#{1,6}\s/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/`(.*?)`/g, "<code>$1</code>")
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n/g, "<br>");
+}
+
+function urgencyInfo(level: string | null | undefined): { text: string; color: string; bg: string } {
+  switch (level) {
+    case "high": return { text: "أولوية عالية", color: "#fff", bg: "#ef4444" };
+    case "medium": return { text: "أولوية متوسطة", color: "#fff", bg: "#f59e0b" };
+    case "low": return { text: "أولوية منخفضة", color: "#fff", bg: "#22c55e" };
+    default: return { text: "غير محدد", color: "#64748b", bg: "#f1f5f9" };
+  }
+}
+
+export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void> {
+  const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
+
+  if (!lead) throw new Error("لا توجد بيانات للعميل");
+
+  const primaryColor = company?.primaryColor || "#1e3a5f";
+  const secondaryColor = company?.secondaryColor || "#c9a84c";
+  const companyName = company?.companyName || "مكسب";
+  const companyLogo = company?.logoUrl || "";
+  const reportDate = new Date().toLocaleDateString("ar-SA", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 
-  const pageW = 210;
-  const pageH = 297;
-  const margin = 15;
-  const contentW = pageW - margin * 2;
+  const urgency = urgencyInfo(lead.urgencyLevel);
+  const priorityScore = lead.leadPriorityScore ? Number(lead.leadPriorityScore).toFixed(1) : null;
+  const websiteScore = websiteAnalysis?.overallScore ? Number(websiteAnalysis.overallScore).toFixed(1) : null;
 
-  // Colors
-  const primaryColor = company?.primaryColor || "#1a2744";
-  const accentColor = company?.secondaryColor || "#3b82f6";
+  const socialSectionHtml = socialAnalyses.length > 0 ? `
+    <div class="section">
+      <div class="section-title"><span class="section-icon">📱</span>تحليل وسائل التواصل الاجتماعي</div>
+      <div class="social-grid">
+        ${socialAnalyses.map((sa: any) => `
+          <div class="social-card">
+            <div class="social-header">
+              <span class="social-icon">${platformIcon(sa.platform || "")}</span>
+              <span class="social-name">${platformName(sa.platform || "")}</span>
+              ${sa.followersCount ? `<span class="social-followers">${Number(sa.followersCount).toLocaleString("ar")} متابع</span>` : ""}
+            </div>
+            ${sa.engagementRate ? `<div class="social-stat">معدل التفاعل: <strong>${Number(sa.engagementRate).toFixed(2)}%</strong></div>` : ""}
+            ${sa.postsCount ? `<div class="social-stat">عدد المنشورات: <strong>${Number(sa.postsCount).toLocaleString("ar")}</strong></div>` : ""}
+            ${(sa.analysisText || sa.rawAnalysis) ? `<div class="social-analysis">${(sa.analysisText || sa.rawAnalysis || "").slice(0, 400)}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
 
-  // Helper: hex to RGB
-  function hexToRgb(hex: string): [number, number, number] {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result
-      ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
-      : [26, 39, 68];
+  const websiteSectionHtml = websiteAnalysis ? `
+    <div class="section">
+      <div class="section-title"><span class="section-icon">🌐</span>تحليل الموقع الإلكتروني</div>
+      <div class="scores-grid">
+        ${[
+          { label: "التقييم الإجمالي", value: websiteAnalysis.overallScore },
+          { label: "السرعة", value: websiteAnalysis.loadSpeedScore },
+          { label: "الجوال", value: websiteAnalysis.mobileExperienceScore },
+          { label: "SEO", value: websiteAnalysis.seoScore },
+          { label: "المحتوى", value: websiteAnalysis.contentQualityScore },
+          { label: "التصميم", value: websiteAnalysis.designScore },
+        ].map((s) => `
+          <div class="score-box">
+            <div class="score-value" style="color: ${scoreColor(s.value)}">${scoreLabel(s.value)}</div>
+            <div class="score-label">${s.label}</div>
+          </div>
+        `).join("")}
+      </div>
+      ${websiteAnalysis.summary ? `<div class="analysis-text"><strong>ملخص التحليل:</strong><br>${websiteAnalysis.summary}</div>` : ""}
+      ${websiteAnalysis.recommendations ? `<div class="analysis-text"><strong>التوصيات:</strong><br>${websiteAnalysis.recommendations}</div>` : ""}
+    </div>
+  ` : "";
+
+  const aiSectionHtml = (lead.salesEntryAngle || lead.suggestedSalesEntryAngle || lead.iceBreaker || lead.biggestMarketingGap || lead.revenueOpportunity) ? `
+    <div class="section">
+      <div class="section-title"><span class="section-icon">🤖</span>التحليل التسويقي بالذكاء الاصطناعي</div>
+      ${(lead.salesEntryAngle || lead.suggestedSalesEntryAngle) ? `
+        <div class="ai-block">
+          <div class="ai-block-title">⚡ زاوية الدخول البيعية</div>
+          <div class="ai-block-content">${lead.salesEntryAngle || lead.suggestedSalesEntryAngle}</div>
+        </div>
+      ` : ""}
+      ${lead.iceBreaker ? `
+        <div class="ai-block">
+          <div class="ai-block-title">💬 كسر الجمود</div>
+          <div class="ai-block-content">${lead.iceBreaker}</div>
+        </div>
+      ` : ""}
+      ${lead.biggestMarketingGap ? `
+        <div class="ai-block">
+          <div class="ai-block-title">🎯 أكبر ثغرة تسويقية</div>
+          <div class="ai-block-content">${lead.biggestMarketingGap}</div>
+        </div>
+      ` : ""}
+      ${lead.revenueOpportunity ? `
+        <div class="ai-block">
+          <div class="ai-block-title">💰 فرصة الإيراد</div>
+          <div class="ai-block-content">${lead.revenueOpportunity}</div>
+        </div>
+      ` : ""}
+    </div>
+  ` : "";
+
+  const fullReportSectionHtml = report?.fullReport ? `
+    <div class="section page-break-before">
+      <div class="section-title"><span class="section-icon">📋</span>التقرير الشامل</div>
+      <div class="full-report">
+        <p>${cleanMarkdown(typeof report.fullReport === "string" ? report.fullReport : "")}</p>
+      </div>
+    </div>
+  ` : "";
+
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تقرير ${lead.companyName || "عميل"}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Tajawal', sans-serif; direction: rtl; text-align: right; background: #f8fafc; color: #1e293b; font-size: 13px; line-height: 1.7; }
+    .header { background: linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}dd 60%, ${secondaryColor}44 100%); color: white; padding: 32px 40px; position: relative; overflow: hidden; }
+    .header::before { content: ''; position: absolute; top: -50px; left: -50px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.05); }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .company-brand { display: flex; align-items: center; gap: 12px; }
+    .company-logo { width: 56px; height: 56px; border-radius: 12px; object-fit: contain; background: white; padding: 4px; }
+    .company-logo-placeholder { width: 56px; height: 56px; border-radius: 12px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: white; }
+    .company-info h1 { font-size: 20px; font-weight: 800; color: white; }
+    .company-info p { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+    .report-meta { text-align: left; color: rgba(255,255,255,0.8); font-size: 12px; }
+    .report-meta .date { font-size: 13px; font-weight: 500; color: white; margin-bottom: 4px; }
+    .report-meta .report-id { font-size: 11px; color: rgba(255,255,255,0.6); }
+    .client-section { display: flex; justify-content: space-between; align-items: flex-end; }
+    .client-name { font-size: 28px; font-weight: 900; color: white; margin-bottom: 6px; }
+    .client-type { font-size: 14px; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 8px; }
+    .client-type .dot { width: 6px; height: 6px; border-radius: 50%; background: ${secondaryColor}; display: inline-block; }
+    .scores-row { display: flex; gap: 12px; align-items: center; }
+    .score-badge { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px 16px; text-align: center; min-width: 80px; }
+    .score-badge .val { font-size: 22px; font-weight: 900; color: white; }
+    .score-badge .lbl { font-size: 10px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+    .urgency-badge { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; background: ${urgency.bg}; color: ${urgency.color}; }
+    .accent-bar { height: 4px; background: linear-gradient(90deg, ${secondaryColor}, ${primaryColor}); }
+    .intro-section { background: white; padding: 20px 40px; border-bottom: 1px solid #e2e8f0; }
+    .intro-text { color: #475569; font-size: 13px; line-height: 1.8; }
+    .contact-section { background: white; padding: 24px 40px; border-bottom: 1px solid #e2e8f0; }
+    .contact-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .contact-item { display: flex; align-items: center; gap: 10px; }
+    .contact-icon { width: 36px; height: 36px; border-radius: 8px; background: ${primaryColor}15; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .contact-label { font-size: 10px; color: #94a3b8; margin-bottom: 2px; }
+    .contact-value { font-size: 13px; font-weight: 600; color: #1e293b; }
+    .content { padding: 24px 40px; }
+    .section { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .section-title { font-size: 16px; font-weight: 800; color: ${primaryColor}; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 2px solid ${secondaryColor}44; display: flex; align-items: center; gap: 8px; }
+    .section-icon { font-size: 18px; }
+    .scores-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 16px; }
+    .score-box { background: #f8fafc; border-radius: 10px; padding: 14px 8px; text-align: center; border: 1px solid #e2e8f0; }
+    .score-value { font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+    .score-label { font-size: 10px; color: #64748b; font-weight: 500; }
+    .analysis-text { background: #f8fafc; border-radius: 8px; padding: 14px 16px; font-size: 12px; color: #475569; line-height: 1.8; margin-top: 12px; border-right: 3px solid ${primaryColor}44; }
+    .ai-block { background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 10px; padding: 16px; margin-bottom: 12px; border: 1px solid #e2e8f0; }
+    .ai-block:last-child { margin-bottom: 0; }
+    .ai-block-title { font-size: 13px; font-weight: 700; color: ${primaryColor}; margin-bottom: 8px; }
+    .ai-block-content { font-size: 12px; color: #475569; line-height: 1.8; }
+    .social-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .social-card { background: #f8fafc; border-radius: 10px; padding: 16px; border: 1px solid #e2e8f0; }
+    .social-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .social-icon { font-size: 20px; }
+    .social-name { font-size: 14px; font-weight: 700; color: ${primaryColor}; flex: 1; }
+    .social-followers { font-size: 11px; font-weight: 600; color: white; background: ${primaryColor}; padding: 3px 8px; border-radius: 20px; }
+    .social-stat { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+    .social-stat strong { color: #1e293b; }
+    .social-analysis { font-size: 11px; color: #64748b; line-height: 1.7; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+    .full-report { font-size: 12px; color: #475569; line-height: 1.9; }
+    .full-report p { margin-bottom: 10px; }
+    .full-report strong { color: ${primaryColor}; font-weight: 700; }
+    .full-report code { background: #f1f5f9; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+    .footer-accent { height: 3px; background: ${secondaryColor}; }
+    .footer { background: ${primaryColor}; color: rgba(255,255,255,0.8); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 8px; }
+    .footer-brand { font-weight: 700; color: white; font-size: 13px; }
+    .footer-meta { text-align: left; color: rgba(255,255,255,0.6); }
+    .print-bar { position: fixed; top: 0; left: 0; right: 0; background: ${primaryColor}; color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .print-bar h3 { font-size: 14px; font-weight: 700; }
+    .print-bar .actions { display: flex; gap: 10px; }
+    .btn-print { background: ${secondaryColor}; color: ${primaryColor}; border: none; padding: 8px 20px; border-radius: 8px; font-family: 'Tajawal', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .btn-close { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 8px; font-family: 'Tajawal', sans-serif; font-size: 13px; cursor: pointer; }
+    .page-wrapper { margin-top: 52px; }
+    @media print {
+      .print-bar { display: none !important; }
+      .page-wrapper { margin-top: 0 !important; }
+      body { background: white; }
+      .section { break-inside: avoid; }
+      .page-break-before { break-before: page; }
+      @page { margin: 0; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-bar">
+    <h3>📄 تقرير ${lead.companyName || "عميل"}</h3>
+    <div class="actions">
+      <button class="btn-print" onclick="window.print()">🖨️ طباعة / تحميل PDF</button>
+      <button class="btn-close" onclick="window.close()">✕ إغلاق</button>
+    </div>
+  </div>
+
+  <div class="page-wrapper">
+    <div class="header">
+      <div class="header-top">
+        <div class="company-brand">
+          ${companyLogo
+            ? `<img src="${companyLogo}" alt="${companyName}" class="company-logo">`
+            : `<div class="company-logo-placeholder">${companyName.charAt(0)}</div>`
+          }
+          <div class="company-info">
+            <h1>${companyName}</h1>
+            ${company?.reportHeaderText ? `<p>${company.reportHeaderText}</p>` : ""}
+            ${company?.phone ? `<p>📞 ${company.phone}</p>` : ""}
+          </div>
+        </div>
+        <div class="report-meta">
+          <div class="date">📅 ${reportDate}</div>
+          <div class="report-id">تقرير تحليل العميل #${lead.id || ""}</div>
+          ${company?.licenseNumber ? `<div class="report-id">رقم الترخيص: ${company.licenseNumber}</div>` : ""}
+        </div>
+      </div>
+      <div class="client-section">
+        <div>
+          <div class="client-name">${lead.companyName || "—"}</div>
+          <div class="client-type">
+            <span class="dot"></span>
+            ${lead.businessType || ""}
+            ${lead.city ? `<span class="dot"></span> ${lead.city}` : ""}
+            ${lead.country ? ` · ${lead.country}` : ""}
+          </div>
+        </div>
+        <div class="scores-row">
+          ${priorityScore ? `<div class="score-badge"><div class="val">${priorityScore}</div><div class="lbl">أولوية</div></div>` : ""}
+          ${websiteScore ? `<div class="score-badge"><div class="val">${websiteScore}</div><div class="lbl">الموقع</div></div>` : ""}
+          <div class="urgency-badge">${urgency.text}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accent-bar"></div>
+
+    ${company?.reportIntroText ? `<div class="intro-section"><div class="intro-text">${company.reportIntroText}</div></div>` : ""}
+
+    <div class="contact-section">
+      <div class="contact-grid">
+        ${(lead.verifiedPhone || lead.phone) ? `<div class="contact-item"><div class="contact-icon">📞</div><div><div class="contact-label">رقم الهاتف</div><div class="contact-value">${lead.verifiedPhone || lead.phone}</div></div></div>` : ""}
+        ${lead.email ? `<div class="contact-item"><div class="contact-icon">📧</div><div><div class="contact-label">البريد الإلكتروني</div><div class="contact-value">${lead.email}</div></div></div>` : ""}
+        ${lead.website ? `<div class="contact-item"><div class="contact-icon">🌐</div><div><div class="contact-label">الموقع الإلكتروني</div><div class="contact-value">${lead.website}</div></div></div>` : ""}
+        ${lead.instagramUrl ? `<div class="contact-item"><div class="contact-icon">📸</div><div><div class="contact-label">إنستغرام</div><div class="contact-value">${lead.instagramUrl.replace("https://www.instagram.com/", "@").replace("https://instagram.com/", "@")}</div></div></div>` : ""}
+        ${lead.twitterUrl ? `<div class="contact-item"><div class="contact-icon">🐦</div><div><div class="contact-label">تويتر / X</div><div class="contact-value">${lead.twitterUrl.replace("https://twitter.com/", "@").replace("https://x.com/", "@")}</div></div></div>` : ""}
+        ${lead.tiktokUrl ? `<div class="contact-item"><div class="contact-icon">🎵</div><div><div class="contact-label">تيك توك</div><div class="contact-value">${lead.tiktokUrl.replace("https://www.tiktok.com/@", "@").replace("https://tiktok.com/@", "@")}</div></div></div>` : ""}
+        ${lead.rating ? `<div class="contact-item"><div class="contact-icon">⭐</div><div><div class="contact-label">التقييم</div><div class="contact-value">${lead.rating} / 5 ${lead.reviewCount ? `(${lead.reviewCount} تقييم)` : ""}</div></div></div>` : ""}
+      </div>
+    </div>
+
+    <div class="content">
+      ${aiSectionHtml}
+      ${websiteSectionHtml}
+      ${socialSectionHtml}
+      ${fullReportSectionHtml}
+      ${lead.notes ? `<div class="section"><div class="section-title"><span class="section-icon">📝</span>الملاحظات</div><div class="analysis-text">${lead.notes}</div></div>` : ""}
+    </div>
+
+    <div class="footer-accent"></div>
+    <div class="footer">
+      <div>
+        <div class="footer-brand">${companyName}</div>
+        ${company?.reportFooterText ? `<div>${company.reportFooterText}</div>` : ""}
+        ${company?.email ? `<div>${company.email}</div>` : ""}
+        ${company?.website ? `<div>${company.website}</div>` : ""}
+      </div>
+      <div class="footer-meta">
+        <div>تاريخ الإصدار: ${reportDate}</div>
+        <div>هذا التقرير سري وخاص بالشركة</div>
+        ${company?.address ? `<div>${company.address}</div>` : ""}
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) {
+    throw new Error("تعذّر فتح نافذة التقرير. يرجى السماح بالنوافذ المنبثقة في المتصفح.");
   }
 
-  const [pr, pg, pb] = hexToRgb(primaryColor);
-  const [ar, ag, ab] = hexToRgb(accentColor);
+  printWindow.document.write(html);
+  printWindow.document.close();
 
-  // ─── HEADER ───────────────────────────────────────────────
-  doc.setFillColor(pr, pg, pb);
-  doc.rect(0, 0, pageW, 45, "F");
-
-  // Accent line
-  doc.setFillColor(ar, ag, ab);
-  doc.rect(0, 43, pageW, 2, "F");
-
-  // Company name (right-aligned for Arabic)
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  const companyName = company?.companyName || "مجمع بيانات الأعمال";
-  doc.text(companyName, pageW - margin, 16, { align: "right" });
-
-  // Company info
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(200, 210, 230);
-  const companyInfo = [
-    company?.phone,
-    company?.email,
-    company?.website,
-  ].filter(Boolean).join("  |  ");
-  if (companyInfo) {
-    doc.text(companyInfo, pageW - margin, 23, { align: "right" });
-  }
-
-  // Report label (left side)
-  doc.setTextColor(ar, ag, ab);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("ANALYTICAL REPORT", margin, 16);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(180, 190, 210);
-  doc.text(new Date().toLocaleDateString("ar-SA"), margin, 23);
-  if (company?.licenseNumber) {
-    doc.text(`License: ${company.licenseNumber}`, margin, 29);
-  }
-
-  // ─── CLIENT NAME SECTION ──────────────────────────────────
-  let y = 55;
-  doc.setFillColor(240, 244, 255);
-  doc.roundedRect(margin, y, contentW, 22, 3, 3, "F");
-
-  doc.setTextColor(pr, pg, pb);
-  doc.setFontSize(15);
-  doc.setFont("helvetica", "bold");
-  doc.text(lead.companyName || "", pageW - margin - 2, y + 8, { align: "right" });
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 100, 140);
-  const subInfo = [lead.businessType, lead.city, lead.country].filter(Boolean).join(" · ");
-  doc.text(subInfo, pageW - margin - 2, y + 15, { align: "right" });
-
-  // Stage badge
-  if (lead.stage) {
-    doc.setFillColor(ar, ag, ab);
-    doc.roundedRect(margin + 2, y + 5, 28, 10, 2, 2, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.text(lead.stage, margin + 16, y + 11, { align: "center" });
-  }
-
-  y += 30;
-
-  // ─── SCORES ROW ───────────────────────────────────────────
-  const scores = [
-    { label: "أولوية العميل", value: lead.leadPriorityScore },
-    { label: "جودة الهوية", value: lead.brandingQualityScore },
-    { label: "جاهزية الموسم", value: lead.seasonalReadinessScore },
-  ];
-
-  const boxW = (contentW - 8) / 3;
-  scores.forEach((s, i) => {
-    const bx = margin + i * (boxW + 4);
-    doc.setFillColor(pr, pg, pb);
-    doc.roundedRect(bx, y, boxW, 22, 3, 3, "F");
-
-    const val = s.value ? Number(s.value).toFixed(1) : "—";
-    const color = s.value
-      ? Number(s.value) >= 7
-        ? ([34, 197, 94] as [number, number, number])
-        : Number(s.value) >= 5
-        ? ([234, 179, 8] as [number, number, number])
-        : ([239, 68, 68] as [number, number, number])
-      : ([150, 160, 180] as [number, number, number]);
-
-    doc.setTextColor(...color);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(val, bx + boxW / 2, y + 11, { align: "center" });
-
-    doc.setTextColor(180, 190, 210);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(s.label, bx + boxW / 2, y + 18, { align: "center" });
+  printWindow.addEventListener("load", () => {
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 1500);
   });
-
-  y += 30;
-
-  // ─── CONTACT INFO ─────────────────────────────────────────
-  doc.setFillColor(248, 250, 255);
-  doc.roundedRect(margin, y, contentW, 20, 3, 3, "F");
-  doc.setDrawColor(220, 228, 245);
-  doc.roundedRect(margin, y, contentW, 20, 3, 3, "S");
-
-  doc.setTextColor(60, 80, 120);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.text("معلومات الاتصال", pageW - margin - 2, y + 6, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  const contacts = [
-    lead.verifiedPhone && `📞 ${lead.verifiedPhone}`,
-    lead.website && `🌐 ${lead.website}`,
-    lead.city && `📍 ${lead.city}`,
-    lead.instagramUrl && `📸 ${lead.instagramUrl}`,
-  ].filter(Boolean);
-
-  const colW = contentW / 2;
-  contacts.forEach((c, i) => {
-    const cx = i % 2 === 0 ? pageW - margin - 2 : pageW - margin - colW;
-    const cy = y + 12 + Math.floor(i / 2) * 6;
-    doc.setTextColor(80, 100, 140);
-    doc.text(c as string, cx, cy, { align: "right" });
-  });
-
-  y += 28;
-
-  // ─── SECTION HELPER ───────────────────────────────────────
-  function sectionTitle(title: string) {
-    doc.setFillColor(ar, ag, ab);
-    doc.rect(margin, y, 3, 7, "F");
-    doc.setTextColor(pr, pg, pb);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(title, pageW - margin - 2, y + 5.5, { align: "right" });
-    y += 12;
-  }
-
-  function textBlock(label: string, value: string | null | undefined, highlight = false) {
-    if (!value) return;
-    if (highlight) {
-      doc.setFillColor(ar, ag, ab);
-      doc.setFillColor(235, 242, 255);
-      doc.roundedRect(margin, y, contentW, 14, 2, 2, "F");
-    }
-    doc.setTextColor(100, 120, 160);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(label, pageW - margin - 2, y + 5, { align: "right" });
-
-    doc.setTextColor(30, 50, 90);
-    doc.setFontSize(8.5);
-    doc.setFont("helvetica", "bold");
-    const lines = doc.splitTextToSize(value, contentW - 4);
-    doc.text(lines.slice(0, 2), pageW - margin - 2, y + 10, { align: "right" });
-    y += highlight ? 18 : 14;
-  }
-
-  function checkNewPage(needed = 30) {
-    if (y + needed > pageH - 20) {
-      doc.addPage();
-      y = 20;
-    }
-  }
-
-  // ─── AI ANALYSIS ──────────────────────────────────────────
-  checkNewPage(60);
-  sectionTitle("التحليل التسويقي بالذكاء الاصطناعي");
-
-  if (lead.salesEntryAngle || lead.suggestedSalesEntryAngle) {
-    textBlock("زاوية الدخول البيعية", lead.salesEntryAngle || lead.suggestedSalesEntryAngle, true);
-  }
-  if (lead.iceBreaker) {
-    textBlock("كسر الجمود", lead.iceBreaker);
-  }
-  if (lead.biggestMarketingGap) {
-    textBlock("أكبر ثغرة تسويقية", lead.biggestMarketingGap);
-  }
-  if (lead.revenueOpportunity) {
-    textBlock("فرصة الإيراد", lead.revenueOpportunity);
-  }
-
-  // ─── WEBSITE ANALYSIS ─────────────────────────────────────
-  if (websiteAnalysis) {
-    checkNewPage(60);
-    sectionTitle("تحليل الموقع الإلكتروني");
-
-    const wsScores = [
-      { label: "السرعة", value: websiteAnalysis.loadSpeedScore },
-      { label: "الجوال", value: websiteAnalysis.mobileExperienceScore },
-      { label: "SEO", value: websiteAnalysis.seoScore },
-      { label: "المحتوى", value: websiteAnalysis.contentQualityScore },
-      { label: "التصميم", value: websiteAnalysis.designScore },
-      { label: "الإجمالي", value: websiteAnalysis.overallScore },
-    ];
-
-    const sbW = (contentW - 10) / 3;
-    wsScores.forEach((s, i) => {
-      if (i > 0 && i % 3 === 0) y += 18;
-      const bx = margin + (i % 3) * (sbW + 5);
-      const val = s.value ? Number(s.value).toFixed(1) : "—";
-      const clr: [number, number, number] = s.value
-        ? Number(s.value) >= 7 ? [34, 197, 94] : Number(s.value) >= 5 ? [234, 179, 8] : [239, 68, 68]
-        : [150, 160, 180];
-      doc.setFillColor(245, 248, 255);
-      doc.roundedRect(bx, y, sbW, 14, 2, 2, "F");
-      doc.setTextColor(...clr);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text(val, bx + sbW / 2, y + 7, { align: "center" });
-      doc.setTextColor(100, 120, 160);
-      doc.setFontSize(6.5);
-      doc.setFont("helvetica", "normal");
-      doc.text(s.label, bx + sbW / 2, y + 12, { align: "center" });
-    });
-    y += 22;
-
-    if (websiteAnalysis.summary) {
-      textBlock("ملخص التحليل", websiteAnalysis.summary);
-    }
-  }
-
-  // ─── SOCIAL MEDIA ─────────────────────────────────────────
-  if (socialAnalyses && socialAnalyses.length > 0) {
-    checkNewPage(50);
-    sectionTitle("تحليل وسائل التواصل الاجتماعي");
-
-    socialAnalyses.forEach((sa: any) => {
-      checkNewPage(30);
-      const platform = sa.platform || "";
-      doc.setFillColor(245, 248, 255);
-      doc.roundedRect(margin, y, contentW, 12, 2, 2, "F");
-      doc.setTextColor(ar, ag, ab);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text(platform.toUpperCase(), pageW - margin - 2, y + 8, { align: "right" });
-
-      if (sa.followersCount) {
-        doc.setTextColor(60, 80, 120);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.text(`متابعون: ${Number(sa.followersCount).toLocaleString("ar")}`, margin + 2, y + 8);
-      }
-      y += 16;
-
-      if (sa.analysisText || sa.rawAnalysis) {
-        const txt = sa.analysisText || sa.rawAnalysis || "";
-        doc.setTextColor(60, 80, 120);
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "normal");
-        const lines = doc.splitTextToSize(txt.slice(0, 300), contentW);
-        doc.text(lines.slice(0, 4), pageW - margin - 2, y, { align: "right" });
-        y += lines.slice(0, 4).length * 4 + 4;
-      }
-    });
-  }
-
-  // ─── FULL REPORT ──────────────────────────────────────────
-  if (report?.fullReport) {
-    checkNewPage(50);
-    sectionTitle("التقرير الشامل");
-    const reportText = typeof report.fullReport === "string"
-      ? report.fullReport.replace(/[#*`]/g, "").slice(0, 1500)
-      : "";
-    if (reportText) {
-      doc.setTextColor(50, 70, 110);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      const lines = doc.splitTextToSize(reportText, contentW);
-      lines.slice(0, 30).forEach((line: string) => {
-        checkNewPage(8);
-        doc.text(line, pageW - margin - 2, y, { align: "right" });
-        y += 5;
-      });
-    }
-  }
-
-  // ─── FOOTER ───────────────────────────────────────────────
-  const totalPages = doc.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    doc.setFillColor(pr, pg, pb);
-    doc.rect(0, pageH - 12, pageW, 12, "F");
-    doc.setFillColor(ar, ag, ab);
-    doc.rect(0, pageH - 12, pageW, 1, "F");
-
-    doc.setTextColor(180, 190, 210);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-
-    const footerText = company?.reportFooterText || companyName;
-    doc.text(footerText, pageW - margin, pageH - 5, { align: "right" });
-    doc.text(`${p} / ${totalPages}`, margin, pageH - 5);
-  }
-
-  // ─── SAVE ─────────────────────────────────────────────────
-  const filename = `تقرير-${lead.companyName || "عميل"}-${new Date().toISOString().slice(0, 10)}.pdf`;
-  doc.save(filename);
 }
