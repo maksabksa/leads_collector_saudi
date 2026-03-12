@@ -91,34 +91,21 @@ export default function LeadDetail() {
   const [pdfCustomMessage, setPdfCustomMessage] = useState("");
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
-
-  const handleDownloadPdf = async (url: string, filename: string) => {
-    setPdfDownloading(true);
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-    } catch {
-      window.open(url, '_blank');
-    } finally {
-      setPdfDownloading(false);
-    }
-  };
+  const { data: companySettingsData } = trpc.companySettings.get.useQuery();
 
   const handleGeneratePDF = async () => {
     setPdfGenerating(true);
     try {
-      const result = await generatePDF.mutateAsync({ leadId: id });
-      setPdfUrl(result.url);
-      setShowPdfModal(true);
-      toast.success("تم توليد التقرير بنجاح");
+      // Client-side PDF generation - no server/Chromium needed
+      const { generateLeadPDF } = await import("@/lib/generateLeadPDF");
+      await generateLeadPDF({
+        lead: data?.lead,
+        websiteAnalysis: data?.websiteAnalysis,
+        socialAnalyses: data?.socialAnalyses || [],
+        report: report,
+        company: companySettingsData,
+      });
+      toast.success("تم تحميل التقرير بنجاح");
     } catch (e: any) {
       toast.error("فشل توليد التقرير", { description: e.message });
     } finally {
@@ -131,7 +118,7 @@ export default function LeadDetail() {
       toast.error("لا يوجد حساب واتساب متصل");
       return;
     }
-    if (!lead.verifiedPhone) {
+    if (!data?.lead?.verifiedPhone) {
       toast.error("لا يوجد رقم هاتف للعميل");
       return;
     }
@@ -185,22 +172,22 @@ export default function LeadDetail() {
   const isWaConnected = !!connectedSession;
 
   const handleCheckWhatsapp = async () => {
-    if (!lead.verifiedPhone) { toast.error("لا يوجد رقم هاتف لهذا العميل"); return; }
+    if (!data?.lead?.verifiedPhone) { toast.error("لا يوجد رقم هاتف لهذا العميل"); return; }
     // فتح wa.me للتحقق فقط (ليس للإرسال)
-    const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+    const phone = (data?.lead?.verifiedPhone || "").replace(/[^0-9]/g, "");
     window.open(`https://wa.me/${phone}`, "_blank");
     toast.info("تم فتح واتساب للتحقق - حدد الحالة بعد التحقق");
   };
 
   const handleGenerateWaMessage = async () => {
-    if (!lead.verifiedPhone) { toast.error("لا يوجد رقم هاتف"); return; }
+    if (!data?.lead?.verifiedPhone) { toast.error("لا يوجد رقم هاتف"); return; }
     setWaGenerating(true);
     try {
       const result = await generateWaMessage.mutateAsync({
         leadId: id,
-        companyName: lead.companyName,
-        businessType: lead.businessType,
-        city: lead.city,
+        companyName: data?.lead?.companyName,
+        businessType: data?.lead?.businessType,
+        city: data?.lead?.city,
       });
       setWaMessage(result.message);
       toast.success("تم توليد الرسالة بالذكاء الاصطناعي");
@@ -209,8 +196,8 @@ export default function LeadDetail() {
   };
 
   const handleSendWhatsapp = async () => {
-    if (!lead.verifiedPhone || !waMessage) return;
-    const phone = lead.verifiedPhone.replace(/[^0-9]/g, "");
+    if (!data?.lead?.verifiedPhone || !waMessage) return;
+    const phone = (data?.lead?.verifiedPhone || "").replace(/[^0-9]/g, "");
     if (isWaConnected && connectedSession) {
       // إرسال عبر النظام الداخلي
       setWaSending(true);
@@ -230,7 +217,7 @@ export default function LeadDetail() {
       }
     } else {
       // لا يوجد اتصال - فتح المحادثة الداخلية
-      const leadName = (lead as any).businessName || lead.companyName || '';
+      const leadName = (data?.lead as any)?.businessName || data?.lead?.companyName || '';
       navigate(`/chats?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(leadName)}&message=${encodeURIComponent(waMessage)}`);
       toast.info("تم فتح المحادثة الداخلية");
     }
