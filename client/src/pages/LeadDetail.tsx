@@ -83,6 +83,7 @@ export default function LeadDetail() {
   const [waSending, setWaSending] = useState(false);
 
   // PDF Report state
+  const [pdfDownloading, setPdfDownloading] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfSending, setPdfSending] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -90,6 +91,26 @@ export default function LeadDetail() {
   const [pdfCustomMessage, setPdfCustomMessage] = useState("");
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
+
+  const handleDownloadPdf = async (url: string, filename: string) => {
+    setPdfDownloading(true);
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    } catch {
+      window.open(url, '_blank');
+    } finally {
+      setPdfDownloading(false);
+    }
+  };
 
   const handleGeneratePDF = async () => {
     setPdfGenerating(true);
@@ -1608,15 +1629,15 @@ export default function LeadDetail() {
             </div>
             {pdfUrl && (
               <div className="flex gap-2 pt-1">
-                <a
-                  href={pdfUrl}
-                  download={`تقرير-${lead.companyName}.pdf`}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+                <button
+                  onClick={() => handleDownloadPdf(pdfUrl, `تقرير-${lead.companyName}.pdf`)}
+                  disabled={pdfDownloading}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-60"
                   style={{ background: "oklch(0.55 0.2 220)", color: "white" }}
                 >
-                  <Download className="w-4 h-4" />
-                  تحميل PDF
-                </a>
+                  {pdfDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  {pdfDownloading ? "جاري التحميل..." : "تحميل PDF"}
+                </button>
                 <a
                   href={pdfUrl}
                   target="_blank"
