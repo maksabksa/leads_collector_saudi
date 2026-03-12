@@ -262,6 +262,14 @@ export const socialAnalyses = mysqlTable("social_analyses", {
   summary: text("summary"),
   recommendations: json("recommendations").$type<string[]>(),
   rawAnalysis: text("rawAnalysis"),
+  // === Bright Data Dataset API real data fields ===
+  followersCount: int("followersCount"),
+  engagementRate: float("engagementRate"),
+  postsCount: int("postsCount"),
+  avgLikes: int("avgLikes"),
+  avgViews: int("avgViews"),
+  analysisText: text("analysisText"),
+  dataSource: varchar("dataSource", { length: 50 }),
   analyzedAt: timestamp("analyzedAt").defaultNow().notNull(),
 });
 

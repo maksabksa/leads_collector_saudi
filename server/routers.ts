@@ -53,6 +53,7 @@ import { pdfReportRouter } from "./routers/pdfReport";
 import { bulkAnalysisRouter } from "./routers/bulkAnalysis";
 import { analysisSettingsRouter } from "./routers/analysisSettings";
 import { scrapeWebsite, scrapeInstagram, scrapeLinkedIn, scrapeTwitter, scrapeTikTok, formatScrapedDataForLLM } from "./lib/brightDataScraper";
+import { fetchSocialPlatformData, extractSocialStats } from "./lib/brightDataSocialDatasets";
 import { brightDataAnalysisRouter } from "./routers/brightDataAnalysis";
 import { aiAgentRouter } from "./routers/aiAgent";
 
@@ -597,12 +598,50 @@ const analysisRouter = router({
         facebook: "فيسبوك",
       };
 
+      // ===== جلب البيانات الحقيقية من Bright Data Dataset API =====
+      let realDataContext = "";
+      let realStats: any = {};
+      if (["tiktok", "snapchat", "twitter", "facebook"].includes(input.platform)) {
+        try {
+          console.log(`[analyzeSocial] Fetching real data for ${input.platform}: ${input.profileUrl}`);
+          const datasetResult = await fetchSocialPlatformData(
+            input.platform as "tiktok" | "snapchat" | "twitter" | "facebook",
+            input.profileUrl
+          );
+          if (datasetResult.success && datasetResult.data && datasetResult.data.length > 0) {
+            realStats = extractSocialStats(datasetResult.platform, datasetResult.data);
+            const statsLines = [
+              realStats.followersCount ? `عدد المتابعين: ${realStats.followersCount.toLocaleString("ar")}` : "",
+              realStats.postsCount ? `عدد المنشورات/الفيديوهات: ${realStats.postsCount}` : "",
+              realStats.engagementRate ? `معدل التفاعل: ${realStats.engagementRate}%` : "",
+              realStats.avgLikes ? `متوسط الإعجابات: ${realStats.avgLikes.toLocaleString("ar")}` : "",
+              realStats.avgViews ? `متوسط المشاهدات: ${realStats.avgViews.toLocaleString("ar")}` : "",
+              realStats.bio ? `البيو: ${realStats.bio.substring(0, 150)}` : "",
+              realStats.isVerified ? `الحساب موثق: نعم` : "",
+              realStats.profileName ? `اسم الحساب: ${realStats.profileName}` : "",
+            ].filter(Boolean).join("\n");
+            if (statsLines) {
+              realDataContext = `\n\nبيانات حقيقية من Bright Data Dataset API:\n${statsLines}`;
+              if (realStats.recentPosts && realStats.recentPosts.length > 0) {
+                const postsPreview = realStats.recentPosts.slice(0, 3).map((p: any, i: number) =>
+                  `منشور ${i+1}: ${(p.content || "").substring(0, 80)}${p.likes ? ` (${p.likes} إعجاب)` : ""}${p.views ? ` (${p.views} مشاهدة)` : ""}`
+                ).join("\n");
+                realDataContext += `\n\nآخر المنشورات:\n${postsPreview}`;
+              }
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[analyzeSocial] Dataset API failed for ${input.platform}:`, err.message);
+          // استمر بالتحليل بدون بيانات حقيقية
+        }
+      }
+
       const prompt = `أنت خبير تحليل سوشيال ميديا متخصص في السوق السعودي.
 
 قم بتحليل حساب ${platformNames[input.platform]} التالي:
 - اسم النشاط: ${input.companyName}
 - نوع النشاط: ${input.businessType}
-- رابط الحساب: ${input.profileUrl}
+- رابط الحساب: ${input.profileUrl}${realDataContext}
 
 قدم تحليلاً بصيغة JSON فقط:
 {
@@ -615,15 +654,16 @@ const analysisRouter = router({
   "hasCallToAction": false,
   "contentStrategyScore": 5,
   "digitalPresenceScore": 6,
+  "followersCount": 0,
   "gaps": ["لا يوجد محتوى موسمي", "لا يوجد وضوح في الأسعار"],
   "overallScore": 5.5,
-  "summary": "ملخص تحليلي في سطرين",
+  "summary": "ملخص تحليلي في سطرين بناءً على البيانات الحقيقية",
   "recommendations": ["توصية 1", "توصية 2", "توصية 3"]
 }`;
 
       const response = await invokeLLM({
         messages: [
-          { role: "system", content: "أنت محلل سوشيال ميديا خبير. أجب دائماً بـ JSON صحيح فقط." },
+          { role: "system", content: "أنت محلل سوشيال ميديا خبير. أجب دائماً بـ JSON صحيح فقط. استخدم البيانات الحقيقية المقدمة لتحليل دقيق." },
           { role: "user", content: prompt },
         ],
         response_format: { type: "json_object" } as any,
@@ -634,11 +674,18 @@ const analysisRouter = router({
       let analysis: any = {};
       try { analysis = JSON.parse(content); } catch { analysis = {}; }
 
+      // دمج البيانات الحقيقية مع تحليل AI
+      const finalFollowersCount = realStats.followersCount ?? analysis.followersCount ?? 0;
+      const finalEngagementRate = realStats.engagementRate ?? null;
+
       const analysisId = await createSocialAnalysis({
         leadId: input.leadId,
         platform: input.platform,
         profileUrl: input.profileUrl,
         hasAccount: analysis.hasAccount ?? true,
+        followersCount: finalFollowersCount,
+        engagementRate: finalEngagementRate,
+        postsCount: realStats.postsCount ?? null,
         postingFrequencyScore: analysis.postingFrequencyScore,
         engagementScore: analysis.engagementScore,
         contentQualityScore: analysis.contentQualityScore,
@@ -652,9 +699,15 @@ const analysisRouter = router({
         summary: analysis.summary,
         recommendations: analysis.recommendations ?? [],
         rawAnalysis: content,
+        analysisText: analysis.summary,
       });
 
-      return { success: true, analysisId };
+      return {
+        success: true,
+        analysisId,
+        realDataFetched: !!realDataContext,
+        stats: realStats,
+      };
     }),
 
   getWebsiteAnalysis: protectedProcedure

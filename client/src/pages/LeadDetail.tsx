@@ -1165,20 +1165,70 @@ export default function LeadDetail() {
           )}
 
           {/* Social analyses */}
-          {socialAnalyses.length > 0 && socialAnalyses.map((sa) => (
-            <div key={sa.id} className="rounded-2xl p-5 border border-border space-y-4" style={{ background: "oklch(0.12 0.015 240)" }}>
+          {socialAnalyses.length > 0 && socialAnalyses.map((sa) => {
+            const platformConfig: Record<string, { label: string; color: string }> = {
+              instagram: { label: "إنستغرام", color: "oklch(0.62 0.18 285)" },
+              tiktok:    { label: "تيك توك",   color: "oklch(0.58 0.22 25)" },
+              snapchat:  { label: "سناب شات",  color: "oklch(0.85 0.18 95)" },
+              twitter:   { label: "تويتر/X",   color: "oklch(0.75 0.05 240)" },
+              facebook:  { label: "فيسبوك",  color: "oklch(0.55 0.18 250)" },
+            };
+            const pc = platformConfig[sa.platform] || { label: sa.platform, color: "oklch(0.65 0.1 240)" };
+            const hasRealData = (sa as any).followersCount > 0 || (sa as any).postsCount > 0 || (sa as any).engagementRate > 0;
+            return (
+            <div key={sa.id} className="rounded-2xl p-5 border space-y-4" style={{ background: "oklch(0.12 0.015 240)", borderColor: pc.color.replace(')', ' / 0.3)') }}>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
-                  <Instagram className="w-4 h-4" style={{ color: "var(--brand-purple)" }} />
-                  تحليل {sa.platform}
+                  <span className="w-2 h-2 rounded-full" style={{ background: pc.color }} />
+                  تحليل {pc.label}
+                  {hasRealData && (
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "oklch(0.55 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)" }}>بيانات حقيقية</span>
+                  )}
                 </h3>
                 <span className="text-lg font-bold" style={{ color: sa.overallScore && sa.overallScore >= 7 ? "var(--brand-green)" : sa.overallScore && sa.overallScore >= 5 ? "var(--brand-gold)" : "var(--brand-red)" }}>
                   {sa.overallScore?.toFixed(1)}/10
                 </span>
               </div>
+
+              {/* بيانات حقيقية من Bright Data Dataset API */}
+              {hasRealData && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-xl" style={{ background: pc.color.replace(')', ' / 0.06)') }}>
+                  {(sa as any).followersCount > 0 && (
+                    <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.1 0.01 240 / 0.6)" }}>
+                      <p className="text-xs text-muted-foreground mb-0.5">المتابعون</p>
+                      <p className="text-sm font-bold" style={{ color: pc.color }}>{(sa as any).followersCount.toLocaleString("ar-SA")}</p>
+                    </div>
+                  )}
+                  {(sa as any).postsCount > 0 && (
+                    <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.1 0.01 240 / 0.6)" }}>
+                      <p className="text-xs text-muted-foreground mb-0.5">المنشورات</p>
+                      <p className="text-sm font-bold" style={{ color: pc.color }}>{(sa as any).postsCount.toLocaleString("ar-SA")}</p>
+                    </div>
+                  )}
+                  {(sa as any).engagementRate > 0 && (
+                    <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.1 0.01 240 / 0.6)" }}>
+                      <p className="text-xs text-muted-foreground mb-0.5">معدل التفاعل</p>
+                      <p className="text-sm font-bold" style={{ color: pc.color }}>{(sa as any).engagementRate.toFixed(2)}%</p>
+                    </div>
+                  )}
+                  {(sa as any).avgLikes > 0 && (
+                    <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.1 0.01 240 / 0.6)" }}>
+                      <p className="text-xs text-muted-foreground mb-0.5">متوسط الإعجابات</p>
+                      <p className="text-sm font-bold" style={{ color: pc.color }}>{(sa as any).avgLikes.toLocaleString("ar-SA")}</p>
+                    </div>
+                  )}
+                  {(sa as any).avgViews > 0 && (
+                    <div className="text-center p-2 rounded-lg" style={{ background: "oklch(0.1 0.01 240 / 0.6)" }}>
+                      <p className="text-xs text-muted-foreground mb-0.5">متوسط المشاهدات</p>
+                      <p className="text-sm font-bold" style={{ color: pc.color }}>{(sa as any).avgViews.toLocaleString("ar-SA")}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {sa.summary && <p className="text-sm text-muted-foreground leading-relaxed">{sa.summary}</p>}
               <div className="space-y-2">
-                <ScoreBar label="تكرار النشر" value={sa.postingFrequencyScore} color="oklch(0.62 0.18 285)" />
+                <ScoreBar label="تكرار النشر" value={sa.postingFrequencyScore} color={pc.color} />
                 <ScoreBar label="التفاعل" value={sa.engagementScore} color="oklch(0.65 0.18 200)" />
                 <ScoreBar label="جودة المحتوى" value={sa.contentQualityScore} color="oklch(0.78 0.16 75)" />
                 <ScoreBar label="استراتيجية المحتوى" value={sa.contentStrategyScore} color="oklch(0.65 0.18 145)" />
@@ -1203,7 +1253,8 @@ export default function LeadDetail() {
                 </div>
               ) : null}
             </div>
-          ))}
+            );
+          })}
 
           {/* Instagram Dataset API Results Card */}
           {bdResults.instagram && bdResults.instagram.followersCount > 0 && (
@@ -1411,16 +1462,38 @@ export default function LeadDetail() {
             </button>
           </div>
 
-          <div className="rounded-xl p-4 space-y-2" style={{ background: "oklch(0.65 0.18 145 / 0.08)", border: "1px solid oklch(0.65 0.18 145 / 0.2)" }}>
-            <p className="text-xs text-muted-foreground">تم توليد التقرير بنجاح لـ</p>
-            <p className="font-semibold text-foreground">{lead.companyName}</p>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: "oklch(0.65 0.18 145 / 0.08)", border: "1px solid oklch(0.65 0.18 145 / 0.2)" }}>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "oklch(0.65 0.18 145 / 0.2)" }}>
+                <FileText className="w-4 h-4" style={{ color: "oklch(0.65 0.18 145)" }} />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">تم توليد التقرير بنجاح</p>
+                <p className="font-semibold text-foreground text-sm">{lead.companyName}</p>
+              </div>
+            </div>
             {pdfUrl && (
-              <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-2 text-xs px-3 py-2 rounded-xl mt-2 transition-all"
-                style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
-                <Download className="w-3.5 h-3.5" />
-                تحميل التقرير
-              </a>
+              <div className="flex gap-2 pt-1">
+                <a
+                  href={pdfUrl}
+                  download={`تقرير-${lead.companyName}.pdf`}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+                  style={{ background: "oklch(0.55 0.2 220)", color: "white" }}
+                >
+                  <Download className="w-4 h-4" />
+                  تحميل PDF
+                </a>
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+                  style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  فتح
+                </a>
+              </div>
             )}
           </div>
 

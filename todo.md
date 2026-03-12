@@ -1366,3 +1366,14 @@
 - [x] إضافة linkedinUrl في leads.update procedure في routers.ts
 - [x] إضافة حقول snapchatUrl, tiktokUrl, facebookUrl, linkedinUrl في handleEdit state
 - [x] إضافة حقول snapchatUrl, tiktokUrl, facebookUrl, linkedinUrl في نموذج التعديل (LeadDetail.tsx)
+
+## الدفعة 88 - Dataset API للسوشيال ميديا + إصلاح PDF (12 مارس 2026)
+
+- [x] إنشاء brightDataSocialDatasets.ts لـ TikTok وSnapchat وTwitter وFacebook
+- [x] إضافة حقول Dataset API في socialAnalyses table (followersCount, engagementRate, postsCount, avgLikes, avgViews, analysisText, dataSource)
+- [x] تطبيق migration SQL للحقول الجديدة
+- [x] تحديث analyzeSocial procedure لاستخدام Bright Data Dataset API
+- [x] تحديث واجهة LeadDetail لعرض البيانات الحقيقية مع أيقونات المنصات
+- [x] إصلاح PDF generation في report.ts (Puppeteer + S3)
+- [x] تحسين PDF modal بزر تحميل مباشر
+- [x] إضافة snapchatUrl, tiktokUrl, facebookUrl, linkedinUrl في leads table وفي نموذج التعديل
