@@ -1479,3 +1479,16 @@
 - [x] إصلاح خطأ "Chromium not found" في بيئة الإنتاج
 - [x] إضافة @sparticuz/chromium كـ fallback في /api/generate-pdf عند عدم وجود Chromium محلي
 - [x] اختبار وجود Chromium في /tmp/chromium - يعمل بشكل صحيح
+
+## إضافة رابط PDF في تصدير CSV (13 مارس 2026)
+
+- [ ] فحص كود تصدير CSV الحالي
+- [ ] إضافة عمود "رابط التقرير PDF" في CSV
+- [ ] توليد PDF تلقائياً للعملاء الذين ليس لديهم تقرير عند التصدير
+
+## إصلاح PDF نهائي - مشكلة libnspr4.so (13 مارس 2026)
+
+- [x] التخلي عن Puppeteer في generateLeadPDF و previewLeadPDF
+- [x] استبدال /api/generate-pdf بـ window.print() مع شريط أدوات وزر حفظ PDF
+- [x] إضافة @media print CSS لإخفاء شريط الأدوات عند الطباعة
+- [x] إضافة عمود "رابط تقرير PDF" في تصدير CSV

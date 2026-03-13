@@ -1040,7 +1040,9 @@ const exportRouter = router({
         // Social analysis
         "تحليل سوشيال - أفضل منصة", "درجة التفاعل", "جودة المحتوى السوشيال",
         "ثغرات السوشيال", "ملخص تحليل السوشيال",
-        "تاريخ الإضافة"
+        "تاريخ الإضافة",
+        // PDF Report
+        "رابط تقرير PDF"
       ];
 
       const rows = allLeads.map(lead => {
@@ -1068,6 +1070,8 @@ const exportRouter = router({
           Array.isArray(bestSocial?.gaps) ? bestSocial.gaps.join(" | ") : "",
           bestSocial?.summary || "",
           new Date(lead.createdAt).toLocaleDateString("ar-SA"),
+          // PDF report link
+          lead.pdfFileUrl || "",
         ];
       });
 

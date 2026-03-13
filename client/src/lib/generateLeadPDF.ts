@@ -809,27 +809,54 @@ body{
 ${p1}${p2}${p3}${p4}</body>
 </html>`;
 
-  // ɕɔɕ إرسال HTML إلى /api/generate-pdf (يستخدم Puppeteer - يدعم oklch بشكل كامل) ɕɔɕ
-  const response = await fetch("/api/generate-pdf", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ html: iframeHTML, filename: fileName }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "فشل توليد PDF");
+  // ɕɔɕ فتح نافذة جديدة مع HTML التقرير وزر طباعة لحفظ PDF (بدون Puppeteer) ɕɔɕ
+  // نضيف شريط أدوات فوق التقرير مع زر "حفظ PDF" الذي يستدعي window.print()
+  const printHTML = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>${fileName}</title>
+<style>
+  @media print { #print-toolbar { display: none !important; } }
+  #print-toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+    background: #0f172a; border-bottom: 1px solid #22c55e44;
+    padding: 10px 20px; display: flex; align-items: center;
+    justify-content: space-between; gap: 12px;
+    font-family: 'Tajawal', sans-serif; direction: rtl;
   }
+  #print-toolbar .title { color: #e2e8f0; font-size: 14px; font-weight: 700; }
+  #print-toolbar .hint { color: #94a3b8; font-size: 12px; }
+  #print-toolbar button {
+    background: #22c55e; color: #000; border: none; border-radius: 8px;
+    padding: 8px 20px; font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: 'Tajawal', sans-serif;
+  }
+  #print-toolbar button:hover { background: #16a34a; }
+  body { margin-top: 60px; }
+  @media print { body { margin-top: 0; } }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="print-toolbar">
+  <div>
+    <div class="title">📄 ${fileName}</div>
+    <div class="hint">اضغط "حفظ PDF" ثم اختر "حفظ كـ PDF" من إعدادات الطباعة</div>
+  </div>
+  <button onclick="window.print()">⬇️ حفظ PDF</button>
+</div>
+${iframeHTML.replace(/<\/body>/, '').replace(/[\s\S]*<body[^>]*>/, '')}
+</body>
+</html>`;
 
-  const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    throw new Error('تعذّر فتح نافذة جديدة. يرجى السماح بالنوافذ المنبثقة في المتصفح.');
+  }
+  printWindow.document.open();
+  printWindow.document.write(printHTML);
+  printWindow.document.close();
 }
 
 // ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ
@@ -1369,39 +1396,31 @@ export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void>
     };
     document.getElementById('report-container').appendChild(iframe);
 
-    // دالة تحميل PDF
-    async function downloadPDF() {
-      const btn = document.getElementById('download-btn');
-      const overlay = document.getElementById('loading-overlay');
-      btn.disabled = true;
-      btn.textContent = 'جاري التوليد...';
-      overlay.style.display = 'flex';
-      try {
-        const res = await fetch('/api/generate-pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ html: reportHTML, filename: fileName })
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'فشل توليد PDF');
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = fileName;
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        btn.textContent = '✅ تم التحميل';
-        btn.style.background = '#16a34a';
-      } catch(e) {
-        alert('خطأ في توليد PDF: ' + e.message);
-        btn.textContent = '⬇️ تحميل PDF';
-        btn.disabled = false;
-      } finally {
-        overlay.style.display = 'none';
-      }
+    // دالة حفظ PDF باستخدام window.print() (بدون Puppeteer)
+    function downloadPDF() {
+      // فتح نافذة طباعة جديدة مع HTML التقرير وزر طباعة
+      const printWin = window.open('', '_blank');
+      if (!printWin) { alert('يرجى السماح بالنوافذ المنبثقة في المتصفح'); return; }
+      const printDoc = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>' + fileName + '</title>' +
+        '<style>@media print{#ptb{display:none!important;}}' +
+        '#ptb{position:fixed;top:0;left:0;right:0;z-index:99999;background:#0f172a;border-bottom:1px solid #22c55e44;' +
+        'padding:10px 20px;display:flex;align-items:center;justify-content:space-between;' +
+        'font-family:Tajawal,sans-serif;direction:rtl;}' +
+        '#ptb .t{color:#e2e8f0;font-size:14px;font-weight:700;}' +
+        '#ptb .h{color:#94a3b8;font-size:12px;}' +
+        '#ptb button{background:#22c55e;color:#000;border:none;border-radius:8px;padding:8px 20px;' +
+        'font-size:14px;font-weight:700;cursor:pointer;font-family:Tajawal,sans-serif;}' +
+        'body{margin-top:60px;}@media print{body{margin-top:0;}}</style>' +
+        '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">' +
+        '</head><body>' +
+        '<div id="ptb"><div><div class="t">📄 ' + fileName + '</div>' +
+        '<div class="h">اختر "حفظ كـ PDF" من إعدادات الطباعة</div></div>' +
+        '<button onclick="window.print()">⬇️ حفظ PDF</button></div>' +
+        reportHTML.replace(/[\s\S]*<body[^>]*>/, '').replace(/<\/body>[\s\S]*$/, '') +
+        '</body></html>';
+      printWin.document.open();
+      printWin.document.write(printDoc);
+      printWin.document.close();
     }
   </script>
 </body>
