@@ -71,6 +71,7 @@ async function startServer() {
       // تجربة مسارات Chromium المختلفة تلقائياً
       const { execSync } = await import("child_process");
       const possiblePaths = [
+        "/usr/lib/chromium-browser/chromium-browser",
         "/usr/bin/chromium-browser",
         "/usr/bin/chromium",
         "/usr/bin/google-chrome",

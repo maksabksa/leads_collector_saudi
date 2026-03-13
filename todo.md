@@ -1465,3 +1465,11 @@
 ## إصلاح oklch وزر المعاينة
 - [ ] إصلاح oklch بعزل container عن CSS الصفحة باستخدام iframe srcdoc
 - [ ] إضافة زر "فتح في نافذة" للمعاينة في LeadDetail
+
+## الدفعة الأخيرة - إصلاحات وتحسينات (13 مارس 2026)
+
+- [x] إصلاح دالة parseGoogleResultsPublic: استخراج صحيح للعناوين والأوصاف من HTML
+- [x] إضافة زر معاينة PDF (Preview) في صفحة LeadDetail
+- [x] إضافة دالة previewLeadPDF لعرض جميع الصفحات الأربع في نافذة جديدة مع زر تحميل
+- [x] إضافة procedure fetchClientLogo لجلب شعار العميل تلقائياً (Google Favicon + Clearbit)
+- [x] عرض شعار العميل في بطاقة معلومات الاتصال مع زر جلب الشعار

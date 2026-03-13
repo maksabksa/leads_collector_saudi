@@ -6,7 +6,7 @@ import {
   ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
   Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown, MessagesSquare,
-  Activity, Users, Clock, Brain, ChevronUp, Sparkles, FileText, Download
+  Activity, Users, Clock, Brain, ChevronUp, Sparkles, FileText, Download, Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -92,6 +92,7 @@ export default function LeadDetail() {
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
+  const fetchClientLogoMutation = trpc.leads.fetchClientLogo.useMutation();
 
   const handleGeneratePDF = async () => {
     setPdfGenerating(true);
@@ -108,6 +109,24 @@ export default function LeadDetail() {
       toast.success("تم تحميل التقرير بنجاح");
     } catch (e: any) {
       toast.error("فشل توليد التقرير", { description: e.message });
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
+  const handlePreviewPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const { previewLeadPDF } = await import("@/lib/generateLeadPDF");
+      await previewLeadPDF({
+        lead: data?.lead,
+        websiteAnalysis: data?.websiteAnalysis,
+        socialAnalyses: data?.socialAnalyses || [],
+        report: report,
+        company: companySettingsData,
+      });
+    } catch (e: any) {
+      toast.error("فشل فتح المعاينة", { description: e.message });
     } finally {
       setPdfGenerating(false);
     }
@@ -421,6 +440,12 @@ export default function LeadDetail() {
             {generateReport.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             تقرير شامل
           </button>
+          <button onClick={handlePreviewPDF} disabled={pdfGenerating}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "oklch(0.62 0.18 285 / 0.15)", color: "oklch(0.72 0.18 285)", border: "1px solid oklch(0.62 0.18 285 / 0.3)" }}>
+            {pdfGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+            معاينة
+          </button>
           <button onClick={handleGeneratePDF} disabled={pdfGenerating}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "oklch(0.65 0.18 25 / 0.15)", color: "oklch(0.75 0.18 25)", border: "1px solid oklch(0.65 0.18 25 / 0.3)" }}>
@@ -520,7 +545,48 @@ export default function LeadDetail() {
         <div className="col-span-1 space-y-4">
           {/* Contact card */}
           <div className="rounded-2xl p-4 border border-border space-y-3" style={{ background: "oklch(0.12 0.015 240)" }}>
-            <h3 className="text-sm font-semibold text-foreground">معلومات الاتصال</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">معلومات الاتصال</h3>
+              {/* شعار العميل */}
+              <div className="flex items-center gap-2">
+                {(lead as any).clientLogoUrl ? (
+                  <img src={(lead as any).clientLogoUrl} alt={lead.companyName}
+                    className="w-10 h-10 rounded-xl object-contain border border-border"
+                    style={{ background: "oklch(0.08 0.01 240)" }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold"
+                    style={{ background: "oklch(0.18 0.02 240)", color: "oklch(0.65 0.18 200)" }}>
+                    {(lead.companyName || '?').charAt(0)}
+                  </div>
+                )}
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetchClientLogoMutation.mutateAsync({
+                        leadId: id,
+                        website: lead.website || undefined,
+                        instagramUrl: lead.instagramUrl || undefined,
+                        companyName: lead.companyName,
+                      });
+                      if (res.success) {
+                        toast.success('تم جلب الشعار بنجاح');
+                        utils.leads.getFullDetails.invalidate({ id });
+                      } else {
+                        toast.error('لم يتم العثور على شعار');
+                      }
+                    } catch (e: any) {
+                      toast.error('فشل جلب الشعار', { description: e.message });
+                    }
+                  }}
+                  disabled={fetchClientLogoMutation.isPending}
+                  className="text-xs px-2 py-1 rounded-lg transition-all"
+                  style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
+                  title="جلب الشعار تلقائياً">
+                  {fetchClientLogoMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "🖼️"}
+                </button>
+              </div>
+            </div>
             {lead.verifiedPhone && (
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />

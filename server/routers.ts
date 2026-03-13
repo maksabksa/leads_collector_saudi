@@ -429,6 +429,67 @@ const leadsRouter = router({
       return { success: true };
     }),
 
+  fetchClientLogo: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      website: z.string().optional(),
+      instagramUrl: z.string().optional(),
+      companyName: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { leadId, website, instagramUrl, companyName } = input;
+
+      // محاولة 1: جلب الشعار من الموقع عبر Google Favicon Service
+      if (website) {
+        try {
+          const domain = new URL(website.startsWith('http') ? website : 'https://' + website).hostname;
+          // نجرب Google Favicon API
+          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+          // نتحقق من أن الصورة موجودة
+          const checkRes = await fetch(faviconUrl, { method: 'HEAD' });
+          if (checkRes.ok) {
+            await updateLead(leadId, { clientLogoUrl: faviconUrl });
+            return { success: true, logoUrl: faviconUrl, source: 'favicon' };
+          }
+        } catch (e) {
+          // استمر للمحاولة التالية
+        }
+      }
+
+      // محاولة 2: جلب الشعار من Clearbit Logo API
+      if (website || companyName) {
+        try {
+          const domain = website
+            ? new URL(website.startsWith('http') ? website : 'https://' + website).hostname
+            : null;
+          if (domain) {
+            const clearbitUrl = `https://logo.clearbit.com/${domain}`;
+            const checkRes = await fetch(clearbitUrl, { method: 'HEAD' });
+            if (checkRes.ok) {
+              await updateLead(leadId, { clientLogoUrl: clearbitUrl });
+              return { success: true, logoUrl: clearbitUrl, source: 'clearbit' };
+            }
+          }
+        } catch (e) {
+          // استمر
+        }
+      }
+
+      // محاولة 3: استخدام Google Favicon بحجم أصغر كبديل
+      if (website) {
+        try {
+          const domain = new URL(website.startsWith('http') ? website : 'https://' + website).hostname;
+          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+          await updateLead(leadId, { clientLogoUrl: faviconUrl });
+          return { success: true, logoUrl: faviconUrl, source: 'google_favicon_64' };
+        } catch (e) {
+          // فشل
+        }
+      }
+
+      return { success: false, logoUrl: null, source: null };
+    }),
+
   bulkDelete: protectedProcedure
     .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
     .mutation(async ({ input }) => {

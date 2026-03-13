@@ -178,6 +178,7 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
           socket,
           servername: targetHost,
           rejectUnauthorized: false,
+          checkServerIdentity: () => undefined,
         });
         tlsSocket.on("secureConnect", () => sendRawRequest(tlsSocket));
         tlsSocket.on("error", (err) => { socket.destroy(); reject(err); });
@@ -319,52 +320,87 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
   const results: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
   const seen = new Set<string>();
 
-  // استخراج الروابط من HTML
+  // استخراج الروابط من HTML مع السياق المحيط بها
   const linkRegex = /href="(https?:\/\/(?:www\.)?[^"]*?)"/g;
-  const links: string[] = [];
   let match;
+
+  // قائمة الحسابات المحظورة
+  const blacklist = new Set(["explore", "p", "reel", "reels", "stories", "accounts", "hashtag", "tv",
+    "search", "login", "signup", "about", "help", "legal", "privacy", "terms",
+    "intent", "share", "home", "notifications", "messages", "add", "web",
+    "discover", "trending", "live", "map", "maps", "places"]);
 
   while ((match = linkRegex.exec(html)) !== null) {
     const url = match[1];
-    if (url.includes(domainFilter) && !url.includes("google.com")) {
-      links.push(url);
-    }
-  }
+    if (!url.includes(domainFilter) || url.includes("google.com")) continue;
 
-  // استخراج usernames من الروابط
-  for (const url of links.slice(0, 15)) {
     let username = "";
 
     if (domainFilter === "instagram.com") {
       const m = url.match(/instagram\.com\/([a-zA-Z0-9._]+)\/?/);
       username = m?.[1] || "";
     } else if (domainFilter === "tiktok.com") {
-      const m = url.match(/tiktok\.com\/@([a-zA-Z0-9._]+)\/?/);
+      const m = url.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
       username = m?.[1] || "";
+      if (!username) {
+        // بعض روابط TikTok بدون @
+        const m2 = url.match(/tiktok\.com\/([a-zA-Z0-9._]+)/);
+        username = m2?.[1] || "";
+      }
     } else if (domainFilter === "snapchat.com") {
-      const m = url.match(/snapchat\.com\/(?:add\/)?([a-zA-Z0-9._-]+)\/?/);
+      const m = url.match(/snapchat\.com\/(?:add\/)?([a-zA-Z0-9._-]+)/);
       username = m?.[1] || "";
     } else if (domainFilter === "linkedin.com") {
-      const m = url.match(/linkedin\.com\/company\/([a-zA-Z0-9._-]+)\/?/);
+      const m = url.match(/linkedin\.com\/company\/([a-zA-Z0-9._-]+)/);
       username = m?.[1] || "";
     } else if (domainFilter === "twitter.com" || domainFilter === "x.com") {
-      const m = url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)\/?/);
+      const m = url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)/);
       username = m?.[1] || "";
     } else {
       username = url;
     }
 
-    // تصفية الحسابات غير المرغوبة
-    const blacklist = ["explore", "p", "reel", "stories", "accounts", "hashtag", "tv", "reels", "search", "login", "signup", "about", "help", "legal", "privacy", "terms", "intent", "share", "home", "notifications", "messages"];
-    if (username && !blacklist.includes(username.toLowerCase()) && !seen.has(username)) {
-      seen.add(username);
-      results.push({
-        username,
-        displayName: username,
-        bio: "",
-        url,
-      });
+    if (!username || blacklist.has(username.toLowerCase()) || seen.has(username)) continue;
+    seen.add(username);
+
+    // استخراج العنوان والوصف من السياق المحيط بالرابط
+    const pos = match.index;
+    const contextStart = Math.max(0, pos - 600);
+    const contextEnd = Math.min(html.length, pos + 600);
+    const context = html.slice(contextStart, contextEnd);
+
+    // استخراج العنوان من h3
+    let displayName = username;
+    const h3Match = context.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
+    if (h3Match) {
+      const rawTitle = h3Match[1].replace(/<[^>]+>/g, "").trim();
+      if (rawTitle) {
+        // استخراج الاسم قبل @ إذا كان موجوداً
+        const atMatch = rawTitle.match(/^(.+?)\s*[@(]/);
+        displayName = atMatch ? atMatch[1].trim() : rawTitle.slice(0, 60);
+      }
     }
+
+    // استخراج الوصف
+    let bio = "";
+    const descPatterns = [
+      /class="[^"]*VwiC3b[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*s3v9rd[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*lEBKkf[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*yDYNvb[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*IsZvec[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+    ];
+    for (const pattern of descPatterns) {
+      const descMatch = context.match(pattern);
+      if (descMatch) {
+        bio = descMatch[1].replace(/<[^>]+>/g, "").trim().slice(0, 200);
+        if (bio) break;
+      }
+    }
+
+    results.push({ username, displayName, bio, url });
+
+    if (results.length >= 10) break;
   }
 
   return results;

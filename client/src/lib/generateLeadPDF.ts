@@ -806,29 +806,10 @@ body{
 </style>
 </head>
 <body>
-${p1}${p2}${p3}${p4}
-</body>
+${p1}${p2}${p3}${p4}</body>
 </html>`;
 
-  // إنشاء iframe مخفي
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:1123px;height:1600px;border:none;visibility:hidden;";
-  iframe.setAttribute("sandbox", "allow-same-origin");
-  document.body.appendChild(iframe);
-
-  // كتابة HTML في iframe
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!iframeDoc) throw new Error("تعذّر إنشاء iframe للتقرير");
-  iframeDoc.open();
-  iframeDoc.write(iframeHTML);
-  iframeDoc.close();
-
-  // انتظار تحميل الخط
-  await new Promise<void>((resolve) => setTimeout(resolve, 2000));
-
-  const container = iframeDoc.body;
-
-  // ═══ إرسال HTML إلى /api/generate-pdf (يستخدم Puppeteer - يدعم oklch بشكل كامل) ═══
+  // ɕɔɕ إرسال HTML إلى /api/generate-pdf (يستخدم Puppeteer - يدعم oklch بشكل كامل) ɕɔɕ
   const response = await fetch("/api/generate-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -841,26 +822,23 @@ ${p1}${p2}${p3}${p4}
   }
 
   const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
+  a.href = blobUrl;
   a.download = fileName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  document.body.removeChild(iframe);
+  URL.revokeObjectURL(blobUrl);
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  PREVIEW - فتح التقرير في نافذة جديدة للمراجعة (جميع الصفحات الأربع)
-// ═══════════════════════════════════════════════════════════════════════
-export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void> {
+// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ
+//  buildReportHTML - دالة مشتركة لبناء HTML التقرير (تستخدمها generate و preview)
+// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ
+function buildReportHTML(options: GeneratePDFOptions): { html: string; fileName: string } {
   const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
   if (!lead) throw new Error("لا توجد بيانات للعميل");
 
-  // نستخدم نفس منطق generateLeadPDF بالضبط لبناء الصفحات
   const coName    = company?.companyName || "مكسب";
   const coLogo    = company?.logoUrl || "";
   const clLogo    = lead.clientLogoUrl || "";
@@ -924,9 +902,11 @@ export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void>
   const avgSocialScore = socialScores.length ? socialScores.reduce((a, b) => a + b, 0) / socialScores.length : null;
   const totalFollowers = socials.reduce((sum, s) => sum + (s.followersCount ? Number(s.followersCount) : 0), 0);
 
-  // بناء الصفحات بنفس كود generateLeadPDF تماماً
-  const p1 = page(`
-    <!-- Grid background -->
+  const safeLeadName = (lead.companyName || "عميل").replace(/[\/\\?%*:|"<>]/g, "-");
+  const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
+
+  // صفحة 1
+  const bp1 = page(`
     <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(34,197,94,0.02) 1px,transparent 1px),
       linear-gradient(90deg,rgba(34,197,94,0.02) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;"></div>
     <div style="position:absolute;top:-80px;right:-80px;width:400px;height:400px;border-radius:50%;
@@ -981,54 +961,449 @@ export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void>
     </div>
   `);
 
-  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
-  const fileName = `تحليل مخصص لعناية - ${safeLeadName}`;
+  // صفحة 2 - الملخص التنفيذي
+  const bp2 = page(`
+    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(34,197,94,0.1);
+      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:18px;font-weight:800;color:#f8fafc;">الملخص التنفيذي</div>
+      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 2</div>
+    </div>
+    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
+    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        ${card(`
+          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:12px;letter-spacing:0.5px;">بيانات التواصل</div>
+          ${phones.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            ${phones.map(p => `<span style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);
+              border-radius:6px;padding:4px 12px;font-size:13px;font-weight:700;color:#22c55e;font-family:monospace;direction:ltr;">${p}</span>`).join("")}
+          </div>` : ""}
+          ${lead.email ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">📧 ${lead.email}</div>` : ""}
+          ${lead.website ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">🌐 ${lead.website}</div>` : ""}
+          ${sLinks.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+            ${sLinks.map(s => `<span style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
+              border-radius:5px;padding:3px 8px;font-size:10px;color:#64748b;">${s.icon} ${s.val}</span>`).join("")}
+          </div>` : ""}
+        `)}
+        ${card(`
+          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:12px;letter-spacing:0.5px;">بيانات النشاط</div>
+          ${lead.businessType ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">🏢 ${lead.businessType}</div>` : ""}
+          ${lead.city ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📍 ${lead.city}${lead.country ? "، " + lead.country : ""}</div>` : ""}
+          ${lead.crNumber ? `<div style="font-size:12px;color:#0ea5e9;margin-bottom:6px;font-weight:700;">📋 سجل تجاري: ${lead.crNumber}</div>` : ""}
+          ${lead.socialSince ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📅 على السوشيال منذ: ${lead.socialSince}</div>` : ""}
+          ${lead.rating ? `<div style="font-size:12px;color:#eab308;margin-bottom:6px;">⭐ تقييم جوجل: ${lead.rating}${lead.reviewCount ? " (" + lead.reviewCount + " تقييم)" : ""}</div>` : ""}
+          <div style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:12px;
+            font-size:11px;font-weight:700;background:${urgency.bg};color:${urgency.color};border:1px solid ${urgency.border};">
+            ${urgency.text}
+          </div>
+        `)}
+      </div>
+      ${gaps.length > 0 ? `
+      <div>
+        ${sh("أبرز الفجوات التشغيلية", "نقاط الضعف الحرجة التي تحتاج معالجة فورية")}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${gaps.slice(0, 6).map((g, i) => `
+            <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(239,68,68,0.04);
+              border:1px solid rgba(239,68,68,0.1);border-radius:8px;padding:10px 12px;">
+              <div style="width:22px;height:22px;border-radius:50%;background:rgba(239,68,68,0.12);
+                display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;
+                color:#ef4444;flex-shrink:0;">${i + 1}</div>
+              <span style="font-size:12px;color:#94a3b8;line-height:1.6;">${g}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>` : ""}
+      ${lead.revenueOpportunity ? `
+      <div>
+        ${sh("الفرصة التجارية", "تقدير الإمكانية الاستراتيجية")}
+        <div style="background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));
+          border:1px solid rgba(34,197,94,0.15);border-radius:12px;padding:18px 20px;">
+          <div style="font-size:13px;color:#94a3b8;line-height:1.85;">${lead.revenueOpportunity}</div>
+        </div>
+      </div>` : ""}
+      ${lead.suggestedSalesEntryAngle ? `
+      <div>
+        ${sh("زاوية الدخول المقترحة")}
+        ${card(`<div style="font-size:13px;color:#94a3b8;line-height:1.85;">${lead.suggestedSalesEntryAngle}</div>`, "#0ea5e9")}
+      </div>` : ""}
+      ${lead.iceBreaker ? `
+      <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);
+        border-radius:10px;padding:14px 18px;display:flex;align-items:flex-start;gap:12px;">
+        <div style="font-size:20px;flex-shrink:0;">💬</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px;">مقترح فاتحة الحديث</div>
+          <div style="font-size:12px;color:#94a3b8;line-height:1.7;">${lead.iceBreaker}</div>
+        </div>
+      </div>` : ""}
+    </div>
+  `);
+
+  // صفحة 3 - التقييم الرقمي
+  const bp3 = page(`
+    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(14,165,233,0.1);
+      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:18px;font-weight:800;color:#f8fafc;">التقييم الرقمي</div>
+      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 3</div>
+    </div>
+    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
+    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
+      <div>
+        ${sh("نظرة عامة على الأداء الرقمي")}
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+          ${statBox("🎯", "الأولوية", priScore ? priScore.toFixed(0) + "/10" : "—", sc(priScore))}
+          ${statBox("📱", "متوسط السوشيال", avgSocialScore ? avgSocialScore.toFixed(1) + "/10" : "—", sc(avgSocialScore))}
+          ${statBox("🌐", "تقييم الموقع", wsScore ? wsScore.toFixed(1) + "/10" : "—", sc(wsScore))}
+          ${statBox("👥", "إجمالي المتابعين", fmtK(totalFollowers || null), "#0ea5e9")}
+        </div>
+      </div>
+      ${websiteAnalysis ? `
+      <div>
+        ${sh("تحليل الموقع الإلكتروني", lead.website || "")}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>${wsItems.filter(i => i.value).map(i => bar(i.value, i.label)).join("")}</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            ${wsItems.filter(i => i.value).map(i => `
+              <div style="background:rgba(255,255,255,0.03);border:1px solid ${sc(i.value)}18;
+                border-radius:8px;padding:10px;text-align:center;">
+                <div style="font-size:20px;font-weight:900;color:${sc(i.value)};
+                  text-shadow:${sg(i.value)};line-height:1;">${fmt(i.value)}</div>
+                <div style="font-size:9px;color:#475569;margin-top:4px;font-weight:600;">${i.label}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        ${websiteAnalysis.summary ? `<div style="margin-top:12px;font-size:12px;color:#64748b;line-height:1.7;
+          background:rgba(255,255,255,0.02);border-radius:8px;padding:12px 14px;">${websiteAnalysis.summary}</div>` : ""}
+      </div>` : ""}
+      ${socials.length > 0 ? `
+      <div>
+        ${sh("أرقام منصات التواصل الاجتماعي")}
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(socials.length, 3)},1fr);gap:12px;">
+          ${socials.map(sa => {
+            const m = pm(sa.platform);
+            return `
+              <div style="background:linear-gradient(135deg,#0d1f3c,#080f1e);border:1px solid ${m.color}18;
+                border-radius:12px;padding:16px;position:relative;overflow:hidden;">
+                <div style="position:absolute;top:0;right:0;width:60px;height:60px;
+                  background:radial-gradient(circle,${m.color}08 0%,transparent 70%);"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                  <div style="display:flex;align-items:center;gap:7px;">
+                    <span style="font-size:16px;">${m.icon}</span>
+                    <span style="font-size:13px;font-weight:700;color:${m.color};">${m.name}</span>
+                  </div>
+                  ${sa.overallScore ? ring(Number(sa.overallScore), 36) : ""}
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+                  ${sa.followersCount ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:${m.color};">${fmtK(sa.followersCount)}</div><div style="font-size:9px;color:#475569;">متابع</div></div>` : ""}
+                  ${sa.postsCount ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#94a3b8;">${fmtK(sa.postsCount)}</div><div style="font-size:9px;color:#475569;">منشور</div></div>` : ""}
+                  ${sa.engagementRate ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#22c55e;">${Number(sa.engagementRate).toFixed(2)}%</div><div style="font-size:9px;color:#475569;">تفاعل</div></div>` : ""}
+                  ${sa.avgLikes ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#f97316;">${fmtK(sa.avgLikes)}</div><div style="font-size:9px;color:#475569;">متوسط إعجاب</div></div>` : ""}
+                </div>
+                ${(sa.postingFrequencyScore || sa.engagementScore || sa.contentQualityScore) ? `
+                <div style="border-top:1px solid rgba(255,255,255,0.04);padding-top:10px;">
+                  ${bar(sa.postingFrequencyScore, "التكرار")}
+                  ${bar(sa.engagementScore,       "التفاعل")}
+                  ${bar(sa.contentQualityScore,   "المحتوى")}
+                </div>` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>` : ""}
+      ${report?.fullReport ? `
+      <div>
+        ${sh("التحليل التفصيلي")}
+        ${card(`<div style="font-size:12px;color:#94a3b8;line-height:1.9;"><p>${cleanMarkdown(typeof report.fullReport === "string" ? report.fullReport.slice(0, 800) + (report.fullReport.length > 800 ? "..." : "") : "")}</p></div>`)}
+      </div>` : ""}
+    </div>
+  `);
+
+  // صفحة 4 - التوصيات
+  const bp4 = page(`
+    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(139,92,246,0.1);
+      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:18px;font-weight:800;color:#f8fafc;">التوصيات والخطوة القادمة</div>
+      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 4</div>
+    </div>
+    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
+    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
+      <div>
+        ${sh("مقارنة الوضع الحالي مع المستهدف")}
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:stretch;">
+          <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);
+            border-radius:12px 0 0 12px;padding:18px 20px;">
+            <div style="font-size:12px;font-weight:700;color:#ef4444;margin-bottom:14px;">⚠️ الوضع الحالي</div>
+            ${gaps.slice(0, 4).map(g => `
+              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div>
+                <span style="font-size:11px;color:#64748b;line-height:1.6;">${g}</span>
+              </div>
+            `).join("")}
+            ${!gaps.length ? `
+              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">غياب استراتيجية رقمية موثقة</span></div>
+              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">محدودية الظهور في البحث المحلي</span></div>
+              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">ضعف استثمار قنوات التواصل</span></div>
+            ` : ""}
+            <div style="margin-top:14px;text-align:center;">
+              <div style="font-size:32px;font-weight:900;color:#ef4444;text-shadow:0 0 14px rgba(239,68,68,0.5);">
+                ${wsScore ? wsScore.toFixed(0) : (priScore ? priScore.toFixed(0) : "—")}/10
+              </div>
+              <div style="font-size:10px;color:#475569;margin-top:3px;">الدرجة الحالية</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;padding:0 16px;
+            background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.04);
+            border-bottom:1px solid rgba(255,255,255,0.04);">
+            <div style="font-size:28px;color:#334155;">→</div>
+          </div>
+          <div style="background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.15);
+            border-radius:0 12px 12px 0;padding:18px 20px;">
+            <div style="font-size:12px;font-weight:700;color:#22c55e;margin-bottom:14px;">✅ مع ${coName}</div>
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">حضور رقمي متكامل عبر جميع المنصات</span></div>
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">استراتيجية محتوى مبنية على بيانات الجمهور</span></div>
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">تعزيز الظهور العضوي في محركات البحث</span></div>
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">تحويل الزيارات إلى إيراد قابل للقياس</span></div>
+            ${lead.revenueOpportunity ? `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#0ea5e9;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#0ea5e9;font-weight:600;">${lead.revenueOpportunity.slice(0, 90)}${lead.revenueOpportunity.length > 90 ? "..." : ""}</span></div>` : ""}
+            <div style="margin-top:14px;text-align:center;">
+              <div style="font-size:32px;font-weight:900;color:#22c55e;text-shadow:0 0 14px rgba(34,197,94,0.5);">9+/10</div>
+              <div style="font-size:10px;color:#475569;margin-top:3px;">الهدف المستهدف</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ${socials.filter(s => s.analysisText).length > 0 ? `
+      <div>
+        ${sh("تقييم المنصات", "ملخص الأداء والتوصيات لكل منصة")}
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(socials.filter(s => s.analysisText).length, 2)},1fr);gap:10px;">
+          ${socials.filter(s => s.analysisText).map(sa => {
+            const m = pm(sa.platform);
+            const gapsList: string[] = Array.isArray(sa.gaps) ? sa.gaps.slice(0, 2) : [];
+            return `
+              <div style="background:rgba(255,255,255,0.02);border:1px solid ${m.color}15;border-radius:10px;padding:14px 16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span>${m.icon}</span>
+                  <span style="font-size:12px;font-weight:700;color:${m.color};">${m.name}</span>
+                  ${sa.overallScore ? `<span style="font-size:11px;font-weight:800;color:${sc(Number(sa.overallScore))};margin-right:auto;">${Number(sa.overallScore).toFixed(0)}/10</span>` : ""}
+                </div>
+                <div style="font-size:11px;color:#64748b;line-height:1.65;margin-bottom:8px;">
+                  ${sa.analysisText.slice(0, 180)}${sa.analysisText.length > 180 ? "..." : ""}
+                </div>
+                ${gapsList.length > 0 ? gapsList.map(g => `<div style="font-size:10px;color:#ef4444;margin-bottom:3px;">• ${g}</div>`).join("") : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>` : ""}
+      <div style="flex:1;"></div>
+      <div style="background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.05));
+        border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:20px 24px;
+        display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:16px;font-weight:800;color:#f8fafc;margin-bottom:6px;">هل أنت مستعد للخطوة القادمة؟</div>
+          <div style="font-size:12px;color:#475569;line-height:1.6;">يسعدنا تقديم عرض مخصص يتوافق مع أهداف نشاطكم التجاري وميزانيتكم</div>
+        </div>
+        <div style="text-align:center;flex-shrink:0;">
+          <div style="font-size:18px;font-weight:900;color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,0.5);">
+            ${company?.phone || company?.email || "maksab-ksa.com"}
+          </div>
+          <div style="font-size:9px;color:#334155;margin-top:2px;letter-spacing:1px;">تواصل معنا الآن</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#030810;border-top:1px solid rgba(34,197,94,0.07);padding:20px 40px;
+      display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <img src="${qr(company?.website || "https://maksab-ksa.com")}"
+            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(34,197,94,0.2);background:#0f172a;padding:3px;" alt="QR الموقع">
+          <div style="font-size:8px;font-weight:700;color:#22c55e;letter-spacing:0.3px;">موقع ${coName}</div>
+        </div>
+        ${lead.crNumber ? `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <img src="${qr("https://mc.gov.sa/ar/eservices/Pages/ServiceDetails.aspx?sID=" + lead.crNumber, "0ea5e9")}"
+            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(14,165,233,0.2);background:#0f172a;padding:3px;" alt="QR السجل">
+          <div style="font-size:8px;font-weight:700;color:#0ea5e9;">السجل التجاري</div>
+          <div style="font-size:7px;color:#334155;font-family:monospace;">${lead.crNumber}</div>
+        </div>` : ""}
+        ${lead.website ? `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <img src="${qr(lead.website, "8b5cf6")}"
+            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(139,92,246,0.2);background:#0f172a;padding:3px;" alt="QR موقع العميل">
+          <div style="font-size:8px;font-weight:700;color:#8b5cf6;">موقع العميل</div>
+        </div>` : ""}
+        ${lead.googleMapsUrl ? `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <img src="${qr(lead.googleMapsUrl, "eab308")}"
+            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(234,179,8,0.2);background:#0f172a;padding:3px;" alt="QR خرائط">
+          <div style="font-size:8px;font-weight:700;color:#eab308;">خرائط جوجل</div>
+        </div>` : ""}
+      </div>
+      <div style="font-size:10px;color:#334155;line-height:1.8;padding-top:4px;">
+        <div style="font-weight:700;color:#22c55e;font-size:11px;margin-bottom:3px;">${coName}</div>
+        <div>${company?.website || "maksab-ksa.com"}</div>
+        ${company?.email ? `<div>${company.email}</div>` : ""}
+        ${company?.phone ? `<div>${company.phone}</div>` : ""}
+      </div>
+      <div style="text-align:left;font-size:10px;color:#334155;line-height:1.8;">
+        <div>تاريخ الإصدار: ${reportDate}</div>
+        <div style="font-size:8px;color:#1e293b;margin-top:3px;letter-spacing:1.5px;">CONFIDENTIAL</div>
+      </div>
+    </div>
+  `, false);
+
+  const fullHTML = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#060d1a;color:#e2e8f0;font-size:14px;line-height:1.65;width:1123px;-webkit-font-smoothing:antialiased;}
+</style>
+</head>
+<body>
+${bp1}${bp2}${bp3}${bp4}
+</body>
+</html>`;
+
+  return { html: fullHTML, fileName };
+}
+
+// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ
+//  PREVIEW - فتح التقرير في نافذة جديدة للمراجعة (جميع الصفحات الأربع)
+// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ═════════════════════════════════════════════════════════════════════
+export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void> {
+  if (!options.lead) throw new Error("لا توجد بيانات للعميل");
+
+  const coName = options.company?.companyName || "مكسب";
+
+  // بناء HTML التقرير باستخدام الدالة المشتركة
+  const { html: reportHTML, fileName } = buildReportHTML(options);
 
   // فتح نافذة جديدة بالتقرير كاملاً
-  const previewWindow = window.open("", "_blank", "width=1200,height=900,scrollbars=yes,resizable=yes");
+  const previewWindow = window.open("", "_blank", "width=1280,height=900,scrollbars=yes,resizable=yes");
   if (!previewWindow) {
     throw new Error("تعذّر فتح نافذة المعاينة. تأكد من السماح بالنوافذ المنبثقة في المتصفح");
   }
 
+  // بناء HTML المعاينة مع شريط أدوات وزر تحميل يعمل
   const previewHTML = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>معاينة: ${fileName}</title>
+  <title>معاينة: ${fileName.replace('.pdf', '')}</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#030810;color:#e2e8f0;font-size:14px;line-height:1.65;}
-    .preview-toolbar{position:sticky;top:0;z-index:9999;background:#0f1729;border-bottom:1px solid #22c55e33;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;direction:rtl;}
-    .preview-toolbar-title{font-size:14px;font-weight:600;color:#e2e8f0;flex:1;}
-    .preview-toolbar-sub{font-size:11px;color:#64748b;margin-top:2px;}
-    .preview-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;text-decoration:none;}
-    .preview-btn-download{background:#22c55e;color:#030810;}
-    .preview-btn-download:hover{background:#16a34a;}
-    .preview-btn-close{background:#1e293b;color:#94a3b8;border:1px solid #334155;}
-    .preview-btn-close:hover{background:#334155;color:#e2e8f0;}
-    .preview-badge{background:#22c55e1a;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;}
-    .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:100px;font-weight:900;color:rgba(34,197,94,0.025);white-space:nowrap;pointer-events:none;z-index:9998;letter-spacing:8px;}
-    .page-divider{text-align:center;padding:8px;font-size:11px;color:#334155;background:#0a1020;letter-spacing:2px;}
+    body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#030810;color:#e2e8f0;}
+    .toolbar{position:sticky;top:0;z-index:9999;background:#0f1729;border-bottom:2px solid #22c55e44;
+      padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;direction:rtl;
+      box-shadow:0 4px 20px rgba(0,0,0,0.5);}
+    .toolbar-title{font-size:14px;font-weight:700;color:#f8fafc;flex:1;}
+    .toolbar-sub{font-size:11px;color:#64748b;margin-top:2px;}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 20px;border-radius:10px;
+      font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;
+      transition:all 0.2s;text-decoration:none;}
+    .btn-dl{background:linear-gradient(135deg,#22c55e,#16a34a);color:#030810;}
+    .btn-dl:hover{background:linear-gradient(135deg,#16a34a,#15803d);transform:translateY(-1px);}
+    .btn-dl:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+    .btn-close{background:#1e293b;color:#94a3b8;border:1px solid #334155;}
+    .btn-close:hover{background:#334155;color:#e2e8f0;}
+    .badge{background:#22c55e1a;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;
+      padding:3px 10px;font-size:11px;font-weight:600;}
+    .page-sep{text-align:center;padding:10px;font-size:11px;color:#334155;background:#0a1020;
+      letter-spacing:2px;border-top:1px solid #0f172a;border-bottom:1px solid #0f172a;}
+    .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
+      font-size:100px;font-weight:900;color:rgba(34,197,94,0.025);white-space:nowrap;
+      pointer-events:none;z-index:9998;letter-spacing:8px;}
+    #loading-overlay{position:fixed;inset:0;background:rgba(3,8,16,0.9);z-index:99999;
+      display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+    .spinner{width:48px;height:48px;border:3px solid rgba(34,197,94,0.2);
+      border-top-color:#22c55e;border-radius:50%;animation:spin 0.8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
   </style>
 </head>
 <body>
-  <div class="preview-toolbar">
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div style="font-size:16px;font-weight:700;color:#22c55e;">جاري توليد التقرير...</div>
+    <div style="font-size:12px;color:#64748b;">قد يستغرق 10-15 ثانية، يرجى الانتظار</div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
     <div>
-      <div class="preview-toolbar-title">📄 ${fileName}</div>
-      <div class="preview-toolbar-sub">معاينة التقرير قبل التحميل — 4 صفحات</div>
+      <div class="toolbar-title">📄 ${fileName.replace('.pdf', '')}</div>
+      <div class="toolbar-sub">معاينة التقرير قبل التحميل — 4 صفحات</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <span class="preview-badge">معاينة</span>
-      <button class="preview-btn preview-btn-download" onclick="window.close()">⬇️ تحميل PDF</button>
-      <button class="preview-btn preview-btn-close" onclick="window.close()">✕ إغلاق</button>
+      <span class="badge">معاينة</span>
+      <button class="btn btn-dl" id="download-btn" onclick="downloadPDF()">⬇️ تحميل PDF</button>
+      <button class="btn btn-close" onclick="window.close()">✕ إغلاق</button>
     </div>
   </div>
+
   <div class="wm">حصري من ${coName}</div>
-  <div class="page-divider">▶ الصفحة 1 — الغلاف ◄</div>
-  ${p1}
-  <div class="page-divider">▶ الصفحة 2 — الملخص التنفيذي ◄</div>
-  <div style="height:40px;"></div>
+
+  <!-- Report pages -->
+  <div class="page-sep">▶ الصفحة 1 — الغلاف ◄</div>
+  <div id="report-container" style="background:#060d1a;">
+    <!-- سيتم حقن محتوى التقرير هنا عبر JavaScript -->
+  </div>
+
+  <script>
+    // حقن محتوى التقرير
+    const reportHTML = ${JSON.stringify(reportHTML)};
+    const fileName = ${JSON.stringify(fileName)};
+
+    // إدراج الصفحات في iframe لعرضها
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;border:none;display:block;min-height:600px;';
+    iframe.srcdoc = reportHTML;
+    iframe.onload = function() {
+      // ضبط ارتفاع iframe بعد التحميل
+      try {
+        const h = iframe.contentDocument.body.scrollHeight;
+        if (h > 100) iframe.style.height = h + 'px';
+      } catch(e) {}
+    };
+    document.getElementById('report-container').appendChild(iframe);
+
+    // دالة تحميل PDF
+    async function downloadPDF() {
+      const btn = document.getElementById('download-btn');
+      const overlay = document.getElementById('loading-overlay');
+      btn.disabled = true;
+      btn.textContent = 'جاري التوليد...';
+      overlay.style.display = 'flex';
+      try {
+        const res = await fetch('/api/generate-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: reportHTML, filename: fileName })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'فشل توليد PDF');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fileName;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        btn.textContent = '✅ تم التحميل';
+        btn.style.background = '#16a34a';
+      } catch(e) {
+        alert('خطأ في توليد PDF: ' + e.message);
+        btn.textContent = '⬇️ تحميل PDF';
+        btn.disabled = false;
+      } finally {
+        overlay.style.display = 'none';
+      }
+    }
+  </script>
 </body>
 </html>`;
 
