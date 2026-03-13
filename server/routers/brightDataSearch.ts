@@ -458,4 +458,83 @@ export const brightDataSearchRouter = router({
         errors,
       };
     }),
+
+  // بحث ذكي تلقائي عن حسابات السوشيال ميديا لنشاط تجاري محدد
+  smartFindSocialAccounts: protectedProcedure
+    .input(z.object({
+      companyName: z.string().min(1),
+      city: z.string().default(""),
+      businessType: z.string().default(""),
+    }))
+    .mutation(async ({ input }) => {
+      const query = input.companyName;
+      const location = input.city;
+      const results: Record<string, any[]> = {
+        instagram: [],
+        tiktok: [],
+        snapchat: [],
+        twitter: [],
+        linkedin: [],
+      };
+      const errors: Record<string, string> = {};
+
+      // بحث متوازي في جميع المنصات
+      await Promise.allSettled([
+        searchInstagramSERP(query, location)
+          .then(r => { results.instagram = r.slice(0, 5); })
+          .catch(e => { errors.instagram = e.message; }),
+        searchTikTokSERP(query, location)
+          .then(r => { results.tiktok = r.slice(0, 5); })
+          .catch(e => { errors.tiktok = e.message; }),
+        searchSnapchatSERP(query, location)
+          .then(r => { results.snapchat = r.slice(0, 5); })
+          .catch(e => { errors.snapchat = e.message; }),
+        searchLinkedInSERP(query, location)
+          .then(r => { results.linkedin = r.slice(0, 5); })
+          .catch(e => { errors.linkedin = e.message; }),
+        // Twitter via SERP
+        (async () => {
+          try {
+            const twitterQuery = `${query} ${location} site:twitter.com OR site:x.com`;
+            const url = `https://www.google.com/search?q=${encodeURIComponent(twitterQuery)}&num=10&hl=ar`;
+            const html = await serpRequest(url);
+            const parsed = parseGoogleResultsPublic(html, "twitter.com");
+            results.twitter = parsed.slice(0, 5).map(r => ({
+              username: r.url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)/)?.[1] || "",
+              displayName: r.displayName,
+              url: r.url,
+              bio: r.bio,
+            }));
+          } catch (e: any) {
+            errors.twitter = e.message;
+          }
+        })(),
+      ]);
+
+      const totalFound = Object.values(results).flat().length;
+
+      // استخدام AI لاقتراح أفضل حساب لكل منصة
+      let aiSuggestions: Record<string, string> = {};
+      if (totalFound > 0) {
+        try {
+          const platformSummary = Object.entries(results)
+            .filter(([, accounts]) => accounts.length > 0)
+            .map(([platform, accounts]) =>
+              `${platform}: ${accounts.map((a: any) => a.username || a.displayName || a.name || "").filter(Boolean).join(", ")}`
+            ).join("\n");
+
+          const aiResp = await invokeLLM({
+            messages: [
+              { role: "system", content: "أنت خبير تحليل سوشيال ميديا. أجب بـ JSON فقط بدون أي نص إضافي." },
+              { role: "user", content: `النشاط: ${input.companyName} (${input.businessType || "غير محدد"}) في ${input.city || "السعودية"}\nنتائج البحث:\n${platformSummary}\n\nاقترح أفضل حساب لكل منصة بناءً على التشابه مع اسم النشاط. أجب بـ JSON:\n{"instagram":"username","tiktok":"username","snapchat":"username","twitter":"username","linkedin":"username"}` },
+            ],
+            response_format: { type: "json_object" } as any,
+          });
+          const content = aiResp?.choices?.[0]?.message?.content;
+          if (content) aiSuggestions = JSON.parse(typeof content === "string" ? content : "{}");
+        } catch {}
+      }
+
+      return { results, errors, aiSuggestions, totalFound };
+    }),
 });

@@ -26,6 +26,7 @@ import {
   SearchCheck, Link2, BarChart2, Shield, Twitter, Linkedin
 } from "lucide-react";
 import { MapView } from "@/components/Map";
+import { AddLeadModal } from "@/components/AddLeadModal";
 
 // ===== ثوابت =====
 const SAUDI_CITIES = [
@@ -2167,266 +2168,36 @@ export default function SearchHub() {
         </Tabs>
       </div>
 
-      {/* ===== نافذة إضافة عميل ===== */}
-      <Dialog open={addDialog.open} onOpenChange={open => setAddDialog(prev => ({ ...prev, open }))}>
-        <DialogContent className="max-w-lg" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-primary" />
-              إضافة كعميل محتمل
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
-            {/* بطاقة معلومات النشاط من Google Maps */}
-            {addDialog.platform === "google" && addDialog.result && (() => {
-              const details = placeDetailsQuery.data as any;
-              const r = addDialog.result;
-              const rating = details?.rating || r.rating;
-              const totalRatings = details?.user_ratings_total || r.user_ratings_total;
-              const openNow = details?.opening_hours?.open_now ?? r.opening_hours?.open_now;
-              const weekdayText = details?.opening_hours?.weekday_text || r.opening_hours?.weekday_text;
-              const photos = details?.photos || r.photos;
-              const mapsUrl = details?.url || r.url;
-              const address = details?.formatted_address || r.formatted_address || r.vicinity;
-              return (
-                <div className="rounded-xl border border-green-500/30 bg-green-500/5 overflow-hidden">
-                  {/* صور النشاط */}
-                  {photos && photos.length > 0 && (
-                    <div className="flex gap-1 overflow-x-auto p-2 bg-black/20">
-                      {photos.slice(0, 4).map((photo: any, idx: number) => (
-                        <div key={idx} className="shrink-0 w-20 h-16 rounded-lg overflow-hidden bg-muted">
-                          <img
-                            src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=160&photo_reference=${photo.photo_reference}&key=placeholder`}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="p-3 space-y-2">
-                    {/* التقييم وحالة الفتح */}
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      {rating && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex">
-                            {[1,2,3,4,5].map(s => (
-                              <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} />
-                            ))}
-                          </div>
-                          <span className="text-sm font-bold text-yellow-400">{rating}</span>
-                          {totalRatings && <span className="text-xs text-muted-foreground">({totalRatings.toLocaleString()} تقييم)</span>}
-                        </div>
-                      )}
-                      {openNow !== undefined && (
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${openNow ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {openNow ? '● مفتوح الآن' : '● مغلق الآن'}
-                        </span>
-                      )}
-                    </div>
-                    {/* العنوان */}
-                    {address && (
-                      <p className="text-xs text-muted-foreground flex items-start gap-1">
-                        <MapPin className="w-3 h-3 shrink-0 mt-0.5 text-green-400" />
-                        {address}
-                      </p>
-                    )}
-                    {/* ساعات العمل */}
-                    {weekdayText && weekdayText.length > 0 && (
-                      <details className="group">
-                        <summary className="text-xs text-blue-400 cursor-pointer flex items-center gap-1 list-none">
-                          <Clock className="w-3 h-3" />
-                          ساعات العمل
-                          <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
-                        </summary>
-                        <div className="mt-1.5 space-y-0.5 pr-4">
-                          {weekdayText.map((day: string, i: number) => (
-                            <p key={i} className="text-xs text-muted-foreground">{day}</p>
-                          ))}
-                        </div>
-                      </details>
-                    )}
-                    {/* رابط Google Maps */}
-                    {mapsUrl && (
-                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
-                        <ExternalLink className="w-3 h-3" />
-                        فتح في Google Maps
-                      </a>
-                    )}
-                    {placeDetailsQuery.isFetching && (
-                      <div className="flex items-center gap-1.5 text-xs text-blue-400">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        جاري جلب التفاصيل الكاملة...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div>
-              <Label className="text-xs mb-1 block">اسم النشاط التجاري <span className="text-red-400">*</span></Label>
-              <Input
-                value={addForm.companyName}
-                onChange={e => setAddForm(f => ({ ...f, companyName: e.target.value }))}
-                placeholder="اسم المحل أو الشركة"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs mb-1 block">نوع النشاط <span className="text-red-400">*</span></Label>
-                <Input
-                  value={addForm.businessType}
-                  onChange={e => setAddForm(f => ({ ...f, businessType: e.target.value }))}
-                  placeholder="مطعم، صالون..."
-                />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">المدينة</Label>
-                <Input
-                  value={addForm.city}
-                  onChange={e => setAddForm(f => ({ ...f, city: e.target.value }))}
-                  placeholder="الرياض"
-                />
-              </div>
-            </div>
-            {/* حقل رقم الهاتف - يُجلب تلقائياً من Google Places API */}
-            <div>
-              <Label className="text-xs mb-1 flex items-center gap-1.5">
-                رقم الهاتف
-                {addDialog.platform === "google" && placeDetailsQuery.isFetching && (
-                  <span className="flex items-center gap-1 text-[10px] text-blue-400">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    جاري جلب البيانات من Google...
-                  </span>
-                )}
-                {addDialog.platform === "google" && !placeDetailsQuery.isFetching && addForm.phone && (
-                  <span className="flex items-center gap-1 text-[10px] text-green-400">
-                    <CheckCircle2 className="w-3 h-3" />
-                    تم الجلب من Google
-                  </span>
-                )}
-              </Label>
-              {addDialog.result?.availablePhones?.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-1.5 p-2 rounded-lg bg-green-500/5 border border-green-500/20">
-                  <p className="w-full text-[10px] text-green-400/70 mb-1">أرقام متاحة - اضغط للاختيار:</p>
-                  {addDialog.result.availablePhones.map((p: string) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setAddForm(f => ({ ...f, phone: p }))}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors font-mono ${
-                        addForm.phone === p
-                          ? "bg-green-500/30 border-green-500 text-green-300 font-bold"
-                          : "border-green-500/30 text-green-400/80 hover:bg-green-500/20 hover:border-green-500"
-                      }`}
-                      dir="ltr"
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <Input
-                value={addForm.phone}
-                onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder={
-                  placeDetailsQuery.isFetching
-                    ? "جاري الجلب من Google Maps..."
-                    : addForm.phone
-                    ? ""
-                    : "لم يُعثر على رقم - أدخل يدوياً"
-                }
-                dir="ltr"
-                className={addForm.phone ? "border-green-500/50 focus-visible:ring-green-500/30" : ""}
-                disabled={placeDetailsQuery.isFetching}
-              />
-            </div>
-            {/* حقل الموقع - يُجلب تلقائياً من Google Places API */}
-            <div>
-              <Label className="text-xs mb-1 flex items-center gap-1.5">
-                الموقع الإلكتروني
-                {addDialog.platform === "google" && placeDetailsQuery.isFetching && (
-                  <span className="flex items-center gap-1 text-[10px] text-blue-400">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    جاري الجلب...
-                  </span>
-                )}
-                {addDialog.platform === "google" && !placeDetailsQuery.isFetching && addForm.website && (
-                  <span className="flex items-center gap-1 text-[10px] text-blue-400">
-                    <CheckCircle2 className="w-3 h-3" />
-                    تم الجلب من Google
-                  </span>
-                )}
-              </Label>
-              {addDialog.result?.availableWebsites?.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-1.5 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                  <p className="w-full text-[10px] text-blue-400/70 mb-1">مواقع متاحة - اضغط للاختيار:</p>
-                  {addDialog.result.availableWebsites.map((w: string) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => setAddForm(f => ({ ...f, website: w }))}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors max-w-[200px] truncate ${
-                        addForm.website === w
-                          ? "bg-blue-500/30 border-blue-500 text-blue-300 font-bold"
-                          : "border-blue-500/30 text-blue-400/80 hover:bg-blue-500/20 hover:border-blue-500"
-                      }`}
-                      dir="ltr"
-                      title={w}
-                    >
-                      {w.replace(/^https?:\/\//, "").slice(0, 35)}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <Input
-                value={addForm.website}
-                onChange={e => setAddForm(f => ({ ...f, website: e.target.value }))}
-                placeholder={
-                  placeDetailsQuery.isFetching
-                    ? "جاري الجلب من Google Maps..."
-                    : addForm.website
-                    ? ""
-                    : "لم يُعثر على موقع - أدخل يدوياً"
-                }
-                dir="ltr"
-                className={addForm.website ? "border-blue-500/50 focus-visible:ring-blue-500/30" : ""}
-                disabled={placeDetailsQuery.isFetching}
-              />
-            </div>
-            <div>
-              <Label className="text-xs mb-1 block">ملاحظات</Label>
-              <Textarea
-                value={addForm.notes}
-                onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))}
-                placeholder="أي ملاحظات إضافية..."
-                className="text-sm resize-none"
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setAddDialog({ open: false, result: null, platform: "" })}>
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleAddLead}
-              disabled={!addForm.companyName || !addForm.businessType || createLead.isPending || addInstagramAsLead.isPending}
-              className="gap-2"
-            >
-              {(createLead.isPending || addInstagramAsLead.isPending) ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-              إضافة كعميل
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ===== نافذة إضافة عميل الموحدة ===== */}
+      <AddLeadModal
+        open={addDialog.open}
+        onClose={() => setAddDialog({ open: false, result: null, platform: "" })}
+        onSuccess={(leadId) => {
+          const key = addDialog.result?.name || addDialog.result?.username || addDialog.result?.companyName || "";
+          if (key) setAddedNames(prev => { const next = new Set(prev); next.add(key); return next; });
+        }}
+        initialData={addDialog.result ? {
+          companyName: addDialog.result.name || addDialog.result.fullName || addDialog.result.username || "",
+          businessType: addDialog.result.businessCategory || addDialog.result.types?.[0] || "",
+          city: addDialog.result.city || city,
+          phone: addDialog.result.phone || addDialog.result.formatted_phone_number || "",
+          website: addDialog.result.website || "",
+          googleMapsUrl: addDialog.result.url || "",
+          placeId: addDialog.result.place_id || undefined,
+          rating: addDialog.result.rating || undefined,
+          address: addDialog.result.formatted_address || addDialog.result.vicinity || "",
+          notes: addDialog.result.bio || addDialog.result.description || "",
+          platform: addDialog.platform || undefined,
+          username: addDialog.result.username || undefined,
+          bio: addDialog.result.bio || addDialog.result.description || "",
+          followersCount: addDialog.result.followersCount || 0,
+          instagramUrl: addDialog.platform === "instagram" && addDialog.result.username ? `https://instagram.com/${addDialog.result.username}` : undefined,
+          tiktokUrl: addDialog.platform === "tiktok" && addDialog.result.username ? `https://tiktok.com/@${addDialog.result.username}` : undefined,
+          snapchatUrl: addDialog.platform === "snapchat" && addDialog.result.username ? `https://snapchat.com/add/${addDialog.result.username}` : undefined,
+          twitterUrl: addDialog.platform === "twitter" && addDialog.result.username ? `https://x.com/${addDialog.result.username}` : undefined,
+          linkedinUrl: addDialog.platform === "linkedin" && addDialog.result.username ? `https://linkedin.com/company/${addDialog.result.username}` : undefined,
+        } : undefined}
+      />
 
       {/* ===== نافذة معالج الاستهداف الذكي ===== */}
       <Dialog open={showTargetWizard} onOpenChange={setShowTargetWizard}>

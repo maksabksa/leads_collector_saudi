@@ -4,6 +4,7 @@
  */
 import * as https from "https";
 import * as http from "http";
+import * as tls from "tls";
 
 const SERP_HOST = process.env.BRIGHT_DATA_SERP_HOST || "brd.superproxy.io";
 const SERP_PORT = parseInt(process.env.BRIGHT_DATA_SERP_PORT || "22225");
@@ -105,57 +106,75 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
         return;
       }
 
-      // الآن نرسل الطلب الفعلي عبر الـ tunnel
-      const getOptions: https.RequestOptions = {
-        host: targetHost,
-        port: targetPort,
-        path: parsed.pathname + parsed.search,
-        method: "GET",
-        socket,
-        agent: false,
-        rejectUnauthorized: false, // Bright Data proxy uses self-signed certs
-        headers: {
-          "Host": targetHost,
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "ar,en;q=0.9",
-          "Accept-Encoding": "identity",
-        },
-      } as any;
+      // دالة مساعدة لإرسال الطلب الفعلي عبر socket معطى
+      const doRequest = (requestSocket: any) => {
+        const getOptions: https.RequestOptions = {
+          host: targetHost,
+          port: targetPort,
+          path: parsed.pathname + parsed.search,
+          method: "GET",
+          socket: requestSocket,
+          agent: false,
+          rejectUnauthorized: false,
+          headers: {
+            "Host": targetHost,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ar,en;q=0.9",
+            "Accept-Encoding": "identity",
+          },
+        } as any;
 
-      const req = (isHttps ? https : http).request(getOptions, (innerRes) => {
-        if (innerRes.statusCode === 429) {
-          socket.destroy();
-          reject(new Error(`SERP request failed: 429`));
-          return;
-        }
-        if (innerRes.statusCode && innerRes.statusCode >= 400) {
-          socket.destroy();
-          reject(new Error(`SERP request failed: ${innerRes.statusCode}`));
-          return;
-        }
+        const req = (isHttps ? https : http).request(getOptions, (innerRes) => {
+          if (innerRes.statusCode === 429) {
+            requestSocket.destroy();
+            reject(new Error(`SERP request failed: 429`));
+            return;
+          }
+          if (innerRes.statusCode && innerRes.statusCode >= 400) {
+            requestSocket.destroy();
+            reject(new Error(`SERP request failed: ${innerRes.statusCode}`));
+            return;
+          }
 
-        const chunks: Buffer[] = [];
-        innerRes.on("data", (chunk) => chunks.push(chunk));
-        innerRes.on("end", () => {
-          socket.destroy();
-          resolve(Buffer.concat(chunks).toString("utf-8"));
+          const chunks: Buffer[] = [];
+          innerRes.on("data", (chunk) => chunks.push(chunk));
+          innerRes.on("end", () => {
+            requestSocket.destroy();
+            resolve(Buffer.concat(chunks).toString("utf-8"));
+          });
+          innerRes.on("error", (err) => {
+            requestSocket.destroy();
+            reject(err);
+          });
         });
-        innerRes.on("error", (err) => {
-          socket.destroy();
+
+        req.setTimeout(20000, () => {
+          requestSocket.destroy();
+          reject(new Error("Request timeout"));
+        });
+        req.on("error", (err) => {
+          requestSocket.destroy();
           reject(err);
         });
-      });
+        req.end();
+      };
 
-      req.setTimeout(20000, () => {
-        socket.destroy();
-        reject(new Error("Request timeout"));
-      });
-      req.on("error", (err) => {
-        socket.destroy();
-        reject(err);
-      });
-      req.end();
+      if (isHttps) {
+        // إنشاء TLS socket صريح مع rejectUnauthorized: false
+        // هذا ضروري لأن Bright Data يستخدم self-signed certificates
+        // تمرير socket مباشرة لـ https.request لا يكفي - يجب tls.connect صريح
+        const tlsSocket = tls.connect({
+          socket,
+          host: targetHost,
+          servername: targetHost,
+          rejectUnauthorized: false,
+        });
+        tlsSocket.on("secureConnect", () => doRequest(tlsSocket));
+        tlsSocket.on("error", (err) => { socket.destroy(); reject(err); });
+      } else {
+        doRequest(socket);
+      }
     });
 
     connectReq.on("error", (err) => reject(err));

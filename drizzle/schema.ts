@@ -79,6 +79,7 @@ export const leads = mysqlTable("leads", {
   sourceJobId: int("sourceJobId"),   // رابط بمهمة البحث التي أنشأت هذا الـ Lead
   socialSince: varchar("socialSince", { length: 20 }),  // تاريخ الظهور على السوشيال ميديا (مثال: 2019، 2020-05)
   crNumber: varchar("crNumber", { length: 30 }),  // رقم السجل التجاري
+  clientLogoUrl: varchar("clientLogoUrl", { length: 1000 }),  // لوجو العميل (favicon أو إنستغرام)
   hasWhatsapp: mysqlEnum("hasWhatsapp", ["unknown", "yes", "no"]).default("unknown").notNull(),
   whatsappCheckedAt: timestamp("whatsappCheckedAt"),
   lastWhatsappSentAt: timestamp("lastWhatsappSentAt"),
