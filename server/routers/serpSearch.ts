@@ -71,6 +71,7 @@ function setCache(key: string, data: string): void {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ===== Core SERP Request via HTTP CONNECT Proxy =====
+// الطريقة الصحيحة: CONNECT + TLS + raw HTTP (بدون https.request فوق TLS لتجنب double-TLS)
 async function serpRequestRaw(targetUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!SERP_USERNAME || !SERP_PASSWORD) {
@@ -83,9 +84,9 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
     const isHttps = parsed.protocol === "https:";
     const targetHost = parsed.hostname;
     const targetPort = isHttps ? 443 : 80;
+    const requestPath = parsed.pathname + parsed.search;
 
-    // استخدام HTTP CONNECT للـ proxy
-    const connectOptions = {
+    const connectReq = http.request({
       host: SERP_HOST,
       port: SERP_PORT,
       method: "CONNECT",
@@ -94,10 +95,8 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
         "Proxy-Authorization": `Basic ${auth}`,
         "Host": `${targetHost}:${targetPort}`,
       },
-    };
-
-    const connectReq = http.request(connectOptions);
-    connectReq.setTimeout(20000);
+    });
+    connectReq.setTimeout(20000, () => { connectReq.destroy(); reject(new Error("Proxy connect timeout")); });
 
     connectReq.on("connect", (res, socket) => {
       if (res.statusCode !== 200) {
@@ -106,82 +105,88 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
         return;
       }
 
-      // دالة مساعدة لإرسال الطلب الفعلي عبر socket معطى
-      const doRequest = (requestSocket: any) => {
-        const getOptions: https.RequestOptions = {
-          host: targetHost,
-          port: targetPort,
-          path: parsed.pathname + parsed.search,
-          method: "GET",
-          socket: requestSocket,
-          agent: false,
-          rejectUnauthorized: false,
-          headers: {
-            "Host": targetHost,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "ar,en;q=0.9",
-            "Accept-Encoding": "identity",
-          },
-        } as any;
+      // إرسال raw HTTP request مباشرة عبر socket (أو TLS socket)
+      const sendRawRequest = (sock: any) => {
+        const rawReq = [
+          `GET ${requestPath} HTTP/1.1`,
+          `Host: ${targetHost}`,
+          `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36`,
+          `Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8`,
+          `Accept-Language: ar,en;q=0.9`,
+          `Accept-Encoding: identity`,
+          `Connection: close`,
+          ``,
+          ``,
+        ].join("\r\n");
 
-        const req = (isHttps ? https : http).request(getOptions, (innerRes) => {
-          if (innerRes.statusCode === 429) {
-            requestSocket.destroy();
-            reject(new Error(`SERP request failed: 429`));
-            return;
-          }
-          if (innerRes.statusCode && innerRes.statusCode >= 400) {
-            requestSocket.destroy();
-            reject(new Error(`SERP request failed: ${innerRes.statusCode}`));
-            return;
-          }
+        sock.write(rawReq);
 
-          const chunks: Buffer[] = [];
-          innerRes.on("data", (chunk) => chunks.push(chunk));
-          innerRes.on("end", () => {
-            requestSocket.destroy();
-            resolve(Buffer.concat(chunks).toString("utf-8"));
-          });
-          innerRes.on("error", (err) => {
-            requestSocket.destroy();
-            reject(err);
-          });
-        });
+        let responseData = "";
+        let headersParsed = false;
+        let statusCode = 0;
+        let bodyStart = 0;
 
-        req.setTimeout(20000, () => {
-          requestSocket.destroy();
+        const timeout = setTimeout(() => {
+          sock.destroy();
           reject(new Error("Request timeout"));
+        }, 25000);
+
+        sock.on("data", (chunk: Buffer) => {
+          responseData += chunk.toString("utf-8");
+          if (!headersParsed) {
+            const headerEnd = responseData.indexOf("\r\n\r\n");
+            if (headerEnd !== -1) {
+              headersParsed = true;
+              bodyStart = headerEnd + 4;
+              const statusLine = responseData.split("\r\n")[0];
+              const statusMatch = statusLine.match(/HTTP\/\d\.\d (\d+)/);
+              statusCode = statusMatch ? parseInt(statusMatch[1]) : 0;
+              if (statusCode === 429) {
+                clearTimeout(timeout);
+                sock.destroy();
+                reject(new Error("SERP request failed: 429"));
+              } else if (statusCode >= 400 && statusCode !== 200) {
+                clearTimeout(timeout);
+                sock.destroy();
+                reject(new Error(`SERP request failed: ${statusCode}`));
+              }
+            }
+          }
         });
-        req.on("error", (err) => {
-          requestSocket.destroy();
+
+        sock.on("end", () => {
+          clearTimeout(timeout);
+          sock.destroy();
+          if (!headersParsed) {
+            reject(new Error("Empty response from SERP"));
+            return;
+          }
+          const body = responseData.slice(bodyStart);
+          resolve(body);
+        });
+
+        sock.on("error", (err: Error) => {
+          clearTimeout(timeout);
+          sock.destroy();
           reject(err);
         });
-        req.end();
       };
 
       if (isHttps) {
-        // إنشاء TLS socket صريح مع rejectUnauthorized: false
-        // هذا ضروري لأن Bright Data يستخدم self-signed certificates
-        // تمرير socket مباشرة لـ https.request لا يكفي - يجب tls.connect صريح
+        // TLS upgrade على الـ socket مباشرة - لا نستخدم https.request لتجنب double-TLS
         const tlsSocket = tls.connect({
           socket,
-          host: targetHost,
           servername: targetHost,
           rejectUnauthorized: false,
         });
-        tlsSocket.on("secureConnect", () => doRequest(tlsSocket));
+        tlsSocket.on("secureConnect", () => sendRawRequest(tlsSocket));
         tlsSocket.on("error", (err) => { socket.destroy(); reject(err); });
       } else {
-        doRequest(socket);
+        sendRawRequest(socket);
       }
     });
 
     connectReq.on("error", (err) => reject(err));
-    connectReq.on("timeout", () => {
-      connectReq.destroy();
-      reject(new Error("Proxy connect timeout"));
-    });
     connectReq.end();
   });
 }
