@@ -786,41 +786,49 @@ window.addEventListener('load', function() {
 </body>
 </html>`;
 
-  // إنشاء iframe مخفي للتحميل المباشر
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;";
-  document.body.appendChild(iframe);
+  // إنشاء div مخفي في الصفحة الحالية بدلاً من iframe لتجنب مشكلة oklch
+  const container = document.createElement("div");
+  container.style.cssText = [
+    "position:fixed",
+    "top:-99999px",
+    "left:-99999px",
+    "width:1123px",  // A3 width at 96dpi
+    "background:#060d1a",
+    "color:#e2e8f0",
+    "font-family:'Tajawal',sans-serif",
+    "direction:rtl",
+    "text-align:right",
+    "font-size:14px",
+    "line-height:1.65",
+    "overflow:visible",
+  ].join(";");
 
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!iframeDoc) {
-    document.body.removeChild(iframe);
-    throw new Error("تعذّر إنشاء نافذة التقرير");
-  }
-
-  iframeDoc.open();
-  iframeDoc.write(html);
-  iframeDoc.close();
-
-  await new Promise<void>((resolve) => {
-    const check = () => {
-      if ((iframe.contentWindow as any)?.__PDF_READY__) {
-        resolve();
-      } else {
-        setTimeout(check, 200);
+  // تضمين محتوى التقرير مباشرة بدون ألوان oklch
+  container.innerHTML = `
+    <style>
+      * { box-sizing: border-box; }
+      .pdf-page {
+        width: 100%;
+        background: linear-gradient(160deg, #020810 0%, #060d1a 50%, #020810 100%);
+        page-break-after: always;
+        break-after: page;
+        overflow: hidden;
       }
-    };
-    setTimeout(check, 500);
-    // fallback بعد 5 ثوانٍ
-    setTimeout(resolve, 5000);
-  });
+      .pdf-page:last-child { page-break-after: avoid; break-after: avoid; }
+    </style>
+    ${p1.replace(/page-break-after:always;/g, "")}
+    ${p2.replace(/page-break-after:always;/g, "")}
+    ${p3.replace(/page-break-after:always;/g, "")}
+    ${p4.replace(/page-break-after:always;/g, "")}
+  `;
+
+  document.body.appendChild(container);
+
+  // انتظار تحميل خط Tajawal
+  await new Promise<void>((resolve) => setTimeout(resolve, 1500));
 
   // استخدام html2pdf للتحميل المباشر
   const html2pdf = (await import("html2pdf.js")).default;
-  const element = iframeDoc.getElementById("pdf-content");
-  if (!element) {
-    document.body.removeChild(iframe);
-    throw new Error("تعذّر العثور على محتوى التقرير");
-  }
 
   await html2pdf()
     .set({
@@ -833,6 +841,29 @@ window.addEventListener('load', function() {
         backgroundColor: "#060d1a",
         logging: false,
         allowTaint: true,
+        // تجاهل أخطاء الألوان غير المدعومة
+        onclone: (clonedDoc: Document) => {
+          // إزالة جميع العناصر التي تحتوي على oklch في اللون
+          const allElements = clonedDoc.querySelectorAll("*");
+          allElements.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            const style = htmlEl.getAttribute("style") || "";
+            if (style.includes("oklch")) {
+              // استبدال ألوان oklch بألوان hex مكافئة
+              htmlEl.setAttribute("style", style
+                .replace(/oklch\([^)]+\)/g, (match) => {
+                  // تحويل ألوان oklch الشائعة إلى hex
+                  if (match.includes("0.141")) return "#1e293b";
+                  if (match.includes("0.21")) return "#1e293b";
+                  if (match.includes("0.85")) return "#d1d5db";
+                  if (match.includes("0.274")) return "#334155";
+                  if (match.includes("0.705")) return "#94a3b8";
+                  return "#64748b"; // fallback
+                })
+              );
+            }
+          });
+        },
       },
       jsPDF: {
         unit: "mm",
@@ -840,8 +871,8 @@ window.addEventListener('load', function() {
         orientation: "portrait",
       },
     })
-    .from(element)
+    .from(container)
     .save();
 
-  document.body.removeChild(iframe);
+  document.body.removeChild(container);
 }
