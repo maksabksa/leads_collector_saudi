@@ -313,6 +313,44 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     .wm2::after{top:65%;left:-15%;}
     /* Page wrapper */
     .pw{margin-top:48px;max-width:900px;margin-left:auto;margin-right:auto;padding-bottom:40px;}
+    /* ── Cover Page (full page) ── */
+    .cover-page{
+      min-height:100vh;
+      background:linear-gradient(160deg,#020810 0%,#060d1a 40%,#091428 70%,#020810 100%);
+      display:flex;flex-direction:column;
+      position:relative;overflow:hidden;
+      page-break-after:always;
+    }
+    .cp-glow-tl{position:absolute;top:-100px;right:-100px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.08) 0%,transparent 65%);pointer-events:none;}
+    .cp-glow-br{position:absolute;bottom:-120px;left:-80px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 65%);pointer-events:none;}
+    .cp-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(34,197,94,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(34,197,94,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+    .cp-top{padding:32px 48px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(34,197,94,0.08);}
+    .cp-logo-wrap{display:flex;align-items:center;gap:14px;}
+    .cp-logo{width:52px;height:52px;border-radius:12px;object-fit:contain;background:#0f172a;padding:4px;border:1px solid rgba(34,197,94,0.2);box-shadow:0 0 20px rgba(34,197,94,0.12);}
+    .cp-logo-ph{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#22c55e;box-shadow:0 0 20px rgba(34,197,94,0.12);}
+    .cp-co-name{font-size:20px;font-weight:800;color:#f8fafc;}
+    .cp-co-sub{font-size:10px;color:#475569;margin-top:2px;letter-spacing:1px;text-transform:uppercase;}
+    .cp-report-id{font-size:11px;color:#334155;text-align:left;}
+    .cp-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 60px;position:relative;z-index:1;}
+    .cp-tag{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22c55e;opacity:0.7;margin-bottom:20px;}
+    .cp-client-name{font-size:52px;font-weight:900;text-align:center;background:linear-gradient(135deg,#ffffff 0%,#94a3b8 60%,#475569 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.15;margin-bottom:16px;text-shadow:none;}
+    .cp-client-meta{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:40px;}
+    .cp-meta-item{font-size:13px;color:#475569;}
+    .cp-meta-sep{color:#1e293b;font-size:16px;}
+    .cp-divider{width:120px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);margin:0 auto 40px;box-shadow:0 0 10px rgba(34,197,94,0.4);}
+    .cp-scores{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-bottom:40px;}
+    .cp-score-block{text-align:center;}
+    .cp-score-ring{width:80px;height:80px;border-radius:50%;border:2.5px solid;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;margin:0 auto 8px;position:relative;}
+    .cp-score-ring::before{content:'';position:absolute;inset:-8px;border-radius:50%;background:radial-gradient(circle,currentColor 0%,transparent 70%);opacity:0.07;}
+    .cp-score-lbl{font-size:11px;color:#475569;font-weight:600;letter-spacing:0.5px;}
+    .cp-urgency{display:inline-flex;align-items:center;gap:8px;padding:8px 22px;border-radius:24px;font-size:12px;font-weight:700;border:1px solid;margin-bottom:40px;}
+    .cp-bottom{padding:28px 48px;border-top:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center;}
+    .cp-bottom-left{font-size:11px;color:#334155;line-height:1.8;}
+    .cp-bottom-right{font-size:11px;color:#334155;text-align:left;}
+    .cp-confidential{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#1e293b;margin-top:4px;}
+    @media print{
+      .cover-page{min-height:100vh!important;page-break-after:always!important;}
+    }
     /* ── Cover ── */
     .cover{
       background:linear-gradient(135deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%);
@@ -439,7 +477,91 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
 <div class="pw">
 
-  <!-- ══ COVER ══ -->
+  <!-- ══ COVER PAGE (standalone) ══ -->
+  <div class="cover-page">
+    <div class="cp-glow-tl"></div>
+    <div class="cp-glow-br"></div>
+    <div class="cp-grid"></div>
+
+    <!-- Top bar -->
+    <div class="cp-top">
+      <div class="cp-logo-wrap">
+        ${companyLogo
+          ? `<img src="${companyLogo}" class="cp-logo" alt="${companyName}">`
+          : `<div class="cp-logo-ph">${companyName.charAt(0)}</div>`
+        }
+        <div>
+          <div class="cp-co-name">${companyName}</div>
+          <div class="cp-co-sub">${company?.reportHeaderText || "تقرير تحليل الوضع الرقمي"}</div>
+        </div>
+      </div>
+      <div class="cp-report-id">
+        <div>رقم التقرير: <strong style="color:#22c55e;">#${String(lead.id || "—").padStart(6, "0")}</strong></div>
+        <div style="margin-top:3px;">${reportDate}</div>
+        ${company?.licenseNumber ? `<div style="margin-top:3px;">ترخيص: ${company.licenseNumber}</div>` : ""}
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="cp-body">
+      <div class="cp-tag">تقرير تحليل رقمي شامل</div>
+      <div class="cp-client-name">${lead.companyName || "—"}</div>
+      <div class="cp-client-meta">
+        ${lead.businessType ? `<span class="cp-meta-item">${lead.businessType}</span>` : ""}
+        ${lead.businessType && lead.city ? `<span class="cp-meta-sep">·</span>` : ""}
+        ${lead.city ? `<span class="cp-meta-item">${lead.city}</span>` : ""}
+        ${lead.city && lead.country ? `<span class="cp-meta-sep">·</span>` : ""}
+        ${lead.country ? `<span class="cp-meta-item">${lead.country}</span>` : ""}
+      </div>
+      <div class="cp-divider"></div>
+
+      <!-- Scores -->
+      ${(priorityScore || qualityScore || seasonScore) ? `
+      <div class="cp-scores">
+        ${priorityScore ? `
+        <div class="cp-score-block">
+          <div class="cp-score-ring" style="border-color:${scoreColor(priorityScore)};color:${scoreColor(priorityScore)};box-shadow:${scoreGlow(priorityScore)};">${priorityScore.toFixed(0)}</div>
+          <div class="cp-score-lbl">الأولوية</div>
+        </div>` : ""}
+        ${qualityScore ? `
+        <div class="cp-score-block">
+          <div class="cp-score-ring" style="border-color:${scoreColor(qualityScore)};color:${scoreColor(qualityScore)};box-shadow:${scoreGlow(qualityScore)};">${qualityScore.toFixed(0)}</div>
+          <div class="cp-score-lbl">جودة البيانات</div>
+        </div>` : ""}
+        ${seasonScore ? `
+        <div class="cp-score-block">
+          <div class="cp-score-ring" style="border-color:${scoreColor(seasonScore)};color:${scoreColor(seasonScore)};box-shadow:${scoreGlow(seasonScore)};">${seasonScore.toFixed(0)}</div>
+          <div class="cp-score-lbl">الموسمية</div>
+        </div>` : ""}
+        ${lead.rating ? `
+        <div class="cp-score-block">
+          <div class="cp-score-ring" style="border-color:#eab308;color:#eab308;box-shadow:0 0 14px rgba(234,179,8,0.55);">${Number(lead.rating).toFixed(1)}</div>
+          <div class="cp-score-lbl">تقييم جوجل</div>
+        </div>` : ""}
+      </div>` : ""}
+
+      <div class="cp-urgency" style="background:${urgency.bg};color:${urgency.color};border-color:${urgency.border};box-shadow:0 0 14px ${urgency.color}22;">
+        ${urgency.dot} ${urgency.text}
+      </div>
+    </div>
+
+    <!-- Bottom -->
+    <div class="cp-bottom">
+      <div class="cp-bottom-left">
+        <div style="font-weight:700;color:#22c55e;font-size:12px;margin-bottom:3px;">${companyName}</div>
+        ${company?.website ? `<div>${company.website}</div>` : "<div>maksab-ksa.com</div>"}
+        ${company?.phone ? `<div>${company.phone}</div>` : ""}
+        ${company?.email ? `<div>${company.email}</div>` : ""}
+      </div>
+      <div class="cp-bottom-right">
+        <div>تاريخ الإصدار: ${reportDate}</div>
+        <div class="cp-confidential">حصري · سري · للاستخدام الداخلي فقط</div>
+      </div>
+    </div>
+  </div>
+  <!-- ══ END COVER PAGE ══ -->
+
+  <!-- ══ COVER (summary header) ══ -->
   <div class="cover">
     <div class="cover-top">
       <div class="co-brand">
@@ -502,19 +624,14 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     ${company?.reportIntroText ? `<div class="dc"><div class="at">${company.reportIntroText}</div></div>` : ""}
 
-    <!-- نص التواصل المقترح -->
-    ${(lead.salesEntryAngle || lead.suggestedSalesEntryAngle) ? `
-    <div class="sh"><div class="sh-dot"></div>نص التواصل المقترح</div>
-    <div class="dc">
-      <div class="msg-box">${lead.salesEntryAngle || lead.suggestedSalesEntryAngle}</div>
-    </div>` : ""}
+    <!-- نص التواصل المقترح محذوف من تقرير العميل — مخصص للمندوب فقط -->
 
     <!-- الثغرات الحرجة + أرقام الهاتف في صف واحد -->
     ${(gaps.length > 0 || phones.length > 0) ? `
     <div style="display:grid;grid-template-columns:${gaps.length > 0 && phones.length > 0 ? "1fr 1fr" : "1fr"};gap:12px;">
       ${gaps.length > 0 ? `
       <div>
-        <div class="sh" style="margin-top:0;"><div class="sh-dot"></div>الثغرات الحرجة</div>
+        <div class="sh" style="margin-top:0;"><div class="sh-dot"></div>الفجوات التشغيلية الحرجة</div>
         <div class="dc">
           <ul class="gap-list">
             ${gaps.map(g => `<li class="gap-item"><span class="gap-dot">•</span><span>${g}</span></li>`).join("")}
@@ -535,19 +652,19 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <!-- فرصة الإيراد -->
     ${lead.revenueOpportunity ? `
-    <div class="sh"><div class="sh-dot"></div>الفرصة التجارية المقدّرة</div>
+    <div class="sh"><div class="sh-dot"></div>تقدير الفرصة التجارية</div>
     <div class="dc">
       <div class="at">${lead.revenueOpportunity}</div>
     </div>` : ""}
 
     <!-- ══ السوشيال ميديا ══ -->
     ${parsedSocials.length > 0 ? `
-    <div class="sh"><div class="sh-dot"></div>تحليل وسائل التواصل الاجتماعي</div>
+    <div class="sh"><div class="sh-dot"></div>تحليل الحضور على منصات التواصل الاجتماعي</div>
 
     <!-- إحصائيات سريعة — Highlight Metric Rows -->
     ${parsedSocials.filter(s => s.followersCount).length > 0 ? `
     <div class="dc" style="margin-bottom:12px;">
-      <div class="dc-title green">إجمالي الحضور الرقمي</div>
+      <div class="dc-title green">ملخص الحضور الرقمي عبر المنصات</div>
       ${parsedSocials.filter(s => s.followersCount).map(s => {
         const m = platformMeta(s.platform);
         return metricRow(m.svg, m.name, fmtInt(s.followersCount) + " متابع", m.color);
@@ -614,7 +731,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <!-- ══ الفرص الضائعة ══ -->
     ${(lead.biggestMarketingGap || lead.revenueOpportunity || websiteAnalysis || socialAnalyses.length > 0) ? `
-    <div class="sh"><div class="sh-dot"></div>الفرص الضائعة — ما يمكن تحقيقه مع مكسب</div>
+    <div class="sh"><div class="sh-dot"></div>تحليل الفجوات والفرص الاستراتيجية</div>
 
     <div class="opp-vs">
       <div class="opp-vs-stat">
@@ -635,21 +752,21 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <div class="opp-grid">
       <div class="opp-card now">
-        <div class="opp-label" style="color:#ef4444;">⚠️ الوضع الحالي</div>
+        <div class="opp-label" style="color:#ef4444;">⚠️ الفجوات التشغيلية الحالية</div>
         ${gaps.slice(0,4).map(g => `<div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>${g}</span></div>`).join("")}
         ${!gaps.length ? `
-          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>يفتقد إلى استراتيجية رقمية متكاملة</span></div>
-          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>ضعف الظهور على محركات البحث</span></div>
-          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>قصور في توظيف قنوات التواصل</span></div>
-          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>تسرب مستمر في العملاء المحتملين</span></div>
+          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>غياب استراتيجية رقمية موثقة وقابلة للقياس</span></div>
+          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>محدودية الظهور في نتائج البحث المحلية والعضوية</span></div>
+          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>ضعف استثمار قنوات التواصل في توليد الطلب</span></div>
+          <div class="opp-item"><span class="opp-dot" style="background:#ef4444;"></span><span>تسرب ملحوظ في العملاء المحتملين لغياب آليات التحويل</span></div>
         ` : ""}
       </div>
       <div class="opp-card with-maksab">
-        <div class="opp-label" style="color:#22c55e;">✅ مع مكسب</div>
-        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>حضور رقمي احترافي ومتكامل على جميع المنصات</span></div>
-        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>استراتيجية محتوى مخصصة تستهدف الجمهور المثالي</span></div>
-        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>تحسين الظهور المجاني وتعزيز الثقة الرقمية</span></div>
-        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>تحويل المتابعين إلى عملاء فعليين وزيادة الإيراد</span></div>
+        <div class="opp-label" style="color:#22c55e;">✅ المخرجات المستهدفة مع مكسب</div>
+        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>بناء حضور رقمي متكامل ومتسق عبر جميع المنصات ذات الصلة</span></div>
+        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>تطوير استراتيجية محتوى مبنية على بيانات الجمهور المستهدف</span></div>
+        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>تعزيز الظهور العضوي في محركات البحث وخرائط جوجل</span></div>
+        <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>تحويل حركة المرور الرقمية إلى إيراد قابل للقياس والتتبع</span></div>
         ${lead.revenueOpportunity ? `<div class="opp-item"><span class="opp-dot" style="background:#0ea5e9;"></span><span style="color:#0ea5e9;font-weight:600;">${lead.revenueOpportunity.slice(0,110)}${lead.revenueOpportunity.length > 110 ? "..." : ""}</span></div>` : ""}
       </div>
     </div>
@@ -657,8 +774,8 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <!-- CTA -->
     <div style="background:linear-gradient(135deg,rgba(34,197,94,0.07),rgba(14,165,233,0.05));border:1px solid rgba(34,197,94,0.15);border-radius:10px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
       <div>
-        <div style="font-size:14px;font-weight:800;color:#f8fafc;margin-bottom:4px;">ابدأ رحلة النمو الرقمي اليوم</div>
-        <div style="font-size:11px;color:#475569;">تواصل مع فريق مكسب للحصول على خطة عمل مخصصة لنشاطك التجاري</div>
+        <div style="font-size:14px;font-weight:800;color:#f8fafc;margin-bottom:4px;">للاستفسار وطلب خطة العمل التفصيلية</div>
+        <div style="font-size:11px;color:#475569;">يسعدنا تقديم عرض مخصص يتوافق مع أهداف نشاطكم التجاري وميزانيتكم</div>
       </div>
       <div style="text-align:center;">
         <div style="font-size:16px;font-weight:900;color:#22c55e;text-shadow:0 0 10px rgba(34,197,94,0.45);">${company?.phone || company?.email || "maksab-ksa.com"}</div>
@@ -669,14 +786,14 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <!-- ══ التقرير الشامل ══ -->
     ${report?.fullReport ? `
-    <div class="sh"><div class="sh-dot"></div>التقرير التحليلي الشامل</div>
+    <div class="sh"><div class="sh-dot"></div>التحليل التفصيلي والتوصيات الاستراتيجية</div>
     <div class="dc">
       <div class="fr"><p>${cleanMarkdown(typeof report.fullReport === "string" ? report.fullReport : "")}</p></div>
     </div>` : ""}
 
     <!-- ══ الملاحظات ══ -->
     ${lead.notes ? `
-    <div class="sh"><div class="sh-dot"></div>ملاحظات إضافية</div>
+    <div class="sh" style="margin-top:0;"><div class="sh-dot"></div>الفجوات التشغيلية الحرجة</div>
     <div class="dc"><div class="at">${lead.notes}</div></div>` : ""}
 
   </div><!-- /content -->

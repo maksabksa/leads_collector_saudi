@@ -340,6 +340,7 @@ export default function LeadDetail() {
       tiktokUrl: (lead as any).tiktokUrl || "",
       facebookUrl: (lead as any).facebookUrl || "",
       linkedinUrl: (lead as any).linkedinUrl || "",
+      crNumber: (lead as any).crNumber || "",
       notes: lead.notes || "",
       stage: (lead as any).stage || "new",
       priority: (lead as any).priority || "medium",
