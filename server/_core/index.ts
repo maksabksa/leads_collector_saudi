@@ -61,6 +61,38 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 
+  // ===== PDF Generation via Puppeteer (يدعم oklch بشكل كامل) =====
+  app.post("/api/generate-pdf", async (req, res) => {
+    try {
+      const { html, filename = "report.pdf" } = req.body as { html: string; filename: string };
+      if (!html) { res.status(400).json({ error: "html is required" }); return; }
+
+      const puppeteer = await import("puppeteer-core");
+      const browser = await puppeteer.launch({
+        executablePath: "/usr/bin/chromium-browser",
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        headless: true,
+      });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
+      // انتظار تحميل الخطوط
+      await new Promise((r) => setTimeout(r, 1500));
+      const pdfBuffer = await page.pdf({
+        format: "A3",
+        printBackground: true,
+        margin: { top: "10mm", right: "10mm", bottom: "10mm", left: "10mm" },
+      });
+      await browser.close();
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      res.send(Buffer.from(pdfBuffer));
+    } catch (err: any) {
+      console.error("[PDF Generation] Error:", err);
+      res.status(500).json({ error: err.message || "فشل توليد PDF" });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

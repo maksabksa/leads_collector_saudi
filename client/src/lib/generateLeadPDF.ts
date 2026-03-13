@@ -828,30 +828,27 @@ ${p1}${p2}${p3}${p4}
 
   const container = iframeDoc.body;
 
-  // استخدام html2pdf للتحميل المباشر
-  const html2pdf = (await import("html2pdf.js")).default;
+  // ═══ إرسال HTML إلى /api/generate-pdf (يستخدم Puppeteer - يدعم oklch بشكل كامل) ═══
+  const response = await fetch("/api/generate-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ html: iframeHTML, filename: fileName }),
+  });
 
-  await html2pdf()
-    .set({
-      margin: [10, 10, 10, 10],
-      filename: fileName,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#060d1a",
-        logging: false,
-        allowTaint: true,
-        windowWidth: 1123,
-      },
-      jsPDF: {
-        unit: "mm",
-        format: "a3",
-        orientation: "portrait",
-      },
-    })
-    .from(container)
-    .save();
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || "فشل توليد PDF");
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 
   document.body.removeChild(iframe);
 }
