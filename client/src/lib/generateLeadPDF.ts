@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  generateLeadPDF — Professional Report v6 (Print-Ready)
+//  generateLeadPDF — Dark Professional Report v7 (Print-Ready Dark)
 //  صفحة 1: الغلاف  |  صفحة 2: الملخص التنفيذي
-//  صفحة 3: التحليل الرقمي  |  صفحة 4: التوصيات + CTA
+//  صفحة 3: التحليل الرقمي + Radar  |  صفحة 4: التوصيات + CTA
 // ═══════════════════════════════════════════════════════════════════════
 
 interface GeneratePDFOptions {
@@ -14,11 +14,18 @@ interface GeneratePDFOptions {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function sc(v?: number | null) {
-  if (!v) return "#6b7280";
-  if (v >= 8) return "#16a34a";
-  if (v >= 6) return "#ca8a04";
-  if (v >= 4) return "#ea580c";
-  return "#dc2626";
+  if (!v) return "#64748b";
+  if (v >= 8) return "#22c55e";
+  if (v >= 6) return "#eab308";
+  if (v >= 4) return "#f97316";
+  return "#ef4444";
+}
+function sg(v?: number | null) {
+  if (!v) return "none";
+  if (v >= 8) return "0 0 20px rgba(34,197,94,0.7)";
+  if (v >= 6) return "0 0 20px rgba(234,179,8,0.7)";
+  if (v >= 4) return "0 0 20px rgba(249,115,22,0.7)";
+  return "0 0 20px rgba(239,68,68,0.7)";
 }
 function fmt(v?: number | null) { return v ? Number(v).toFixed(1) : "—"; }
 function fmtK(v?: number | null) {
@@ -50,9 +57,9 @@ function cleanUrl(url?: string | null, platform = "") {
 function cleanMarkdown(t: string) {
   return t
     .replace(/#{1,6}\s+/g, "")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong style='color:#f1f5f9;'>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n\n/g, "</p><p style='margin-top:8px;'>")
     .replace(/\n/g, "<br>");
 }
 function parseSocialExtra(raw?: string | null) {
@@ -61,78 +68,156 @@ function parseSocialExtra(raw?: string | null) {
 }
 function urg(level?: string | null) {
   switch (level) {
-    case "high":   return { text: "أولوية عالية",   color: "#dc2626", bg: "#fef2f2", border: "#fecaca" };
-    case "medium": return { text: "أولوية متوسطة", color: "#ca8a04", bg: "#fefce8", border: "#fde68a" };
-    case "low":    return { text: "أولوية منخفضة", color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" };
-    default:       return { text: "غير محدد",       color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" };
+    case "high":   return { text: "أولوية عالية",   color: "#ef4444", bg: "rgba(239,68,68,0.15)",   border: "rgba(239,68,68,0.4)" };
+    case "medium": return { text: "أولوية متوسطة", color: "#eab308", bg: "rgba(234,179,8,0.15)",   border: "rgba(234,179,8,0.4)" };
+    case "low":    return { text: "أولوية منخفضة", color: "#22c55e", bg: "rgba(34,197,94,0.15)",   border: "rgba(34,197,94,0.4)" };
+    default:       return { text: "غير محدد",       color: "#64748b", bg: "rgba(100,116,139,0.1)", border: "rgba(100,116,139,0.3)" };
   }
 }
 function pm(p: string) {
-  const map: Record<string, { name: string; color: string }> = {
-    instagram: { name: "إنستغرام", color: "#e1306c" },
-    twitter:   { name: "تويتر / X", color: "#1da1f2" },
-    tiktok:    { name: "تيك توك",   color: "#010101" },
-    snapchat:  { name: "سناب شات", color: "#f7b731" },
-    facebook:  { name: "فيسبوك",   color: "#1877f2" },
-    linkedin:  { name: "لينكد إن", color: "#0a66c2" },
+  const map: Record<string, { name: string; color: string; icon: string }> = {
+    instagram: { name: "إنستغرام", color: "#e1306c", icon: "📸" },
+    twitter:   { name: "تويتر / X", color: "#1da1f2", icon: "🐦" },
+    tiktok:    { name: "تيك توك",   color: "#69c9d0", icon: "🎵" },
+    snapchat:  { name: "سناب شات", color: "#fffc00", icon: "👻" },
+    facebook:  { name: "فيسبوك",   color: "#1877f2", icon: "📘" },
+    linkedin:  { name: "لينكد إن", color: "#0a66c2", icon: "💼" },
   };
-  return map[p?.toLowerCase()] || { name: p || "منصة", color: "#6b7280" };
+  return map[p?.toLowerCase()] || { name: p || "منصة", color: "#64748b", icon: "📱" };
 }
 
-// ─── Score badge ──────────────────────────────────────────────────────────────
-function scoreBadge(v?: number | null, label = "") {
-  const color = sc(v);
-  const val = v ? Number(v).toFixed(1) : "—";
-  const bg = v
-    ? v >= 8 ? "#f0fdf4" : v >= 6 ? "#fefce8" : v >= 4 ? "#fff7ed" : "#fef2f2"
-    : "#f9fafb";
-  return `<div style="text-align:center;padding:12px 8px;background:${bg};border:2px solid ${color}33;border-radius:12px;">
-    <div style="font-size:28px;font-weight:900;color:${color};line-height:1;">${val}</div>
-    <div style="font-size:9px;color:#6b7280;margin-top:4px;font-weight:600;">${label}</div>
+// ─── Score ring (dark) ────────────────────────────────────────────────────────
+function ring(v?: number | null, size = 80, label = "") {
+  const color = sc(v); const glow = sg(v);
+  const d = v ? Number(v).toFixed(1) : "—";
+  const fs = size > 70 ? 26 : 18;
+  return `<div style="text-align:center;">
+    <div style="width:${size}px;height:${size}px;border-radius:50%;
+      border:3px solid ${color};box-shadow:${glow};
+      display:flex;align-items:center;justify-content:center;
+      font-size:${fs}px;font-weight:900;color:${color};
+      background:rgba(6,13,26,0.9);margin:0 auto ${label ? "8px" : "0"};">
+      ${d}
+    </div>
+    ${label ? `<div style="font-size:10px;color:#94a3b8;font-weight:600;letter-spacing:0.5px;">${label}</div>` : ""}
   </div>`;
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
-function progressBar(v?: number | null, label = "", max = 10) {
+// ─── Progress bar (dark) ──────────────────────────────────────────────────────
+function bar(v?: number | null, label = "", max = 10) {
   const pct = v ? Math.min((v / max) * 100, 100) : 0;
   const color = sc(v);
   return `<div style="margin-bottom:10px;">
-    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-      <span style="font-size:11px;color:#374151;font-weight:600;">${label}</span>
-      <span style="font-size:11px;font-weight:700;color:${color};">${fmt(v)}</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+      <span style="font-size:11.5px;color:#cbd5e1;font-weight:600;">${label}</span>
+      <span style="font-size:12px;font-weight:800;color:${color};text-shadow:0 0 8px ${color}88;">${fmt(v)}</span>
     </div>
-    <div style="height:7px;background:#e5e7eb;border-radius:4px;overflow:hidden;">
-      <div style="height:100%;width:${pct}%;background:${color};border-radius:4px;"></div>
+    <div style="height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;">
+      <div style="height:100%;width:${pct}%;
+        background:linear-gradient(90deg,${color},${color}cc);
+        border-radius:4px;box-shadow:0 0 10px ${color}66;"></div>
     </div>
   </div>`;
 }
 
-// ─── Page wrapper (A4) ────────────────────────────────────────────────────────
+// ─── Radar Chart SVG (dark) ───────────────────────────────────────────────────
+function radarChart(axes: { label: string; value: number | null; market: number }[], size = 240) {
+  const n = axes.length;
+  if (n < 3) return "";
+  const cx = size / 2, cy = size / 2, r = size * 0.36, levels = 5;
+  const angle = (i: number) => (Math.PI * 2 * i) / n - Math.PI / 2;
+  const pt = (i: number, ratio: number) => ({
+    x: cx + r * ratio * Math.cos(angle(i)),
+    y: cy + r * ratio * Math.sin(angle(i)),
+  });
+
+  let gridLines = "";
+  for (let l = 1; l <= levels; l++) {
+    const ratio = l / levels;
+    const pts = Array.from({ length: n }, (_, i) => pt(i, ratio));
+    const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") + " Z";
+    gridLines += `<path d="${d}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.8"/>`;
+  }
+
+  let axisLines = "";
+  for (let i = 0; i < n; i++) {
+    const p = pt(i, 1);
+    axisLines += `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>`;
+  }
+
+  const mPts = axes.map((a, i) => pt(i, (a.market || 5) / 10));
+  const mPath = mPts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") + " Z";
+
+  const cPts = axes.map((a, i) => pt(i, Math.min(Math.max((a.value || 0) / 10, 0), 1)));
+  const cPath = cPts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") + " Z";
+
+  let labels = "";
+  for (let i = 0; i < n; i++) {
+    const a = angle(i);
+    const lx = cx + (r + 26) * Math.cos(a);
+    const ly = cy + (r + 26) * Math.sin(a);
+    const anchor = Math.cos(a) > 0.1 ? "start" : Math.cos(a) < -0.1 ? "end" : "middle";
+    const ax = axes[i];
+    const valStr = ax.value !== null && ax.value !== undefined ? Number(ax.value).toFixed(1) : "—";
+    const valColor = sc(ax.value);
+    labels += `<text x="${lx.toFixed(1)}" y="${(ly - 4).toFixed(1)}" text-anchor="${anchor}" font-size="8.5" fill="#cbd5e1" font-weight="700" font-family="Tajawal,Arial,sans-serif">${ax.label}</text>`;
+    labels += `<text x="${lx.toFixed(1)}" y="${(ly + 9).toFixed(1)}" text-anchor="${anchor}" font-size="9" fill="${valColor}" font-weight="900" font-family="Tajawal,Arial,sans-serif">${valStr}</text>`;
+  }
+
+  let dots = "";
+  cPts.forEach(p => {
+    dots += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="#22c55e" stroke="rgba(34,197,94,0.3)" stroke-width="4"/>`;
+  });
+
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;">
+    ${gridLines}${axisLines}
+    <path d="${mPath}" fill="rgba(100,116,139,0.15)" stroke="rgba(100,116,139,0.5)" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <path d="${cPath}" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="2.5" filter="url(#glow)"/>
+    <defs><filter id="glow"><feGaussianBlur stdDeviation="2" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    ${dots}${labels}
+  </svg>`;
+}
+
+// ─── Section header (dark) ────────────────────────────────────────────────────
+function sh(title: string, sub = "") {
+  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="width:4px;height:24px;border-radius:2px;
+      background:linear-gradient(180deg,#22c55e,#0ea5e9);
+      box-shadow:0 0 10px rgba(34,197,94,0.6);flex-shrink:0;"></div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:#f1f5f9;letter-spacing:0.3px;">${title}</div>
+      ${sub ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">${sub}</div>` : ""}
+    </div>
+  </div>`;
+}
+
+// ─── Card (dark) ──────────────────────────────────────────────────────────────
+function card(content: string, accent = "#22c55e", extraStyle = "") {
+  return `<div style="background:linear-gradient(135deg,#0d1f3c 0%,#080f1e 100%);
+    border:1px solid ${accent}22;border-radius:14px;padding:18px 20px;
+    position:relative;overflow:hidden;${extraStyle}">
+    <div style="position:absolute;top:0;right:0;width:100px;height:100px;
+      background:radial-gradient(circle,${accent}08 0%,transparent 70%);pointer-events:none;"></div>
+    ${content}
+  </div>`;
+}
+
+// ─── Page wrapper (dark A4) ───────────────────────────────────────────────────
 function page(content: string, pageBreak = true) {
   return `<div style="width:210mm;min-height:297mm;padding:0;margin:0 auto;
-    background:#ffffff;position:relative;overflow:hidden;
+    background:linear-gradient(160deg,#020810 0%,#060d1a 60%,#020810 100%);
+    position:relative;overflow:hidden;
     ${pageBreak ? "page-break-after:always;break-after:page;" : ""}">
     ${content}
   </div>`;
 }
 
-// ─── Section header ───────────────────────────────────────────────────────────
-function sh(title: string, sub = "") {
-  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #f3f4f6;">
-    <div style="width:4px;height:24px;border-radius:2px;background:linear-gradient(180deg,#1d4ed8,#0ea5e9);flex-shrink:0;"></div>
-    <div>
-      <div style="font-size:14px;font-weight:800;color:#111827;">${title}</div>
-      ${sub ? `<div style="font-size:10px;color:#6b7280;margin-top:1px;">${sub}</div>` : ""}
-    </div>
-  </div>`;
-}
-
-// ─── Info row ─────────────────────────────────────────────────────────────────
+// ─── Info row (dark) ──────────────────────────────────────────────────────────
 function infoRow(label: string, value: string, icon = "") {
   if (!value) return "";
-  return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f9fafb;">
-    <span style="font-size:11px;color:#6b7280;min-width:90px;flex-shrink:0;">${icon} ${label}</span>
-    <span style="font-size:11px;color:#111827;font-weight:600;flex:1;word-break:break-all;">${value}</span>
+  return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+    <span style="font-size:11px;color:#475569;min-width:80px;flex-shrink:0;">${icon} ${label}</span>
+    <span style="font-size:11px;color:#cbd5e1;font-weight:600;flex:1;word-break:break-all;">${value}</span>
   </div>`;
 }
 
@@ -189,65 +274,89 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     lead.entryAngle.split(/\n/).map((s: string) => s.trim()).filter(Boolean).slice(0, 3).forEach((r: string) => recs.push(r));
   }
 
+  // ── Radar axes ──
+  const radarAxes = [
+    { label: "الأولوية",    value: priScore,                              market: 6 },
+    { label: "الموقع",      value: wsScore,                               market: 5 },
+    { label: "السوشيال",    value: bestSocial?.engagementScore ?? null,   market: 5.5 },
+    { label: "المحتوى",     value: bestSocial?.contentQualityScore ?? null, market: 5 },
+    { label: "SEO",          value: websiteAnalysis?.seoScore ?? null,     market: 4.5 },
+    { label: "البيانات",    value: qualScore,                              market: 6 },
+  ];
+
   const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
   const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 1 — COVER
+  //  PAGE 1 — COVER (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const p1 = page(`
-    <!-- Header bar -->
-    <div style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 50%,#0ea5e9 100%);
-      padding:28px 40px 24px;position:relative;overflow:hidden;">
-      <!-- Decorative circles -->
-      <div style="position:absolute;top:-40px;left:-40px;width:180px;height:180px;
-        border-radius:50%;background:rgba(255,255,255,0.05);"></div>
-      <div style="position:absolute;bottom:-60px;right:-20px;width:220px;height:220px;
-        border-radius:50%;background:rgba(255,255,255,0.04);"></div>
-      <!-- Company header -->
-      <div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;">
-        <div style="display:flex;align-items:center;gap:14px;">
-          ${coLogo ? `<img src="${coLogo}" style="height:44px;width:auto;border-radius:8px;background:white;padding:4px;" alt="شعار الشركة">` : `<div style="width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;">${coName.charAt(0)}</div>`}
-          <div>
-            <div style="font-size:18px;font-weight:900;color:white;letter-spacing:0.5px;">${coName}</div>
-            <div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:2px;">تقرير تحليل تسويقي متخصص</div>
-          </div>
+    <!-- Decorative bg elements -->
+    <div style="position:absolute;top:-80px;right:-80px;width:350px;height:350px;border-radius:50%;
+      background:radial-gradient(circle,rgba(34,197,94,0.06) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-100px;left:-60px;width:400px;height:400px;border-radius:50%;
+      background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <!-- Top bar -->
+    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex;align-items:center;gap:14px;">
+        ${coLogo
+          ? `<img src="${coLogo}" style="height:46px;width:auto;border-radius:10px;border:1px solid rgba(255,255,255,0.1);padding:4px;background:rgba(255,255,255,0.05);" alt="logo">`
+          : `<div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#0ea5e9);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:white;">${coName.charAt(0)}</div>`}
+        <div>
+          <div style="font-size:20px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;">${coName}</div>
+          <div style="font-size:10px;color:#475569;margin-top:2px;letter-spacing:1px;">تقرير تحليل تسويقي متخصص</div>
         </div>
-        <div style="text-align:left;">
-          <div style="font-size:10px;color:rgba(255,255,255,0.6);">تاريخ الإصدار</div>
-          <div style="font-size:12px;font-weight:700;color:white;">${reportDate}</div>
-          <div style="margin-top:6px;padding:3px 10px;background:${urgency.bg};border-radius:20px;
-            font-size:10px;font-weight:700;color:${urgency.color};display:inline-block;">${urgency.text}</div>
-        </div>
+      </div>
+      <div style="text-align:left;">
+        <div style="font-size:10px;color:#475569;margin-bottom:3px;">تاريخ الإصدار</div>
+        <div style="font-size:13px;font-weight:700;color:#94a3b8;">${reportDate}</div>
+        <div style="margin-top:8px;padding:4px 12px;background:${urgency.bg};border:1px solid ${urgency.border};
+          border-radius:20px;font-size:10px;font-weight:700;color:${urgency.color};display:inline-block;
+          box-shadow:0 0 12px ${urgency.border};">${urgency.text}</div>
       </div>
     </div>
 
-    <!-- Client section -->
-    <div style="padding:40px 40px 30px;text-align:center;border-bottom:1px solid #f3f4f6;">
-      ${clLogo ? `<div style="margin-bottom:20px;"><img src="${clLogo}" style="height:80px;width:auto;max-width:200px;border-radius:12px;border:2px solid #e5e7eb;padding:8px;background:white;" alt="شعار العميل"></div>` : ""}
-      <div style="font-size:11px;color:#6b7280;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">تقرير تحليل مخصص لعناية</div>
-      <div style="font-size:32px;font-weight:900;color:#111827;margin-bottom:8px;">${lead.companyName || "العميل"}</div>
-      <div style="font-size:14px;color:#4b5563;margin-bottom:16px;">${lead.businessType || ""} ${lead.city ? `· ${lead.city}` : ""}</div>
-      <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 20px;
-        background:#f0f9ff;border:1px solid #bae6fd;border-radius:20px;">
-        <span style="font-size:11px;color:#0369a1;font-weight:600;">تحليل رقمي شامل · 4 محاور رئيسية</span>
+    <!-- Client hero -->
+    <div style="padding:44px 40px 36px;text-align:center;position:relative;">
+      ${clLogo ? `<div style="margin-bottom:24px;"><img src="${clLogo}" style="height:90px;width:auto;max-width:220px;border-radius:16px;border:2px solid rgba(255,255,255,0.1);padding:10px;background:rgba(255,255,255,0.04);" alt="client logo"></div>` : ""}
+      <div style="font-size:11px;color:#475569;font-weight:600;letter-spacing:3px;margin-bottom:10px;">تقرير تحليل مخصص لعناية</div>
+      <div style="font-size:38px;font-weight:900;color:#f8fafc;margin-bottom:10px;
+        text-shadow:0 0 40px rgba(34,197,94,0.2);letter-spacing:0.5px;">${lead.companyName || "العميل"}</div>
+      <div style="font-size:15px;color:#64748b;margin-bottom:20px;">
+        ${lead.businessType || ""} ${lead.city ? `<span style="color:#334155;">·</span> ${lead.city}` : ""}
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:10px;padding:10px 24px;
+        background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:24px;
+        box-shadow:0 0 20px rgba(34,197,94,0.1);">
+        <div style="width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></div>
+        <span style="font-size:12px;color:#22c55e;font-weight:700;letter-spacing:0.5px;">تحليل رقمي شامل · 4 محاور رئيسية</span>
       </div>
     </div>
 
-    <!-- Score summary -->
-    <div style="padding:24px 40px;background:#f9fafb;border-bottom:1px solid #f3f4f6;">
-      <div style="font-size:11px;color:#6b7280;font-weight:700;text-align:center;margin-bottom:16px;letter-spacing:1px;">ملخص التقييم الرقمي</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-        ${scoreBadge(priScore, "الأولوية")}
-        ${scoreBadge(qualScore, "جودة البيانات")}
-        ${scoreBadge(wsScore, "تقييم الموقع")}
-        ${scoreBadge(bestSocial?.engagementScore, "التفاعل السوشيال")}
+    <!-- Score rings -->
+    <div style="padding:0 40px 28px;">
+      <div style="font-size:11px;color:#334155;font-weight:700;text-align:center;margin-bottom:18px;
+        letter-spacing:2px;text-transform:uppercase;">ملخص التقييم الرقمي</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+        ${[
+          { v: priScore,                           label: "الأولوية" },
+          { v: qualScore,                          label: "جودة البيانات" },
+          { v: wsScore,                            label: "تقييم الموقع" },
+          { v: bestSocial?.engagementScore ?? null, label: "التفاعل الرقمي" },
+        ].map(({ v, label }) => `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+          border-radius:14px;padding:16px 10px;text-align:center;">
+          ${ring(v, 72)}
+          <div style="font-size:10px;color:#475569;margin-top:10px;font-weight:600;">${label}</div>
+        </div>`).join("")}
       </div>
     </div>
 
     <!-- Contact info -->
-    <div style="padding:20px 40px 24px;">
-      <div style="font-size:11px;color:#6b7280;font-weight:700;margin-bottom:12px;letter-spacing:1px;">معلومات الاتصال</div>
+    <div style="padding:0 40px 28px;">
+      <div style="font-size:11px;color:#334155;font-weight:700;margin-bottom:12px;letter-spacing:1px;">معلومات الاتصال</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;">
         ${infoRow("الهاتف", phones.slice(0, 2).join(" | "), "📞")}
         ${infoRow("الموقع", cleanUrl(lead.website), "🌐")}
@@ -260,260 +369,316 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <!-- Footer -->
     <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 40px;
-      background:linear-gradient(135deg,#1e3a8a,#1d4ed8);
+      background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:rgba(255,255,255,0.6);">حصري من ${coName} — جميع الحقوق محفوظة</div>
-      <div style="font-size:9px;color:rgba(255,255,255,0.6);">CONFIDENTIAL · صفحة 1 من 4</div>
+      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 1 من 4</div>
     </div>
 
     <!-- Watermark -->
     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
-      font-size:72px;font-weight:900;color:rgba(29,78,216,0.04);white-space:nowrap;
+      font-size:64px;font-weight:900;color:rgba(34,197,94,0.03);white-space:nowrap;
       pointer-events:none;z-index:0;letter-spacing:6px;">حصري من ${coName}</div>
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 2 — EXECUTIVE SUMMARY
+  //  PAGE 2 — EXECUTIVE SUMMARY (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const execSummary = report?.executiveSummary || report?.summary || lead.revenueOpportunity || "";
   const entryAngle  = lead.entryAngle || report?.entryAngle || "";
   const revenueOpp  = lead.revenueOpportunity || "";
 
   const p2 = page(`
+    <!-- Decorative -->
+    <div style="position:absolute;top:-60px;left:-60px;width:300px;height:300px;border-radius:50%;
+      background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+
     <!-- Page header -->
-    <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:900;color:white;">الملخص التنفيذي</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.7);">${lead.companyName || ""} · ${coName}</div>
+    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
+        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">الملخص التنفيذي</div>
+      </div>
+      <div style="font-size:10px;color:#334155;">${lead.companyName || ""} · ${coName} · صفحة 2/4</div>
     </div>
 
-    <div style="padding:28px 40px;">
-      <!-- Summary text -->
+    <div style="padding:24px 40px;">
+
+      <!-- Executive summary -->
       ${execSummary ? `
-      <div style="margin-bottom:24px;">
-        ${sh("نظرة عامة على الوضع الحالي")}
-        <div style="font-size:12px;color:#374151;line-height:1.8;background:#f9fafb;
-          border-right:3px solid #1d4ed8;padding:14px 16px;border-radius:0 8px 8px 0;">
-          <p>${cleanMarkdown(execSummary)}</p>
+      <div style="margin-bottom:22px;">
+        ${sh("نظرة عامة على الوضع الحالي", "تقييم شامل للحضور الرقمي والفرص المتاحة")}
+        <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.15);
+          border-right:4px solid #0ea5e9;border-radius:0 12px 12px 0;padding:16px 20px;">
+          <p style="font-size:12.5px;color:#cbd5e1;line-height:1.9;margin:0;">${cleanMarkdown(execSummary)}</p>
         </div>
       </div>` : ""}
 
       <!-- Gaps -->
       ${gaps.length ? `
-      <div style="margin-bottom:24px;">
-        ${sh("أبرز الثغرات التسويقية", "نقاط الضعف التي تحتاج معالجة فورية")}
+      <div style="margin-bottom:22px;">
+        ${sh("أبرز الثغرات التسويقية", "نقاط الضعف التي تستوجب معالجة فورية لتحقيق النمو")}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           ${gaps.map((g, i) => `
           <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;
-            background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
-            <div style="width:22px;height:22px;border-radius:50%;background:#dc2626;
-              display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">
-              <span style="font-size:10px;font-weight:900;color:white;">${i + 1}</span>
+            background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:rgba(239,68,68,0.2);
+              border:1px solid rgba(239,68,68,0.4);display:flex;align-items:center;justify-content:center;
+              flex-shrink:0;margin-top:1px;">
+              <span style="font-size:11px;font-weight:900;color:#ef4444;">${i + 1}</span>
             </div>
-            <span style="font-size:11px;color:#374151;line-height:1.5;">${g}</span>
+            <span style="font-size:11.5px;color:#cbd5e1;line-height:1.6;">${g}</span>
           </div>`).join("")}
         </div>
       </div>` : ""}
 
       <!-- Revenue & Entry -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;">
         ${revenueOpp ? `
         <div>
-          ${sh("فرصة الإيراد")}
-          <div style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
-            font-size:12px;color:#374151;line-height:1.7;">${cleanMarkdown(revenueOpp)}</div>
+          ${sh("فرصة الإيراد المتاحة")}
+          ${card(`<p style="font-size:12px;color:#94a3b8;line-height:1.8;margin:0;">${cleanMarkdown(revenueOpp)}</p>`, "#22c55e")}
         </div>` : ""}
         ${entryAngle ? `
         <div>
           ${sh("زاوية الدخول المقترحة")}
-          <div style="padding:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
-            font-size:12px;color:#374151;line-height:1.7;">${cleanMarkdown(entryAngle)}</div>
+          ${card(`<p style="font-size:12px;color:#94a3b8;line-height:1.8;margin:0;">${cleanMarkdown(entryAngle)}</p>`, "#0ea5e9")}
         </div>` : ""}
       </div>
 
-      <!-- Scores detail -->
+      <!-- KPI bars -->
       <div>
-        ${sh("مؤشرات الأداء الرئيسية")}
+        ${sh("مؤشرات الأداء الرئيسية", "مقارنة شاملة لأبعاد الحضور الرقمي")}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;">
-          ${progressBar(priScore, "درجة الأولوية")}
-          ${progressBar(qualScore, "جودة البيانات")}
-          ${progressBar(wsScore, "تقييم الموقع الإلكتروني")}
-          ${progressBar(bestSocial?.engagementScore, "التفاعل على السوشيال ميديا")}
-          ${progressBar(websiteAnalysis?.seoScore, "تحسين محركات البحث (SEO)")}
-          ${progressBar(websiteAnalysis?.mobileScore, "تجربة الجوال")}
+          ${bar(priScore, "درجة الأولوية التسويقية")}
+          ${bar(qualScore, "جودة وشمولية البيانات")}
+          ${bar(wsScore, "تقييم الموقع الإلكتروني")}
+          ${bar(bestSocial?.engagementScore, "التفاعل على السوشيال ميديا")}
+          ${bar(websiteAnalysis?.seoScore, "تحسين محركات البحث SEO")}
+          ${bar(websiteAnalysis?.mobileScore, "تجربة المستخدم على الجوال")}
         </div>
       </div>
     </div>
 
     <!-- Footer -->
     <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
-      background:#f9fafb;border-top:1px solid #e5e7eb;
+      background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:#9ca3af;">${coName} · تقرير سري</div>
-      <div style="font-size:9px;color:#9ca3af;">صفحة 2 من 4</div>
+      <div style="font-size:9px;color:#334155;">${coName} · تقرير سري ومخصص</div>
+      <div style="font-size:9px;color:#334155;">صفحة 2 من 4</div>
     </div>
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 3 — DIGITAL ANALYSIS
+  //  PAGE 3 — DIGITAL ANALYSIS + RADAR (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const p3 = page(`
+    <!-- Decorative -->
+    <div style="position:absolute;top:-80px;right:-80px;width:320px;height:320px;border-radius:50%;
+      background:radial-gradient(circle,rgba(34,197,94,0.04) 0%,transparent 70%);pointer-events:none;"></div>
+
     <!-- Page header -->
-    <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:900;color:white;">التحليل الرقمي التفصيلي</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.7);">${lead.companyName || ""} · ${coName}</div>
+    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
+        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">التحليل الرقمي التفصيلي</div>
+      </div>
+      <div style="font-size:10px;color:#334155;">${lead.companyName || ""} · ${coName} · صفحة 3/4</div>
     </div>
 
-    <div style="padding:28px 40px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div style="padding:20px 40px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
 
-        <!-- Website Analysis -->
+        <!-- Left: Website + Social bars -->
         <div>
-          ${sh("تحليل الموقع الإلكتروني", lead.website ? cleanUrl(lead.website) : "")}
-          ${wsScore !== null ? `
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
-            ${scoreBadge(wsScore, "الدرجة الكلية")}
-            ${scoreBadge(websiteAnalysis?.speedScore, "السرعة")}
-            ${scoreBadge(websiteAnalysis?.mobileScore, "الجوال")}
+          <!-- Website -->
+          <div style="margin-bottom:18px;">
+            ${sh("تحليل الموقع الإلكتروني", lead.website ? cleanUrl(lead.website) : "لا يوجد موقع")}
+            ${wsScore !== null ? `
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+              ${[
+                { v: wsScore,                           label: "الكلي" },
+                { v: websiteAnalysis?.speedScore,       label: "السرعة" },
+                { v: websiteAnalysis?.mobileScore,      label: "الجوال" },
+              ].map(({ v, label }) => `
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 8px;text-align:center;">
+                ${ring(v, 56)}
+                <div style="font-size:9px;color:#475569;margin-top:8px;font-weight:600;">${label}</div>
+              </div>`).join("")}
+            </div>
+            ${bar(websiteAnalysis?.seoScore, "تحسين SEO")}
+            ${bar(websiteAnalysis?.contentQualityScore, "جودة المحتوى")}
+            ${bar(websiteAnalysis?.designScore, "التصميم والتجربة")}
+            ${bar(websiteAnalysis?.conversionScore, "وضوح العروض والـ CTA")}
+            ` : `${card('<div style="text-align:center;padding:10px;font-size:11px;color:#475569;">لم يتم تحليل الموقع بعد</div>', "#475569")}`}
           </div>
-          <div style="margin-bottom:12px;">
-            ${progressBar(websiteAnalysis?.seoScore, "تحسين SEO")}
-            ${progressBar(websiteAnalysis?.contentQualityScore, "جودة المحتوى")}
-            ${progressBar(websiteAnalysis?.designScore, "التصميم والتجربة")}
-            ${progressBar(websiteAnalysis?.conversionScore, "وضوح العروض")}
-          </div>` : `<div style="padding:16px;background:#f9fafb;border-radius:8px;font-size:11px;color:#6b7280;text-align:center;">لم يتم تحليل الموقع بعد</div>`}
-          ${websiteAnalysis?.summary ? `
-          <div style="font-size:11px;color:#374151;line-height:1.7;background:#f9fafb;
-            padding:12px;border-radius:8px;border-right:3px solid #1d4ed8;">
-            ${cleanMarkdown(websiteAnalysis.summary.substring(0, 300))}...
+
+          <!-- Social -->
+          <div>
+            ${sh("تحليل السوشيال ميديا", bestSocial ? `أفضل منصة: ${pm(bestSocial.platform).name}` : "")}
+            ${bestSocial ? `
+            ${(() => {
+              const extra = parseSocialExtra(bestSocial.rawData);
+              const followers = extra.followers || extra.followersCount || bestSocial.followersCount;
+              const posts = extra.posts || extra.postsCount || bestSocial.postsCount;
+              const following = extra.following || extra.followingCount;
+              return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+                ${[
+                  { v: fmtK(followers), label: "متابع", color: "#22c55e" },
+                  { v: fmtK(posts),     label: "منشور", color: "#0ea5e9" },
+                  { v: fmtK(following), label: "يتابع",  color: "#a78bfa" },
+                ].map(({ v, label, color }) => `
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 8px;text-align:center;">
+                  <div style="font-size:18px;font-weight:900;color:${color};text-shadow:0 0 12px ${color}66;">${v}</div>
+                  <div style="font-size:9px;color:#475569;margin-top:4px;font-weight:600;">${label}</div>
+                </div>`).join("")}
+              </div>`;
+            })()}
+            ${bar(bestSocial.engagementScore, "درجة التفاعل")}
+            ${bar(bestSocial.contentQualityScore, "جودة المحتوى")}
+            ${bar(bestSocial.overallScore, "التقييم الإجمالي")}
+            ` : `${card('<div style="text-align:center;padding:10px;font-size:11px;color:#475569;">لم يتم تحليل السوشيال ميديا بعد</div>', "#475569")}`}
+          </div>
+        </div>
+
+        <!-- Right: Radar chart -->
+        <div>
+          ${sh("مخطط المقارنة بمتوسط السوق", "العميل (أخضر) مقابل متوسط السوق (رمادي)")}
+          <div style="display:flex;justify-content:center;margin-bottom:14px;">
+            ${radarChart(radarAxes, 230)}
+          </div>
+          <!-- Legend -->
+          <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:24px;height:3px;background:#22c55e;border-radius:2px;box-shadow:0 0 6px #22c55e;"></div>
+              <span style="font-size:10px;color:#94a3b8;font-weight:600;">${lead.companyName || "العميل"}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:24px;height:3px;background:#64748b;border-radius:2px;border-top:2px dashed #64748b;"></div>
+              <span style="font-size:10px;color:#94a3b8;font-weight:600;">متوسط السوق</span>
+            </div>
+          </div>
+
+          <!-- All platforms -->
+          ${socialAnalyses.length > 0 ? `
+          <div style="margin-top:4px;">
+            ${sh("أداء المنصات", `${socialAnalyses.length} منصة محللة`)}
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+              ${socialAnalyses.slice(0, 4).map(s => {
+                const meta = pm(s.platform);
+                const score = s.engagementScore ? Number(s.engagementScore) : null;
+                const color = sc(score);
+                return `<div style="padding:10px 12px;background:rgba(255,255,255,0.03);
+                  border:1px solid rgba(255,255,255,0.06);border-radius:10px;
+                  border-right:3px solid ${meta.color};display:flex;align-items:center;gap:10px;">
+                  <div style="font-size:18px;">${meta.icon}</div>
+                  <div>
+                    <div style="font-size:11px;font-weight:700;color:#f1f5f9;">${meta.name}</div>
+                    <div style="font-size:18px;font-weight:900;color:${color};text-shadow:0 0 10px ${color}66;line-height:1.2;">${fmt(score)}</div>
+                    <div style="font-size:9px;color:#475569;">درجة التفاعل</div>
+                  </div>
+                </div>`;
+              }).join("")}
+            </div>
           </div>` : ""}
         </div>
-
-        <!-- Social Analysis -->
-        <div>
-          ${sh("تحليل السوشيال ميديا", bestSocial ? `أفضل منصة: ${pm(bestSocial.platform).name}` : "")}
-          ${bestSocial ? `
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
-            ${scoreBadge(bestSocial.engagementScore, "التفاعل")}
-            ${scoreBadge(bestSocial.contentQualityScore, "المحتوى")}
-            ${scoreBadge(bestSocial.overallScore, "الإجمالي")}
-          </div>
-          <!-- Platform stats -->
-          ${(() => {
-            const extra = parseSocialExtra(bestSocial.rawData);
-            const followers = extra.followers || extra.followersCount || bestSocial.followersCount;
-            const posts = extra.posts || extra.postsCount || bestSocial.postsCount;
-            const following = extra.following || extra.followingCount;
-            return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
-              <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px;">
-                <div style="font-size:16px;font-weight:900;color:#1d4ed8;">${fmtK(followers)}</div>
-                <div style="font-size:9px;color:#6b7280;margin-top:2px;">متابع</div>
-              </div>
-              <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px;">
-                <div style="font-size:16px;font-weight:900;color:#1d4ed8;">${fmtK(posts)}</div>
-                <div style="font-size:9px;color:#6b7280;margin-top:2px;">منشور</div>
-              </div>
-              <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px;">
-                <div style="font-size:16px;font-weight:900;color:#1d4ed8;">${fmtK(following)}</div>
-                <div style="font-size:9px;color:#6b7280;margin-top:2px;">يتابع</div>
-              </div>
-            </div>`;
-          })()}
-          ${bestSocial.summary ? `
-          <div style="font-size:11px;color:#374151;line-height:1.7;background:#f9fafb;
-            padding:12px;border-radius:8px;border-right:3px solid #e1306c;">
-            ${cleanMarkdown(bestSocial.summary.substring(0, 280))}...
-          </div>` : ""}` : `<div style="padding:16px;background:#f9fafb;border-radius:8px;font-size:11px;color:#6b7280;text-align:center;">لم يتم تحليل السوشيال ميديا بعد</div>`}
-        </div>
       </div>
-
-      <!-- All platforms -->
-      ${socialAnalyses.length > 1 ? `
-      <div style="margin-top:20px;">
-        ${sh("جميع المنصات", `${socialAnalyses.length} منصات محللة`)}
-        <div style="display:grid;grid-template-columns:repeat(${Math.min(socialAnalyses.length, 4)},1fr);gap:10px;">
-          ${socialAnalyses.slice(0, 4).map(s => {
-            const meta = pm(s.platform);
-            return `<div style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-align:center;border-top:3px solid ${meta.color};">
-              <div style="font-size:12px;font-weight:700;color:${meta.color};margin-bottom:6px;">${meta.name}</div>
-              <div style="font-size:20px;font-weight:900;color:#111827;">${s.engagementScore ? Number(s.engagementScore).toFixed(1) : "—"}</div>
-              <div style="font-size:9px;color:#6b7280;margin-top:2px;">درجة التفاعل</div>
-            </div>`;
-          }).join("")}
-        </div>
-      </div>` : ""}
     </div>
 
     <!-- Footer -->
     <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
-      background:#f9fafb;border-top:1px solid #e5e7eb;
+      background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:#9ca3af;">${coName} · تقرير سري</div>
-      <div style="font-size:9px;color:#9ca3af;">صفحة 3 من 4</div>
+      <div style="font-size:9px;color:#334155;">${coName} · تقرير سري ومخصص</div>
+      <div style="font-size:9px;color:#334155;">صفحة 3 من 4</div>
     </div>
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 4 — RECOMMENDATIONS + CTA
+  //  PAGE 4 — RECOMMENDATIONS + CTA (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const p4 = page(`
+    <!-- Decorative -->
+    <div style="position:absolute;bottom:-80px;right:-60px;width:350px;height:350px;border-radius:50%;
+      background:radial-gradient(circle,rgba(34,197,94,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+
     <!-- Page header -->
-    <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:900;color:white;">التوصيات والخطوات التالية</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.7);">${lead.companyName || ""} · ${coName}</div>
+    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
+        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">التوصيات والخطوات التالية</div>
+      </div>
+      <div style="font-size:10px;color:#334155;">${lead.companyName || ""} · ${coName} · صفحة 4/4</div>
     </div>
 
-    <div style="padding:28px 40px;">
+    <div style="padding:24px 40px;">
 
       <!-- Recommendations -->
       ${recs.length ? `
       <div style="margin-bottom:24px;">
-        ${sh("التوصيات الاستراتيجية", "خطوات عملية لتحسين الأداء التسويقي")}
+        ${sh("التوصيات الاستراتيجية", "خطوات عملية مرتبة بالأولوية لتحسين الأداء التسويقي")}
         <div style="display:flex;flex-direction:column;gap:10px;">
-          ${recs.map((r, i) => `
-          <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;
-            background:${i === 0 ? "#eff6ff" : "#f9fafb"};
-            border:1px solid ${i === 0 ? "#bfdbfe" : "#e5e7eb"};border-radius:10px;">
-            <div style="width:28px;height:28px;border-radius:50%;
-              background:${i === 0 ? "#1d4ed8" : "#e5e7eb"};
-              display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <span style="font-size:12px;font-weight:900;color:${i === 0 ? "white" : "#6b7280"};">${i + 1}</span>
-            </div>
-            <div style="flex:1;">
-              <div style="font-size:12px;color:#111827;line-height:1.6;">${r}</div>
-            </div>
-          </div>`).join("")}
+          ${recs.map((r, i) => {
+            const accent = i === 0 ? "#22c55e" : i === 1 ? "#0ea5e9" : i === 2 ? "#a78bfa" : "#f97316";
+            return `<div style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;
+              background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+              border-right:3px solid ${accent};border-radius:0 12px 12px 0;">
+              <div style="width:28px;height:28px;border-radius:50%;
+                background:rgba(255,255,255,0.05);border:2px solid ${accent}44;
+                display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span style="font-size:13px;font-weight:900;color:${accent};text-shadow:0 0 8px ${accent};">${i + 1}</span>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:12.5px;color:#cbd5e1;line-height:1.7;">${r}</div>
+              </div>
+            </div>`;
+          }).join("")}
         </div>
       </div>` : ""}
 
-      <!-- Report summary -->
+      <!-- Report notes -->
       ${report?.fullReport ? `
-      <div style="margin-bottom:24px;">
-        ${sh("ملاحظات إضافية")}
-        <div style="font-size:11px;color:#374151;line-height:1.8;background:#f9fafb;
-          padding:14px;border-radius:8px;max-height:120px;overflow:hidden;">
-          ${cleanMarkdown(report.fullReport.substring(0, 500))}...
+      <div style="margin-bottom:22px;">
+        ${sh("ملاحظات تحليلية إضافية")}
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+          border-radius:12px;padding:16px 18px;max-height:100px;overflow:hidden;">
+          <p style="font-size:11.5px;color:#64748b;line-height:1.8;margin:0;">${cleanMarkdown(report.fullReport.substring(0, 450))}...</p>
         </div>
       </div>` : ""}
 
       <!-- CTA -->
-      <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border-radius:14px;
-        padding:28px 32px;text-align:center;position:relative;overflow:hidden;">
-        <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;
-          border-radius:50%;background:rgba(255,255,255,0.05);"></div>
-        <div style="position:absolute;bottom:-40px;left:-20px;width:150px;height:150px;
-          border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+      <div style="background:linear-gradient(135deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%);
+        border:1px solid rgba(34,197,94,0.2);border-radius:16px;padding:30px 36px;
+        text-align:center;position:relative;overflow:hidden;
+        box-shadow:0 0 40px rgba(34,197,94,0.08);">
+        <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;
+          background:radial-gradient(circle,rgba(34,197,94,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+        <div style="position:absolute;bottom:-50px;left:-30px;width:180px;height:180px;border-radius:50%;
+          background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 70%);pointer-events:none;"></div>
         <div style="position:relative;z-index:1;">
-          <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:8px;letter-spacing:1px;">الخطوة التالية</div>
-          <div style="font-size:20px;font-weight:900;color:white;margin-bottom:8px;">
+          <div style="font-size:11px;color:#334155;margin-bottom:10px;letter-spacing:2px;font-weight:600;">الخطوة التالية</div>
+          <div style="font-size:22px;font-weight:900;color:#f8fafc;margin-bottom:10px;
+            text-shadow:0 0 30px rgba(34,197,94,0.2);">
             هل أنت مستعد للارتقاء بـ ${lead.companyName || "عملك"}؟
           </div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:20px;line-height:1.6;">
-            تواصل معنا اليوم للحصول على استشارة مجانية وخطة عمل مخصصة
+          <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.7;max-width:400px;margin-left:auto;margin-right:auto;">
+            تواصل معنا اليوم للحصول على استشارة مجانية وخطة عمل تسويقية مخصصة لنشاطك
           </div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;">
-            ${company?.phone ? `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">📞 ${company.phone}</div>` : ""}
-            ${company?.website ? `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">🌐 ${company.website}</div>` : `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">🌐 maksab-ksa.com</div>`}
-            ${company?.email ? `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">✉️ ${company.email}</div>` : ""}
+          <div style="display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
+            ${company?.phone ? `
+            <div style="padding:10px 22px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);
+              border-radius:24px;font-size:12px;font-weight:700;color:#22c55e;
+              box-shadow:0 0 16px rgba(34,197,94,0.15);">📞 ${company.phone}</div>` : ""}
+            <div style="padding:10px 22px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.3);
+              border-radius:24px;font-size:12px;font-weight:700;color:#0ea5e9;
+              box-shadow:0 0 16px rgba(14,165,233,0.15);">🌐 ${company?.website || "maksab-ksa.com"}</div>
+            ${company?.email ? `
+            <div style="padding:10px 22px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);
+              border-radius:24px;font-size:12px;font-weight:700;color:#a78bfa;
+              box-shadow:0 0 16px rgba(167,139,250,0.15);">✉️ ${company.email}</div>` : ""}
           </div>
         </div>
       </div>
@@ -521,10 +686,10 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <!-- Footer -->
     <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 40px;
-      background:linear-gradient(135deg,#1e3a8a,#1d4ed8);
+      background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:rgba(255,255,255,0.6);">حصري من ${coName} — جميع الحقوق محفوظة</div>
-      <div style="font-size:9px;color:rgba(255,255,255,0.6);">CONFIDENTIAL · صفحة 4 من 4</div>
+      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 4 من 4</div>
     </div>
   `, false);
 
@@ -543,13 +708,13 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     font-family: 'Tajawal', 'Arial', sans-serif;
     direction: rtl;
     text-align: right;
-    background: #e5e7eb;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    color-adjust: exact;
+    background: #0a0f1e;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
   @media print {
-    body { background: white; margin: 0; padding: 0; }
+    body { background: #020810; margin: 0; padding: 0; }
     #print-toolbar { display: none !important; }
     .page-wrapper { box-shadow: none !important; margin: 0 !important; }
   }
@@ -559,40 +724,43 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   }
   #print-toolbar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
-    background: #1e3a8a; border-bottom: 3px solid #0ea5e9;
+    background: linear-gradient(135deg,#0a1628,#0d1f3c);
+    border-bottom: 2px solid rgba(34,197,94,0.3);
     padding: 10px 24px; display: flex; align-items: center;
     justify-content: space-between; gap: 12px;
     font-family: 'Tajawal', sans-serif; direction: rtl;
-    box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 20px rgba(0,0,0,0.5), 0 0 30px rgba(34,197,94,0.05);
   }
   #print-toolbar .info { display: flex; flex-direction: column; gap: 2px; }
-  #print-toolbar .title { color: white; font-size: 14px; font-weight: 700; }
-  #print-toolbar .hint { color: rgba(255,255,255,0.6); font-size: 11px; }
+  #print-toolbar .title { color: #f1f5f9; font-size: 14px; font-weight: 700; }
+  #print-toolbar .hint { color: #475569; font-size: 11px; }
   #print-toolbar .actions { display: flex; gap: 8px; align-items: center; }
   #print-toolbar .btn-print {
-    background: #22c55e; color: #000; border: none; border-radius: 8px;
-    padding: 8px 20px; font-size: 13px; font-weight: 700;
+    background: linear-gradient(135deg,#16a34a,#22c55e);
+    color: #000; border: none; border-radius: 8px;
+    padding: 9px 22px; font-size: 13px; font-weight: 800;
     cursor: pointer; font-family: 'Tajawal', sans-serif;
     display: flex; align-items: center; gap: 6px;
+    box-shadow: 0 0 20px rgba(34,197,94,0.4);
   }
-  #print-toolbar .btn-print:hover { background: #16a34a; }
+  #print-toolbar .btn-print:hover { background: linear-gradient(135deg,#22c55e,#4ade80); }
   #print-toolbar .btn-close {
-    background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+    background: rgba(255,255,255,0.05); color: #94a3b8;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600;
     cursor: pointer; font-family: 'Tajawal', sans-serif;
   }
-  #print-toolbar .btn-close:hover { background: rgba(255,255,255,0.2); }
+  #print-toolbar .btn-close:hover { background: rgba(255,255,255,0.1); }
   .pages-container {
-    padding: 70px 20px 20px;
-    display: flex; flex-direction: column; align-items: center; gap: 20px;
+    padding: 70px 20px 30px;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
   }
   @media print {
     .pages-container { padding: 0; gap: 0; }
   }
   .page-wrapper {
     width: 210mm;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    background: white;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 60px rgba(34,197,94,0.04);
   }
 </style>
 </head>
@@ -600,7 +768,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 <div id="print-toolbar">
   <div class="info">
     <div class="title">📄 ${fileName}</div>
-    <div class="hint">اضغط "حفظ PDF" ← اختر "حفظ كـ PDF" ← تأكد من تفعيل "رسومات الخلفية"</div>
+    <div class="hint">⚠️ عند الطباعة: فعّل "رسومات الخلفية" (Background graphics) لتظهر الألوان والتأثيرات</div>
   </div>
   <div class="actions">
     <button class="btn-print" onclick="window.print()">⬇️ حفظ PDF</button>
@@ -626,21 +794,8 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  buildReportHTML - دالة مشتركة لبناء HTML التقرير (للمعاينة)
-// ═══════════════════════════════════════════════════════════════════════
-function buildReportHTML(options: GeneratePDFOptions): { html: string; fileName: string } {
-  const { lead, company } = options;
-  if (!lead) throw new Error("لا توجد بيانات للعميل");
-  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
-  const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
-  // نعيد استخدام نفس HTML من generateLeadPDF
-  return { html: "", fileName };
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  previewLeadPDF - فتح معاينة التقرير في نافذة جديدة
+//  previewLeadPDF — نفس generateLeadPDF
 // ═══════════════════════════════════════════════════════════════════════
 export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void> {
-  // المعاينة تستخدم نفس generateLeadPDF - فقط نفتح نافذة جديدة
   await generateLeadPDF(options);
 }
