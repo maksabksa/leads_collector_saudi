@@ -68,9 +68,28 @@ async function startServer() {
       if (!html) { res.status(400).json({ error: "html is required" }); return; }
 
       const puppeteer = await import("puppeteer-core");
+      // تجربة مسارات Chromium المختلفة تلقائياً
+      const { execSync } = await import("child_process");
+      const possiblePaths = [
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/snap/bin/chromium",
+      ];
+      let chromiumPath = "";
+      for (const p of possiblePaths) {
+        try {
+          execSync(`test -x ${p}`);
+          chromiumPath = p;
+          break;
+        } catch {}
+      }
+      if (!chromiumPath) throw new Error("Chromium not found on this system");
+      console.log("[PDF] Using Chromium at:", chromiumPath);
       const browser = await puppeteer.launch({
-        executablePath: "/usr/bin/chromium-browser",
-        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        executablePath: chromiumPath,
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--single-process"],
         headless: true,
       });
       const page = await browser.newPage();
