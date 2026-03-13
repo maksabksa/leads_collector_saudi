@@ -137,9 +137,9 @@ function statBox(icon: string, label: string, value: string, color = "#94a3b8", 
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
 function page(content: string, pageBreak = true) {
-  return `<div style="min-height:100vh;display:flex;flex-direction:column;padding:0;
-    ${pageBreak ? "page-break-after:always;" : ""}
-    background:linear-gradient(160deg,#020810 0%,#060d1a 50%,#020810 100%);">
+  return `<div style="width:100%;display:flex;flex-direction:column;padding:0;
+    ${pageBreak ? "page-break-after:always;break-after:page;" : ""}
+    background:linear-gradient(160deg,#020810 0%,#060d1a 50%,#020810 100%);">  
     ${content}
   </div>`;
 }
@@ -726,58 +726,122 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   // ═══════════════════════════════════════════════════════════════════════
   //  ASSEMBLE HTML
   // ═══════════════════════════════════════════════════════════════════════
+  // اسم الملف المخصص
+  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
+  const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
+
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>تقرير ${lead.companyName || "عميل"} — ${coName}</title>
+  <title>${fileName}</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#060d1a;color:#e2e8f0;font-size:13px;line-height:1.65;}
-    .print-bar{position:fixed;top:0;left:0;right:0;background:rgba(6,13,26,0.97);backdrop-filter:blur(10px);
-      border-bottom:1px solid rgba(34,197,94,0.15);padding:9px 28px;display:flex;justify-content:space-between;
-      align-items:center;z-index:9999;}
-    .print-bar-title{font-size:13px;font-weight:700;color:#94a3b8;}
-    .btn-print{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000;border:none;padding:7px 20px;
-      border-radius:7px;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
-      box-shadow:0 0 14px rgba(34,197,94,0.35);}
-    .btn-close{background:transparent;color:#475569;border:1px solid #1e293b;padding:7px 14px;
-      border-radius:7px;font-family:'Tajawal',sans-serif;font-size:12px;cursor:pointer;margin-right:6px;}
-    .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:80px;
-      font-weight:900;color:rgba(34,197,94,0.025);white-space:nowrap;pointer-events:none;z-index:9998;letter-spacing:8px;}
-    .pw{margin-top:48px;}
+    @page{
+      size:A3 portrait;
+      margin:10mm 10mm 10mm 10mm;
+    }
+    body{
+      font-family:'Tajawal',sans-serif;
+      direction:rtl;
+      text-align:right;
+      background:#060d1a;
+      color:#e2e8f0;
+      font-size:14px;
+      line-height:1.65;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+    .wm{
+      position:fixed;top:50%;left:50%;
+      transform:translate(-50%,-50%) rotate(-35deg);
+      font-size:100px;font-weight:900;
+      color:rgba(34,197,94,0.025);
+      white-space:nowrap;pointer-events:none;
+      z-index:9998;letter-spacing:8px;
+    }
     @media print{
-      .print-bar{display:none!important;}
-      .pw{margin-top:0!important;}
-      body{background:#060d1a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      body{background:#060d1a!important;}
       .wm{color:rgba(34,197,94,0.04)!important;}
     }
   </style>
 </head>
 <body>
 <div class="wm">حصري من ${coName}</div>
-<div class="print-bar">
-  <span class="print-bar-title">تقرير تحليل: ${lead.companyName || "—"} · ${coName}</span>
-  <div>
-    <button class="btn-close" onclick="window.close()">✕ إغلاق</button>
-    <button class="btn-print" onclick="window.print()">🖨️ طباعة / تحميل PDF</button>
-  </div>
-</div>
-<div class="pw">
+<div id="pdf-content">
   ${p1}
   ${p2}
   ${p3}
   ${p4}
 </div>
+<script>
+// تحميل تلقائي بعد تحميل الخط
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    window.__PDF_READY__ = true;
+  }, 1500);
+});
+</script>
 </body>
 </html>`;
 
-  const printWindow = window.open("", "_blank", "width=960,height=840");
-  if (!printWindow) throw new Error("تعذّر فتح نافذة التقرير. يرجى السماح بالنوافذ المنبثقة في المتصفح.");
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.addEventListener("load", () => {
-    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 1800);
+  // إنشاء iframe مخفي للتحميل المباشر
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;";
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error("تعذّر إنشاء نافذة التقرير");
+  }
+
+  iframeDoc.open();
+  iframeDoc.write(html);
+  iframeDoc.close();
+
+  await new Promise<void>((resolve) => {
+    const check = () => {
+      if ((iframe.contentWindow as any)?.__PDF_READY__) {
+        resolve();
+      } else {
+        setTimeout(check, 200);
+      }
+    };
+    setTimeout(check, 500);
+    // fallback بعد 5 ثوانٍ
+    setTimeout(resolve, 5000);
   });
+
+  // استخدام html2pdf للتحميل المباشر
+  const html2pdf = (await import("html2pdf.js")).default;
+  const element = iframeDoc.getElementById("pdf-content");
+  if (!element) {
+    document.body.removeChild(iframe);
+    throw new Error("تعذّر العثور على محتوى التقرير");
+  }
+
+  await html2pdf()
+    .set({
+      margin: [10, 10, 10, 10],
+      filename: fileName,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#060d1a",
+        logging: false,
+        allowTaint: true,
+      },
+      jsPDF: {
+        unit: "mm",
+        format: "a3",
+        orientation: "portrait",
+      },
+    })
+    .from(element)
+    .save();
+
+  document.body.removeChild(iframe);
 }

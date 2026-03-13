@@ -66,6 +66,7 @@
     "express": "^4.21.2",
     "framer-motion": "^12.23.22",
     "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.14.0",
     "input-otp": "^1.4.2",
     "jose": "6.1.0",
     "jsonwebtoken": "^9.0.3",
