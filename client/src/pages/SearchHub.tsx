@@ -110,9 +110,18 @@ const PLATFORMS = [
     borderColor: "border-blue-600/30",
     badgeColor: "bg-blue-600/20 text-blue-500 border-blue-600/40",
   },
+  {
+    id: "facebook",
+    label: "فيسبوك",
+    icon: Users,
+    color: "text-blue-400",
+    bgColor: "bg-blue-400/10",
+    borderColor: "border-blue-400/30",
+    badgeColor: "bg-blue-400/20 text-blue-400 border-blue-400/40",
+  },
 ] as const;
 
-const ALL_PLATFORM_IDS = ["google", "googleWeb", "instagram", "tiktok", "snapchat", "twitter", "linkedin"] as const;
+const ALL_PLATFORM_IDS = ["google", "googleWeb", "instagram", "tiktok", "snapchat", "twitter", "linkedin", "facebook"] as const;
 
 type PlatformId = typeof PLATFORMS[number]["id"];
 type ActiveTabType = PlatformId | "all";
@@ -397,11 +406,11 @@ export default function SearchHub() {
 
   // نتائج البحث
   const [results, setResults] = useState<Record<PlatformId, any[]>>({
-    google: [], googleWeb: [], instagram: [], tiktok: [], snapchat: [], twitter: [], linkedin: []
+    google: [], googleWeb: [], instagram: [], tiktok: [], snapchat: [], twitter: [], linkedin: [], facebook: []
   });
   // حالة التحميل
   const [loading, setLoading] = useState<Record<PlatformId, boolean>>({
-    google: false, googleWeb: false, instagram: false, tiktok: false, snapchat: false, twitter: false, linkedin: false
+    google: false, googleWeb: false, instagram: false, tiktok: false, snapchat: false, twitter: false, linkedin: false, facebook: false
   });
   // عدد النتائج المعروضة
   const [resultLimit, setResultLimit] = useState<number>(25);
@@ -940,6 +949,24 @@ export default function SearchHub() {
     }
   }, [keyword, city]);
 
+  // ===== دالة البحث في Facebook عبر Bright Data =====
+  const searchFacebook = useCallback(async () => {
+    if (!keyword.trim()) return;
+    setLoadingPlatform("facebook", true);
+    setResultsPlatform("facebook", []);
+    try {
+      const res = await brightDataSearchMut.mutateAsync({ platform: "facebook", query: keyword, location: city, analyzeWithAI: true });
+      const data = res.results || [];
+      setResultsPlatform("facebook", data);
+      if (!data.length) toast.info("لا توجد نتائج في فيسبوك");
+      else toast.success(`تم العثور على ${data.length} صفحة من فيسبوك`);
+    } catch (e: any) {
+      handleBrightDataError(e, "فيسبوك");
+    } finally {
+      setLoadingPlatform("facebook", false);
+    }
+  }, [keyword, city]);
+
   const searchFunctions: Record<PlatformId, () => void> = {
     google: searchGoogle,
     googleWeb: searchGoogleWeb,
@@ -948,6 +975,7 @@ export default function SearchHub() {
     snapchat: searchSnapchat,
     twitter: searchTwitter,
     linkedin: searchLinkedIn,
+    facebook: searchFacebook,
   };
 
   const handleSearch = () => {
@@ -983,6 +1011,7 @@ export default function SearchHub() {
     searchSnapchat();
     searchTwitter();
     searchLinkedIn();
+    searchFacebook();
     toast.info("بدأ البحث في جميع المنصات", { description: "سيستغرق بضع ثوانَ..." });
   };
 
@@ -1482,7 +1511,21 @@ export default function SearchHub() {
           </TabsContent>
 
           {/* محتوى التبويبات */}
-          {PLATFORMS.map(p => (
+          {PLATFORMS.map(p => {
+            // حساب filteredResults مستقل لكل منصة
+            const platformResults = results[p.id];
+            const platformFilteredResults = platformResults.filter((r: any) => {
+              if (minFollowers && r.followersCount < parseInt(minFollowers)) return false;
+              if (maxFollowers && r.followersCount > parseInt(maxFollowers)) return false;
+              if (onlyWithPhone) {
+                const hasPhone = (r.availablePhones && r.availablePhones.length > 0) ||
+                  (r.phone && r.phone.trim() !== "") ||
+                  (r.phones && r.phones.length > 0);
+                if (!hasPhone) return false;
+              }
+              return true;
+            });
+            return (
             <TabsContent key={p.id} value={p.id} className="flex-1 min-h-0 overflow-y-auto m-0 p-6">
               <div className="max-w-3xl mx-auto space-y-4">
                 {/* شريط الأدوات */}
@@ -2001,15 +2044,15 @@ export default function SearchHub() {
                 {/* إنستجرام يعمل عبر Bright Data مباشرة - لا حاجة لأي ملاحظة */}
 
                 {/* النتائج */}
-                {filteredResults.length > 0 ? (
+                {platformFilteredResults.length > 0 ? (
                   <div className="space-y-3">
-                    {(filteredResults.length !== results[p.id].length || filteredResults.length > resultLimit) && (
+                    {(platformFilteredResults.length !== results[p.id].length || platformFilteredResults.length > resultLimit) && (
                       <p className="text-xs text-muted-foreground">
-                        يُعرض <span className="text-foreground font-medium">{Math.min(resultLimit, filteredResults.length)}</span> من {results[p.id].length} نتيجة
-                        {filteredResults.length < results[p.id].length && " (بعد الفلترة)"}
+                        يُعرض <span className="text-foreground font-medium">{Math.min(resultLimit, platformFilteredResults.length)}</span> من {results[p.id].length} نتيجة
+                        {platformFilteredResults.length < results[p.id].length && " (بعد الفلترة)"}
                       </p>
                     )}
-                    {filteredResults.slice(0, resultLimit).map((result: any, i: number) => (
+                    {platformFilteredResults.slice(0, resultLimit).map((result: any, i: number) => (
                       p.id === "googleWeb" ? (
                         /* بطاقة Google Web Search مخصصة */
                         <Card key={result.id || i} className={`group transition-all duration-200 hover:border-orange-500/40 hover:shadow-sm ${
@@ -2164,7 +2207,8 @@ export default function SearchHub() {
                 ) : null}
               </div>
             </TabsContent>
-          ))}
+            );
+          })}
         </Tabs>
       </div>
 

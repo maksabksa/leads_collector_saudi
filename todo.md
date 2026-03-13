@@ -1507,3 +1507,33 @@
 -- [x] بناء دالة SVG لمخطط Radar بتصميم داكن مع glow effects
 - [x] إضافة مخطط Radar في صفحة 3 مع مقارنة العميل بمتوسط السوق
 - [x] إعادة تصميم التقرير بالتصميم الداكن الاحترافي مع print-color-adjust
+
+## إصلاح فلترة المنصات في مركز البحث (13 مارس 2026)
+
+- [ ] فحص كود فلترة تبويبات المنصات (Instagram, TikTok, Snapchat, Twitter)
+- [ ] إصلاح عدم ظهور نتائج عند الضغط على تبويب منصة محددة
+
+## إضافة Facebook كمنصة بحث (13 مارس 2026)
+
+- [ ] إضافة Facebook في قائمة PLATFORMS في SearchHub
+- [ ] إضافة router للبحث في Facebook عبر Bright Data SERP
+- [ ] إضافة بطاقة نتائج Facebook في SearchHub
+- [ ] إضافة facebookUrl في نموذج إضافة العميل
+
+## تحسين نتائج البحث جذرياً (14 مارس 2026)
+
+- [ ] استخدام Bright Data SERP API بصيغة JSON بدلاً من HTML parsing
+- [ ] تعدد الاستعلامات (Query Expansion) لكل منصة: عربي + إنجليزي + مع واتساب + مع للتواصل
+- [ ] رفع عدد النتائج من 10 إلى 100 نتيجة لكل استعلام
+- [ ] إضافة Facebook في SearchHub وربطه بـ router
+- [ ] إضافة Facebook في brightDataSearch router
+
+## تحسين البحث وإضافة Facebook (14 مارس 2026)
+
+- [x] إضافة دالة multiQuerySearch: 5 استعلامات متنوعة لكل منصة (عربي + إنجليزي + واتساب + للتواصل + رقم)
+- [x] رفع حد النتائج من 10 إلى 50 في parseGoogleResultsPublic (num=20 × 5 استعلامات)
+- [x] تطبيق multiQuerySearch على Instagram وTikTok وSnapchat وFacebook
+- [x] إضافة Facebook في serpSearch.ts: دالة searchFacebookSERP
+- [x] إضافة Facebook في brightDataSearch.ts: دالة scrapeFacebook + enum المنصات
+- [x] إضافة Facebook في SearchHub.tsx: PLATFORMS array + results/loading state + searchFacebook + handleSearchAll
+- [x] إصلاح فلترة تبويبات المنصات: platformFilteredResults مستقل لكل منصة

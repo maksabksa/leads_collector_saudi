@@ -230,6 +230,80 @@ export async function serpRequest(url: string, maxRetries = 3): Promise<string> 
   });
 }
 
+// ===== دالة مساعدة: توليد استعلامات متعددة للبحث =====
+function buildQueryVariants(query: string, location: string | undefined, site: string): string[] {
+  const loc = location || "";
+  const locAr = loc ? `${loc} السعودية` : "السعودية";
+  const locEn = loc ? `${loc} Saudi Arabia` : "Saudi Arabia";
+  return [
+    `site:${site} ${query} ${locAr}`,
+    `site:${site} ${query} ${locEn}`,
+    `site:${site} ${query} السعودية للتواصل`,
+    `site:${site} ${query} السعودية واتساب`,
+    `site:${site} ${query} KSA`,
+  ];
+}
+
+// دالة بحث محسّنة: ترسل استعلامات متعددة وتدمج النتائج بدون تكرار
+async function multiQuerySearch(
+  site: string,
+  query: string,
+  location: string | undefined,
+  label: string
+): Promise<Array<{ username: string; displayName: string; bio: string; url: string }>> {
+  const variants = buildQueryVariants(query, location, site);
+  const seen = new Set<string>();
+  const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
+
+  // إرسال أول 3 استعلامات بالتوازي
+  const firstBatch = variants.slice(0, 3).map(async (q) => {
+    try {
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+      const html = await serpRequest(url);
+      return parseGoogleResultsPublic(html, site);
+    } catch (err) {
+      console.warn(`[${label}] query failed: ${q}`, err);
+      return [];
+    }
+  });
+
+  const batchResults = await Promise.all(firstBatch);
+  for (const batch of batchResults) {
+    for (const r of batch) {
+      if (!seen.has(r.username)) {
+        seen.add(r.username);
+        allResults.push(r);
+      }
+    }
+  }
+
+  // إذا كانت النتائج أقل من 15، أرسل الاستعلامات المتبقية
+  if (allResults.length < 15) {
+    const secondBatch = variants.slice(3).map(async (q) => {
+      try {
+        const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+        const html = await serpRequest(url);
+        return parseGoogleResultsPublic(html, site);
+      } catch (err) {
+        console.warn(`[${label}] query failed: ${q}`, err);
+        return [];
+      }
+    });
+    const secondResults = await Promise.all(secondBatch);
+    for (const batch of secondResults) {
+      for (const r of batch) {
+        if (!seen.has(r.username)) {
+          seen.add(r.username);
+          allResults.push(r);
+        }
+      }
+    }
+  }
+
+  console.log(`[${label}] Total unique results: ${allResults.length}`);
+  return allResults;
+}
+
 // ===== البحث في Google عن حسابات Instagram =====
 export async function searchInstagramSERP(query: string, location?: string): Promise<Array<{
   username: string;
@@ -237,17 +311,7 @@ export async function searchInstagramSERP(query: string, location?: string): Pro
   bio: string;
   url: string;
 }>> {
-  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
-  const searchQuery = `site:instagram.com ${query} ${locationStr}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
-
-  try {
-    const html = await serpRequest(url);
-    return parseGoogleResultsPublic(html, "instagram.com");
-  } catch (err) {
-    console.warn(`[Instagram SERP] query failed: ${query}`, err);
-    return [];
-  }
+  return multiQuerySearch("instagram.com", query, location, "Instagram SERP");
 }
 
 // ===== البحث في Google عن حسابات TikTok =====
@@ -257,17 +321,7 @@ export async function searchTikTokSERP(query: string, location?: string): Promis
   bio: string;
   url: string;
 }>> {
-  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
-  const searchQuery = `site:tiktok.com ${query} ${locationStr}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
-
-  try {
-    const html = await serpRequest(url);
-    return parseGoogleResultsPublic(html, "tiktok.com");
-  } catch (err) {
-    console.warn(`[TikTok SERP] query failed: ${query}`, err);
-    return [];
-  }
+  return multiQuerySearch("tiktok.com", query, location, "TikTok SERP");
 }
 
 // ===== البحث في Google عن حسابات Snapchat =====
@@ -277,17 +331,7 @@ export async function searchSnapchatSERP(query: string, location?: string): Prom
   bio: string;
   url: string;
 }>> {
-  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
-  const searchQuery = `site:snapchat.com ${query} ${locationStr}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
-
-  try {
-    const html = await serpRequest(url);
-    return parseGoogleResultsPublic(html, "snapchat.com");
-  } catch (err) {
-    console.warn(`[Snapchat SERP] query failed: ${query}`, err);
-    return [];
-  }
+  return multiQuerySearch("snapchat.com", query, location, "Snapchat SERP");
 }
 
 // ===== البحث في Google عن حسابات LinkedIn =====
@@ -297,17 +341,37 @@ export async function searchLinkedInSERP(query: string, location?: string): Prom
   bio: string;
   url: string;
 }>> {
-  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
-  const searchQuery = `site:linkedin.com/company ${query} ${locationStr}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
-
-  try {
-    const html = await serpRequest(url);
-    return parseGoogleResultsPublic(html, "linkedin.com");
-  } catch (err) {
-    console.warn(`[LinkedIn SERP] query failed: ${query}`, err);
-    return [];
+  // LinkedIn يحتاج استعلام خاص للشركات
+  const loc = location || "";
+  const locAr = loc ? `${loc} السعودية` : "السعودية";
+  const variants = [
+    `site:linkedin.com/company ${query} ${locAr}`,
+    `site:linkedin.com/in ${query} ${locAr}`,
+    `site:linkedin.com ${query} Saudi Arabia`,
+  ];
+  const seen = new Set<string>();
+  const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
+  for (const q of variants) {
+    try {
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+      const html = await serpRequest(url);
+      const res = parseGoogleResultsPublic(html, "linkedin.com");
+      for (const r of res) {
+        if (!seen.has(r.username)) { seen.add(r.username); allResults.push(r); }
+      }
+    } catch (err) { console.warn(`[LinkedIn SERP] failed: ${q}`, err); }
   }
+  return allResults;
+}
+
+// ===== البحث في Google عن صفحات Facebook =====
+export async function searchFacebookSERP(query: string, location?: string): Promise<Array<{
+  username: string;
+  displayName: string;
+  bio: string;
+  url: string;
+}>> {
+  return multiQuerySearch("facebook.com", query, location, "Facebook SERP");
 }
 
 // ===== تحليل نتائج Google HTML =====
@@ -356,6 +420,14 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
     } else if (domainFilter === "twitter.com" || domainFilter === "x.com") {
       const m = url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)/);
       username = m?.[1] || "";
+    } else if (domainFilter === "facebook.com") {
+      // صفحات Facebook: /pages/name/id أو /name أو /profile.php?id=
+      const mPage = url.match(/facebook\.com\/pages\/([^/]+)/);
+      const mProfile = url.match(/facebook\.com\/([a-zA-Z0-9._-]+)(?:\/|\?|$)/);
+      const mPhpId = url.match(/profile\.php\?id=(\d+)/);
+      if (mPage) username = mPage[1];
+      else if (mPhpId) username = mPhpId[1];
+      else if (mProfile) username = mProfile[1];
     } else {
       username = url;
     }
@@ -400,7 +472,7 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
 
     results.push({ username, displayName, bio, url });
 
-    if (results.length >= 10) break;
+    if (results.length >= 50) break; // رفع الحد من 10 إلى 50
   }
 
   return results;

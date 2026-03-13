@@ -3,7 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import puppeteer from "puppeteer-core";
 import { invokeLLM } from "../_core/llm";
-import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP, serpRequest, parseGoogleResultsPublic } from "./serpSearch";
+import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP, searchFacebookSERP, serpRequest, parseGoogleResultsPublic } from "./serpSearch";
 import { searchInstagramByKeyword } from "../lib/brightDataInstagram";
 
 // ─── Bright Data Browser API Helper ───────────────────────────────────────────
@@ -210,6 +210,28 @@ async function scrapeSnapchat(query: string, location: string): Promise<any[]> {
     return [];
   }
 }
+// ─── بحث Facebook (عبر SERP API) ──────────────────────────────────────────────
+async function scrapeFacebook(query: string, location: string): Promise<any[]> {
+  try {
+    const serpResults = await searchFacebookSERP(query, location);
+    return serpResults.map(r => ({
+      platform: "facebook",
+      username: r.username,
+      displayName: r.displayName,
+      profileUrl: r.url,
+      bio: r.bio,
+      followers: 0,
+      phone: "",
+      id: r.username,
+      type: "company",
+      dataSource: "serp",
+    }));
+  } catch (err) {
+    console.warn("[Facebook SERP] failed:", err);
+    return [];
+  }
+}
+
 // ─── بحث Google Search (عبر SERP API - بدلاً من Puppeteer البطيء) ──────────────
 async function scrapeGoogleSearch(query: string, location: string): Promise<any[]> {
   // استخدام SERP API مباشرة بدلاً من Puppeteer لتجنب timeout
@@ -315,7 +337,7 @@ export const brightDataSearchRouter = router({
   searchPlatform: protectedProcedure
     .input(
       z.object({
-        platform: z.enum(["instagram", "tiktok", "twitter", "linkedin", "snapchat", "google"]),
+        platform: z.enum(["instagram", "tiktok", "twitter", "linkedin", "snapchat", "google", "facebook"]),
         query: z.string().min(1),
         location: z.string().default(""),
         analyzeWithAI: z.boolean().default(true),
@@ -343,6 +365,9 @@ export const brightDataSearchRouter = router({
             break;
           case "google":
             results = await scrapeGoogleSearch(input.query, input.location);
+            break;
+          case "facebook":
+            results = await scrapeFacebook(input.query, input.location);
             break;
         }
       } catch (e: any) {
@@ -403,8 +428,8 @@ export const brightDataSearchRouter = router({
         query: z.string().min(1),
         location: z.string().default(""),
         platforms: z
-          .array(z.enum(["instagram", "tiktok", "twitter", "linkedin", "snapchat", "google"]))
-          .default(["instagram", "tiktok", "twitter", "linkedin", "snapchat", "google"]),
+          .array(z.enum(["instagram", "tiktok", "twitter", "linkedin", "snapchat", "google", "facebook"]))
+          .default(["instagram", "tiktok", "twitter", "linkedin", "snapchat", "google", "facebook"]),
       })
     )
     .mutation(async ({ input }) => {
@@ -436,6 +461,9 @@ export const brightDataSearchRouter = router({
                   break;
                 case "google":
                   results = await scrapeGoogleSearch(input.query, input.location);
+                  break;
+                case "facebook":
+                  results = await scrapeFacebook(input.query, input.location);
                   break;
               }
               allResults[platform] = results;
