@@ -474,17 +474,60 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     .footer-brand { font-weight: 700; color: #94a3b8; font-size: 13px; }
     .footer-meta { text-align: left; }
 
+    /* ── Watermark ── */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-35deg);
+      font-size: 72px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.04);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 9999;
+      user-select: none;
+      letter-spacing: 8px;
+    }
+    .watermark-repeat {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 9998;
+      overflow: hidden;
+    }
+    .watermark-repeat::before,
+    .watermark-repeat::after {
+      content: 'سري وخاص  •  سري وخاص  •  سري وخاص';
+      position: absolute;
+      font-family: 'Tajawal', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.035);
+      white-space: nowrap;
+      letter-spacing: 4px;
+      transform: rotate(-35deg);
+    }
+    .watermark-repeat::before { top: 20%; left: -20%; }
+    .watermark-repeat::after  { top: 60%; left: -10%; }
+
     /* ── Print media ── */
     @media print {
       .print-bar { display: none !important; }
       .page-wrapper { margin-top: 0 !important; }
       body { background: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .watermark { color: rgba(255,255,255,0.06) !important; }
+      .watermark-repeat::before, .watermark-repeat::after { color: rgba(255,255,255,0.05) !important; }
       .dark-card { break-inside: avoid; }
       .section-header { break-after: avoid; }
     }
   </style>
 </head>
 <body>
+  <!-- Watermark -->
+  <div class="watermark-repeat"></div>
+  <div class="watermark">سري وخاص</div>
+
   <!-- Print bar -->
   <div class="print-bar">
     <h3>تقرير عميل: ${lead.companyName || "—"}</h3>
