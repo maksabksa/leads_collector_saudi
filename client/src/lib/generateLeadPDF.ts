@@ -495,6 +495,36 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     .footer-brand{font-weight:700;color:#475569;font-size:13px;}
     /* Divider */
     .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(34,197,94,0.2),transparent);margin:20px 0;}
+    /* Missed Opportunities */
+    .opp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px;}
+    .opp-card{
+      background:linear-gradient(135deg,#0d1f3c,#0a1628);
+      border:1px solid rgba(255,255,255,0.06);
+      border-radius:12px;padding:18px 20px;
+      position:relative;overflow:hidden;
+    }
+    .opp-card.now{border-color:rgba(239,68,68,0.25);}
+    .opp-card.with-maksab{border-color:rgba(34,197,94,0.25);}
+    .opp-card.now::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(239,68,68,0.08) 0%,transparent 70%);}
+    .opp-card.with-maksab::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(34,197,94,0.08) 0%,transparent 70%);}
+    .opp-label{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;}
+    .opp-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;line-height:1.7;margin-bottom:6px;}
+    .opp-item-dot{flex-shrink:0;margin-top:4px;width:6px;height:6px;border-radius:50%;}
+    .opp-vs{
+      background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.08));
+      border:1px solid rgba(34,197,94,0.15);
+      border-radius:10px;padding:14px 18px;
+      display:flex;align-items:center;justify-content:center;gap:16px;
+      margin-bottom:14px;flex-wrap:wrap;
+    }
+    .opp-vs-stat{text-align:center;}
+    .opp-vs-val{font-size:22px;font-weight:900;}
+    .opp-vs-lbl{font-size:10px;color:#64748b;margin-top:2px;}
+    .opp-vs-arrow{font-size:24px;color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,0.6);}
+    /* QR */
+    .qr-wrap{display:flex;align-items:center;gap:16px;}
+    .qr-img{width:72px;height:72px;border-radius:8px;border:1px solid rgba(34,197,94,0.2);background:#0f172a;padding:4px;}
+    .qr-text{font-size:11px;color:#475569;line-height:1.8;}
     /* Stat highlight */
     .stat-hl{
       display:inline-flex;align-items:center;gap:6px;
@@ -712,6 +742,70 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     ${websiteAnalysis.recommendations ? `<div class="dc"><div class="dc-title">التوصيات</div><div class="at">${websiteAnalysis.recommendations}</div></div>` : ""}
     ` : ""}
 
+    <!-- ══ الفرص الضائعة ══ -->
+    ${(lead.biggestMarketingGap || lead.revenueOpportunity || websiteAnalysis || socialAnalyses.length > 0) ? `
+    <div class="sh"><div class="sh-dot"></div>🚀 الفرص الضائعة — ما يمكن تحقيقه مع مكسب</div>
+
+    <!-- VS Stats bar -->
+    <div class="opp-vs">
+      <div class="opp-vs-stat">
+        <div class="opp-vs-val" style="color:#ef4444;text-shadow:0 0 12px rgba(239,68,68,0.5);">${websiteAnalysis?.overallScore ? Number(websiteAnalysis.overallScore).toFixed(0) : (priorityScore ? priorityScore.toFixed(0) : "—")}/10</div>
+        <div class="opp-vs-lbl">الوضع الحالي</div>
+      </div>
+      <div class="opp-vs-arrow">→</div>
+      <div class="opp-vs-stat">
+        <div class="opp-vs-val" style="color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,0.5);">9+/10</div>
+        <div class="opp-vs-lbl">مع مكسب</div>
+      </div>
+      <div class="opp-vs-arrow">→</div>
+      <div class="opp-vs-stat">
+        <div class="opp-vs-val" style="color:#0ea5e9;text-shadow:0 0 12px rgba(14,165,233,0.5);">+40%</div>
+        <div class="opp-vs-lbl">نمو متوقع</div>
+      </div>
+    </div>
+
+    <div class="opp-grid">
+      <!-- الوضع الحالي -->
+      <div class="opp-card now">
+        <div class="opp-label" style="color:#ef4444;">⚠️ الوضع الحالي</div>
+        ${gaps.slice(0,4).map(g => `<div class="opp-item"><span class="opp-item-dot" style="background:#ef4444;"></span><span>${g}</span></div>`).join("")}
+        ${!gaps.length ? `
+          <div class="opp-item"><span class="opp-item-dot" style="background:#ef4444;"></span><span>غياب استراتيجية رقمية متكاملة</span></div>
+          <div class="opp-item"><span class="opp-item-dot" style="background:#ef4444;"></span><span>ضعف التواجد على محركات البحث</span></div>
+          <div class="opp-item"><span class="opp-item-dot" style="background:#ef4444;"></span><span>عدم استغلال قنوات التواصل الاجتماعي</span></div>
+          <div class="opp-item"><span class="opp-item-dot" style="background:#ef4444;"></span><span>فقدان عملاء محتملين يومياً</span></div>
+        ` : ""}
+      </div>
+      <!-- مع مكسب -->
+      <div class="opp-card with-maksab">
+        <div class="opp-label" style="color:#22c55e;">✅ مع مكسب</div>
+        <div class="opp-item"><span class="opp-item-dot" style="background:#22c55e;"></span><span>حضور رقمي احترافي ومتكامل على جميع المنصات</span></div>
+        <div class="opp-item"><span class="opp-item-dot" style="background:#22c55e;"></span><span>استراتيجية محتوى مخصصة تستهدف العملاء المثاليين</span></div>
+        <div class="opp-item"><span class="opp-item-dot" style="background:#22c55e;"></span><span>تحسين محركات البحث وزيادة الظهور المجاني</span></div>
+        <div class="opp-item"><span class="opp-item-dot" style="background:#22c55e;"></span><span>تحويل المتابعين إلى عملاء حقيقيين وزيادة الإيرادات</span></div>
+        ${lead.revenueOpportunity ? `<div class="opp-item"><span class="opp-item-dot" style="background:#0ea5e9;"></span><span style="color:#0ea5e9;font-weight:600;">${lead.revenueOpportunity.slice(0,120)}${lead.revenueOpportunity.length > 120 ? "..." : ""}</span></div>` : ""}
+      </div>
+    </div>
+
+    <!-- CTA Banner -->
+    <div style="
+      background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.06));
+      border:1px solid rgba(34,197,94,0.2);
+      border-radius:12px;padding:20px 24px;
+      display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+      margin-bottom:14px;
+    ">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:#f8fafc;margin-bottom:6px;">ابدأ رحلة النمو الرقمي اليوم</div>
+        <div style="font-size:12px;color:#64748b;">تواصل مع فريق مكسب للحصول على خطة عمل مخصصة لنشاطك التجاري</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:18px;font-weight:900;color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,0.5);">${company?.phone || company?.email || "maksab-ksa.com"}</div>
+        <div style="font-size:10px;color:#475569;margin-top:2px;">تواصل معنا الآن</div>
+      </div>
+    </div>
+    ` : ""}
+
     <!-- ══ التقرير الشامل ══ -->
     ${report?.fullReport ? `
     <div class="sh"><div class="sh-dot"></div>📋 التقرير الشامل</div>
@@ -728,16 +822,24 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
   <!-- ══ FOOTER ══ -->
   <div class="footer">
-    <div>
-      <div class="footer-brand">${companyName}</div>
-      ${company?.reportFooterText ? `<div>${company.reportFooterText}</div>` : ""}
-      ${company?.email ? `<div>${company.email}</div>` : ""}
-      ${company?.website ? `<div>${company.website}</div>` : ""}
+    <div class="qr-wrap">
+      <img
+        class="qr-img"
+        src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(company?.website || "https://maksab-ksa.com")}&bgcolor=0f172a&color=22c55e&format=svg"
+        alt="QR مكسب"
+      />
+      <div class="qr-text">
+        <div style="font-weight:700;color:#22c55e;font-size:12px;margin-bottom:4px;">${companyName}</div>
+        ${company?.website ? `<div>${company.website}</div>` : "<div>maksab-ksa.com</div>"}
+        ${company?.email ? `<div>${company.email}</div>` : ""}
+        ${company?.phone ? `<div>${company.phone}</div>` : ""}
+        ${company?.reportFooterText ? `<div style="margin-top:4px;color:#334155;">${company.reportFooterText}</div>` : ""}
+      </div>
     </div>
     <div style="text-align:left;">
       <div>تاريخ الإصدار: ${reportDate}</div>
-      <div style="color:#22c55e22;">حصري من شركة مكسب — جميع الحقوق محفوظة</div>
-      ${company?.address ? `<div>${company.address}</div>` : ""}
+      <div style="color:#22c55e44;font-size:10px;margin-top:4px;">حصري من شركة مكسب — جميع الحقوق محفوظة</div>
+      ${company?.address ? `<div style="font-size:10px;color:#334155;">${company.address}</div>` : ""}
     </div>
   </div>
 
