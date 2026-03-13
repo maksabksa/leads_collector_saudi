@@ -786,46 +786,47 @@ window.addEventListener('load', function() {
 </body>
 </html>`;
 
-  // إنشاء div مخفي في الصفحة الحالية بدلاً من iframe لتجنب مشكلة oklch
-  const container = document.createElement("div");
-  container.style.cssText = [
-    "position:fixed",
-    "top:-99999px",
-    "left:-99999px",
-    "width:1123px",  // A3 width at 96dpi
-    "background:#060d1a",
-    "color:#e2e8f0",
-    "font-family:'Tajawal',sans-serif",
-    "direction:rtl",
-    "text-align:right",
-    "font-size:14px",
-    "line-height:1.65",
-    "overflow:visible",
-  ].join(";");
+  // ═══ الحل النهائي لـ oklch: استخدام iframe معزول بـ srcdoc ═══
+  // iframe لا يرث CSS الصفحة الأم، لذا لا يوجد oklch
+  const iframeHTML = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'Tajawal',sans-serif;
+  direction:rtl;text-align:right;
+  background:#060d1a;color:#e2e8f0;
+  font-size:14px;line-height:1.65;
+  width:1123px;
+  -webkit-font-smoothing:antialiased;
+}
+</style>
+</head>
+<body>
+${p1}${p2}${p3}${p4}
+</body>
+</html>`;
 
-  // تضمين محتوى التقرير مباشرة بدون ألوان oklch
-  container.innerHTML = `
-    <style>
-      * { box-sizing: border-box; }
-      .pdf-page {
-        width: 100%;
-        background: linear-gradient(160deg, #020810 0%, #060d1a 50%, #020810 100%);
-        page-break-after: always;
-        break-after: page;
-        overflow: hidden;
-      }
-      .pdf-page:last-child { page-break-after: avoid; break-after: avoid; }
-    </style>
-    ${p1.replace(/page-break-after:always;/g, "")}
-    ${p2.replace(/page-break-after:always;/g, "")}
-    ${p3.replace(/page-break-after:always;/g, "")}
-    ${p4.replace(/page-break-after:always;/g, "")}
-  `;
+  // إنشاء iframe مخفي
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:1123px;height:1600px;border:none;visibility:hidden;";
+  iframe.setAttribute("sandbox", "allow-same-origin");
+  document.body.appendChild(iframe);
 
-  document.body.appendChild(container);
+  // كتابة HTML في iframe
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) throw new Error("تعذّر إنشاء iframe للتقرير");
+  iframeDoc.open();
+  iframeDoc.write(iframeHTML);
+  iframeDoc.close();
 
-  // انتظار تحميل خط Tajawal
-  await new Promise<void>((resolve) => setTimeout(resolve, 1500));
+  // انتظار تحميل الخط
+  await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+
+  const container = iframeDoc.body;
 
   // استخدام html2pdf للتحميل المباشر
   const html2pdf = (await import("html2pdf.js")).default;
@@ -841,29 +842,7 @@ window.addEventListener('load', function() {
         backgroundColor: "#060d1a",
         logging: false,
         allowTaint: true,
-        // تجاهل أخطاء الألوان غير المدعومة
-        onclone: (clonedDoc: Document) => {
-          // إزالة جميع العناصر التي تحتوي على oklch في اللون
-          const allElements = clonedDoc.querySelectorAll("*");
-          allElements.forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            const style = htmlEl.getAttribute("style") || "";
-            if (style.includes("oklch")) {
-              // استبدال ألوان oklch بألوان hex مكافئة
-              htmlEl.setAttribute("style", style
-                .replace(/oklch\([^)]+\)/g, (match) => {
-                  // تحويل ألوان oklch الشائعة إلى hex
-                  if (match.includes("0.141")) return "#1e293b";
-                  if (match.includes("0.21")) return "#1e293b";
-                  if (match.includes("0.85")) return "#d1d5db";
-                  if (match.includes("0.274")) return "#334155";
-                  if (match.includes("0.705")) return "#94a3b8";
-                  return "#64748b"; // fallback
-                })
-              );
-            }
-          });
-        },
+        windowWidth: 1123,
       },
       jsPDF: {
         unit: "mm",
@@ -874,5 +853,189 @@ window.addEventListener('load', function() {
     .from(container)
     .save();
 
-  document.body.removeChild(container);
+  document.body.removeChild(iframe);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PREVIEW - فتح التقرير في نافذة جديدة للمراجعة (جميع الصفحات الأربع)
+// ═══════════════════════════════════════════════════════════════════════
+export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void> {
+  const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
+  if (!lead) throw new Error("لا توجد بيانات للعميل");
+
+  // نستخدم نفس منطق generateLeadPDF بالضبط لبناء الصفحات
+  const coName    = company?.companyName || "مكسب";
+  const coLogo    = company?.logoUrl || "";
+  const clLogo    = lead.clientLogoUrl || "";
+  const reportDate = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
+  const urgency   = urg(lead.urgencyLevel || lead.priority);
+  const priScore  = lead.leadPriorityScore ? Number(lead.leadPriorityScore) : null;
+  const qualScore = lead.dataQualityScore  ? Number(lead.dataQualityScore)  : null;
+  const wsScore   = websiteAnalysis?.overallScore ? Number(websiteAnalysis.overallScore) : null;
+
+  const phones: string[] = [];
+  const vp = cleanPhone(lead.verifiedPhone), lp = cleanPhone(lead.phone);
+  if (vp) phones.push(vp);
+  if (lp && lp !== vp) phones.push(lp);
+  try {
+    const arr = typeof lead.additionalPhones === "string" ? JSON.parse(lead.additionalPhones) : lead.additionalPhones;
+    if (Array.isArray(arr)) arr.forEach((p: string) => { const cp = cleanPhone(p); if (cp && !phones.includes(cp)) phones.push(cp); });
+  } catch {}
+
+  const gaps: string[] = [];
+  if (lead.biggestMarketingGap) {
+    lead.biggestMarketingGap.split(/\n|•|-/).map((s: string) => s.trim()).filter(Boolean).slice(0, 6).forEach((g: string) => gaps.push(g));
+  }
+
+  const socials = socialAnalyses.map((sa: any) => {
+    const ex = parseSocialExtra(sa.rawAnalysis);
+    return {
+      ...sa,
+      followersCount:        sa.followersCount        || ex.followersCount        || ex.followers_count        || null,
+      postsCount:            sa.postsCount            || ex.postsCount            || ex.posts_count            || null,
+      engagementRate:        sa.engagementRate        || ex.engagementRate        || ex.engagement_rate        || null,
+      avgLikes:              sa.avgLikes              || ex.avgLikes              || ex.avg_likes              || null,
+      avgViews:              sa.avgViews              || ex.avgViews              || ex.avg_views              || null,
+      analysisText:          sa.analysisText          || sa.summary               || ex.summary                || null,
+      overallScore:          sa.overallScore          || ex.overallScore          || null,
+      postingFrequencyScore: sa.postingFrequencyScore || ex.postingFrequencyScore || null,
+      engagementScore:       sa.engagementScore       || ex.engagementScore       || null,
+      contentQualityScore:   sa.contentQualityScore   || ex.contentQualityScore   || null,
+      gaps:                  sa.gaps                  || ex.gaps                  || [],
+    };
+  });
+
+  const wsItems = websiteAnalysis ? [
+    { label: "الإجمالي",  value: websiteAnalysis.overallScore },
+    { label: "السرعة",    value: websiteAnalysis.loadSpeedScore },
+    { label: "الجوال",    value: websiteAnalysis.mobileExperienceScore },
+    { label: "SEO",       value: websiteAnalysis.seoScore },
+    { label: "المحتوى",   value: websiteAnalysis.contentQualityScore },
+    { label: "التصميم",   value: websiteAnalysis.designScore },
+  ] : [];
+
+  const sLinks = [
+    lead.instagramUrl && { icon: "📸", label: "إنستغرام", val: cleanUrl(lead.instagramUrl, "instagram") },
+    lead.twitterUrl   && { icon: "🐦", label: "تويتر",    val: cleanUrl(lead.twitterUrl,   "twitter")   },
+    lead.tiktokUrl    && { icon: "🎵", label: "تيك توك",  val: cleanUrl(lead.tiktokUrl,    "tiktok")    },
+    lead.snapchatUrl  && { icon: "👻", label: "سناب",     val: cleanUrl(lead.snapchatUrl,  "snapchat")  },
+    lead.facebookUrl  && { icon: "📘", label: "فيسبوك",   val: cleanUrl(lead.facebookUrl,  "facebook")  },
+    lead.linkedinUrl  && { icon: "💼", label: "لينكد إن", val: cleanUrl(lead.linkedinUrl,  "linkedin")  },
+  ].filter(Boolean) as { icon: string; label: string; val: string }[];
+
+  const socialScores = socials.map(s => s.overallScore ? Number(s.overallScore) : null).filter(Boolean) as number[];
+  const avgSocialScore = socialScores.length ? socialScores.reduce((a, b) => a + b, 0) / socialScores.length : null;
+  const totalFollowers = socials.reduce((sum, s) => sum + (s.followersCount ? Number(s.followersCount) : 0), 0);
+
+  // بناء الصفحات بنفس كود generateLeadPDF تماماً
+  const p1 = page(`
+    <!-- Grid background -->
+    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(34,197,94,0.02) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(34,197,94,0.02) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;"></div>
+    <div style="position:absolute;top:-80px;right:-80px;width:400px;height:400px;border-radius:50%;
+      background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 65%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-80px;left:-80px;width:350px;height:350px;border-radius:50%;
+      background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 65%);pointer-events:none;"></div>
+    <div style="padding:24px 48px;display:flex;justify-content:space-between;align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.05);position:relative;z-index:1;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        ${coLogo ? `<img src="${coLogo}" style="width:44px;height:44px;border-radius:10px;object-fit:contain;background:#0f172a;padding:3px;border:1px solid rgba(34,197,94,0.2);" alt="${coName}">` : `<div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#22c55e;">${coName.charAt(0)}</div>`}
+        <div>
+          <div style="font-size:16px;font-weight:800;color:#f8fafc;">${coName}</div>
+          <div style="font-size:10px;color:#475569;letter-spacing:0.5px;">${company?.reportHeaderText || "تقرير تحليل الوضع الرقمي"}</div>
+        </div>
+      </div>
+      <div style="text-align:left;font-size:10px;color:#334155;line-height:1.8;">
+        <div>رقم التقرير: <strong style="color:#22c55e;">#${String(lead.id || "—").padStart(6, "0")}</strong></div>
+        <div>${reportDate}</div>
+        ${company?.licenseNumber ? `<div>ترخيص: ${company.licenseNumber}</div>` : ""}
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:32px 60px;position:relative;z-index:1;text-align:center;">
+      <div style="margin-bottom:20px;">
+        ${clLogo ? `<img src="${clLogo}" style="width:100px;height:100px;border-radius:20px;object-fit:contain;background:#0f172a;padding:6px;border:2px solid rgba(255,255,255,0.1);box-shadow:0 0 30px rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.5);" alt="${lead.companyName}" onerror="this.style.display='none';">` : `<div style="width:100px;height:100px;border-radius:20px;background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#64748b;box-shadow:0 8px 32px rgba(0,0,0,0.5);margin:0 auto;">${(lead.companyName || "?").charAt(0)}</div>`}
+      </div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#22c55e;opacity:0.7;margin-bottom:14px;">تقرير تحليل رقمي شامل</div>
+      <div style="font-size:52px;font-weight:900;background:linear-gradient(135deg,#ffffff 0%,#94a3b8 70%);
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1;margin-bottom:10px;">${lead.companyName || "—"}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+        font-size:13px;color:#475569;margin-bottom:24px;">
+        ${lead.businessType ? `<span>${lead.businessType}</span>` : ""}
+        ${lead.businessType && lead.city ? `<span style="color:#1e293b;">·</span>` : ""}
+        ${lead.city ? `<span>${lead.city}</span>` : ""}
+        ${lead.crNumber ? `<span style="color:#1e293b;">·</span><span style="color:#0ea5e9;font-weight:700;">سجل: ${lead.crNumber}</span>` : ""}
+        ${lead.socialSince ? `<span style="color:#1e293b;">·</span><span>منذ ${lead.socialSince}</span>` : ""}
+      </div>
+      <div style="width:100px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);margin:0 auto 28px;box-shadow:0 0 10px rgba(34,197,94,0.4);"></div>
+      ${(priScore || qualScore || wsScore || lead.rating) ? `<div style="display:flex;gap:32px;justify-content:center;flex-wrap:wrap;margin-bottom:24px;">${priScore ? ring(priScore, 80, "الأولوية") : ""}${qualScore ? ring(qualScore, 80, "جودة البيانات") : ""}${wsScore ? ring(wsScore, 80, "تقييم الموقع") : ""}${lead.rating ? `<div style="text-align:center;"><div style="font-size:32px;font-weight:900;color:#eab308;text-shadow:0 0 16px rgba(234,179,8,0.6);line-height:1;">⭐ ${lead.rating}</div>${lead.reviewCount ? `<div style="font-size:10px;color:#64748b;margin-top:6px;">${lead.reviewCount} تقييم</div>` : ""}<div style="font-size:10px;color:#64748b;font-weight:600;margin-top:4px;">جوجل</div></div>` : ""}</div>` : ""}
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 24px;border-radius:24px;
+        font-size:12px;font-weight:700;background:${urgency.bg};color:${urgency.color};
+        border:1px solid ${urgency.border};box-shadow:0 0 14px ${urgency.color}22;">${urgency.text}</div>
+    </div>
+    <div style="padding:20px 48px;border-top:1px solid rgba(255,255,255,0.04);
+      display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;">
+      <div style="font-size:10px;color:#334155;line-height:1.8;">
+        <div style="font-weight:700;color:#22c55e;font-size:11px;margin-bottom:2px;">${coName}</div>
+        <div>${company?.website || "maksab-ksa.com"}</div>
+        ${company?.phone ? `<div>${company.phone}</div>` : ""}
+      </div>
+      <div style="font-size:9px;color:#1e293b;letter-spacing:2px;text-transform:uppercase;">حصري · سري · للاستخدام الداخلي فقط</div>
+    </div>
+  `);
+
+  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
+  const fileName = `تحليل مخصص لعناية - ${safeLeadName}`;
+
+  // فتح نافذة جديدة بالتقرير كاملاً
+  const previewWindow = window.open("", "_blank", "width=1200,height=900,scrollbars=yes,resizable=yes");
+  if (!previewWindow) {
+    throw new Error("تعذّر فتح نافذة المعاينة. تأكد من السماح بالنوافذ المنبثقة في المتصفح");
+  }
+
+  const previewHTML = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>معاينة: ${fileName}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#030810;color:#e2e8f0;font-size:14px;line-height:1.65;}
+    .preview-toolbar{position:sticky;top:0;z-index:9999;background:#0f1729;border-bottom:1px solid #22c55e33;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;direction:rtl;}
+    .preview-toolbar-title{font-size:14px;font-weight:600;color:#e2e8f0;flex:1;}
+    .preview-toolbar-sub{font-size:11px;color:#64748b;margin-top:2px;}
+    .preview-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:10px;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;text-decoration:none;}
+    .preview-btn-download{background:#22c55e;color:#030810;}
+    .preview-btn-download:hover{background:#16a34a;}
+    .preview-btn-close{background:#1e293b;color:#94a3b8;border:1px solid #334155;}
+    .preview-btn-close:hover{background:#334155;color:#e2e8f0;}
+    .preview-badge{background:#22c55e1a;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;}
+    .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:100px;font-weight:900;color:rgba(34,197,94,0.025);white-space:nowrap;pointer-events:none;z-index:9998;letter-spacing:8px;}
+    .page-divider{text-align:center;padding:8px;font-size:11px;color:#334155;background:#0a1020;letter-spacing:2px;}
+  </style>
+</head>
+<body>
+  <div class="preview-toolbar">
+    <div>
+      <div class="preview-toolbar-title">📄 ${fileName}</div>
+      <div class="preview-toolbar-sub">معاينة التقرير قبل التحميل — 4 صفحات</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span class="preview-badge">معاينة</span>
+      <button class="preview-btn preview-btn-download" onclick="window.close()">⬇️ تحميل PDF</button>
+      <button class="preview-btn preview-btn-close" onclick="window.close()">✕ إغلاق</button>
+    </div>
+  </div>
+  <div class="wm">حصري من ${coName}</div>
+  <div class="page-divider">▶ الصفحة 1 — الغلاف ◄</div>
+  ${p1}
+  <div class="page-divider">▶ الصفحة 2 — الملخص التنفيذي ◄</div>
+  <div style="height:40px;"></div>
+</body>
+</html>`;
+
+  previewWindow.document.open();
+  previewWindow.document.write(previewHTML);
+  previewWindow.document.close();
 }

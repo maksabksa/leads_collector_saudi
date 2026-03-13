@@ -236,8 +236,9 @@ export async function searchInstagramSERP(query: string, location?: string): Pro
   bio: string;
   url: string;
 }>> {
-  const searchQuery = `site:instagram.com ${query}${location ? ` ${location}` : ""}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar`;
+  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
+  const searchQuery = `site:instagram.com ${query} ${locationStr}`;
+  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
 
   try {
     const html = await serpRequest(url);
@@ -255,8 +256,9 @@ export async function searchTikTokSERP(query: string, location?: string): Promis
   bio: string;
   url: string;
 }>> {
-  const searchQuery = `site:tiktok.com ${query}${location ? ` ${location}` : ""}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar`;
+  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
+  const searchQuery = `site:tiktok.com ${query} ${locationStr}`;
+  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
 
   try {
     const html = await serpRequest(url);
@@ -274,8 +276,9 @@ export async function searchSnapchatSERP(query: string, location?: string): Prom
   bio: string;
   url: string;
 }>> {
-  const searchQuery = `site:snapchat.com ${query}${location ? ` ${location}` : ""}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar`;
+  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
+  const searchQuery = `site:snapchat.com ${query} ${locationStr}`;
+  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
 
   try {
     const html = await serpRequest(url);
@@ -293,8 +296,9 @@ export async function searchLinkedInSERP(query: string, location?: string): Prom
   bio: string;
   url: string;
 }>> {
-  const searchQuery = `site:linkedin.com/company ${query}${location ? ` ${location}` : ""}`;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar`;
+  const locationStr = location ? `${location} السعودية` : "المملكة العربية السعودية";
+  const searchQuery = `site:linkedin.com/company ${query} ${locationStr}`;
+  const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=10&hl=ar&gl=sa&cr=countrySA`;
 
   try {
     const html = await serpRequest(url);

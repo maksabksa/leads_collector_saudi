@@ -114,10 +114,11 @@ async function scrapeTikTok(query: string, location: string): Promise<any[]> {
 // ─── بحث Twitter/X (عبر SERP API - بدلاً من Puppeteer المحظور) ─────────────────
 async function scrapeTwitter(query: string, location: string): Promise<any[]> {
   // Twitter يحظر Puppeteer بشكل صارم - نستخدم SERP API للبحث في Google عن حسابات Twitter
+  const locationStr = location ? `${location} السعودية` : "السعودية";
   const queries = [
-    `${query} ${location} site:twitter.com OR site:x.com`,
-    `${query} ${location} twitter`,
-    `${query} site:x.com`,
+    `${query} ${locationStr} site:twitter.com OR site:x.com`,
+    `${query} ${locationStr} twitter`,
+    `${query} السعودية site:x.com`,
   ];
 
   const results: any[] = [];
@@ -125,7 +126,7 @@ async function scrapeTwitter(query: string, location: string): Promise<any[]> {
 
   for (const q of queries) {
     try {
-      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
       const html = await serpRequest(googleUrl);
       const googleResults = parseGoogleResultsPublic(html, "twitter.com");
 
@@ -212,12 +213,13 @@ async function scrapeSnapchat(query: string, location: string): Promise<any[]> {
 // ─── بحث Google Search (عبر SERP API - بدلاً من Puppeteer البطيء) ──────────────
 async function scrapeGoogleSearch(query: string, location: string): Promise<any[]> {
   // استخدام SERP API مباشرة بدلاً من Puppeteer لتجنب timeout
-  const searchQuery = location ? `${query} ${location}` : query;
+  const locationStr = location ? `${location} السعودية` : "السعودية";
+  const searchQuery = `${query} ${locationStr}`;
   // استعلامات متعددة لتوسيع النتائج
   const queries = [
     searchQuery,
-    `${query} ${location} أعمال`,
-    `${query} ${location} للتواصل`,
+    `${query} ${locationStr} أعمال`,
+    `${query} ${locationStr} للتواصل`,
   ];
 
   const results: any[] = [];
@@ -225,7 +227,7 @@ async function scrapeGoogleSearch(query: string, location: string): Promise<any[
 
   for (const q of queries) {
     try {
-      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
       const html = await serpRequest(googleUrl);
       const googleResults = parseGoogleResultsPublic(html, ""); // بدون تصفية domain
 
