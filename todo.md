@@ -1473,3 +1473,9 @@
 - [x] إضافة دالة previewLeadPDF لعرض جميع الصفحات الأربع في نافذة جديدة مع زر تحميل
 - [x] إضافة procedure fetchClientLogo لجلب شعار العميل تلقائياً (Google Favicon + Clearbit)
 - [x] عرض شعار العميل في بطاقة معلومات الاتصال مع زر جلب الشعار
+
+## إصلاح توليد PDF - مشكلة Chromium (13 مارس 2026)
+
+- [x] إصلاح خطأ "Chromium not found" في بيئة الإنتاج
+- [x] إضافة @sparticuz/chromium كـ fallback في /api/generate-pdf عند عدم وجود Chromium محلي
+- [x] اختبار وجود Chromium في /tmp/chromium - يعمل بشكل صحيح

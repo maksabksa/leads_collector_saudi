@@ -61,14 +61,16 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 
-  // ===== PDF Generation via Puppeteer (يدعم oklch بشكل كامل) =====
+  // ===== PDF Generation via Puppeteer + @sparticuz/chromium (يدعم oklch بشكل كامل) =====
   app.post("/api/generate-pdf", async (req, res) => {
     try {
       const { html, filename = "report.pdf" } = req.body as { html: string; filename: string };
       if (!html) { res.status(400).json({ error: "html is required" }); return; }
 
       const puppeteer = await import("puppeteer-core");
-      // تجربة مسارات Chromium المختلفة تلقائياً
+      const chromium = await import("@sparticuz/chromium");
+
+      // تجربة مسارات Chromium المحلية أولاً (dev)، ثم @sparticuz/chromium (production)
       const { execSync } = await import("child_process");
       const possiblePaths = [
         "/usr/lib/chromium-browser/chromium-browser",
@@ -86,13 +88,27 @@ async function startServer() {
           break;
         } catch {}
       }
-      if (!chromiumPath) throw new Error("Chromium not found on this system");
-      console.log("[PDF] Using Chromium at:", chromiumPath);
-      const browser = await puppeteer.launch({
-        executablePath: chromiumPath,
-        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--single-process"],
-        headless: true,
-      });
+
+      let browser;
+      if (chromiumPath) {
+        console.log("[PDF] Using local Chromium at:", chromiumPath);
+        browser = await puppeteer.default.launch({
+          executablePath: chromiumPath,
+          args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--single-process"],
+          headless: true,
+        });
+      } else {
+        // Production: استخدام @sparticuz/chromium
+        console.log("[PDF] Local Chromium not found, using @sparticuz/chromium");
+        const execPath = await chromium.default.executablePath();
+        browser = await puppeteer.default.launch({
+          executablePath: execPath,
+          args: [...chromium.default.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--single-process"],
+          headless: true,
+          defaultViewport: { width: 1200, height: 900 },
+        });
+      }
+
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
       // انتظار تحميل الخطوط
