@@ -268,7 +268,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       pointer-events:none;z-index:9997;overflow:hidden;
     }
     .wm2::before,.wm2::after{
-      content:'سري وخاص  ✦  سري وخاص  ✦  سري وخاص';
+      content:'حصري من شركة مكسب  ✦  حصري من شركة مكسب  ✦  حصري من شركة مكسب';
       position:absolute;
       font-family:'Tajawal',sans-serif;font-size:16px;font-weight:700;
       color:rgba(34,197,94,0.025);
@@ -478,7 +478,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 </head>
 <body>
 <div class="wm2"></div>
-<div class="wm">سري وخاص</div>
+<div class="wm">حصري من شركة مكسب</div>
 
 <!-- Print bar -->
 <div class="print-bar">
@@ -696,7 +696,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     </div>
     <div style="text-align:left;">
       <div>تاريخ الإصدار: ${reportDate}</div>
-      <div style="color:#22c55e22;">هذا التقرير سري وخاص بالشركة</div>
+      <div style="color:#22c55e22;">حصري من شركة مكسب — جميع الحقوق محفوظة</div>
       ${company?.address ? `<div>${company.address}</div>` : ""}
     </div>
   </div>
