@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  generateLeadPDF — 4-Page Structured Report v5
+//  generateLeadPDF — Professional Report v6 (Print-Ready)
 //  صفحة 1: الغلاف  |  صفحة 2: الملخص التنفيذي
-//  صفحة 3: التقييم الرقمي  |  صفحة 4: التوصيات + CTA
+//  صفحة 3: التحليل الرقمي  |  صفحة 4: التوصيات + CTA
 // ═══════════════════════════════════════════════════════════════════════
 
 interface GeneratePDFOptions {
@@ -14,18 +14,11 @@ interface GeneratePDFOptions {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function sc(v?: number | null) {
-  if (!v) return "#64748b";
-  if (v >= 8) return "#22c55e";
-  if (v >= 6) return "#eab308";
-  if (v >= 4) return "#f97316";
-  return "#ef4444";
-}
-function sg(v?: number | null) {
-  if (!v) return "none";
-  if (v >= 8) return "0 0 16px rgba(34,197,94,0.6)";
-  if (v >= 6) return "0 0 16px rgba(234,179,8,0.6)";
-  if (v >= 4) return "0 0 16px rgba(249,115,22,0.6)";
-  return "0 0 16px rgba(239,68,68,0.6)";
+  if (!v) return "#6b7280";
+  if (v >= 8) return "#16a34a";
+  if (v >= 6) return "#ca8a04";
+  if (v >= 4) return "#ea580c";
+  return "#dc2626";
 }
 function fmt(v?: number | null) { return v ? Number(v).toFixed(1) : "—"; }
 function fmtK(v?: number | null) {
@@ -66,104 +59,80 @@ function parseSocialExtra(raw?: string | null) {
   if (!raw) return {};
   try { const o = JSON.parse(raw); return typeof o === "object" ? o : {}; } catch { return {}; }
 }
-
-// ─── Platform meta ────────────────────────────────────────────────────────────
-function pm(p: string) {
-  const map: Record<string, { name: string; color: string; icon: string }> = {
-    instagram: { name: "إنستغرام", color: "#e1306c", icon: "📸" },
-    twitter:   { name: "تويتر / X", color: "#1da1f2", icon: "🐦" },
-    tiktok:    { name: "تيك توك",   color: "#69c9d0", icon: "🎵" },
-    snapchat:  { name: "سناب شات", color: "#fffc00", icon: "👻" },
-    facebook:  { name: "فيسبوك",   color: "#1877f2", icon: "📘" },
-    linkedin:  { name: "لينكد إن", color: "#0a66c2", icon: "💼" },
-  };
-  return map[p?.toLowerCase()] || { name: p || "منصة", color: "#64748b", icon: "📱" };
-}
-
-// ─── Score ring ───────────────────────────────────────────────────────────────
-function ring(v?: number | null, size = 72, label = "") {
-  const color = sc(v); const glow = sg(v);
-  const d = v ? Number(v).toFixed(0) : "—";
-  const fs = size > 60 ? 24 : 16;
-  return `<div style="text-align:center;">
-    <div style="width:${size}px;height:${size}px;border-radius:50%;border:2.5px solid ${color};
-      box-shadow:${glow};display:flex;align-items:center;justify-content:center;
-      font-size:${fs}px;font-weight:900;color:${color};background:#060d1a;margin:0 auto ${label ? "6px" : "0"};">
-      ${d}
-    </div>
-    ${label ? `<div style="font-size:10px;color:#64748b;font-weight:600;">${label}</div>` : ""}
-  </div>`;
-}
-
-// ─── Mini bar ─────────────────────────────────────────────────────────────────
-function bar(v?: number | null, label = "", max = 10) {
-  const pct = v ? Math.min((v / max) * 100, 100) : 0;
-  const color = sc(v);
-  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-    <span style="font-size:11px;color:#64748b;min-width:90px;text-align:right;">${label}</span>
-    <div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
-      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,${color},${color}88);
-        border-radius:3px;box-shadow:0 0 8px ${color}55;"></div>
-    </div>
-    <span style="font-size:11px;font-weight:700;color:${color};min-width:26px;">${fmt(v)}</span>
-  </div>`;
-}
-
-// ─── QR ───────────────────────────────────────────────────────────────────────
-function qr(data: string, color = "22c55e") {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(data)}&bgcolor=060d1a&color=${color}&format=svg&margin=4`;
-}
-
-// ─── Urgency ──────────────────────────────────────────────────────────────────
 function urg(level?: string | null) {
   switch (level) {
-    case "high":   return { text: "أولوية عالية",     color: "#ef4444", bg: "rgba(239,68,68,0.1)",   border: "rgba(239,68,68,0.3)" };
-    case "medium": return { text: "أولوية متوسطة",   color: "#eab308", bg: "rgba(234,179,8,0.1)",   border: "rgba(234,179,8,0.3)" };
-    case "low":    return { text: "أولوية منخفضة",   color: "#22c55e", bg: "rgba(34,197,94,0.1)",   border: "rgba(34,197,94,0.3)" };
-    default:       return { text: "غير محدد",         color: "#64748b", bg: "rgba(100,116,139,0.08)", border: "rgba(100,116,139,0.2)" };
+    case "high":   return { text: "أولوية عالية",   color: "#dc2626", bg: "#fef2f2", border: "#fecaca" };
+    case "medium": return { text: "أولوية متوسطة", color: "#ca8a04", bg: "#fefce8", border: "#fde68a" };
+    case "low":    return { text: "أولوية منخفضة", color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" };
+    default:       return { text: "غير محدد",       color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" };
   }
 }
+function pm(p: string) {
+  const map: Record<string, { name: string; color: string }> = {
+    instagram: { name: "إنستغرام", color: "#e1306c" },
+    twitter:   { name: "تويتر / X", color: "#1da1f2" },
+    tiktok:    { name: "تيك توك",   color: "#010101" },
+    snapchat:  { name: "سناب شات", color: "#f7b731" },
+    facebook:  { name: "فيسبوك",   color: "#1877f2" },
+    linkedin:  { name: "لينكد إن", color: "#0a66c2" },
+  };
+  return map[p?.toLowerCase()] || { name: p || "منصة", color: "#6b7280" };
+}
 
-// ─── Stat box ─────────────────────────────────────────────────────────────────
-function statBox(icon: string, label: string, value: string, color = "#94a3b8", sub = "") {
-  return `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
-    border-radius:10px;padding:14px 16px;text-align:center;">
-    <div style="font-size:20px;margin-bottom:6px;">${icon}</div>
-    <div style="font-size:20px;font-weight:900;color:${color};text-shadow:0 0 12px ${color}55;line-height:1;">${value}</div>
-    ${sub ? `<div style="font-size:10px;color:#475569;margin-top:2px;">${sub}</div>` : ""}
-    <div style="font-size:10px;color:#475569;margin-top:4px;font-weight:600;">${label}</div>
+// ─── Score badge ──────────────────────────────────────────────────────────────
+function scoreBadge(v?: number | null, label = "") {
+  const color = sc(v);
+  const val = v ? Number(v).toFixed(1) : "—";
+  const bg = v
+    ? v >= 8 ? "#f0fdf4" : v >= 6 ? "#fefce8" : v >= 4 ? "#fff7ed" : "#fef2f2"
+    : "#f9fafb";
+  return `<div style="text-align:center;padding:12px 8px;background:${bg};border:2px solid ${color}33;border-radius:12px;">
+    <div style="font-size:28px;font-weight:900;color:${color};line-height:1;">${val}</div>
+    <div style="font-size:9px;color:#6b7280;margin-top:4px;font-weight:600;">${label}</div>
   </div>`;
 }
 
-// ─── Page wrapper ─────────────────────────────────────────────────────────────
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+function progressBar(v?: number | null, label = "", max = 10) {
+  const pct = v ? Math.min((v / max) * 100, 100) : 0;
+  const color = sc(v);
+  return `<div style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+      <span style="font-size:11px;color:#374151;font-weight:600;">${label}</span>
+      <span style="font-size:11px;font-weight:700;color:${color};">${fmt(v)}</span>
+    </div>
+    <div style="height:7px;background:#e5e7eb;border-radius:4px;overflow:hidden;">
+      <div style="height:100%;width:${pct}%;background:${color};border-radius:4px;"></div>
+    </div>
+  </div>`;
+}
+
+// ─── Page wrapper (A4) ────────────────────────────────────────────────────────
 function page(content: string, pageBreak = true) {
-  return `<div style="width:100%;display:flex;flex-direction:column;padding:0;
-    ${pageBreak ? "page-break-after:always;break-after:page;" : ""}
-    background:linear-gradient(160deg,#020810 0%,#060d1a 50%,#020810 100%);">  
+  return `<div style="width:210mm;min-height:297mm;padding:0;margin:0 auto;
+    background:#ffffff;position:relative;overflow:hidden;
+    ${pageBreak ? "page-break-after:always;break-after:page;" : ""}">
     ${content}
   </div>`;
 }
 
 // ─── Section header ───────────────────────────────────────────────────────────
 function sh(title: string, sub = "") {
-  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-    <div style="width:3px;height:22px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);
-      box-shadow:0 0 8px rgba(34,197,94,0.5);flex-shrink:0;"></div>
+  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #f3f4f6;">
+    <div style="width:4px;height:24px;border-radius:2px;background:linear-gradient(180deg,#1d4ed8,#0ea5e9);flex-shrink:0;"></div>
     <div>
-      <div style="font-size:15px;font-weight:800;color:#f8fafc;">${title}</div>
-      ${sub ? `<div style="font-size:11px;color:#475569;margin-top:1px;">${sub}</div>` : ""}
+      <div style="font-size:14px;font-weight:800;color:#111827;">${title}</div>
+      ${sub ? `<div style="font-size:10px;color:#6b7280;margin-top:1px;">${sub}</div>` : ""}
     </div>
   </div>`;
 }
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
-function card(content: string, accent = "#22c55e", style = "") {
-  return `<div style="background:linear-gradient(135deg,#0d1f3c,#080f1e);
-    border:1px solid ${accent}18;border-radius:12px;padding:18px 20px;
-    position:relative;overflow:hidden;${style}">
-    <div style="position:absolute;top:0;right:0;width:80px;height:80px;
-      background:radial-gradient(circle,${accent}06 0%,transparent 70%);"></div>
-    ${content}
+// ─── Info row ─────────────────────────────────────────────────────────────────
+function infoRow(label: string, value: string, icon = "") {
+  if (!value) return "";
+  return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f9fafb;">
+    <span style="font-size:11px;color:#6b7280;min-width:90px;flex-shrink:0;">${icon} ${label}</span>
+    <span style="font-size:11px;color:#111827;font-weight:600;flex:1;word-break:break-all;">${value}</span>
   </div>`;
 }
 
@@ -174,14 +143,14 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
   if (!lead) throw new Error("لا توجد بيانات للعميل");
 
-  const coName    = company?.companyName || "مكسب";
-  const coLogo    = company?.logoUrl || "";
-  const clLogo    = lead.clientLogoUrl || "";
+  const coName     = company?.companyName || "مكسب";
+  const coLogo     = company?.logoUrl || "";
+  const clLogo     = lead.clientLogoUrl || "";
   const reportDate = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
-  const urgency   = urg(lead.urgencyLevel || lead.priority);
-  const priScore  = lead.leadPriorityScore ? Number(lead.leadPriorityScore) : null;
-  const qualScore = lead.dataQualityScore  ? Number(lead.dataQualityScore)  : null;
-  const wsScore   = websiteAnalysis?.overallScore ? Number(websiteAnalysis.overallScore) : null;
+  const urgency    = urg(lead.urgencyLevel || lead.priority);
+  const priScore   = lead.leadPriorityScore ? Number(lead.leadPriorityScore) : null;
+  const qualScore  = lead.dataQualityScore  ? Number(lead.dataQualityScore)  : null;
+  const wsScore    = websiteAnalysis?.overallScore ? Number(websiteAnalysis.overallScore) : null;
 
   // ── Phones ──
   const phones: string[] = [];
@@ -196,657 +165,454 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   // ── Gaps ──
   const gaps: string[] = [];
   if (lead.biggestMarketingGap) {
-    lead.biggestMarketingGap.split(/\n|•|-/).map((s: string) => s.trim()).filter(Boolean).slice(0, 6).forEach((g: string) => gaps.push(g));
+    lead.biggestMarketingGap.split(/\n|•|-/).map((s: string) => s.trim()).filter(Boolean).slice(0, 5).forEach((g: string) => gaps.push(g));
+  }
+  if (!gaps.length && report?.gaps) {
+    try {
+      const arr = typeof report.gaps === "string" ? JSON.parse(report.gaps) : report.gaps;
+      if (Array.isArray(arr)) arr.slice(0, 5).forEach((g: any) => gaps.push(typeof g === "string" ? g : g.title || g.gap || ""));
+    } catch {}
   }
 
-  // ── Social analyses ──
-  const socials = socialAnalyses.map((sa: any) => {
-    const ex = parseSocialExtra(sa.rawAnalysis);
-    return {
-      ...sa,
-      followersCount:        sa.followersCount        || ex.followersCount        || ex.followers_count        || null,
-      postsCount:            sa.postsCount            || ex.postsCount            || ex.posts_count            || null,
-      engagementRate:        sa.engagementRate        || ex.engagementRate        || ex.engagement_rate        || null,
-      avgLikes:              sa.avgLikes              || ex.avgLikes              || ex.avg_likes              || null,
-      avgViews:              sa.avgViews              || ex.avgViews              || ex.avg_views              || null,
-      analysisText:          sa.analysisText          || sa.summary               || ex.summary                || null,
-      overallScore:          sa.overallScore          || ex.overallScore          || null,
-      postingFrequencyScore: sa.postingFrequencyScore || ex.postingFrequencyScore || null,
-      engagementScore:       sa.engagementScore       || ex.engagementScore       || null,
-      contentQualityScore:   sa.contentQualityScore   || ex.contentQualityScore   || null,
-      gaps:                  sa.gaps                  || ex.gaps                  || [],
-    };
-  });
+  // ── Social ──
+  const bestSocial = socialAnalyses.reduce((best: any, s: any) => {
+    if (!best || (s.engagementScore || 0) > (best.engagementScore || 0)) return s;
+    return best;
+  }, null);
 
-  // ── Website scores ──
-  const wsItems = websiteAnalysis ? [
-    { label: "الإجمالي",  value: websiteAnalysis.overallScore },
-    { label: "السرعة",    value: websiteAnalysis.loadSpeedScore },
-    { label: "الجوال",    value: websiteAnalysis.mobileExperienceScore },
-    { label: "SEO",       value: websiteAnalysis.seoScore },
-    { label: "المحتوى",   value: websiteAnalysis.contentQualityScore },
-    { label: "التصميم",   value: websiteAnalysis.designScore },
-  ] : [];
+  // ── Recs ──
+  const recs: string[] = [];
+  if (report?.recommendations) {
+    report.recommendations.split(/\n|•|-|\d+\./).map((s: string) => s.trim()).filter(Boolean).slice(0, 5).forEach((r: string) => recs.push(r));
+  }
+  if (!recs.length && lead.entryAngle) {
+    lead.entryAngle.split(/\n/).map((s: string) => s.trim()).filter(Boolean).slice(0, 3).forEach((r: string) => recs.push(r));
+  }
 
-  // ── Social links ──
-  const sLinks = [
-    lead.instagramUrl && { icon: "📸", label: "إنستغرام", val: cleanUrl(lead.instagramUrl, "instagram") },
-    lead.twitterUrl   && { icon: "🐦", label: "تويتر",    val: cleanUrl(lead.twitterUrl,   "twitter")   },
-    lead.tiktokUrl    && { icon: "🎵", label: "تيك توك",  val: cleanUrl(lead.tiktokUrl,    "tiktok")    },
-    lead.snapchatUrl  && { icon: "👻", label: "سناب",     val: cleanUrl(lead.snapchatUrl,  "snapchat")  },
-    lead.facebookUrl  && { icon: "📘", label: "فيسبوك",   val: cleanUrl(lead.facebookUrl,  "facebook")  },
-    lead.linkedinUrl  && { icon: "💼", label: "لينكد إن", val: cleanUrl(lead.linkedinUrl,  "linkedin")  },
-  ].filter(Boolean) as { icon: string; label: string; val: string }[];
+  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
+  const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
 
-  // ── Avg social score ──
-  const socialScores = socials.map(s => s.overallScore ? Number(s.overallScore) : null).filter(Boolean) as number[];
-  const avgSocialScore = socialScores.length ? socialScores.reduce((a, b) => a + b, 0) / socialScores.length : null;
-
-  // ── Total followers ──
-  const totalFollowers = socials.reduce((sum, s) => sum + (s.followersCount ? Number(s.followersCount) : 0), 0);
-
-  // ─────────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
   //  PAGE 1 — COVER
-  // ─────────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
   const p1 = page(`
-    <!-- Grid background -->
-    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(34,197,94,0.02) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(34,197,94,0.02) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;"></div>
-    <!-- Glow -->
-    <div style="position:absolute;top:-80px;right:-80px;width:400px;height:400px;border-radius:50%;
-      background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 65%);pointer-events:none;"></div>
-    <div style="position:absolute;bottom:-80px;left:-80px;width:350px;height:350px;border-radius:50%;
-      background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 65%);pointer-events:none;"></div>
-
-    <!-- Top bar -->
-    <div style="padding:24px 48px;display:flex;justify-content:space-between;align-items:center;
-      border-bottom:1px solid rgba(255,255,255,0.05);position:relative;z-index:1;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        ${coLogo
-          ? `<img src="${coLogo}" style="width:44px;height:44px;border-radius:10px;object-fit:contain;background:#0f172a;padding:3px;border:1px solid rgba(34,197,94,0.2);" alt="${coName}">`
-          : `<div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#22c55e;">${coName.charAt(0)}</div>`
-        }
-        <div>
-          <div style="font-size:16px;font-weight:800;color:#f8fafc;">${coName}</div>
-          <div style="font-size:10px;color:#475569;letter-spacing:0.5px;">${company?.reportHeaderText || "تقرير تحليل الوضع الرقمي"}</div>
+    <!-- Header bar -->
+    <div style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 50%,#0ea5e9 100%);
+      padding:28px 40px 24px;position:relative;overflow:hidden;">
+      <!-- Decorative circles -->
+      <div style="position:absolute;top:-40px;left:-40px;width:180px;height:180px;
+        border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+      <div style="position:absolute;bottom:-60px;right:-20px;width:220px;height:220px;
+        border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+      <!-- Company header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          ${coLogo ? `<img src="${coLogo}" style="height:44px;width:auto;border-radius:8px;background:white;padding:4px;" alt="شعار الشركة">` : `<div style="width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;">${coName.charAt(0)}</div>`}
+          <div>
+            <div style="font-size:18px;font-weight:900;color:white;letter-spacing:0.5px;">${coName}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:2px;">تقرير تحليل تسويقي متخصص</div>
+          </div>
+        </div>
+        <div style="text-align:left;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.6);">تاريخ الإصدار</div>
+          <div style="font-size:12px;font-weight:700;color:white;">${reportDate}</div>
+          <div style="margin-top:6px;padding:3px 10px;background:${urgency.bg};border-radius:20px;
+            font-size:10px;font-weight:700;color:${urgency.color};display:inline-block;">${urgency.text}</div>
         </div>
       </div>
-      <div style="text-align:left;font-size:10px;color:#334155;line-height:1.8;">
-        <div>رقم التقرير: <strong style="color:#22c55e;">#${String(lead.id || "—").padStart(6, "0")}</strong></div>
-        <div>${reportDate}</div>
-        ${company?.licenseNumber ? `<div>ترخيص: ${company.licenseNumber}</div>` : ""}
+    </div>
+
+    <!-- Client section -->
+    <div style="padding:40px 40px 30px;text-align:center;border-bottom:1px solid #f3f4f6;">
+      ${clLogo ? `<div style="margin-bottom:20px;"><img src="${clLogo}" style="height:80px;width:auto;max-width:200px;border-radius:12px;border:2px solid #e5e7eb;padding:8px;background:white;" alt="شعار العميل"></div>` : ""}
+      <div style="font-size:11px;color:#6b7280;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">تقرير تحليل مخصص لعناية</div>
+      <div style="font-size:32px;font-weight:900;color:#111827;margin-bottom:8px;">${lead.companyName || "العميل"}</div>
+      <div style="font-size:14px;color:#4b5563;margin-bottom:16px;">${lead.businessType || ""} ${lead.city ? `· ${lead.city}` : ""}</div>
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 20px;
+        background:#f0f9ff;border:1px solid #bae6fd;border-radius:20px;">
+        <span style="font-size:11px;color:#0369a1;font-weight:600;">تحليل رقمي شامل · 4 محاور رئيسية</span>
       </div>
     </div>
 
-    <!-- Center body -->
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-      padding:32px 60px;position:relative;z-index:1;text-align:center;">
-
-      <!-- Client logo -->
-      <div style="margin-bottom:20px;">
-        ${clLogo
-          ? `<img src="${clLogo}" style="width:100px;height:100px;border-radius:20px;object-fit:contain;
-              background:#0f172a;padding:6px;border:2px solid rgba(255,255,255,0.1);
-              box-shadow:0 0 30px rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.5);" alt="${lead.companyName}"
-              onerror="this.style.display='none';">`
-          : `<div style="width:100px;height:100px;border-radius:20px;background:linear-gradient(135deg,#1e293b,#0f172a);
-              border:2px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;
-              font-size:40px;font-weight:900;color:#64748b;box-shadow:0 8px 32px rgba(0,0,0,0.5);margin:0 auto;">
-              ${(lead.companyName || "?").charAt(0)}
-            </div>`
-        }
-      </div>
-
-      <!-- Label -->
-      <div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#22c55e;opacity:0.7;margin-bottom:14px;">
-        تقرير تحليل رقمي شامل
-      </div>
-
-      <!-- Client name -->
-      <div style="font-size:52px;font-weight:900;background:linear-gradient(135deg,#ffffff 0%,#94a3b8 70%);
-        -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1;margin-bottom:10px;">
-        ${lead.companyName || "—"}
-      </div>
-
-      <!-- Meta row -->
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
-        font-size:13px;color:#475569;margin-bottom:24px;">
-        ${lead.businessType ? `<span>${lead.businessType}</span>` : ""}
-        ${lead.businessType && lead.city ? `<span style="color:#1e293b;">·</span>` : ""}
-        ${lead.city ? `<span>${lead.city}</span>` : ""}
-        ${lead.crNumber ? `<span style="color:#1e293b;">·</span><span style="color:#0ea5e9;font-weight:700;">سجل: ${lead.crNumber}</span>` : ""}
-        ${lead.socialSince ? `<span style="color:#1e293b;">·</span><span>منذ ${lead.socialSince}</span>` : ""}
-      </div>
-
-      <!-- Divider -->
-      <div style="width:100px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);
-        margin:0 auto 28px;box-shadow:0 0 10px rgba(34,197,94,0.4);"></div>
-
-      <!-- Score rings -->
-      ${(priScore || qualScore || wsScore || lead.rating) ? `
-      <div style="display:flex;gap:32px;justify-content:center;flex-wrap:wrap;margin-bottom:24px;">
-        ${priScore  ? ring(priScore,  80, "الأولوية")    : ""}
-        ${qualScore ? ring(qualScore, 80, "جودة البيانات") : ""}
-        ${wsScore   ? ring(wsScore,   80, "تقييم الموقع") : ""}
-        ${lead.rating ? `<div style="text-align:center;">
-          <div style="font-size:32px;font-weight:900;color:#eab308;text-shadow:0 0 16px rgba(234,179,8,0.6);line-height:1;">⭐ ${lead.rating}</div>
-          ${lead.reviewCount ? `<div style="font-size:10px;color:#64748b;margin-top:6px;">${lead.reviewCount} تقييم</div>` : ""}
-          <div style="font-size:10px;color:#64748b;font-weight:600;margin-top:4px;">جوجل</div>
-        </div>` : ""}
-      </div>` : ""}
-
-      <!-- Urgency pill -->
-      <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 24px;border-radius:24px;
-        font-size:12px;font-weight:700;background:${urgency.bg};color:${urgency.color};
-        border:1px solid ${urgency.border};box-shadow:0 0 14px ${urgency.color}22;">
-        ${urgency.text}
+    <!-- Score summary -->
+    <div style="padding:24px 40px;background:#f9fafb;border-bottom:1px solid #f3f4f6;">
+      <div style="font-size:11px;color:#6b7280;font-weight:700;text-align:center;margin-bottom:16px;letter-spacing:1px;">ملخص التقييم الرقمي</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+        ${scoreBadge(priScore, "الأولوية")}
+        ${scoreBadge(qualScore, "جودة البيانات")}
+        ${scoreBadge(wsScore, "تقييم الموقع")}
+        ${scoreBadge(bestSocial?.engagementScore, "التفاعل السوشيال")}
       </div>
     </div>
 
-    <!-- Bottom bar -->
-    <div style="padding:20px 48px;border-top:1px solid rgba(255,255,255,0.04);
-      display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;">
-      <div style="font-size:10px;color:#334155;line-height:1.8;">
-        <div style="font-weight:700;color:#22c55e;font-size:11px;margin-bottom:2px;">${coName}</div>
-        <div>${company?.website || "maksab-ksa.com"}</div>
-        ${company?.phone ? `<div>${company.phone}</div>` : ""}
-      </div>
-      <div style="font-size:9px;color:#1e293b;letter-spacing:2px;text-transform:uppercase;">
-        حصري · سري · للاستخدام الداخلي فقط
+    <!-- Contact info -->
+    <div style="padding:20px 40px 24px;">
+      <div style="font-size:11px;color:#6b7280;font-weight:700;margin-bottom:12px;letter-spacing:1px;">معلومات الاتصال</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;">
+        ${infoRow("الهاتف", phones.slice(0, 2).join(" | "), "📞")}
+        ${infoRow("الموقع", cleanUrl(lead.website), "🌐")}
+        ${infoRow("إنستغرام", cleanUrl(lead.instagramUrl, "instagram"), "📸")}
+        ${infoRow("تيك توك", cleanUrl(lead.tiktokUrl, "tiktok"), "🎵")}
+        ${infoRow("سناب شات", cleanUrl(lead.snapchatUrl, "snapchat"), "👻")}
+        ${infoRow("تويتر", cleanUrl(lead.twitterUrl, "twitter"), "🐦")}
       </div>
     </div>
+
+    <!-- Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 40px;
+      background:linear-gradient(135deg,#1e3a8a,#1d4ed8);
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.6);">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.6);">CONFIDENTIAL · صفحة 1 من 4</div>
+    </div>
+
+    <!-- Watermark -->
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
+      font-size:72px;font-weight:900;color:rgba(29,78,216,0.04);white-space:nowrap;
+      pointer-events:none;z-index:0;letter-spacing:6px;">حصري من ${coName}</div>
   `);
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  PAGE 2 — EXECUTIVE SUMMARY + GAPS + OPPORTUNITY
-  // ─────────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE 2 — EXECUTIVE SUMMARY
+  // ═══════════════════════════════════════════════════════════════════════
+  const execSummary = report?.executiveSummary || report?.summary || lead.revenueOpportunity || "";
+  const entryAngle  = lead.entryAngle || report?.entryAngle || "";
+  const revenueOpp  = lead.revenueOpportunity || "";
+
   const p2 = page(`
-    <!-- Page header strip -->
-    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(34,197,94,0.1);
-      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:18px;font-weight:800;color:#f8fafc;">الملخص التنفيذي</div>
-      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 2</div>
+    <!-- Page header -->
+    <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:15px;font-weight:900;color:white;">الملخص التنفيذي</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.7);">${lead.companyName || ""} · ${coName}</div>
     </div>
-    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
 
-    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
-
-      <!-- Contact + basic info -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        ${card(`
-          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:12px;letter-spacing:0.5px;">بيانات التواصل</div>
-          ${phones.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            ${phones.map(p => `<span style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);
-              border-radius:6px;padding:4px 12px;font-size:13px;font-weight:700;color:#22c55e;font-family:monospace;direction:ltr;">${p}</span>`).join("")}
-          </div>` : ""}
-          ${lead.email ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">📧 ${lead.email}</div>` : ""}
-          ${lead.website ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">🌐 ${lead.website}</div>` : ""}
-          ${sLinks.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
-            ${sLinks.map(s => `<span style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
-              border-radius:5px;padding:3px 8px;font-size:10px;color:#64748b;">${s.icon} ${s.val}</span>`).join("")}
-          </div>` : ""}
-        `)}
-        ${card(`
-          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:12px;letter-spacing:0.5px;">بيانات النشاط</div>
-          ${lead.businessType ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">🏢 ${lead.businessType}</div>` : ""}
-          ${lead.city ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📍 ${lead.city}${lead.country ? "، " + lead.country : ""}</div>` : ""}
-          ${lead.crNumber ? `<div style="font-size:12px;color:#0ea5e9;margin-bottom:6px;font-weight:700;">📋 سجل تجاري: ${lead.crNumber}</div>` : ""}
-          ${lead.socialSince ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📅 على السوشيال منذ: ${lead.socialSince}</div>` : ""}
-          ${lead.rating ? `<div style="font-size:12px;color:#eab308;margin-bottom:6px;">⭐ تقييم جوجل: ${lead.rating}${lead.reviewCount ? " (" + lead.reviewCount + " تقييم)" : ""}</div>` : ""}
-          <div style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:12px;
-            font-size:11px;font-weight:700;background:${urgency.bg};color:${urgency.color};border:1px solid ${urgency.border};">
-            ${urgency.text}
-          </div>
-        `)}
-      </div>
+    <div style="padding:28px 40px;">
+      <!-- Summary text -->
+      ${execSummary ? `
+      <div style="margin-bottom:24px;">
+        ${sh("نظرة عامة على الوضع الحالي")}
+        <div style="font-size:12px;color:#374151;line-height:1.8;background:#f9fafb;
+          border-right:3px solid #1d4ed8;padding:14px 16px;border-radius:0 8px 8px 0;">
+          <p>${cleanMarkdown(execSummary)}</p>
+        </div>
+      </div>` : ""}
 
       <!-- Gaps -->
-      ${gaps.length > 0 ? `
-      <div>
-        ${sh("أبرز الفجوات التشغيلية", "نقاط الضعف الحرجة التي تحتاج معالجة فورية")}
+      ${gaps.length ? `
+      <div style="margin-bottom:24px;">
+        ${sh("أبرز الثغرات التسويقية", "نقاط الضعف التي تحتاج معالجة فورية")}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          ${gaps.slice(0, 6).map((g, i) => `
-            <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(239,68,68,0.04);
-              border:1px solid rgba(239,68,68,0.1);border-radius:8px;padding:10px 12px;">
-              <div style="width:22px;height:22px;border-radius:50%;background:rgba(239,68,68,0.12);
-                display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;
-                color:#ef4444;flex-shrink:0;">${i + 1}</div>
-              <span style="font-size:12px;color:#94a3b8;line-height:1.6;">${g}</span>
+          ${gaps.map((g, i) => `
+          <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;
+            background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
+            <div style="width:22px;height:22px;border-radius:50%;background:#dc2626;
+              display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">
+              <span style="font-size:10px;font-weight:900;color:white;">${i + 1}</span>
             </div>
-          `).join("")}
+            <span style="font-size:11px;color:#374151;line-height:1.5;">${g}</span>
+          </div>`).join("")}
         </div>
       </div>` : ""}
 
-      <!-- Revenue opportunity -->
-      ${lead.revenueOpportunity ? `
-      <div>
-        ${sh("الفرصة التجارية", "تقدير الإمكانية الاستراتيجية")}
-        <div style="background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));
-          border:1px solid rgba(34,197,94,0.15);border-radius:12px;padding:18px 20px;">
-          <div style="font-size:13px;color:#94a3b8;line-height:1.85;">${lead.revenueOpportunity}</div>
-        </div>
-      </div>` : ""}
-
-      <!-- Sales angle -->
-      ${lead.suggestedSalesEntryAngle ? `
-      <div>
-        ${sh("زاوية الدخول المقترحة")}
-        ${card(`<div style="font-size:13px;color:#94a3b8;line-height:1.85;">${lead.suggestedSalesEntryAngle}</div>`, "#0ea5e9")}
-      </div>` : ""}
-
-      <!-- Ice breaker -->
-      ${lead.iceBreaker ? `
-      <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);
-        border-radius:10px;padding:14px 18px;display:flex;align-items:flex-start;gap:12px;">
-        <div style="font-size:20px;flex-shrink:0;">💬</div>
+      <!-- Revenue & Entry -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+        ${revenueOpp ? `
         <div>
-          <div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px;">مقترح فاتحة الحديث</div>
-          <div style="font-size:12px;color:#94a3b8;line-height:1.7;">${lead.iceBreaker}</div>
-        </div>
-      </div>` : ""}
+          ${sh("فرصة الإيراد")}
+          <div style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+            font-size:12px;color:#374151;line-height:1.7;">${cleanMarkdown(revenueOpp)}</div>
+        </div>` : ""}
+        ${entryAngle ? `
+        <div>
+          ${sh("زاوية الدخول المقترحة")}
+          <div style="padding:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
+            font-size:12px;color:#374151;line-height:1.7;">${cleanMarkdown(entryAngle)}</div>
+        </div>` : ""}
+      </div>
 
+      <!-- Scores detail -->
+      <div>
+        ${sh("مؤشرات الأداء الرئيسية")}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;">
+          ${progressBar(priScore, "درجة الأولوية")}
+          ${progressBar(qualScore, "جودة البيانات")}
+          ${progressBar(wsScore, "تقييم الموقع الإلكتروني")}
+          ${progressBar(bestSocial?.engagementScore, "التفاعل على السوشيال ميديا")}
+          ${progressBar(websiteAnalysis?.seoScore, "تحسين محركات البحث (SEO)")}
+          ${progressBar(websiteAnalysis?.mobileScore, "تجربة الجوال")}
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
+      background:#f9fafb;border-top:1px solid #e5e7eb;
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:#9ca3af;">${coName} · تقرير سري</div>
+      <div style="font-size:9px;color:#9ca3af;">صفحة 2 من 4</div>
     </div>
   `);
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  PAGE 3 — DIGITAL ASSESSMENT (numbers + visualization)
-  // ─────────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE 3 — DIGITAL ANALYSIS
+  // ═══════════════════════════════════════════════════════════════════════
   const p3 = page(`
-    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(14,165,233,0.1);
-      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:18px;font-weight:800;color:#f8fafc;">التقييم الرقمي</div>
-      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 3</div>
+    <!-- Page header -->
+    <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:15px;font-weight:900;color:white;">التحليل الرقمي التفصيلي</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.7);">${lead.companyName || ""} · ${coName}</div>
     </div>
-    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
 
-    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
+    <div style="padding:28px 40px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
 
-      <!-- Overall score overview -->
-      <div>
-        ${sh("نظرة عامة على الأداء الرقمي")}
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-          ${statBox("🎯", "الأولوية", priScore ? priScore.toFixed(0) + "/10" : "—", sc(priScore))}
-          ${statBox("📱", "متوسط السوشيال", avgSocialScore ? avgSocialScore.toFixed(1) + "/10" : "—", sc(avgSocialScore))}
-          ${statBox("🌐", "تقييم الموقع", wsScore ? wsScore.toFixed(1) + "/10" : "—", sc(wsScore))}
-          ${statBox("👥", "إجمالي المتابعين", fmtK(totalFollowers || null), "#0ea5e9")}
+        <!-- Website Analysis -->
+        <div>
+          ${sh("تحليل الموقع الإلكتروني", lead.website ? cleanUrl(lead.website) : "")}
+          ${wsScore !== null ? `
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+            ${scoreBadge(wsScore, "الدرجة الكلية")}
+            ${scoreBadge(websiteAnalysis?.speedScore, "السرعة")}
+            ${scoreBadge(websiteAnalysis?.mobileScore, "الجوال")}
+          </div>
+          <div style="margin-bottom:12px;">
+            ${progressBar(websiteAnalysis?.seoScore, "تحسين SEO")}
+            ${progressBar(websiteAnalysis?.contentQualityScore, "جودة المحتوى")}
+            ${progressBar(websiteAnalysis?.designScore, "التصميم والتجربة")}
+            ${progressBar(websiteAnalysis?.conversionScore, "وضوح العروض")}
+          </div>` : `<div style="padding:16px;background:#f9fafb;border-radius:8px;font-size:11px;color:#6b7280;text-align:center;">لم يتم تحليل الموقع بعد</div>`}
+          ${websiteAnalysis?.summary ? `
+          <div style="font-size:11px;color:#374151;line-height:1.7;background:#f9fafb;
+            padding:12px;border-radius:8px;border-right:3px solid #1d4ed8;">
+            ${cleanMarkdown(websiteAnalysis.summary.substring(0, 300))}...
+          </div>` : ""}
+        </div>
+
+        <!-- Social Analysis -->
+        <div>
+          ${sh("تحليل السوشيال ميديا", bestSocial ? `أفضل منصة: ${pm(bestSocial.platform).name}` : "")}
+          ${bestSocial ? `
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+            ${scoreBadge(bestSocial.engagementScore, "التفاعل")}
+            ${scoreBadge(bestSocial.contentQualityScore, "المحتوى")}
+            ${scoreBadge(bestSocial.overallScore, "الإجمالي")}
+          </div>
+          <!-- Platform stats -->
+          ${(() => {
+            const extra = parseSocialExtra(bestSocial.rawData);
+            const followers = extra.followers || extra.followersCount || bestSocial.followersCount;
+            const posts = extra.posts || extra.postsCount || bestSocial.postsCount;
+            const following = extra.following || extra.followingCount;
+            return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+              <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px;">
+                <div style="font-size:16px;font-weight:900;color:#1d4ed8;">${fmtK(followers)}</div>
+                <div style="font-size:9px;color:#6b7280;margin-top:2px;">متابع</div>
+              </div>
+              <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px;">
+                <div style="font-size:16px;font-weight:900;color:#1d4ed8;">${fmtK(posts)}</div>
+                <div style="font-size:9px;color:#6b7280;margin-top:2px;">منشور</div>
+              </div>
+              <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px;">
+                <div style="font-size:16px;font-weight:900;color:#1d4ed8;">${fmtK(following)}</div>
+                <div style="font-size:9px;color:#6b7280;margin-top:2px;">يتابع</div>
+              </div>
+            </div>`;
+          })()}
+          ${bestSocial.summary ? `
+          <div style="font-size:11px;color:#374151;line-height:1.7;background:#f9fafb;
+            padding:12px;border-radius:8px;border-right:3px solid #e1306c;">
+            ${cleanMarkdown(bestSocial.summary.substring(0, 280))}...
+          </div>` : ""}` : `<div style="padding:16px;background:#f9fafb;border-radius:8px;font-size:11px;color:#6b7280;text-align:center;">لم يتم تحليل السوشيال ميديا بعد</div>`}
         </div>
       </div>
 
-      <!-- Website analysis -->
-      ${websiteAnalysis ? `
-      <div>
-        ${sh("تحليل الموقع الإلكتروني", lead.website || "")}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div>
-            ${wsItems.filter(i => i.value).map(i => bar(i.value, i.label)).join("")}
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-            ${wsItems.filter(i => i.value).map(i => `
-              <div style="background:rgba(255,255,255,0.03);border:1px solid ${sc(i.value)}18;
-                border-radius:8px;padding:10px;text-align:center;">
-                <div style="font-size:20px;font-weight:900;color:${sc(i.value)};
-                  text-shadow:${sg(i.value)};line-height:1;">${fmt(i.value)}</div>
-                <div style="font-size:9px;color:#475569;margin-top:4px;font-weight:600;">${i.label}</div>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-        ${websiteAnalysis.summary ? `<div style="margin-top:12px;font-size:12px;color:#64748b;line-height:1.7;
-          background:rgba(255,255,255,0.02);border-radius:8px;padding:12px 14px;">${websiteAnalysis.summary}</div>` : ""}
-      </div>` : ""}
-
-      <!-- Social media numbers -->
-      ${socials.length > 0 ? `
-      <div>
-        ${sh("أرقام منصات التواصل الاجتماعي")}
-        <div style="display:grid;grid-template-columns:repeat(${Math.min(socials.length, 3)},1fr);gap:12px;">
-          ${socials.map(sa => {
-            const m = pm(sa.platform);
-            return `
-              <div style="background:linear-gradient(135deg,#0d1f3c,#080f1e);border:1px solid ${m.color}18;
-                border-radius:12px;padding:16px;position:relative;overflow:hidden;">
-                <div style="position:absolute;top:0;right:0;width:60px;height:60px;
-                  background:radial-gradient(circle,${m.color}08 0%,transparent 70%);"></div>
-                <!-- Platform header -->
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                  <div style="display:flex;align-items:center;gap:7px;">
-                    <span style="font-size:16px;">${m.icon}</span>
-                    <span style="font-size:13px;font-weight:700;color:${m.color};">${m.name}</span>
-                  </div>
-                  ${sa.overallScore ? ring(Number(sa.overallScore), 36) : ""}
-                </div>
-                <!-- Key numbers -->
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
-                  ${sa.followersCount ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;">
-                    <div style="font-size:16px;font-weight:900;color:${m.color};">${fmtK(sa.followersCount)}</div>
-                    <div style="font-size:9px;color:#475569;">متابع</div>
-                  </div>` : ""}
-                  ${sa.postsCount ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;">
-                    <div style="font-size:16px;font-weight:900;color:#94a3b8;">${fmtK(sa.postsCount)}</div>
-                    <div style="font-size:9px;color:#475569;">منشور</div>
-                  </div>` : ""}
-                  ${sa.engagementRate ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;">
-                    <div style="font-size:16px;font-weight:900;color:#22c55e;">${Number(sa.engagementRate).toFixed(2)}%</div>
-                    <div style="font-size:9px;color:#475569;">تفاعل</div>
-                  </div>` : ""}
-                  ${sa.avgLikes ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;">
-                    <div style="font-size:16px;font-weight:900;color:#f97316;">${fmtK(sa.avgLikes)}</div>
-                    <div style="font-size:9px;color:#475569;">متوسط إعجاب</div>
-                  </div>` : ""}
-                </div>
-                <!-- Sub-scores bars -->
-                ${(sa.postingFrequencyScore || sa.engagementScore || sa.contentQualityScore) ? `
-                <div style="border-top:1px solid rgba(255,255,255,0.04);padding-top:10px;">
-                  ${bar(sa.postingFrequencyScore, "التكرار")}
-                  ${bar(sa.engagementScore,       "التفاعل")}
-                  ${bar(sa.contentQualityScore,   "المحتوى")}
-                </div>` : ""}
-              </div>
-            `;
+      <!-- All platforms -->
+      ${socialAnalyses.length > 1 ? `
+      <div style="margin-top:20px;">
+        ${sh("جميع المنصات", `${socialAnalyses.length} منصات محللة`)}
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(socialAnalyses.length, 4)},1fr);gap:10px;">
+          ${socialAnalyses.slice(0, 4).map(s => {
+            const meta = pm(s.platform);
+            return `<div style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-align:center;border-top:3px solid ${meta.color};">
+              <div style="font-size:12px;font-weight:700;color:${meta.color};margin-bottom:6px;">${meta.name}</div>
+              <div style="font-size:20px;font-weight:900;color:#111827;">${s.engagementScore ? Number(s.engagementScore).toFixed(1) : "—"}</div>
+              <div style="font-size:9px;color:#6b7280;margin-top:2px;">درجة التفاعل</div>
+            </div>`;
           }).join("")}
         </div>
       </div>` : ""}
+    </div>
 
-      <!-- Full report excerpt -->
-      ${report?.fullReport ? `
-      <div>
-        ${sh("التحليل التفصيلي")}
-        ${card(`<div style="font-size:12px;color:#94a3b8;line-height:1.9;">
-          <p>${cleanMarkdown(typeof report.fullReport === "string" ? report.fullReport.slice(0, 800) + (report.fullReport.length > 800 ? "..." : "") : "")}</p>
-        </div>`)}
-      </div>` : ""}
-
+    <!-- Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
+      background:#f9fafb;border-top:1px solid #e5e7eb;
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:#9ca3af;">${coName} · تقرير سري</div>
+      <div style="font-size:9px;color:#9ca3af;">صفحة 3 من 4</div>
     </div>
   `);
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  PAGE 4 — PLATFORMS ASSESSMENT + TARGETS + CTA + FOOTER
-  // ─────────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE 4 — RECOMMENDATIONS + CTA
+  // ═══════════════════════════════════════════════════════════════════════
   const p4 = page(`
-    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(139,92,246,0.1);
-      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:18px;font-weight:800;color:#f8fafc;">التوصيات والخطوة القادمة</div>
-      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 4</div>
+    <!-- Page header -->
+    <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:15px;font-weight:900;color:white;">التوصيات والخطوات التالية</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.7);">${lead.companyName || ""} · ${coName}</div>
     </div>
-    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
 
-    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
+    <div style="padding:28px 40px;">
 
-      <!-- Before / After comparison -->
-      <div>
-        ${sh("مقارنة الوضع الحالي مع المستهدف")}
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:stretch;">
-          <!-- Current -->
-          <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);
-            border-radius:12px 0 0 12px;padding:18px 20px;">
-            <div style="font-size:12px;font-weight:700;color:#ef4444;margin-bottom:14px;">⚠️ الوضع الحالي</div>
-            ${gaps.slice(0, 4).map(g => `
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div>
-                <span style="font-size:11px;color:#64748b;line-height:1.6;">${g}</span>
-              </div>
-            `).join("")}
-            ${!gaps.length ? `
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">غياب استراتيجية رقمية موثقة</span></div>
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">محدودية الظهور في البحث المحلي</span></div>
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">ضعف استثمار قنوات التواصل</span></div>
-            ` : ""}
-            <div style="margin-top:14px;text-align:center;">
-              <div style="font-size:32px;font-weight:900;color:#ef4444;text-shadow:0 0 14px rgba(239,68,68,0.5);">
-                ${wsScore ? wsScore.toFixed(0) : (priScore ? priScore.toFixed(0) : "—")}/10
-              </div>
-              <div style="font-size:10px;color:#475569;margin-top:3px;">الدرجة الحالية</div>
+      <!-- Recommendations -->
+      ${recs.length ? `
+      <div style="margin-bottom:24px;">
+        ${sh("التوصيات الاستراتيجية", "خطوات عملية لتحسين الأداء التسويقي")}
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${recs.map((r, i) => `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;
+            background:${i === 0 ? "#eff6ff" : "#f9fafb"};
+            border:1px solid ${i === 0 ? "#bfdbfe" : "#e5e7eb"};border-radius:10px;">
+            <div style="width:28px;height:28px;border-radius:50%;
+              background:${i === 0 ? "#1d4ed8" : "#e5e7eb"};
+              display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span style="font-size:12px;font-weight:900;color:${i === 0 ? "white" : "#6b7280"};">${i + 1}</span>
             </div>
-          </div>
-          <!-- Arrow -->
-          <div style="display:flex;align-items:center;justify-content:center;padding:0 16px;
-            background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.04);
-            border-bottom:1px solid rgba(255,255,255,0.04);">
-            <div style="font-size:28px;color:#334155;">→</div>
-          </div>
-          <!-- Target -->
-          <div style="background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.15);
-            border-radius:0 12px 12px 0;padding:18px 20px;">
-            <div style="font-size:12px;font-weight:700;color:#22c55e;margin-bottom:14px;">✅ مع ${coName}</div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">حضور رقمي متكامل عبر جميع المنصات</span></div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">استراتيجية محتوى مبنية على بيانات الجمهور</span></div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">تعزيز الظهور العضوي في محركات البحث</span></div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">تحويل الزيارات إلى إيراد قابل للقياس</span></div>
-            ${lead.revenueOpportunity ? `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#0ea5e9;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#0ea5e9;font-weight:600;">${lead.revenueOpportunity.slice(0, 90)}${lead.revenueOpportunity.length > 90 ? "..." : ""}</span></div>` : ""}
-            <div style="margin-top:14px;text-align:center;">
-              <div style="font-size:32px;font-weight:900;color:#22c55e;text-shadow:0 0 14px rgba(34,197,94,0.5);">9+/10</div>
-              <div style="font-size:10px;color:#475569;margin-top:3px;">الهدف المستهدف</div>
+            <div style="flex:1;">
+              <div style="font-size:12px;color:#111827;line-height:1.6;">${r}</div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Social platform assessment (text summaries) -->
-      ${socials.filter(s => s.analysisText).length > 0 ? `
-      <div>
-        ${sh("تقييم المنصات", "ملخص الأداء والتوصيات لكل منصة")}
-        <div style="display:grid;grid-template-columns:repeat(${Math.min(socials.filter(s => s.analysisText).length, 2)},1fr);gap:10px;">
-          ${socials.filter(s => s.analysisText).map(sa => {
-            const m = pm(sa.platform);
-            const gapsList: string[] = Array.isArray(sa.gaps) ? sa.gaps.slice(0, 2) : [];
-            return `
-              <div style="background:rgba(255,255,255,0.02);border:1px solid ${m.color}15;border-radius:10px;padding:14px 16px;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                  <span>${m.icon}</span>
-                  <span style="font-size:12px;font-weight:700;color:${m.color};">${m.name}</span>
-                  ${sa.overallScore ? `<span style="font-size:11px;font-weight:800;color:${sc(Number(sa.overallScore))};margin-right:auto;">${Number(sa.overallScore).toFixed(0)}/10</span>` : ""}
-                </div>
-                <div style="font-size:11px;color:#64748b;line-height:1.65;margin-bottom:8px;">
-                  ${sa.analysisText.slice(0, 180)}${sa.analysisText.length > 180 ? "..." : ""}
-                </div>
-                ${gapsList.length > 0 ? gapsList.map(g => `<div style="font-size:10px;color:#ef4444;margin-bottom:3px;">• ${g}</div>`).join("") : ""}
-              </div>
-            `;
-          }).join("")}
+          </div>`).join("")}
         </div>
       </div>` : ""}
 
-      <!-- Spacer -->
-      <div style="flex:1;"></div>
+      <!-- Report summary -->
+      ${report?.fullReport ? `
+      <div style="margin-bottom:24px;">
+        ${sh("ملاحظات إضافية")}
+        <div style="font-size:11px;color:#374151;line-height:1.8;background:#f9fafb;
+          padding:14px;border-radius:8px;max-height:120px;overflow:hidden;">
+          ${cleanMarkdown(report.fullReport.substring(0, 500))}...
+        </div>
+      </div>` : ""}
 
       <!-- CTA -->
-      <div style="background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.05));
-        border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:20px 24px;
-        display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:16px;font-weight:800;color:#f8fafc;margin-bottom:6px;">
-            هل أنت مستعد للخطوة القادمة؟
+      <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border-radius:14px;
+        padding:28px 32px;text-align:center;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;
+          border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+        <div style="position:absolute;bottom:-40px;left:-20px;width:150px;height:150px;
+          border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+        <div style="position:relative;z-index:1;">
+          <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:8px;letter-spacing:1px;">الخطوة التالية</div>
+          <div style="font-size:20px;font-weight:900;color:white;margin-bottom:8px;">
+            هل أنت مستعد للارتقاء بـ ${lead.companyName || "عملك"}؟
           </div>
-          <div style="font-size:12px;color:#475569;line-height:1.6;">
-            يسعدنا تقديم عرض مخصص يتوافق مع أهداف نشاطكم التجاري وميزانيتكم
+          <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:20px;line-height:1.6;">
+            تواصل معنا اليوم للحصول على استشارة مجانية وخطة عمل مخصصة
           </div>
-        </div>
-        <div style="text-align:center;flex-shrink:0;">
-          <div style="font-size:18px;font-weight:900;color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,0.5);">
-            ${company?.phone || company?.email || "maksab-ksa.com"}
+          <div style="display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;">
+            ${company?.phone ? `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">📞 ${company.phone}</div>` : ""}
+            ${company?.website ? `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">🌐 ${company.website}</div>` : `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">🌐 maksab-ksa.com</div>`}
+            ${company?.email ? `<div style="padding:8px 20px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:700;color:white;">✉️ ${company.email}</div>` : ""}
           </div>
-          <div style="font-size:9px;color:#334155;margin-top:2px;letter-spacing:1px;">تواصل معنا الآن</div>
         </div>
       </div>
-
     </div>
 
-    <!-- ══ FOOTER ══ -->
-    <div style="background:#030810;border-top:1px solid rgba(34,197,94,0.07);padding:20px 40px;
-      display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-      <!-- QR codes -->
-      <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-        <!-- QR موقع الشركة -->
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr(company?.website || "https://maksab-ksa.com")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(34,197,94,0.2);background:#0f172a;padding:3px;" alt="QR الموقع">
-          <div style="font-size:8px;font-weight:700;color:#22c55e;letter-spacing:0.3px;">موقع ${coName}</div>
-        </div>
-        <!-- QR السجل التجاري -->
-        ${lead.crNumber ? `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr("https://mc.gov.sa/ar/eservices/Pages/ServiceDetails.aspx?sID=" + lead.crNumber, "0ea5e9")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(14,165,233,0.2);background:#0f172a;padding:3px;" alt="QR السجل">
-          <div style="font-size:8px;font-weight:700;color:#0ea5e9;">السجل التجاري</div>
-          <div style="font-size:7px;color:#334155;font-family:monospace;">${lead.crNumber}</div>
-        </div>` : ""}
-        <!-- QR موقع العميل -->
-        ${lead.website ? `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr(lead.website, "8b5cf6")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(139,92,246,0.2);background:#0f172a;padding:3px;" alt="QR موقع العميل">
-          <div style="font-size:8px;font-weight:700;color:#8b5cf6;">موقع العميل</div>
-        </div>` : ""}
-        <!-- QR خرائط جوجل -->
-        ${lead.googleMapsUrl ? `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr(lead.googleMapsUrl, "eab308")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(234,179,8,0.2);background:#0f172a;padding:3px;" alt="QR خرائط">
-          <div style="font-size:8px;font-weight:700;color:#eab308;">خرائط جوجل</div>
-        </div>` : ""}
-        <!-- Company info -->
-        <div style="font-size:10px;color:#334155;line-height:1.8;padding-top:4px;">
-          <div style="font-weight:700;color:#22c55e;font-size:11px;margin-bottom:3px;">${coName}</div>
-          <div>${company?.website || "maksab-ksa.com"}</div>
-          ${company?.email ? `<div>${company.email}</div>` : ""}
-          ${company?.phone ? `<div>${company.phone}</div>` : ""}
-          ${company?.address ? `<div style="margin-top:2px;">${company.address}</div>` : ""}
-          ${company?.reportFooterText ? `<div style="margin-top:2px;color:#1e293b;">${company.reportFooterText}</div>` : ""}
-        </div>
-      </div>
-      <!-- Date + confidential -->
-      <div style="text-align:left;font-size:10px;color:#334155;line-height:1.8;">
-        <div>تاريخ الإصدار: ${reportDate}</div>
-        <div style="color:#22c55e22;font-size:9px;margin-top:2px;">حصري من ${coName} — جميع الحقوق محفوظة</div>
-        <div style="font-size:8px;color:#1e293b;margin-top:3px;letter-spacing:1.5px;">CONFIDENTIAL</div>
-      </div>
+    <!-- Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 40px;
+      background:linear-gradient(135deg,#1e3a8a,#1d4ed8);
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.6);">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.6);">CONFIDENTIAL · صفحة 4 من 4</div>
     </div>
   `, false);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  ASSEMBLE HTML
+  //  ASSEMBLE & OPEN PRINT WINDOW
   // ═══════════════════════════════════════════════════════════════════════
-  // اسم الملف المخصص
-  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
-  const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
-
-  const html = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <title>${fileName}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box;}
-    @page{
-      size:A3 portrait;
-      margin:10mm 10mm 10mm 10mm;
-    }
-    body{
-      font-family:'Tajawal',sans-serif;
-      direction:rtl;
-      text-align:right;
-      background:#060d1a;
-      color:#e2e8f0;
-      font-size:14px;
-      line-height:1.65;
-      -webkit-print-color-adjust:exact;
-      print-color-adjust:exact;
-    }
-    .wm{
-      position:fixed;top:50%;left:50%;
-      transform:translate(-50%,-50%) rotate(-35deg);
-      font-size:100px;font-weight:900;
-      color:rgba(34,197,94,0.025);
-      white-space:nowrap;pointer-events:none;
-      z-index:9998;letter-spacing:8px;
-    }
-    @media print{
-      body{background:#060d1a!important;}
-      .wm{color:rgba(34,197,94,0.04)!important;}
-    }
-  </style>
-</head>
-<body>
-<div class="wm">حصري من ${coName}</div>
-<div id="pdf-content">
-  ${p1}
-  ${p2}
-  ${p3}
-  ${p4}
-</div>
-<script>
-// تحميل تلقائي بعد تحميل الخط
-window.addEventListener('load', function() {
-  setTimeout(function() {
-    window.__PDF_READY__ = true;
-  }, 1500);
-});
-</script>
-</body>
-</html>`;
-
-  // ═══ الحل النهائي لـ oklch: استخدام iframe معزول بـ srcdoc ═══
-  // iframe لا يرث CSS الصفحة الأم، لذا لا يوجد oklch
-  const iframeHTML = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{
-  font-family:'Tajawal',sans-serif;
-  direction:rtl;text-align:right;
-  background:#060d1a;color:#e2e8f0;
-  font-size:14px;line-height:1.65;
-  width:1123px;
-  -webkit-font-smoothing:antialiased;
-}
-</style>
-</head>
-<body>
-${p1}${p2}${p3}${p4}</body>
-</html>`;
-
-  // ɕɔɕ فتح نافذة جديدة مع HTML التقرير وزر طباعة لحفظ PDF (بدون Puppeteer) ɕɔɕ
-  // نضيف شريط أدوات فوق التقرير مع زر "حفظ PDF" الذي يستدعي window.print()
   const printHTML = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <title>${fileName}</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
 <style>
-  @media print { #print-toolbar { display: none !important; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Tajawal', 'Arial', sans-serif;
+    direction: rtl;
+    text-align: right;
+    background: #e5e7eb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  @media print {
+    body { background: white; margin: 0; padding: 0; }
+    #print-toolbar { display: none !important; }
+    .page-wrapper { box-shadow: none !important; margin: 0 !important; }
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
   #print-toolbar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
-    background: #0f172a; border-bottom: 1px solid #22c55e44;
-    padding: 10px 20px; display: flex; align-items: center;
+    background: #1e3a8a; border-bottom: 3px solid #0ea5e9;
+    padding: 10px 24px; display: flex; align-items: center;
     justify-content: space-between; gap: 12px;
     font-family: 'Tajawal', sans-serif; direction: rtl;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.3);
   }
-  #print-toolbar .title { color: #e2e8f0; font-size: 14px; font-weight: 700; }
-  #print-toolbar .hint { color: #94a3b8; font-size: 12px; }
-  #print-toolbar button {
+  #print-toolbar .info { display: flex; flex-direction: column; gap: 2px; }
+  #print-toolbar .title { color: white; font-size: 14px; font-weight: 700; }
+  #print-toolbar .hint { color: rgba(255,255,255,0.6); font-size: 11px; }
+  #print-toolbar .actions { display: flex; gap: 8px; align-items: center; }
+  #print-toolbar .btn-print {
     background: #22c55e; color: #000; border: none; border-radius: 8px;
-    padding: 8px 20px; font-size: 14px; font-weight: 700;
+    padding: 8px 20px; font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: 'Tajawal', sans-serif;
+    display: flex; align-items: center; gap: 6px;
+  }
+  #print-toolbar .btn-print:hover { background: #16a34a; }
+  #print-toolbar .btn-close {
+    background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600;
     cursor: pointer; font-family: 'Tajawal', sans-serif;
   }
-  #print-toolbar button:hover { background: #16a34a; }
-  body { margin-top: 60px; }
-  @media print { body { margin-top: 0; } }
+  #print-toolbar .btn-close:hover { background: rgba(255,255,255,0.2); }
+  .pages-container {
+    padding: 70px 20px 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  }
+  @media print {
+    .pages-container { padding: 0; gap: 0; }
+  }
+  .page-wrapper {
+    width: 210mm;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    background: white;
+  }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="print-toolbar">
-  <div>
+  <div class="info">
     <div class="title">📄 ${fileName}</div>
-    <div class="hint">اضغط "حفظ PDF" ثم اختر "حفظ كـ PDF" من إعدادات الطباعة</div>
+    <div class="hint">اضغط "حفظ PDF" ← اختر "حفظ كـ PDF" ← تأكد من تفعيل "رسومات الخلفية"</div>
   </div>
-  <button onclick="window.print()">⬇️ حفظ PDF</button>
+  <div class="actions">
+    <button class="btn-print" onclick="window.print()">⬇️ حفظ PDF</button>
+    <button class="btn-close" onclick="window.close()">✕ إغلاق</button>
+  </div>
 </div>
-${iframeHTML.replace(/<\/body>/, '').replace(/[\s\S]*<body[^>]*>/, '')}
+<div class="pages-container">
+  <div class="page-wrapper">${p1}</div>
+  <div class="page-wrapper">${p2}</div>
+  <div class="page-wrapper">${p3}</div>
+  <div class="page-wrapper">${p4}</div>
+</div>
 </body>
 </html>`;
 
@@ -859,574 +625,22 @@ ${iframeHTML.replace(/<\/body>/, '').replace(/[\s\S]*<body[^>]*>/, '')}
   printWindow.document.close();
 }
 
-// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ
-//  buildReportHTML - دالة مشتركة لبناء HTML التقرير (تستخدمها generate و preview)
-// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ
+// ═══════════════════════════════════════════════════════════════════════
+//  buildReportHTML - دالة مشتركة لبناء HTML التقرير (للمعاينة)
+// ═══════════════════════════════════════════════════════════════════════
 function buildReportHTML(options: GeneratePDFOptions): { html: string; fileName: string } {
-  const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
+  const { lead, company } = options;
   if (!lead) throw new Error("لا توجد بيانات للعميل");
-
-  const coName    = company?.companyName || "مكسب";
-  const coLogo    = company?.logoUrl || "";
-  const clLogo    = lead.clientLogoUrl || "";
-  const reportDate = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
-  const urgency   = urg(lead.urgencyLevel || lead.priority);
-  const priScore  = lead.leadPriorityScore ? Number(lead.leadPriorityScore) : null;
-  const qualScore = lead.dataQualityScore  ? Number(lead.dataQualityScore)  : null;
-  const wsScore   = websiteAnalysis?.overallScore ? Number(websiteAnalysis.overallScore) : null;
-
-  const phones: string[] = [];
-  const vp = cleanPhone(lead.verifiedPhone), lp = cleanPhone(lead.phone);
-  if (vp) phones.push(vp);
-  if (lp && lp !== vp) phones.push(lp);
-  try {
-    const arr = typeof lead.additionalPhones === "string" ? JSON.parse(lead.additionalPhones) : lead.additionalPhones;
-    if (Array.isArray(arr)) arr.forEach((p: string) => { const cp = cleanPhone(p); if (cp && !phones.includes(cp)) phones.push(cp); });
-  } catch {}
-
-  const gaps: string[] = [];
-  if (lead.biggestMarketingGap) {
-    lead.biggestMarketingGap.split(/\n|•|-/).map((s: string) => s.trim()).filter(Boolean).slice(0, 6).forEach((g: string) => gaps.push(g));
-  }
-
-  const socials = socialAnalyses.map((sa: any) => {
-    const ex = parseSocialExtra(sa.rawAnalysis);
-    return {
-      ...sa,
-      followersCount:        sa.followersCount        || ex.followersCount        || ex.followers_count        || null,
-      postsCount:            sa.postsCount            || ex.postsCount            || ex.posts_count            || null,
-      engagementRate:        sa.engagementRate        || ex.engagementRate        || ex.engagement_rate        || null,
-      avgLikes:              sa.avgLikes              || ex.avgLikes              || ex.avg_likes              || null,
-      avgViews:              sa.avgViews              || ex.avgViews              || ex.avg_views              || null,
-      analysisText:          sa.analysisText          || sa.summary               || ex.summary                || null,
-      overallScore:          sa.overallScore          || ex.overallScore          || null,
-      postingFrequencyScore: sa.postingFrequencyScore || ex.postingFrequencyScore || null,
-      engagementScore:       sa.engagementScore       || ex.engagementScore       || null,
-      contentQualityScore:   sa.contentQualityScore   || ex.contentQualityScore   || null,
-      gaps:                  sa.gaps                  || ex.gaps                  || [],
-    };
-  });
-
-  const wsItems = websiteAnalysis ? [
-    { label: "الإجمالي",  value: websiteAnalysis.overallScore },
-    { label: "السرعة",    value: websiteAnalysis.loadSpeedScore },
-    { label: "الجوال",    value: websiteAnalysis.mobileExperienceScore },
-    { label: "SEO",       value: websiteAnalysis.seoScore },
-    { label: "المحتوى",   value: websiteAnalysis.contentQualityScore },
-    { label: "التصميم",   value: websiteAnalysis.designScore },
-  ] : [];
-
-  const sLinks = [
-    lead.instagramUrl && { icon: "📸", label: "إنستغرام", val: cleanUrl(lead.instagramUrl, "instagram") },
-    lead.twitterUrl   && { icon: "🐦", label: "تويتر",    val: cleanUrl(lead.twitterUrl,   "twitter")   },
-    lead.tiktokUrl    && { icon: "🎵", label: "تيك توك",  val: cleanUrl(lead.tiktokUrl,    "tiktok")    },
-    lead.snapchatUrl  && { icon: "👻", label: "سناب",     val: cleanUrl(lead.snapchatUrl,  "snapchat")  },
-    lead.facebookUrl  && { icon: "📘", label: "فيسبوك",   val: cleanUrl(lead.facebookUrl,  "facebook")  },
-    lead.linkedinUrl  && { icon: "💼", label: "لينكد إن", val: cleanUrl(lead.linkedinUrl,  "linkedin")  },
-  ].filter(Boolean) as { icon: string; label: string; val: string }[];
-
-  const socialScores = socials.map(s => s.overallScore ? Number(s.overallScore) : null).filter(Boolean) as number[];
-  const avgSocialScore = socialScores.length ? socialScores.reduce((a, b) => a + b, 0) / socialScores.length : null;
-  const totalFollowers = socials.reduce((sum, s) => sum + (s.followersCount ? Number(s.followersCount) : 0), 0);
-
-  const safeLeadName = (lead.companyName || "عميل").replace(/[\/\\?%*:|"<>]/g, "-");
+  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
   const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
-
-  // صفحة 1
-  const bp1 = page(`
-    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(34,197,94,0.02) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(34,197,94,0.02) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;"></div>
-    <div style="position:absolute;top:-80px;right:-80px;width:400px;height:400px;border-radius:50%;
-      background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 65%);pointer-events:none;"></div>
-    <div style="position:absolute;bottom:-80px;left:-80px;width:350px;height:350px;border-radius:50%;
-      background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 65%);pointer-events:none;"></div>
-    <div style="padding:24px 48px;display:flex;justify-content:space-between;align-items:center;
-      border-bottom:1px solid rgba(255,255,255,0.05);position:relative;z-index:1;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        ${coLogo ? `<img src="${coLogo}" style="width:44px;height:44px;border-radius:10px;object-fit:contain;background:#0f172a;padding:3px;border:1px solid rgba(34,197,94,0.2);" alt="${coName}">` : `<div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#22c55e;">${coName.charAt(0)}</div>`}
-        <div>
-          <div style="font-size:16px;font-weight:800;color:#f8fafc;">${coName}</div>
-          <div style="font-size:10px;color:#475569;letter-spacing:0.5px;">${company?.reportHeaderText || "تقرير تحليل الوضع الرقمي"}</div>
-        </div>
-      </div>
-      <div style="text-align:left;font-size:10px;color:#334155;line-height:1.8;">
-        <div>رقم التقرير: <strong style="color:#22c55e;">#${String(lead.id || "—").padStart(6, "0")}</strong></div>
-        <div>${reportDate}</div>
-        ${company?.licenseNumber ? `<div>ترخيص: ${company.licenseNumber}</div>` : ""}
-      </div>
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-      padding:32px 60px;position:relative;z-index:1;text-align:center;">
-      <div style="margin-bottom:20px;">
-        ${clLogo ? `<img src="${clLogo}" style="width:100px;height:100px;border-radius:20px;object-fit:contain;background:#0f172a;padding:6px;border:2px solid rgba(255,255,255,0.1);box-shadow:0 0 30px rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.5);" alt="${lead.companyName}" onerror="this.style.display='none';">` : `<div style="width:100px;height:100px;border-radius:20px;background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#64748b;box-shadow:0 8px 32px rgba(0,0,0,0.5);margin:0 auto;">${(lead.companyName || "?").charAt(0)}</div>`}
-      </div>
-      <div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#22c55e;opacity:0.7;margin-bottom:14px;">تقرير تحليل رقمي شامل</div>
-      <div style="font-size:52px;font-weight:900;background:linear-gradient(135deg,#ffffff 0%,#94a3b8 70%);
-        -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1;margin-bottom:10px;">${lead.companyName || "—"}</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
-        font-size:13px;color:#475569;margin-bottom:24px;">
-        ${lead.businessType ? `<span>${lead.businessType}</span>` : ""}
-        ${lead.businessType && lead.city ? `<span style="color:#1e293b;">·</span>` : ""}
-        ${lead.city ? `<span>${lead.city}</span>` : ""}
-        ${lead.crNumber ? `<span style="color:#1e293b;">·</span><span style="color:#0ea5e9;font-weight:700;">سجل: ${lead.crNumber}</span>` : ""}
-        ${lead.socialSince ? `<span style="color:#1e293b;">·</span><span>منذ ${lead.socialSince}</span>` : ""}
-      </div>
-      <div style="width:100px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);margin:0 auto 28px;box-shadow:0 0 10px rgba(34,197,94,0.4);"></div>
-      ${(priScore || qualScore || wsScore || lead.rating) ? `<div style="display:flex;gap:32px;justify-content:center;flex-wrap:wrap;margin-bottom:24px;">${priScore ? ring(priScore, 80, "الأولوية") : ""}${qualScore ? ring(qualScore, 80, "جودة البيانات") : ""}${wsScore ? ring(wsScore, 80, "تقييم الموقع") : ""}${lead.rating ? `<div style="text-align:center;"><div style="font-size:32px;font-weight:900;color:#eab308;text-shadow:0 0 16px rgba(234,179,8,0.6);line-height:1;">⭐ ${lead.rating}</div>${lead.reviewCount ? `<div style="font-size:10px;color:#64748b;margin-top:6px;">${lead.reviewCount} تقييم</div>` : ""}<div style="font-size:10px;color:#64748b;font-weight:600;margin-top:4px;">جوجل</div></div>` : ""}</div>` : ""}
-      <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 24px;border-radius:24px;
-        font-size:12px;font-weight:700;background:${urgency.bg};color:${urgency.color};
-        border:1px solid ${urgency.border};box-shadow:0 0 14px ${urgency.color}22;">${urgency.text}</div>
-    </div>
-    <div style="padding:20px 48px;border-top:1px solid rgba(255,255,255,0.04);
-      display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;">
-      <div style="font-size:10px;color:#334155;line-height:1.8;">
-        <div style="font-weight:700;color:#22c55e;font-size:11px;margin-bottom:2px;">${coName}</div>
-        <div>${company?.website || "maksab-ksa.com"}</div>
-        ${company?.phone ? `<div>${company.phone}</div>` : ""}
-      </div>
-      <div style="font-size:9px;color:#1e293b;letter-spacing:2px;text-transform:uppercase;">حصري · سري · للاستخدام الداخلي فقط</div>
-    </div>
-  `);
-
-  // صفحة 2 - الملخص التنفيذي
-  const bp2 = page(`
-    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(34,197,94,0.1);
-      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:18px;font-weight:800;color:#f8fafc;">الملخص التنفيذي</div>
-      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 2</div>
-    </div>
-    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
-    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        ${card(`
-          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:12px;letter-spacing:0.5px;">بيانات التواصل</div>
-          ${phones.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            ${phones.map(p => `<span style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);
-              border-radius:6px;padding:4px 12px;font-size:13px;font-weight:700;color:#22c55e;font-family:monospace;direction:ltr;">${p}</span>`).join("")}
-          </div>` : ""}
-          ${lead.email ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">📧 ${lead.email}</div>` : ""}
-          ${lead.website ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">🌐 ${lead.website}</div>` : ""}
-          ${sLinks.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
-            ${sLinks.map(s => `<span style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
-              border-radius:5px;padding:3px 8px;font-size:10px;color:#64748b;">${s.icon} ${s.val}</span>`).join("")}
-          </div>` : ""}
-        `)}
-        ${card(`
-          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:12px;letter-spacing:0.5px;">بيانات النشاط</div>
-          ${lead.businessType ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">🏢 ${lead.businessType}</div>` : ""}
-          ${lead.city ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📍 ${lead.city}${lead.country ? "، " + lead.country : ""}</div>` : ""}
-          ${lead.crNumber ? `<div style="font-size:12px;color:#0ea5e9;margin-bottom:6px;font-weight:700;">📋 سجل تجاري: ${lead.crNumber}</div>` : ""}
-          ${lead.socialSince ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📅 على السوشيال منذ: ${lead.socialSince}</div>` : ""}
-          ${lead.rating ? `<div style="font-size:12px;color:#eab308;margin-bottom:6px;">⭐ تقييم جوجل: ${lead.rating}${lead.reviewCount ? " (" + lead.reviewCount + " تقييم)" : ""}</div>` : ""}
-          <div style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:12px;
-            font-size:11px;font-weight:700;background:${urgency.bg};color:${urgency.color};border:1px solid ${urgency.border};">
-            ${urgency.text}
-          </div>
-        `)}
-      </div>
-      ${gaps.length > 0 ? `
-      <div>
-        ${sh("أبرز الفجوات التشغيلية", "نقاط الضعف الحرجة التي تحتاج معالجة فورية")}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          ${gaps.slice(0, 6).map((g, i) => `
-            <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(239,68,68,0.04);
-              border:1px solid rgba(239,68,68,0.1);border-radius:8px;padding:10px 12px;">
-              <div style="width:22px;height:22px;border-radius:50%;background:rgba(239,68,68,0.12);
-                display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;
-                color:#ef4444;flex-shrink:0;">${i + 1}</div>
-              <span style="font-size:12px;color:#94a3b8;line-height:1.6;">${g}</span>
-            </div>
-          `).join("")}
-        </div>
-      </div>` : ""}
-      ${lead.revenueOpportunity ? `
-      <div>
-        ${sh("الفرصة التجارية", "تقدير الإمكانية الاستراتيجية")}
-        <div style="background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));
-          border:1px solid rgba(34,197,94,0.15);border-radius:12px;padding:18px 20px;">
-          <div style="font-size:13px;color:#94a3b8;line-height:1.85;">${lead.revenueOpportunity}</div>
-        </div>
-      </div>` : ""}
-      ${lead.suggestedSalesEntryAngle ? `
-      <div>
-        ${sh("زاوية الدخول المقترحة")}
-        ${card(`<div style="font-size:13px;color:#94a3b8;line-height:1.85;">${lead.suggestedSalesEntryAngle}</div>`, "#0ea5e9")}
-      </div>` : ""}
-      ${lead.iceBreaker ? `
-      <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);
-        border-radius:10px;padding:14px 18px;display:flex;align-items:flex-start;gap:12px;">
-        <div style="font-size:20px;flex-shrink:0;">💬</div>
-        <div>
-          <div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px;">مقترح فاتحة الحديث</div>
-          <div style="font-size:12px;color:#94a3b8;line-height:1.7;">${lead.iceBreaker}</div>
-        </div>
-      </div>` : ""}
-    </div>
-  `);
-
-  // صفحة 3 - التقييم الرقمي
-  const bp3 = page(`
-    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(14,165,233,0.1);
-      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:18px;font-weight:800;color:#f8fafc;">التقييم الرقمي</div>
-      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 3</div>
-    </div>
-    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
-    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
-      <div>
-        ${sh("نظرة عامة على الأداء الرقمي")}
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-          ${statBox("🎯", "الأولوية", priScore ? priScore.toFixed(0) + "/10" : "—", sc(priScore))}
-          ${statBox("📱", "متوسط السوشيال", avgSocialScore ? avgSocialScore.toFixed(1) + "/10" : "—", sc(avgSocialScore))}
-          ${statBox("🌐", "تقييم الموقع", wsScore ? wsScore.toFixed(1) + "/10" : "—", sc(wsScore))}
-          ${statBox("👥", "إجمالي المتابعين", fmtK(totalFollowers || null), "#0ea5e9")}
-        </div>
-      </div>
-      ${websiteAnalysis ? `
-      <div>
-        ${sh("تحليل الموقع الإلكتروني", lead.website || "")}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div>${wsItems.filter(i => i.value).map(i => bar(i.value, i.label)).join("")}</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-            ${wsItems.filter(i => i.value).map(i => `
-              <div style="background:rgba(255,255,255,0.03);border:1px solid ${sc(i.value)}18;
-                border-radius:8px;padding:10px;text-align:center;">
-                <div style="font-size:20px;font-weight:900;color:${sc(i.value)};
-                  text-shadow:${sg(i.value)};line-height:1;">${fmt(i.value)}</div>
-                <div style="font-size:9px;color:#475569;margin-top:4px;font-weight:600;">${i.label}</div>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-        ${websiteAnalysis.summary ? `<div style="margin-top:12px;font-size:12px;color:#64748b;line-height:1.7;
-          background:rgba(255,255,255,0.02);border-radius:8px;padding:12px 14px;">${websiteAnalysis.summary}</div>` : ""}
-      </div>` : ""}
-      ${socials.length > 0 ? `
-      <div>
-        ${sh("أرقام منصات التواصل الاجتماعي")}
-        <div style="display:grid;grid-template-columns:repeat(${Math.min(socials.length, 3)},1fr);gap:12px;">
-          ${socials.map(sa => {
-            const m = pm(sa.platform);
-            return `
-              <div style="background:linear-gradient(135deg,#0d1f3c,#080f1e);border:1px solid ${m.color}18;
-                border-radius:12px;padding:16px;position:relative;overflow:hidden;">
-                <div style="position:absolute;top:0;right:0;width:60px;height:60px;
-                  background:radial-gradient(circle,${m.color}08 0%,transparent 70%);"></div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                  <div style="display:flex;align-items:center;gap:7px;">
-                    <span style="font-size:16px;">${m.icon}</span>
-                    <span style="font-size:13px;font-weight:700;color:${m.color};">${m.name}</span>
-                  </div>
-                  ${sa.overallScore ? ring(Number(sa.overallScore), 36) : ""}
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
-                  ${sa.followersCount ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:${m.color};">${fmtK(sa.followersCount)}</div><div style="font-size:9px;color:#475569;">متابع</div></div>` : ""}
-                  ${sa.postsCount ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#94a3b8;">${fmtK(sa.postsCount)}</div><div style="font-size:9px;color:#475569;">منشور</div></div>` : ""}
-                  ${sa.engagementRate ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#22c55e;">${Number(sa.engagementRate).toFixed(2)}%</div><div style="font-size:9px;color:#475569;">تفاعل</div></div>` : ""}
-                  ${sa.avgLikes ? `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:7px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#f97316;">${fmtK(sa.avgLikes)}</div><div style="font-size:9px;color:#475569;">متوسط إعجاب</div></div>` : ""}
-                </div>
-                ${(sa.postingFrequencyScore || sa.engagementScore || sa.contentQualityScore) ? `
-                <div style="border-top:1px solid rgba(255,255,255,0.04);padding-top:10px;">
-                  ${bar(sa.postingFrequencyScore, "التكرار")}
-                  ${bar(sa.engagementScore,       "التفاعل")}
-                  ${bar(sa.contentQualityScore,   "المحتوى")}
-                </div>` : ""}
-              </div>
-            `;
-          }).join("")}
-        </div>
-      </div>` : ""}
-      ${report?.fullReport ? `
-      <div>
-        ${sh("التحليل التفصيلي")}
-        ${card(`<div style="font-size:12px;color:#94a3b8;line-height:1.9;"><p>${cleanMarkdown(typeof report.fullReport === "string" ? report.fullReport.slice(0, 800) + (report.fullReport.length > 800 ? "..." : "") : "")}</p></div>`)}
-      </div>` : ""}
-    </div>
-  `);
-
-  // صفحة 4 - التوصيات
-  const bp4 = page(`
-    <div style="background:linear-gradient(135deg,#0a1628,#0d1f3c);border-bottom:1px solid rgba(139,92,246,0.1);
-      padding:18px 40px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:18px;font-weight:800;color:#f8fafc;">التوصيات والخطوة القادمة</div>
-      <div style="font-size:11px;color:#334155;">${lead.companyName} · صفحة 4</div>
-    </div>
-    <div style="height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);"></div>
-    <div style="padding:28px 40px;flex:1;display:flex;flex-direction:column;gap:22px;">
-      <div>
-        ${sh("مقارنة الوضع الحالي مع المستهدف")}
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:stretch;">
-          <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);
-            border-radius:12px 0 0 12px;padding:18px 20px;">
-            <div style="font-size:12px;font-weight:700;color:#ef4444;margin-bottom:14px;">⚠️ الوضع الحالي</div>
-            ${gaps.slice(0, 4).map(g => `
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div>
-                <span style="font-size:11px;color:#64748b;line-height:1.6;">${g}</span>
-              </div>
-            `).join("")}
-            ${!gaps.length ? `
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">غياب استراتيجية رقمية موثقة</span></div>
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">محدودية الظهور في البحث المحلي</span></div>
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">ضعف استثمار قنوات التواصل</span></div>
-            ` : ""}
-            <div style="margin-top:14px;text-align:center;">
-              <div style="font-size:32px;font-weight:900;color:#ef4444;text-shadow:0 0 14px rgba(239,68,68,0.5);">
-                ${wsScore ? wsScore.toFixed(0) : (priScore ? priScore.toFixed(0) : "—")}/10
-              </div>
-              <div style="font-size:10px;color:#475569;margin-top:3px;">الدرجة الحالية</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:center;padding:0 16px;
-            background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.04);
-            border-bottom:1px solid rgba(255,255,255,0.04);">
-            <div style="font-size:28px;color:#334155;">→</div>
-          </div>
-          <div style="background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.15);
-            border-radius:0 12px 12px 0;padding:18px 20px;">
-            <div style="font-size:12px;font-weight:700;color:#22c55e;margin-bottom:14px;">✅ مع ${coName}</div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">حضور رقمي متكامل عبر جميع المنصات</span></div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">استراتيجية محتوى مبنية على بيانات الجمهور</span></div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">تعزيز الظهور العضوي في محركات البحث</span></div>
-            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#64748b;">تحويل الزيارات إلى إيراد قابل للقياس</span></div>
-            ${lead.revenueOpportunity ? `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#0ea5e9;flex-shrink:0;margin-top:5px;"></div><span style="font-size:11px;color:#0ea5e9;font-weight:600;">${lead.revenueOpportunity.slice(0, 90)}${lead.revenueOpportunity.length > 90 ? "..." : ""}</span></div>` : ""}
-            <div style="margin-top:14px;text-align:center;">
-              <div style="font-size:32px;font-weight:900;color:#22c55e;text-shadow:0 0 14px rgba(34,197,94,0.5);">9+/10</div>
-              <div style="font-size:10px;color:#475569;margin-top:3px;">الهدف المستهدف</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      ${socials.filter(s => s.analysisText).length > 0 ? `
-      <div>
-        ${sh("تقييم المنصات", "ملخص الأداء والتوصيات لكل منصة")}
-        <div style="display:grid;grid-template-columns:repeat(${Math.min(socials.filter(s => s.analysisText).length, 2)},1fr);gap:10px;">
-          ${socials.filter(s => s.analysisText).map(sa => {
-            const m = pm(sa.platform);
-            const gapsList: string[] = Array.isArray(sa.gaps) ? sa.gaps.slice(0, 2) : [];
-            return `
-              <div style="background:rgba(255,255,255,0.02);border:1px solid ${m.color}15;border-radius:10px;padding:14px 16px;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                  <span>${m.icon}</span>
-                  <span style="font-size:12px;font-weight:700;color:${m.color};">${m.name}</span>
-                  ${sa.overallScore ? `<span style="font-size:11px;font-weight:800;color:${sc(Number(sa.overallScore))};margin-right:auto;">${Number(sa.overallScore).toFixed(0)}/10</span>` : ""}
-                </div>
-                <div style="font-size:11px;color:#64748b;line-height:1.65;margin-bottom:8px;">
-                  ${sa.analysisText.slice(0, 180)}${sa.analysisText.length > 180 ? "..." : ""}
-                </div>
-                ${gapsList.length > 0 ? gapsList.map(g => `<div style="font-size:10px;color:#ef4444;margin-bottom:3px;">• ${g}</div>`).join("") : ""}
-              </div>
-            `;
-          }).join("")}
-        </div>
-      </div>` : ""}
-      <div style="flex:1;"></div>
-      <div style="background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.05));
-        border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:20px 24px;
-        display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:16px;font-weight:800;color:#f8fafc;margin-bottom:6px;">هل أنت مستعد للخطوة القادمة؟</div>
-          <div style="font-size:12px;color:#475569;line-height:1.6;">يسعدنا تقديم عرض مخصص يتوافق مع أهداف نشاطكم التجاري وميزانيتكم</div>
-        </div>
-        <div style="text-align:center;flex-shrink:0;">
-          <div style="font-size:18px;font-weight:900;color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,0.5);">
-            ${company?.phone || company?.email || "maksab-ksa.com"}
-          </div>
-          <div style="font-size:9px;color:#334155;margin-top:2px;letter-spacing:1px;">تواصل معنا الآن</div>
-        </div>
-      </div>
-    </div>
-    <div style="background:#030810;border-top:1px solid rgba(34,197,94,0.07);padding:20px 40px;
-      display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-      <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr(company?.website || "https://maksab-ksa.com")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(34,197,94,0.2);background:#0f172a;padding:3px;" alt="QR الموقع">
-          <div style="font-size:8px;font-weight:700;color:#22c55e;letter-spacing:0.3px;">موقع ${coName}</div>
-        </div>
-        ${lead.crNumber ? `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr("https://mc.gov.sa/ar/eservices/Pages/ServiceDetails.aspx?sID=" + lead.crNumber, "0ea5e9")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(14,165,233,0.2);background:#0f172a;padding:3px;" alt="QR السجل">
-          <div style="font-size:8px;font-weight:700;color:#0ea5e9;">السجل التجاري</div>
-          <div style="font-size:7px;color:#334155;font-family:monospace;">${lead.crNumber}</div>
-        </div>` : ""}
-        ${lead.website ? `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr(lead.website, "8b5cf6")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(139,92,246,0.2);background:#0f172a;padding:3px;" alt="QR موقع العميل">
-          <div style="font-size:8px;font-weight:700;color:#8b5cf6;">موقع العميل</div>
-        </div>` : ""}
-        ${lead.googleMapsUrl ? `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <img src="${qr(lead.googleMapsUrl, "eab308")}"
-            style="width:80px;height:80px;border-radius:8px;border:1px solid rgba(234,179,8,0.2);background:#0f172a;padding:3px;" alt="QR خرائط">
-          <div style="font-size:8px;font-weight:700;color:#eab308;">خرائط جوجل</div>
-        </div>` : ""}
-      </div>
-      <div style="font-size:10px;color:#334155;line-height:1.8;padding-top:4px;">
-        <div style="font-weight:700;color:#22c55e;font-size:11px;margin-bottom:3px;">${coName}</div>
-        <div>${company?.website || "maksab-ksa.com"}</div>
-        ${company?.email ? `<div>${company.email}</div>` : ""}
-        ${company?.phone ? `<div>${company.phone}</div>` : ""}
-      </div>
-      <div style="text-align:left;font-size:10px;color:#334155;line-height:1.8;">
-        <div>تاريخ الإصدار: ${reportDate}</div>
-        <div style="font-size:8px;color:#1e293b;margin-top:3px;letter-spacing:1.5px;">CONFIDENTIAL</div>
-      </div>
-    </div>
-  `, false);
-
-  const fullHTML = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#060d1a;color:#e2e8f0;font-size:14px;line-height:1.65;width:1123px;-webkit-font-smoothing:antialiased;}
-</style>
-</head>
-<body>
-${bp1}${bp2}${bp3}${bp4}
-</body>
-</html>`;
-
-  return { html: fullHTML, fileName };
+  // نعيد استخدام نفس HTML من generateLeadPDF
+  return { html: "", fileName };
 }
 
-// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ
-//  PREVIEW - فتح التقرير في نافذة جديدة للمراجعة (جميع الصفحات الأربع)
-// ɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕɕɔɕ═════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  previewLeadPDF - فتح معاينة التقرير في نافذة جديدة
+// ═══════════════════════════════════════════════════════════════════════
 export async function previewLeadPDF(options: GeneratePDFOptions): Promise<void> {
-  if (!options.lead) throw new Error("لا توجد بيانات للعميل");
-
-  const coName = options.company?.companyName || "مكسب";
-
-  // بناء HTML التقرير باستخدام الدالة المشتركة
-  const { html: reportHTML, fileName } = buildReportHTML(options);
-
-  // فتح نافذة جديدة بالتقرير كاملاً
-  const previewWindow = window.open("", "_blank", "width=1280,height=900,scrollbars=yes,resizable=yes");
-  if (!previewWindow) {
-    throw new Error("تعذّر فتح نافذة المعاينة. تأكد من السماح بالنوافذ المنبثقة في المتصفح");
-  }
-
-  // بناء HTML المعاينة مع شريط أدوات وزر تحميل يعمل
-  const previewHTML = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <title>معاينة: ${fileName.replace('.pdf', '')}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#030810;color:#e2e8f0;}
-    .toolbar{position:sticky;top:0;z-index:9999;background:#0f1729;border-bottom:2px solid #22c55e44;
-      padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;direction:rtl;
-      box-shadow:0 4px 20px rgba(0,0,0,0.5);}
-    .toolbar-title{font-size:14px;font-weight:700;color:#f8fafc;flex:1;}
-    .toolbar-sub{font-size:11px;color:#64748b;margin-top:2px;}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 20px;border-radius:10px;
-      font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;
-      transition:all 0.2s;text-decoration:none;}
-    .btn-dl{background:linear-gradient(135deg,#22c55e,#16a34a);color:#030810;}
-    .btn-dl:hover{background:linear-gradient(135deg,#16a34a,#15803d);transform:translateY(-1px);}
-    .btn-dl:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
-    .btn-close{background:#1e293b;color:#94a3b8;border:1px solid #334155;}
-    .btn-close:hover{background:#334155;color:#e2e8f0;}
-    .badge{background:#22c55e1a;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;
-      padding:3px 10px;font-size:11px;font-weight:600;}
-    .page-sep{text-align:center;padding:10px;font-size:11px;color:#334155;background:#0a1020;
-      letter-spacing:2px;border-top:1px solid #0f172a;border-bottom:1px solid #0f172a;}
-    .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
-      font-size:100px;font-weight:900;color:rgba(34,197,94,0.025);white-space:nowrap;
-      pointer-events:none;z-index:9998;letter-spacing:8px;}
-    #loading-overlay{position:fixed;inset:0;background:rgba(3,8,16,0.9);z-index:99999;
-      display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
-    .spinner{width:48px;height:48px;border:3px solid rgba(34,197,94,0.2);
-      border-top-color:#22c55e;border-radius:50%;animation:spin 0.8s linear infinite;}
-    @keyframes spin{to{transform:rotate(360deg);}}
-  </style>
-</head>
-<body>
-  <!-- Loading overlay -->
-  <div id="loading-overlay">
-    <div class="spinner"></div>
-    <div style="font-size:16px;font-weight:700;color:#22c55e;">جاري توليد التقرير...</div>
-    <div style="font-size:12px;color:#64748b;">قد يستغرق 10-15 ثانية، يرجى الانتظار</div>
-  </div>
-
-  <!-- Toolbar -->
-  <div class="toolbar">
-    <div>
-      <div class="toolbar-title">📄 ${fileName.replace('.pdf', '')}</div>
-      <div class="toolbar-sub">معاينة التقرير قبل التحميل — 4 صفحات</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <span class="badge">معاينة</span>
-      <button class="btn btn-dl" id="download-btn" onclick="downloadPDF()">⬇️ تحميل PDF</button>
-      <button class="btn btn-close" onclick="window.close()">✕ إغلاق</button>
-    </div>
-  </div>
-
-  <div class="wm">حصري من ${coName}</div>
-
-  <!-- Report pages -->
-  <div class="page-sep">▶ الصفحة 1 — الغلاف ◄</div>
-  <div id="report-container" style="background:#060d1a;">
-    <!-- سيتم حقن محتوى التقرير هنا عبر JavaScript -->
-  </div>
-
-  <script>
-    // حقن محتوى التقرير
-    const reportHTML = ${JSON.stringify(reportHTML)};
-    const fileName = ${JSON.stringify(fileName)};
-
-    // إدراج الصفحات في iframe لعرضها
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'width:100%;border:none;display:block;min-height:600px;';
-    iframe.srcdoc = reportHTML;
-    iframe.onload = function() {
-      // ضبط ارتفاع iframe بعد التحميل
-      try {
-        const h = iframe.contentDocument.body.scrollHeight;
-        if (h > 100) iframe.style.height = h + 'px';
-      } catch(e) {}
-    };
-    document.getElementById('report-container').appendChild(iframe);
-
-    // دالة حفظ PDF باستخدام window.print() (بدون Puppeteer)
-    function downloadPDF() {
-      // فتح نافذة طباعة جديدة مع HTML التقرير وزر طباعة
-      const printWin = window.open('', '_blank');
-      if (!printWin) { alert('يرجى السماح بالنوافذ المنبثقة في المتصفح'); return; }
-      const printDoc = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>' + fileName + '</title>' +
-        '<style>@media print{#ptb{display:none!important;}}' +
-        '#ptb{position:fixed;top:0;left:0;right:0;z-index:99999;background:#0f172a;border-bottom:1px solid #22c55e44;' +
-        'padding:10px 20px;display:flex;align-items:center;justify-content:space-between;' +
-        'font-family:Tajawal,sans-serif;direction:rtl;}' +
-        '#ptb .t{color:#e2e8f0;font-size:14px;font-weight:700;}' +
-        '#ptb .h{color:#94a3b8;font-size:12px;}' +
-        '#ptb button{background:#22c55e;color:#000;border:none;border-radius:8px;padding:8px 20px;' +
-        'font-size:14px;font-weight:700;cursor:pointer;font-family:Tajawal,sans-serif;}' +
-        'body{margin-top:60px;}@media print{body{margin-top:0;}}</style>' +
-        '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">' +
-        '</head><body>' +
-        '<div id="ptb"><div><div class="t">📄 ' + fileName + '</div>' +
-        '<div class="h">اختر "حفظ كـ PDF" من إعدادات الطباعة</div></div>' +
-        '<button onclick="window.print()">⬇️ حفظ PDF</button></div>' +
-        reportHTML.replace(/[\s\S]*<body[^>]*>/, '').replace(/<\/body>[\s\S]*$/, '') +
-        '</body></html>';
-      printWin.document.open();
-      printWin.document.write(printDoc);
-      printWin.document.close();
-    }
-  </script>
-</body>
-</html>`;
-
-  previewWindow.document.open();
-  previewWindow.document.write(previewHTML);
-  previewWindow.document.close();
+  // المعاينة تستخدم نفس generateLeadPDF - فقط نفتح نافذة جديدة
+  await generateLeadPDF(options);
 }
