@@ -78,6 +78,7 @@ export const leads = mysqlTable("leads", {
   analysisStatus: mysqlEnum("analysisStatus", ["pending", "analyzing", "completed", "failed"]).default("pending").notNull(),
   sourceJobId: int("sourceJobId"),   // رابط بمهمة البحث التي أنشأت هذا الـ Lead
   socialSince: varchar("socialSince", { length: 20 }),  // تاريخ الظهور على السوشيال ميديا (مثال: 2019، 2020-05)
+  crNumber: varchar("crNumber", { length: 30 }),  // رقم السجل التجاري
   hasWhatsapp: mysqlEnum("hasWhatsapp", ["unknown", "yes", "no"]).default("unknown").notNull(),
   whatsappCheckedAt: timestamp("whatsappCheckedAt"),
   lastWhatsappSentAt: timestamp("lastWhatsappSentAt"),

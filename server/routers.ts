@@ -406,6 +406,7 @@ const leadsRouter = router({
       suggestedSalesEntryAngle: z.string().optional(),
       analysisStatus: z.enum(["pending", "analyzing", "completed", "failed"]).optional(),
       notes: z.string().optional(),
+      crNumber: z.string().optional(),
       stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).optional(),
       priority: z.enum(["high", "medium", "low"]).optional(),
       nextStep: z.string().optional(),

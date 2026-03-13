@@ -451,6 +451,7 @@ export default function LeadDetail() {
               { field: "facebookUrl", label: "فيسبوك", type: "text" },
               { field: "linkedinUrl", label: "لينكد إن", type: "text" },
               { field: "googleMapsUrl", label: "Google Maps", type: "text" },
+              { field: "crNumber", label: "رقم السجل التجاري", type: "text" },
             ].map(({ field, label }) => (
               <div key={field}>
                 <label className="text-xs text-muted-foreground mb-1 block">{label}</label>

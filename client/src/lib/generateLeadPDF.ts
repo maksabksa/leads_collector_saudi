@@ -522,8 +522,11 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     .opp-vs-lbl{font-size:10px;color:#64748b;margin-top:2px;}
     .opp-vs-arrow{font-size:24px;color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,0.6);}
     /* QR */
-    .qr-wrap{display:flex;align-items:center;gap:16px;}
+    .qr-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+    .qr-block{display:flex;flex-direction:column;align-items:center;gap:6px;}
     .qr-img{width:72px;height:72px;border-radius:8px;border:1px solid rgba(34,197,94,0.2);background:#0f172a;padding:4px;}
+    .qr-img.cr{border-color:rgba(14,165,233,0.3);}
+    .qr-caption{font-size:9px;font-weight:700;letter-spacing:0.5px;text-align:center;}
     .qr-text{font-size:11px;color:#475569;line-height:1.8;}
     /* Stat highlight */
     .stat-hl{
@@ -823,11 +826,26 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   <!-- ══ FOOTER ══ -->
   <div class="footer">
     <div class="qr-wrap">
-      <img
-        class="qr-img"
-        src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(company?.website || "https://maksab-ksa.com")}&bgcolor=0f172a&color=22c55e&format=svg"
-        alt="QR مكسب"
-      />
+      <!-- QR الموقع -->
+      <div class="qr-block">
+        <img
+          class="qr-img"
+          src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(company?.website || "https://maksab-ksa.com")}&bgcolor=0f172a&color=22c55e&format=svg"
+          alt="QR الموقع"
+        />
+        <div class="qr-caption" style="color:#22c55e;">امسح لزيارة الموقع</div>
+      </div>
+      ${lead.crNumber ? `
+      <!-- QR السجل التجاري -->
+      <div class="qr-block">
+        <img
+          class="qr-img cr"
+          src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent("https://mc.gov.sa/ar/eservices/Pages/ServiceDetails.aspx?sID=" + lead.crNumber)}&bgcolor=0f172a&color=0ea5e9&format=svg"
+          alt="QR السجل التجاري"
+        />
+        <div class="qr-caption" style="color:#0ea5e9;">السجل التجاري: ${lead.crNumber}</div>
+      </div>
+      ` : ""}
       <div class="qr-text">
         <div style="font-weight:700;color:#22c55e;font-size:12px;margin-bottom:4px;">${companyName}</div>
         ${company?.website ? `<div>${company.website}</div>` : "<div>maksab-ksa.com</div>"}
