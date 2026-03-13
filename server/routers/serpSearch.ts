@@ -113,6 +113,7 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
         method: "GET",
         socket,
         agent: false,
+        rejectUnauthorized: false, // Bright Data proxy uses self-signed certs
         headers: {
           "Host": targetHost,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
