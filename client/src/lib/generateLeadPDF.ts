@@ -1,6 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  generateLeadPDF — Premium Dark Report · Refined & Compressed v3
+//  generateLeadPDF — Premium Dark Report v4
 //  Arabic RTL · Tajawal Font · window.print() → PDF
+//  ✅ شعار العميل في الغلاف
+//  ✅ QR السجل التجاري في الفوتر
+//  ✅ تحسين شامل للتصميم
 // ═══════════════════════════════════════════════════════════════════════
 
 interface GeneratePDFOptions {
@@ -135,32 +138,21 @@ function cleanMarkdown(text: string): string {
     .replace(/\n/g, "<br>");
 }
 
-// ─── Score Circle ─────────────────────────────────────────────────────────────
 function scoreCircleHTML(val: number | null | undefined, label: string) {
   const color = scoreColor(val);
   const glow = scoreGlow(val);
   const display = val ? val.toFixed(0) : "—";
   return `
     <div style="text-align:center;">
-      <div style="
-        width:62px; height:62px; border-radius:50%;
-        border: 2.5px solid ${color};
-        box-shadow: ${glow};
-        display:flex; align-items:center; justify-content:center;
-        font-size:20px; font-weight:900; color:${color};
-        background: rgba(6,13,26,0.9);
-        margin: 0 auto 6px;
-        position:relative;
-      ">
+      <div style="width:62px;height:62px;border-radius:50%;border:2.5px solid ${color};box-shadow:${glow};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:${color};background:rgba(6,13,26,0.9);margin:0 auto 6px;position:relative;">
         <div style="position:absolute;inset:-5px;border-radius:50%;background:radial-gradient(circle,${color}12 0%,transparent 70%);"></div>
         ${display}
       </div>
-      <div style="font-size:10px; color:#64748b; font-weight:600; letter-spacing:0.3px;">${label}</div>
+      <div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:0.3px;">${label}</div>
     </div>
   `;
 }
 
-// ─── Mini Progress Bar ────────────────────────────────────────────────────────
 function miniBar(val: number | null | undefined, label: string, max = 10) {
   const pct = val ? Math.min((val / max) * 100, 100) : 0;
   const color = scoreColor(val);
@@ -176,7 +168,6 @@ function miniBar(val: number | null | undefined, label: string, max = 10) {
   `;
 }
 
-// ─── Highlight Metric Row ─────────────────────────────────────────────────────
 function metricRow(icon: string, label: string, value: string, color = "#94a3b8") {
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
@@ -186,6 +177,11 @@ function metricRow(icon: string, label: string, value: string, color = "#94a3b8"
   `;
 }
 
+// ─── QR Code URL ──────────────────────────────────────────────────────────────
+function qrUrl(data: string, color = "22c55e"): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(data)}&bgcolor=0f172a&color=${color}&format=svg&margin=5`;
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void> {
   const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
@@ -193,8 +189,9 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
   const companyName = company?.companyName || "مكسب";
   const companyLogo = company?.logoUrl || "";
+  const clientLogo = lead.clientLogoUrl || "";  // ✅ شعار العميل
   const reportDate = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
-  const urgency = urgencyMeta(lead.urgencyLevel);
+  const urgency = urgencyMeta(lead.urgencyLevel || lead.priority);
   const priorityScore = lead.leadPriorityScore ? Number(lead.leadPriorityScore) : null;
   const qualityScore = lead.dataQualityScore ? Number(lead.dataQualityScore) : null;
   const seasonScore = lead.seasonalityScore ? Number(lead.seasonalityScore) : null;
@@ -240,7 +237,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     };
   });
 
-  // ── Website scores list ──
+  // ── Website scores ──
   const wsScores = websiteAnalysis ? [
     { label: "الإجمالي", value: websiteAnalysis.overallScore },
     { label: "السرعة", value: websiteAnalysis.loadSpeedScore },
@@ -249,6 +246,16 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     { label: "المحتوى", value: websiteAnalysis.contentQualityScore },
     { label: "التصميم", value: websiteAnalysis.designScore },
   ] : [];
+
+  // ── Social links for contact strip ──
+  const socialLinks = [
+    lead.instagramUrl && { icon: "📸", label: "إنستغرام", val: cleanUrl(lead.instagramUrl, "instagram"), bg: "rgba(225,48,108,0.08)" },
+    lead.twitterUrl && { icon: "🐦", label: "تويتر", val: cleanUrl(lead.twitterUrl, "twitter"), bg: "rgba(29,161,242,0.08)" },
+    lead.tiktokUrl && { icon: "🎵", label: "تيك توك", val: cleanUrl(lead.tiktokUrl, "tiktok"), bg: "rgba(105,201,208,0.08)" },
+    lead.snapchatUrl && { icon: "👻", label: "سناب", val: cleanUrl(lead.snapchatUrl, "snapchat"), bg: "rgba(255,252,0,0.08)" },
+    lead.facebookUrl && { icon: "📘", label: "فيسبوك", val: cleanUrl(lead.facebookUrl, "facebook"), bg: "rgba(24,119,242,0.08)" },
+    lead.linkedinUrl && { icon: "💼", label: "لينكد إن", val: cleanUrl(lead.linkedinUrl, "linkedin"), bg: "rgba(10,102,194,0.08)" },
+  ].filter(Boolean) as { icon: string; label: string; val: string; bg: string }[];
 
   // ═══════════════════════════════════════════════════════════════════════
   //  HTML TEMPLATE
@@ -261,66 +268,23 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{
-      font-family:'Tajawal',sans-serif;
-      direction:rtl; text-align:right;
-      background:#060d1a;
-      color:#e2e8f0;
-      font-size:13px; line-height:1.65;
-    }
+    body{font-family:'Tajawal',sans-serif;direction:rtl;text-align:right;background:#060d1a;color:#e2e8f0;font-size:13px;line-height:1.65;}
     /* Print bar */
-    .print-bar{
-      position:fixed;top:0;left:0;right:0;
-      background:rgba(6,13,26,0.96);
-      backdrop-filter:blur(10px);
-      border-bottom:1px solid rgba(34,197,94,0.15);
-      padding:9px 28px;
-      display:flex;justify-content:space-between;align-items:center;
-      z-index:9999;
-    }
+    .print-bar{position:fixed;top:0;left:0;right:0;background:rgba(6,13,26,0.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(34,197,94,0.15);padding:9px 28px;display:flex;justify-content:space-between;align-items:center;z-index:9999;}
     .print-bar-title{font-size:13px;font-weight:700;color:#94a3b8;}
-    .btn-print{
-      background:linear-gradient(135deg,#22c55e,#16a34a);
-      color:#000; border:none; padding:7px 20px; border-radius:7px;
-      font-family:'Tajawal',sans-serif; font-size:12px; font-weight:700; cursor:pointer;
-      box-shadow:0 0 14px rgba(34,197,94,0.35);
-    }
-    .btn-close{
-      background:transparent; color:#475569;
-      border:1px solid #1e293b; padding:7px 14px; border-radius:7px;
-      font-family:'Tajawal',sans-serif; font-size:12px; cursor:pointer;
-      margin-right:6px;
-    }
+    .btn-print{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000;border:none;padding:7px 20px;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 0 14px rgba(34,197,94,0.35);}
+    .btn-close{background:transparent;color:#475569;border:1px solid #1e293b;padding:7px 14px;border-radius:7px;font-family:'Tajawal',sans-serif;font-size:12px;cursor:pointer;margin-right:6px;}
     /* Watermark */
-    .wm{
-      position:fixed;top:50%;left:50%;
-      transform:translate(-50%,-50%) rotate(-35deg);
-      font-size:72px;font-weight:900;
-      color:rgba(34,197,94,0.025);
-      white-space:nowrap;pointer-events:none;z-index:9998;
-      letter-spacing:8px;
-    }
+    .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(34,197,94,0.025);white-space:nowrap;pointer-events:none;z-index:9998;letter-spacing:8px;}
     .wm2{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:9997;overflow:hidden;}
-    .wm2::before,.wm2::after{
-      content:'حصري من شركة مكسب  ✦  حصري من شركة مكسب  ✦  حصري من شركة مكسب';
-      position:absolute;
-      font-family:'Tajawal',sans-serif;font-size:14px;font-weight:700;
-      color:rgba(34,197,94,0.02);
-      white-space:nowrap;letter-spacing:5px;
-      transform:rotate(-35deg);
-    }
+    .wm2::before,.wm2::after{content:'حصري من ${companyName}  ✦  حصري من ${companyName}  ✦  حصري من ${companyName}';position:absolute;font-family:'Tajawal',sans-serif;font-size:14px;font-weight:700;color:rgba(34,197,94,0.02);white-space:nowrap;letter-spacing:5px;transform:rotate(-35deg);}
     .wm2::before{top:18%;left:-25%;}
     .wm2::after{top:65%;left:-15%;}
     /* Page wrapper */
     .pw{margin-top:48px;max-width:900px;margin-left:auto;margin-right:auto;padding-bottom:40px;}
-    /* ── Cover Page (full page) ── */
-    .cover-page{
-      min-height:100vh;
-      background:linear-gradient(160deg,#020810 0%,#060d1a 40%,#091428 70%,#020810 100%);
-      display:flex;flex-direction:column;
-      position:relative;overflow:hidden;
-      page-break-after:always;
-    }
+
+    /* ══ COVER PAGE ══ */
+    .cover-page{min-height:100vh;background:linear-gradient(160deg,#020810 0%,#060d1a 40%,#091428 70%,#020810 100%);display:flex;flex-direction:column;position:relative;overflow:hidden;page-break-after:always;}
     .cp-glow-tl{position:absolute;top:-100px;right:-100px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.08) 0%,transparent 65%);pointer-events:none;}
     .cp-glow-br{position:absolute;bottom:-120px;left:-80px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 65%);pointer-events:none;}
     .cp-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(34,197,94,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(34,197,94,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
@@ -329,35 +293,35 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     .cp-logo{width:52px;height:52px;border-radius:12px;object-fit:contain;background:#0f172a;padding:4px;border:1px solid rgba(34,197,94,0.2);box-shadow:0 0 20px rgba(34,197,94,0.12);}
     .cp-logo-ph{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#22c55e;box-shadow:0 0 20px rgba(34,197,94,0.12);}
     .cp-co-name{font-size:20px;font-weight:800;color:#f8fafc;}
-    .cp-co-sub{font-size:10px;color:#475569;margin-top:2px;letter-spacing:1px;text-transform:uppercase;}
+    .cp-co-sub{font-size:10px;color:#475569;margin-top:2px;letter-spacing:1px;}
     .cp-report-id{font-size:11px;color:#334155;text-align:left;}
+    /* ── Client Logo in Cover ── */
+    .cp-client-logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:24px;}
+    .cp-client-logo{width:96px;height:96px;border-radius:20px;object-fit:contain;background:#0f172a;padding:6px;border:2px solid rgba(255,255,255,0.1);box-shadow:0 0 30px rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.4);}
+    .cp-client-logo-ph{width:96px;height:96px;border-radius:20px;background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#94a3b8;box-shadow:0 8px 32px rgba(0,0,0,0.4);}
     .cp-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 60px;position:relative;z-index:1;}
     .cp-tag{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22c55e;opacity:0.7;margin-bottom:20px;}
-    .cp-client-name{font-size:52px;font-weight:900;text-align:center;background:linear-gradient(135deg,#ffffff 0%,#94a3b8 60%,#475569 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.15;margin-bottom:16px;text-shadow:none;}
-    .cp-client-meta{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:40px;}
+    .cp-client-name{font-size:48px;font-weight:900;text-align:center;background:linear-gradient(135deg,#ffffff 0%,#94a3b8 60%,#475569 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.15;margin-bottom:12px;}
+    .cp-client-meta{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:32px;}
     .cp-meta-item{font-size:13px;color:#475569;}
     .cp-meta-sep{color:#1e293b;font-size:16px;}
-    .cp-divider{width:120px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);margin:0 auto 40px;box-shadow:0 0 10px rgba(34,197,94,0.4);}
-    .cp-scores{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-bottom:40px;}
+    .cp-divider{width:120px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);margin:0 auto 32px;box-shadow:0 0 10px rgba(34,197,94,0.4);}
+    .cp-scores{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-bottom:32px;}
     .cp-score-block{text-align:center;}
     .cp-score-ring{width:80px;height:80px;border-radius:50%;border:2.5px solid;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;margin:0 auto 8px;position:relative;}
     .cp-score-ring::before{content:'';position:absolute;inset:-8px;border-radius:50%;background:radial-gradient(circle,currentColor 0%,transparent 70%);opacity:0.07;}
     .cp-score-lbl{font-size:11px;color:#475569;font-weight:600;letter-spacing:0.5px;}
-    .cp-urgency{display:inline-flex;align-items:center;gap:8px;padding:8px 22px;border-radius:24px;font-size:12px;font-weight:700;border:1px solid;margin-bottom:40px;}
+    .cp-urgency{display:inline-flex;align-items:center;gap:8px;padding:8px 22px;border-radius:24px;font-size:12px;font-weight:700;border:1px solid;margin-bottom:32px;}
+    /* CR Number badge */
+    .cp-cr{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:8px;font-size:11px;font-weight:700;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.2);color:#0ea5e9;margin-bottom:12px;}
     .cp-bottom{padding:28px 48px;border-top:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center;}
     .cp-bottom-left{font-size:11px;color:#334155;line-height:1.8;}
     .cp-bottom-right{font-size:11px;color:#334155;text-align:left;}
     .cp-confidential{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#1e293b;margin-top:4px;}
-    @media print{
-      .cover-page{min-height:100vh!important;page-break-after:always!important;}
-    }
-    /* ── Cover ── */
-    .cover{
-      background:linear-gradient(135deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%);
-      border-bottom:1px solid rgba(34,197,94,0.12);
-      padding:28px 36px 22px;
-      position:relative;overflow:hidden;
-    }
+    @media print{.cover-page{min-height:100vh!important;page-break-after:always!important;}}
+
+    /* ══ COVER HEADER ══ */
+    .cover{background:linear-gradient(135deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%);border-bottom:1px solid rgba(34,197,94,0.12);padding:28px 36px 22px;position:relative;overflow:hidden;}
     .cover::before{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 70%);}
     .cover::after{content:'';position:absolute;bottom:-50px;left:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);}
     .cover-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;}
@@ -369,13 +333,15 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     .cover-meta{text-align:left;}
     .cover-date{font-size:11px;color:#475569;}
     .cover-id{font-size:10px;color:#334155;margin-top:2px;}
-    /* Client name */
-    .client-name{font-size:30px;font-weight:900;background:linear-gradient(135deg,#f8fafc,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;}
+    /* Client header row */
+    .client-header-row{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+    .client-logo-sm{width:56px;height:56px;border-radius:12px;object-fit:contain;background:#0f172a;padding:3px;border:1px solid rgba(255,255,255,0.08);}
+    .client-logo-sm-ph{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#94a3b8;}
+    .client-name{font-size:28px;font-weight:900;background:linear-gradient(135deg,#f8fafc,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
     .client-meta{font-size:12px;color:#64748b;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
     .meta-dot{width:4px;height:4px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0;}
-    /* Scores row */
     .scores-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:16px;}
-    .urgency-pill{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;background:${urgency.bg};color:${urgency.color};border:1px solid ${urgency.border};}
+    .urgency-pill{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;background:${urgencyMeta(lead.urgencyLevel || lead.priority).bg};color:${urgencyMeta(lead.urgencyLevel || lead.priority).color};border:1px solid ${urgencyMeta(lead.urgencyLevel || lead.priority).border};}
     /* Accent bar */
     .accent-bar{height:2px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#8b5cf6,#22c55e);}
     /* Contact strip */
@@ -395,62 +361,63 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     .dc-title{font-size:11px;font-weight:700;color:#475569;margin-bottom:10px;letter-spacing:0.5px;text-transform:uppercase;}
     .dc-title.accent{color:#f97316;}
     .dc-title.green{color:#22c55e;}
-    /* Contact message */
-    .msg-box{font-size:12px;color:#cbd5e1;line-height:1.9;background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.18);border-radius:7px;padding:14px 16px;border-right:3px solid #f97316;}
-    /* Gaps */
-    .gap-list{list-style:none;}
-    .gap-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;line-height:1.7;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03);}
-    .gap-item:last-child{border-bottom:none;}
-    .gap-dot{color:#ef4444;font-size:16px;line-height:1;margin-top:2px;flex-shrink:0;text-shadow:0 0 6px rgba(239,68,68,0.5);}
-    /* Phones */
-    .phones-wrap{display:flex;flex-wrap:wrap;gap:7px;}
-    .phone-tag{background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.22);border-radius:7px;padding:5px 12px;font-size:12px;font-weight:700;color:#22c55e;font-family:'Tajawal',sans-serif;direction:ltr;box-shadow:0 0 7px rgba(34,197,94,0.12);}
-    /* Social grid — 2 cols */
-    .social-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+    /* Analysis text */
+    .at{font-size:12px;color:#94a3b8;line-height:1.85;}
+    .at p{margin-bottom:8px;}
+    .at strong{color:#cbd5e1;}
+    /* Divider */
+    .divider{height:1px;background:rgba(255,255,255,0.04);margin:12px 0;}
+    /* Gap list */
+    .gap-list{list-style:none;padding:0;}
+    .gap-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:12px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.03);}
+    .gap-dot{color:#ef4444;flex-shrink:0;font-size:14px;}
+    /* Phone tags */
+    .phones-wrap{display:flex;flex-wrap:wrap;gap:8px;}
+    .phone-tag{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;padding:5px 12px;font-size:13px;font-weight:700;color:#22c55e;font-family:monospace;direction:ltr;}
+    /* Social grid */
+    .social-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:12px;}
     .sc{background:linear-gradient(135deg,#0d1f3c,#080f1e);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;}
     .sc-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
     .sc-platform{font-size:13px;font-weight:700;flex:1;}
-    .sc-badge{font-size:10px;font-weight:700;color:#000;padding:2px 8px;border-radius:12px;}
-    .sc-score-ring{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;border:2px solid;}
+    .sc-badge{color:#000;font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;}
+    .sc-score-ring{width:32px;height:32px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;}
     /* Website scores */
     .ws-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px;}
-    .ws-box{background:#080f1e;border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:10px 4px;text-align:center;}
-    .ws-val{font-size:20px;font-weight:900;margin-bottom:3px;}
-    .ws-lbl{font-size:9px;color:#334155;font-weight:500;letter-spacing:0.3px;}
-    /* Analysis text */
-    .at{font-size:12px;color:#64748b;line-height:1.85;}
-    .at strong{color:#22c55e;font-weight:700;}
-    .at code{background:#0f172a;padding:1px 4px;border-radius:3px;color:#e2e8f0;}
-    /* Full report */
-    .fr{font-size:12px;color:#64748b;line-height:1.85;}
-    .fr p{margin-bottom:8px;}
-    .fr strong{color:#22c55e;font-weight:700;}
-    /* Footer */
-    .footer{background:#080f1e;border-top:1px solid rgba(34,197,94,0.08);padding:16px 36px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#334155;margin-top:12px;}
-    .footer-brand{font-weight:700;color:#475569;font-size:12px;}
-    /* Divider */
-    .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(34,197,94,0.15),transparent);margin:16px 0;}
-    /* Opportunities */
-    .opp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px;}
-    .opp-card{background:linear-gradient(135deg,#0d1f3c,#080f1e);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;}
-    .opp-card.now{border-color:rgba(239,68,68,0.2);}
-    .opp-card.with-maksab{border-color:rgba(34,197,94,0.2);}
-    .opp-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
-    .opp-item{display:flex;align-items:flex-start;gap:7px;font-size:11px;color:#94a3b8;line-height:1.65;margin-bottom:5px;}
-    .opp-dot{flex-shrink:0;margin-top:5px;width:5px;height:5px;border-radius:50%;}
-    /* VS bar */
-    .opp-vs{background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.06));border:1px solid rgba(34,197,94,0.12);border-radius:9px;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:12px;flex-wrap:wrap;}
+    .ws-box{background:linear-gradient(135deg,#0d1f3c,#080f1e);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:12px 8px;text-align:center;}
+    .ws-val{font-size:22px;font-weight:900;margin-bottom:4px;}
+    .ws-lbl{font-size:9px;color:#475569;font-weight:600;letter-spacing:0.3px;}
+    /* Opportunity */
+    .opp-vs{display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:16px;padding:16px;background:rgba(255,255,255,0.02);border-radius:10px;border:1px solid rgba(255,255,255,0.04);}
     .opp-vs-stat{text-align:center;}
-    .opp-vs-val{font-size:20px;font-weight:900;}
-    .opp-vs-lbl{font-size:9px;color:#475569;margin-top:1px;}
-    .opp-vs-arrow{font-size:20px;color:#22c55e;text-shadow:0 0 10px rgba(34,197,94,0.5);}
-    /* QR */
-    .qr-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-    .qr-block{display:flex;flex-direction:column;align-items:center;gap:4px;}
-    .qr-img{width:64px;height:64px;border-radius:7px;border:1px solid rgba(34,197,94,0.18);background:#0f172a;padding:3px;}
+    .opp-vs-val{font-size:28px;font-weight:900;}
+    .opp-vs-lbl{font-size:10px;color:#475569;margin-top:3px;}
+    .opp-vs-arrow{font-size:20px;color:#334155;}
+    .opp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+    .opp-card{background:linear-gradient(135deg,#0d1f3c,#080f1e);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:14px 16px;}
+    .opp-card.now{border-color:rgba(239,68,68,0.12);}
+    .opp-card.with-maksab{border-color:rgba(34,197,94,0.12);}
+    .opp-label{font-size:11px;font-weight:700;margin-bottom:10px;letter-spacing:0.3px;}
+    .opp-item{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#64748b;margin-bottom:6px;}
+    .opp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+    /* Full report */
+    .fr{font-size:12px;color:#94a3b8;line-height:1.9;}
+    .fr p{margin-bottom:10px;}
+    .fr strong{color:#cbd5e1;}
+    .fr code{background:#0f172a;padding:1px 5px;border-radius:3px;font-size:11px;color:#22c55e;}
+    /* ══ FOOTER ══ */
+    .footer{background:#030810;border-top:1px solid rgba(34,197,94,0.08);padding:24px 36px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;}
+    .qr-wrap{display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;}
+    .qr-block{display:flex;flex-direction:column;align-items:center;gap:6px;}
+    .qr-img{width:90px;height:90px;border-radius:10px;border:1px solid rgba(34,197,94,0.2);background:#0f172a;padding:4px;}
     .qr-img.cr{border-color:rgba(14,165,233,0.25);}
+    .qr-img.maps{border-color:rgba(234,179,8,0.25);}
     .qr-caption{font-size:8px;font-weight:700;letter-spacing:0.4px;text-align:center;}
     .qr-text{font-size:10px;color:#334155;line-height:1.7;}
+    /* CR info box */
+    .cr-info-box{background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.15);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+    .cr-info-icon{font-size:20px;}
+    .cr-info-label{font-size:10px;color:#475569;}
+    .cr-info-value{font-size:14px;font-weight:800;color:#0ea5e9;font-family:monospace;}
     @media print{
       .print-bar{display:none!important;}
       .pw{margin-top:0!important;}
@@ -464,7 +431,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 </head>
 <body>
 <div class="wm2"></div>
-<div class="wm">حصري من شركة مكسب</div>
+<div class="wm">حصري من ${companyName}</div>
 
 <!-- Print bar -->
 <div class="print-bar">
@@ -477,13 +444,13 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
 <div class="pw">
 
-  <!-- ══ COVER PAGE (standalone) ══ -->
+  <!-- ══ COVER PAGE ══ -->
   <div class="cover-page">
     <div class="cp-glow-tl"></div>
     <div class="cp-glow-br"></div>
     <div class="cp-grid"></div>
 
-    <!-- Top bar -->
+    <!-- Top bar: شعار الشركة المُصدِرة -->
     <div class="cp-top">
       <div class="cp-logo-wrap">
         ${companyLogo
@@ -505,6 +472,16 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <!-- Body -->
     <div class="cp-body">
       <div class="cp-tag">تقرير تحليل رقمي شامل</div>
+
+      <!-- ✅ شعار العميل في الغلاف -->
+      <div class="cp-client-logo-wrap">
+        ${clientLogo
+          ? `<img src="${clientLogo}" class="cp-client-logo" alt="${lead.companyName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+             <div class="cp-client-logo-ph" style="display:none;">${(lead.companyName || "?").charAt(0)}</div>`
+          : `<div class="cp-client-logo-ph">${(lead.companyName || "?").charAt(0)}</div>`
+        }
+      </div>
+
       <div class="cp-client-name">${lead.companyName || "—"}</div>
       <div class="cp-client-meta">
         ${lead.businessType ? `<span class="cp-meta-item">${lead.businessType}</span>` : ""}
@@ -513,36 +490,28 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         ${lead.city && lead.country ? `<span class="cp-meta-sep">·</span>` : ""}
         ${lead.country ? `<span class="cp-meta-item">${lead.country}</span>` : ""}
       </div>
+
+      ${lead.crNumber ? `
+      <div class="cp-cr">
+        🏢 السجل التجاري: <strong style="font-family:monospace;letter-spacing:1px;">${lead.crNumber}</strong>
+      </div>` : ""}
+
       <div class="cp-divider"></div>
 
       <!-- Scores -->
-      ${(priorityScore || qualityScore || seasonScore) ? `
+      ${(priorityScore || qualityScore || seasonScore || lead.rating) ? `
       <div class="cp-scores">
-        ${priorityScore ? `
-        <div class="cp-score-block">
-          <div class="cp-score-ring" style="border-color:${scoreColor(priorityScore)};color:${scoreColor(priorityScore)};box-shadow:${scoreGlow(priorityScore)};">${priorityScore.toFixed(0)}</div>
-          <div class="cp-score-lbl">الأولوية</div>
-        </div>` : ""}
-        ${qualityScore ? `
-        <div class="cp-score-block">
-          <div class="cp-score-ring" style="border-color:${scoreColor(qualityScore)};color:${scoreColor(qualityScore)};box-shadow:${scoreGlow(qualityScore)};">${qualityScore.toFixed(0)}</div>
-          <div class="cp-score-lbl">جودة البيانات</div>
-        </div>` : ""}
-        ${seasonScore ? `
-        <div class="cp-score-block">
-          <div class="cp-score-ring" style="border-color:${scoreColor(seasonScore)};color:${scoreColor(seasonScore)};box-shadow:${scoreGlow(seasonScore)};">${seasonScore.toFixed(0)}</div>
-          <div class="cp-score-lbl">الموسمية</div>
-        </div>` : ""}
-        ${lead.rating ? `
-        <div class="cp-score-block">
-          <div class="cp-score-ring" style="border-color:#eab308;color:#eab308;box-shadow:0 0 14px rgba(234,179,8,0.55);">${Number(lead.rating).toFixed(1)}</div>
-          <div class="cp-score-lbl">تقييم جوجل</div>
-        </div>` : ""}
+        ${priorityScore ? `<div class="cp-score-block"><div class="cp-score-ring" style="border-color:${scoreColor(priorityScore)};color:${scoreColor(priorityScore)};box-shadow:${scoreGlow(priorityScore)};">${priorityScore.toFixed(0)}</div><div class="cp-score-lbl">الأولوية</div></div>` : ""}
+        ${qualityScore ? `<div class="cp-score-block"><div class="cp-score-ring" style="border-color:${scoreColor(qualityScore)};color:${scoreColor(qualityScore)};box-shadow:${scoreGlow(qualityScore)};">${qualityScore.toFixed(0)}</div><div class="cp-score-lbl">جودة البيانات</div></div>` : ""}
+        ${seasonScore ? `<div class="cp-score-block"><div class="cp-score-ring" style="border-color:${scoreColor(seasonScore)};color:${scoreColor(seasonScore)};box-shadow:${scoreGlow(seasonScore)};">${seasonScore.toFixed(0)}</div><div class="cp-score-lbl">الموسمية</div></div>` : ""}
+        ${lead.rating ? `<div class="cp-score-block"><div class="cp-score-ring" style="border-color:#eab308;color:#eab308;box-shadow:0 0 14px rgba(234,179,8,0.55);">${Number(lead.rating).toFixed(1)}</div><div class="cp-score-lbl">تقييم جوجل</div></div>` : ""}
       </div>` : ""}
 
       <div class="cp-urgency" style="background:${urgency.bg};color:${urgency.color};border-color:${urgency.border};box-shadow:0 0 14px ${urgency.color}22;">
         ${urgency.dot} ${urgency.text}
       </div>
+
+      ${lead.socialSince ? `<div style="font-size:11px;color:#475569;margin-top:-16px;margin-bottom:16px;">📅 على السوشيال منذ: <strong style="color:#94a3b8;">${lead.socialSince}</strong></div>` : ""}
     </div>
 
     <!-- Bottom -->
@@ -561,7 +530,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   </div>
   <!-- ══ END COVER PAGE ══ -->
 
-  <!-- ══ COVER (summary header) ══ -->
+  <!-- ══ COVER HEADER (ملخص) ══ -->
   <div class="cover">
     <div class="cover-top">
       <div class="co-brand">
@@ -581,15 +550,25 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       </div>
     </div>
 
-    <div class="client-name">${lead.companyName || "—"}</div>
-    <div class="client-meta">
-      ${lead.businessType ? `<span class="meta-dot"></span><span>${lead.businessType}</span>` : ""}
-      ${lead.city ? `<span class="meta-dot"></span><span>${lead.city}</span>` : ""}
-      ${lead.country ? `<span class="meta-dot"></span><span>${lead.country}</span>` : ""}
+    <!-- ✅ شعار العميل + اسمه في الهيدر -->
+    <div class="client-header-row">
+      ${clientLogo
+        ? `<img src="${clientLogo}" class="client-logo-sm" alt="${lead.companyName}" onerror="this.style.display='none';">`
+        : `<div class="client-logo-sm-ph">${(lead.companyName || "?").charAt(0)}</div>`
+      }
+      <div>
+        <div class="client-name">${lead.companyName || "—"}</div>
+        <div class="client-meta">
+          ${lead.businessType ? `<span class="meta-dot"></span><span>${lead.businessType}</span>` : ""}
+          ${lead.city ? `<span class="meta-dot"></span><span>${lead.city}</span>` : ""}
+          ${lead.country ? `<span class="meta-dot"></span><span>${lead.country}</span>` : ""}
+          ${lead.crNumber ? `<span class="meta-dot"></span><span style="color:#0ea5e9;">سجل: ${lead.crNumber}</span>` : ""}
+          ${lead.socialSince ? `<span class="meta-dot"></span><span>منذ ${lead.socialSince}</span>` : ""}
+        </div>
+      </div>
     </div>
 
-    <!-- Scores + rating in one row -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-top:12px;">
       <div class="scores-row">
         ${priorityScore ? scoreCircleHTML(priorityScore, "الأولوية") : ""}
         ${qualityScore ? scoreCircleHTML(qualityScore, "الجودة") : ""}
@@ -609,14 +588,12 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   <div class="accent-bar"></div>
 
   <!-- ══ CONTACT STRIP ══ -->
-  ${(phones.length > 0 || lead.email || lead.website || lead.instagramUrl || lead.twitterUrl || lead.tiktokUrl) ? `
+  ${(phones.length > 0 || lead.email || lead.website || socialLinks.length > 0) ? `
   <div class="contact-strip">
     ${phones.length > 0 ? `<div class="ci"><div class="ci-icon">📞</div><div><div class="ci-lbl">هاتف</div><div class="ci-val">${phones[0]}</div></div></div>` : ""}
     ${lead.email ? `<div class="ci"><div class="ci-icon">📧</div><div><div class="ci-lbl">بريد</div><div class="ci-val">${lead.email}</div></div></div>` : ""}
     ${lead.website ? `<div class="ci"><div class="ci-icon">🌐</div><div><div class="ci-lbl">موقع</div><div class="ci-val">${lead.website}</div></div></div>` : ""}
-    ${lead.instagramUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(225,48,108,0.08);">📸</div><div><div class="ci-lbl">إنستغرام</div><div class="ci-val">${cleanUrl(lead.instagramUrl, "instagram")}</div></div></div>` : ""}
-    ${lead.twitterUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(29,161,242,0.08);">🐦</div><div><div class="ci-lbl">تويتر</div><div class="ci-val">${cleanUrl(lead.twitterUrl, "twitter")}</div></div></div>` : ""}
-    ${lead.tiktokUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(105,201,208,0.08);">🎵</div><div><div class="ci-lbl">تيك توك</div><div class="ci-val">${cleanUrl(lead.tiktokUrl, "tiktok")}</div></div></div>` : ""}
+    ${socialLinks.map(s => `<div class="ci"><div class="ci-icon" style="background:${s.bg};">${s.icon}</div><div><div class="ci-lbl">${s.label}</div><div class="ci-val">${s.val}</div></div></div>`).join("")}
   </div>` : ""}
 
   <!-- ══ CONTENT ══ -->
@@ -624,9 +601,17 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     ${company?.reportIntroText ? `<div class="dc"><div class="at">${company.reportIntroText}</div></div>` : ""}
 
-    <!-- نص التواصل المقترح محذوف من تقرير العميل — مخصص للمندوب فقط -->
+    <!-- رقم السجل التجاري (إذا وُجد) -->
+    ${lead.crNumber ? `
+    <div class="cr-info-box">
+      <div class="cr-info-icon">🏢</div>
+      <div>
+        <div class="cr-info-label">رقم السجل التجاري</div>
+        <div class="cr-info-value">${lead.crNumber}</div>
+      </div>
+    </div>` : ""}
 
-    <!-- الثغرات الحرجة + أرقام الهاتف في صف واحد -->
+    <!-- الثغرات + أرقام الهاتف -->
     ${(gaps.length > 0 || phones.length > 0) ? `
     <div style="display:grid;grid-template-columns:${gaps.length > 0 && phones.length > 0 ? "1fr 1fr" : "1fr"};gap:12px;">
       ${gaps.length > 0 ? `
@@ -653,15 +638,11 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <!-- فرصة الإيراد -->
     ${lead.revenueOpportunity ? `
     <div class="sh"><div class="sh-dot"></div>تقدير الفرصة التجارية</div>
-    <div class="dc">
-      <div class="at">${lead.revenueOpportunity}</div>
-    </div>` : ""}
+    <div class="dc"><div class="at">${lead.revenueOpportunity}</div></div>` : ""}
 
     <!-- ══ السوشيال ميديا ══ -->
     ${parsedSocials.length > 0 ? `
     <div class="sh"><div class="sh-dot"></div>تحليل الحضور على منصات التواصل الاجتماعي</div>
-
-    <!-- إحصائيات سريعة — Highlight Metric Rows -->
     ${parsedSocials.filter(s => s.followersCount).length > 0 ? `
     <div class="dc" style="margin-bottom:12px;">
       <div class="dc-title green">ملخص الحضور الرقمي عبر المنصات</div>
@@ -670,7 +651,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         return metricRow(m.svg, m.name, fmtInt(s.followersCount) + " متابع", m.color);
       }).join("")}
     </div>` : ""}
-
     <div class="social-grid">
       ${parsedSocials.map((sa: any) => {
         const m = platformMeta(sa.platform);
@@ -721,7 +701,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         </div>
       `).join("")}
     </div>
-    <!-- Mini bars للمقارنة السريعة -->
     <div class="dc">
       ${wsScores.filter(s => s.value).map(s => miniBar(s.value, s.label)).join("")}
       ${websiteAnalysis.summary ? `<div class="divider"></div><div class="at">${websiteAnalysis.summary}</div>` : ""}
@@ -729,10 +708,9 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     ${websiteAnalysis.recommendations ? `<div class="dc"><div class="dc-title">التوصيات</div><div class="at">${websiteAnalysis.recommendations}</div></div>` : ""}
     ` : ""}
 
-    <!-- ══ الفرص الضائعة ══ -->
+    <!-- ══ الفرص الاستراتيجية ══ -->
     ${(lead.biggestMarketingGap || lead.revenueOpportunity || websiteAnalysis || socialAnalyses.length > 0) ? `
     <div class="sh"><div class="sh-dot"></div>تحليل الفجوات والفرص الاستراتيجية</div>
-
     <div class="opp-vs">
       <div class="opp-vs-stat">
         <div class="opp-vs-val" style="color:#ef4444;text-shadow:0 0 10px rgba(239,68,68,0.45);">${websiteAnalysis?.overallScore ? Number(websiteAnalysis.overallScore).toFixed(0) : (priorityScore ? priorityScore.toFixed(0) : "—")}/10</div>
@@ -741,7 +719,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       <div class="opp-vs-arrow">→</div>
       <div class="opp-vs-stat">
         <div class="opp-vs-val" style="color:#22c55e;text-shadow:0 0 10px rgba(34,197,94,0.45);">9+/10</div>
-        <div class="opp-vs-lbl">مع مكسب</div>
+        <div class="opp-vs-lbl">مع ${companyName}</div>
       </div>
       <div class="opp-vs-arrow">→</div>
       <div class="opp-vs-stat">
@@ -749,7 +727,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         <div class="opp-vs-lbl">نمو متوقع</div>
       </div>
     </div>
-
     <div class="opp-grid">
       <div class="opp-card now">
         <div class="opp-label" style="color:#ef4444;">⚠️ الفجوات التشغيلية الحالية</div>
@@ -762,7 +739,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         ` : ""}
       </div>
       <div class="opp-card with-maksab">
-        <div class="opp-label" style="color:#22c55e;">✅ المخرجات المستهدفة مع مكسب</div>
+        <div class="opp-label" style="color:#22c55e;">✅ المخرجات المستهدفة مع ${companyName}</div>
         <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>بناء حضور رقمي متكامل ومتسق عبر جميع المنصات ذات الصلة</span></div>
         <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>تطوير استراتيجية محتوى مبنية على بيانات الجمهور المستهدف</span></div>
         <div class="opp-item"><span class="opp-dot" style="background:#22c55e;"></span><span>تعزيز الظهور العضوي في محركات البحث وخرائط جوجل</span></div>
@@ -770,7 +747,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         ${lead.revenueOpportunity ? `<div class="opp-item"><span class="opp-dot" style="background:#0ea5e9;"></span><span style="color:#0ea5e9;font-weight:600;">${lead.revenueOpportunity.slice(0,110)}${lead.revenueOpportunity.length > 110 ? "..." : ""}</span></div>` : ""}
       </div>
     </div>
-
     <!-- CTA -->
     <div style="background:linear-gradient(135deg,rgba(34,197,94,0.07),rgba(14,165,233,0.05));border:1px solid rgba(34,197,94,0.15);border-radius:10px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
       <div>
@@ -793,7 +769,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <!-- ══ الملاحظات ══ -->
     ${lead.notes ? `
-    <div class="sh" style="margin-top:0;"><div class="sh-dot"></div>الفجوات التشغيلية الحرجة</div>
+    <div class="sh" style="margin-top:0;"><div class="sh-dot"></div>الملاحظات</div>
     <div class="dc"><div class="at">${lead.notes}</div></div>` : ""}
 
   </div><!-- /content -->
@@ -801,34 +777,57 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   <!-- ══ FOOTER ══ -->
   <div class="footer">
     <div class="qr-wrap">
+      <!-- QR موقع الشركة -->
       <div class="qr-block">
         <img class="qr-img"
-          src="https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(company?.website || "https://maksab-ksa.com")}&bgcolor=0f172a&color=22c55e&format=svg"
+          src="${qrUrl(company?.website || "https://maksab-ksa.com")}"
           alt="QR الموقع"
         />
-        <div class="qr-caption" style="color:#22c55e;">موقع مكسب</div>
+        <div class="qr-caption" style="color:#22c55e;">موقع ${companyName}</div>
       </div>
+
+      <!-- ✅ QR السجل التجاري (إذا وُجد) -->
       ${lead.crNumber ? `
       <div class="qr-block">
         <img class="qr-img cr"
-          src="https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent("https://mc.gov.sa/ar/eservices/Pages/ServiceDetails.aspx?sID=" + lead.crNumber)}&bgcolor=0f172a&color=0ea5e9&format=svg"
+          src="${qrUrl("https://mc.gov.sa/ar/eservices/Pages/ServiceDetails.aspx?sID=" + lead.crNumber, "0ea5e9")}"
           alt="QR السجل التجاري"
         />
-        <div class="qr-caption" style="color:#0ea5e9;">السجل التجاري</div>
-      </div>
-      ` : ""}
+        <div class="qr-caption" style="color:#0ea5e9;">السجل التجاري<br><span style="font-family:monospace;font-size:9px;">${lead.crNumber}</span></div>
+      </div>` : ""}
+
+      <!-- QR Google Maps (إذا وُجد رابط) -->
+      ${lead.googleMapsUrl ? `
+      <div class="qr-block">
+        <img class="qr-img maps"
+          src="${qrUrl(lead.googleMapsUrl, "eab308")}"
+          alt="QR خرائط جوجل"
+        />
+        <div class="qr-caption" style="color:#eab308;">خرائط جوجل</div>
+      </div>` : ""}
+
+      <!-- QR الموقع الإلكتروني للعميل (إذا وُجد) -->
+      ${lead.website ? `
+      <div class="qr-block">
+        <img class="qr-img"
+          src="${qrUrl(lead.website, "8b5cf6")}"
+          alt="QR موقع العميل"
+        />
+        <div class="qr-caption" style="color:#8b5cf6;">موقع العميل</div>
+      </div>` : ""}
+
       <div class="qr-text">
         <div style="font-weight:700;color:#22c55e;font-size:11px;margin-bottom:3px;">${companyName}</div>
         ${company?.website ? `<div>${company.website}</div>` : "<div>maksab-ksa.com</div>"}
         ${company?.email ? `<div>${company.email}</div>` : ""}
         ${company?.phone ? `<div>${company.phone}</div>` : ""}
+        ${company?.address ? `<div style="margin-top:3px;color:#1e293b;">${company.address}</div>` : ""}
         ${company?.reportFooterText ? `<div style="margin-top:3px;color:#1e293b;">${company.reportFooterText}</div>` : ""}
       </div>
     </div>
     <div style="text-align:left;">
       <div>تاريخ الإصدار: ${reportDate}</div>
-      <div style="color:#22c55e33;font-size:9px;margin-top:3px;">حصري من شركة مكسب — جميع الحقوق محفوظة</div>
-      ${company?.address ? `<div style="font-size:9px;color:#1e293b;margin-top:2px;">${company.address}</div>` : ""}
+      <div style="color:#22c55e33;font-size:9px;margin-top:3px;">حصري من ${companyName} — جميع الحقوق محفوظة</div>
     </div>
   </div>
 
