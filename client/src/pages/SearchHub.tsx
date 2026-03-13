@@ -23,7 +23,7 @@ import {
   Layers, SlidersHorizontal, CheckCheck, AlertTriangle,
   RotateCcw, Info, Brain, TrendingUp, Sparkles, Clock,
   Navigation, Crosshair, CircleDot, ChevronDown, UserPlus,
-  SearchCheck, Link2, BarChart2, Shield, Twitter, Linkedin
+  SearchCheck, Link2, BarChart2, Shield, Twitter, Linkedin, Mail
 } from "lucide-react";
 import { MapView } from "@/components/Map";
 import { AddLeadModal } from "@/components/AddLeadModal";
@@ -161,6 +161,25 @@ function ResultCard({
                 {result.username && (result.name || result.fullName) && (
                   <p className="text-xs text-muted-foreground mt-0.5">@{result.username}</p>
                 )}
+                {/* عرض الرابط المختصر قابل للنقر */}
+                {(result.profileUrl || result.url) && (
+                  <a
+                    href={result.profileUrl || result.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400/70 hover:text-blue-400 mt-0.5 font-mono flex items-center gap-1 truncate max-w-[200px]"
+                    dir="ltr"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <Link2 className="w-2.5 h-2.5 shrink-0" />
+                    {(() => {
+                      try {
+                        const u = new URL(result.profileUrl || result.url);
+                        return u.hostname.replace('www.', '') + (u.pathname.length > 1 ? u.pathname.slice(0, 30) : '');
+                      } catch { return (result.profileUrl || result.url).slice(0, 40); }
+                    })()}
+                  </a>
+                )}
               </div>
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                 {(result.dataSource === "tiktok_puppeteer" || result.dataSource === "snapchat_puppeteer") && (
@@ -263,29 +282,32 @@ function ResultCard({
               {result.url && (
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-7 text-xs gap-1.5 px-2"
+                  variant="outline"
+                  className="h-7 text-xs gap-1.5 px-2.5 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
                   onClick={() => window.open(result.url, "_blank")}
+                  title={result.url}
                 >
                   <ExternalLink className="w-3 h-3" />
-                  خرائط
+                  فتح الرابط
                 </Button>
               )}
               {result.username && (
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-7 text-xs gap-1.5 px-2"
+                  variant="outline"
+                  className="h-7 text-xs gap-1.5 px-2.5 border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300"
                   onClick={() => {
                     const url = result.profileUrl ||
                       (result.dataSource?.includes("tiktok") ? `https://www.tiktok.com/@${result.username}` :
                        result.dataSource?.includes("snapchat") ? `https://www.snapchat.com/add/${result.username}` :
+                       result.dataSource?.includes("facebook") ? `https://www.facebook.com/${result.username}` :
                        `https://instagram.com/${result.username}`);
                     window.open(url, "_blank");
                   }}
+                  title={result.profileUrl || `@${result.username}`}
                 >
                   <ExternalLink className="w-3 h-3" />
-                  الملف
+                  فتح الملف
                 </Button>
               )}
             </div>
@@ -368,6 +390,7 @@ export default function SearchHub() {
   const [minFollowers, setMinFollowers] = useState("");
   const [maxFollowers, setMaxFollowers] = useState("");
   const [onlyWithPhone, setOnlyWithPhone] = useState(false);
+  const [onlyWithContact, setOnlyWithContact] = useState(false); // هاتف أو بريد
   // ===== معالج الاستهداف الذكي =====
   const [showTargetWizard, setShowTargetWizard] = useState(false);
   const [targetFilters, setTargetFilters] = useState({
@@ -1129,6 +1152,13 @@ export default function SearchHub() {
         (r.phones && r.phones.length > 0);
       if (!hasPhone) return false;
     }
+    if (onlyWithContact) {
+      const hasPhone = (r.availablePhones && r.availablePhones.length > 0) ||
+        (r.phone && r.phone.trim() !== "") ||
+        (r.phones && r.phones.length > 0);
+      const hasEmail = r.email && r.email.trim() !== "";
+      if (!hasPhone && !hasEmail) return false;
+    }
     return true;
   });
 
@@ -1259,7 +1289,7 @@ export default function SearchHub() {
           <div className="w-px h-4 bg-border" />
           {/* فلتر الأرقام */}
           <button
-            onClick={() => setOnlyWithPhone(!onlyWithPhone)}
+            onClick={() => { setOnlyWithPhone(!onlyWithPhone); if (!onlyWithPhone) setOnlyWithContact(false); }}
             className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-all ${
               onlyWithPhone
                 ? "bg-green-500/15 border-green-500/40 text-green-400 font-semibold"
@@ -1267,7 +1297,19 @@ export default function SearchHub() {
             }`}
           >
             <Phone className="w-3 h-3" />
-            {onlyWithPhone ? "✓ أرقام فقط" : "كل النتائج"}
+            {onlyWithPhone ? "✓ أرقام فقط" : "أرقام فقط"}
+          </button>
+          {/* فلتر هاتف أو بريد */}
+          <button
+            onClick={() => { setOnlyWithContact(!onlyWithContact); if (!onlyWithContact) setOnlyWithPhone(false); }}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-all ${
+              onlyWithContact
+                ? "bg-blue-500/15 border-blue-500/40 text-blue-400 font-semibold"
+                : "bg-muted/30 border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Mail className="w-3 h-3" />
+            {onlyWithContact ? "✓ قابل للتواصل" : "قابل للتواصل"}
           </button>
           {/* فلاتر المنصات المتقدمة */}
           <button
@@ -1522,6 +1564,13 @@ export default function SearchHub() {
                   (r.phone && r.phone.trim() !== "") ||
                   (r.phones && r.phones.length > 0);
                 if (!hasPhone) return false;
+              }
+              if (onlyWithContact) {
+                const hasPhone = (r.availablePhones && r.availablePhones.length > 0) ||
+                  (r.phone && r.phone.trim() !== "") ||
+                  (r.phones && r.phones.length > 0);
+                const hasEmail = r.email && r.email.trim() !== "";
+                if (!hasPhone && !hasEmail) return false;
               }
               return true;
             });
@@ -2068,7 +2117,17 @@ export default function SearchHub() {
                                   <div className="flex-1 min-w-0">
                                     <h3 className="font-semibold text-foreground text-sm leading-tight">{result.name}</h3>
                                     {result.displayUrl && (
-                                      <p className="text-xs text-orange-400/70 mt-0.5 font-mono" dir="ltr">{result.displayUrl}</p>
+                                      <a
+                                        href={result.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-400/80 hover:text-blue-400 mt-0.5 font-mono flex items-center gap-1 truncate max-w-[220px]"
+                                        dir="ltr"
+                                        onClick={e => e.stopPropagation()}
+                                      >
+                                        <Link2 className="w-2.5 h-2.5 shrink-0" />
+                                        {result.displayUrl}
+                                      </a>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1.5 shrink-0">
@@ -2152,12 +2211,13 @@ export default function SearchHub() {
                                   {result.url && (
                                     <Button
                                       size="sm"
-                                      variant="ghost"
-                                      className="h-7 text-xs gap-1.5 px-2"
+                                      variant="outline"
+                                      className="h-7 text-xs gap-1.5 px-2.5 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
                                       onClick={() => window.open(result.url, "_blank")}
+                                      title={result.url}
                                     >
                                       <ExternalLink className="w-3 h-3" />
-                                      الموقع
+                                      فتح الرابط
                                     </Button>
                                   )}
                                   {result.url && !result.deepSearched && (
