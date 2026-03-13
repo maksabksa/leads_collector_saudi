@@ -33,7 +33,45 @@ function fmt(v: number | null | undefined) {
 }
 function fmtInt(v: number | null | undefined) {
   if (!v && v !== 0) return "—";
+  if (v === 0) return "—";
   return Number(v).toLocaleString("ar-SA");
+}
+
+function cleanUrl(url: string | null | undefined, platform: string): string {
+  if (!url) return "—";
+  try {
+    // Remove protocol and www
+    let clean = url.replace(/https?:\/\/(www\.)?/, "");
+    // Extract handle/username based on platform
+    if (platform === "instagram") {
+      const m = clean.match(/instagram\.com\/([^/?&]+)/);
+      return m ? `@${m[1]}` : clean.split("/")[1] || clean;
+    }
+    if (platform === "twitter" || platform === "x") {
+      const m = clean.match(/(?:twitter|x)\.com\/([^/?&]+)/);
+      return m ? `@${m[1]}` : clean.split("/")[1] || clean;
+    }
+    if (platform === "tiktok") {
+      const m = clean.match(/tiktok\.com\/@?([^/?&]+)/);
+      return m ? `@${m[1]}` : clean.split("/").pop() || clean;
+    }
+    if (platform === "snapchat") {
+      const m = clean.match(/snapchat\.com\/add\/([^/?&]+)/);
+      return m ? `@${m[1]}` : clean.split("/").pop() || clean;
+    }
+    // Generic: return just the path after domain
+    const parts = clean.split("/");
+    return parts.length > 1 ? parts.slice(1).join("/") : clean;
+  } catch {
+    return url;
+  }
+}
+
+function cleanPhone(v: string | number | null | undefined): string {
+  if (!v) return "";
+  const s = String(v).trim();
+  if (s === "0" || s === "") return "";
+  return s;
 }
 
 function parseSocialRaw(raw: string | null | undefined): Record<string, any> | null {
@@ -175,11 +213,13 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
   // ── Phones ──
   const phones: string[] = [];
-  if (lead.verifiedPhone) phones.push(lead.verifiedPhone);
-  if (lead.phone && lead.phone !== lead.verifiedPhone) phones.push(lead.phone);
+  const vp = cleanPhone(lead.verifiedPhone);
+  const lp = cleanPhone(lead.phone);
+  if (vp) phones.push(vp);
+  if (lp && lp !== vp) phones.push(lp);
   try {
     const arr = typeof lead.additionalPhones === "string" ? JSON.parse(lead.additionalPhones) : lead.additionalPhones;
-    if (Array.isArray(arr)) arr.forEach((p: string) => { if (p && !phones.includes(p)) phones.push(p); });
+    if (Array.isArray(arr)) arr.forEach((p: string) => { const cp = cleanPhone(p); if (cp && !phones.includes(cp)) phones.push(cp); });
   } catch {}
 
   // ── Gaps ──
@@ -521,9 +561,9 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
     <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;">
       <div class="scores-row">
-        ${scoreCircleHTML(priorityScore, "الأولوية")}
-        ${scoreCircleHTML(qualityScore, "الجودة")}
-        ${scoreCircleHTML(seasonScore, "الموسمية")}
+        ${priorityScore ? scoreCircleHTML(priorityScore, "الأولوية") : ""}
+        ${qualityScore ? scoreCircleHTML(qualityScore, "الجودة") : ""}
+        ${seasonScore ? scoreCircleHTML(seasonScore, "الموسمية") : ""}
         <div class="urgency-pill">${urgency.text}</div>
       </div>
       ${lead.rating ? `
@@ -541,12 +581,12 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   <!-- ══ CONTACT STRIP ══ -->
   ${(lead.verifiedPhone || lead.phone || lead.email || lead.website || lead.instagramUrl || lead.twitterUrl || lead.tiktokUrl) ? `
   <div class="contact-strip">
-    ${(lead.verifiedPhone || lead.phone) ? `<div class="ci"><div class="ci-icon">📞</div><div><div class="ci-lbl">الهاتف</div><div class="ci-val">${lead.verifiedPhone || lead.phone}</div></div></div>` : ""}
+    ${phones.length > 0 ? `<div class="ci"><div class="ci-icon">📞</div><div><div class="ci-lbl">الهاتف</div><div class="ci-val">${phones[0]}</div></div></div>` : ""}
     ${lead.email ? `<div class="ci"><div class="ci-icon">📧</div><div><div class="ci-lbl">البريد</div><div class="ci-val">${lead.email}</div></div></div>` : ""}
     ${lead.website ? `<div class="ci"><div class="ci-icon">🌐</div><div><div class="ci-lbl">الموقع</div><div class="ci-val">${lead.website}</div></div></div>` : ""}
-    ${lead.instagramUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(225,48,108,0.1);border-color:rgba(225,48,108,0.2);">📸</div><div><div class="ci-lbl">إنستغرام</div><div class="ci-val">${lead.instagramUrl.replace(/https?:\/\/(www\.)?instagram\.com\//,"@")}</div></div></div>` : ""}
-    ${lead.twitterUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(29,161,242,0.1);border-color:rgba(29,161,242,0.2);">🐦</div><div><div class="ci-lbl">تويتر</div><div class="ci-val">${lead.twitterUrl.replace(/https?:\/\/(www\.)?(twitter|x)\.com\//,"@")}</div></div></div>` : ""}
-    ${lead.tiktokUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(105,201,208,0.1);border-color:rgba(105,201,208,0.2);">🎵</div><div><div class="ci-lbl">تيك توك</div><div class="ci-val">${lead.tiktokUrl.replace(/https?:\/\/(www\.)?tiktok\.com\/@?/,"@")}</div></div></div>` : ""}
+    ${lead.instagramUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(225,48,108,0.1);border-color:rgba(225,48,108,0.2);">📸</div><div><div class="ci-lbl">إنستغرام</div><div class="ci-val">${cleanUrl(lead.instagramUrl, "instagram")}</div></div></div>` : ""}
+    ${lead.twitterUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(29,161,242,0.1);border-color:rgba(29,161,242,0.2);">🐦</div><div><div class="ci-lbl">تويتر</div><div class="ci-val">${cleanUrl(lead.twitterUrl, "twitter")}</div></div></div>` : ""}
+    ${lead.tiktokUrl ? `<div class="ci"><div class="ci-icon" style="background:rgba(105,201,208,0.1);border-color:rgba(105,201,208,0.2);">🎵</div><div><div class="ci-lbl">تيك توك</div><div class="ci-val">${cleanUrl(lead.tiktokUrl, "tiktok")}</div></div></div>` : ""}
   </div>` : ""}
 
   <!-- ══ CONTENT ══ -->
