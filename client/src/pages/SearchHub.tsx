@@ -1559,16 +1559,24 @@ export default function SearchHub() {
             const platformFilteredResults = platformResults.filter((r: any) => {
               if (minFollowers && r.followersCount < parseInt(minFollowers)) return false;
               if (maxFollowers && r.followersCount > parseInt(maxFollowers)) return false;
-              if (onlyWithPhone) {
+              // Google Maps لا يُرجع الهاتف مباشرة (يحتاج getPlaceDetails منفصل)
+              // لذلك نستثني google من فلتر الهاتف لتجنب إخفاء جميع النتائج
+              if (onlyWithPhone && p.id !== "google") {
                 const hasPhone = (r.availablePhones && r.availablePhones.length > 0) ||
                   (r.phone && r.phone.trim() !== "") ||
-                  (r.phones && r.phones.length > 0);
+                  (r.phones && r.phones.length > 0) ||
+                  (r.formatted_phone_number && r.formatted_phone_number.trim() !== "") ||
+                  (r.international_phone_number && r.international_phone_number.trim() !== "") ||
+                  (r.phoneNumber && r.phoneNumber.trim() !== "");
                 if (!hasPhone) return false;
               }
-              if (onlyWithContact) {
+              if (onlyWithContact && p.id !== "google") {
                 const hasPhone = (r.availablePhones && r.availablePhones.length > 0) ||
                   (r.phone && r.phone.trim() !== "") ||
-                  (r.phones && r.phones.length > 0);
+                  (r.phones && r.phones.length > 0) ||
+                  (r.formatted_phone_number && r.formatted_phone_number.trim() !== "") ||
+                  (r.international_phone_number && r.international_phone_number.trim() !== "") ||
+                  (r.phoneNumber && r.phoneNumber.trim() !== "");
                 const hasEmail = r.email && r.email.trim() !== "";
                 if (!hasPhone && !hasEmail) return false;
               }
@@ -2286,7 +2294,6 @@ export default function SearchHub() {
           city: addDialog.result.city || city,
           phone: addDialog.result.phone || addDialog.result.formatted_phone_number || "",
           website: addDialog.result.website || "",
-          googleMapsUrl: addDialog.result.url || "",
           placeId: addDialog.result.place_id || undefined,
           rating: addDialog.result.rating || undefined,
           address: addDialog.result.formatted_address || addDialog.result.vicinity || "",
@@ -2301,7 +2308,7 @@ export default function SearchHub() {
           twitterUrl: addDialog.platform === "twitter" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://x.com/${addDialog.result.username}` : undefined)) : undefined,
           linkedinUrl: addDialog.platform === "linkedin" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://linkedin.com/company/${addDialog.result.username}` : undefined)) : undefined,
           facebookUrl: addDialog.platform === "facebook" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://facebook.com/${addDialog.result.username}` : undefined)) : undefined,
-          googleMapsUrl: addDialog.platform === "google" ? (addDialog.result.url || addDialog.result.googleMapsUrl || "") : "",
+          googleMapsUrl: addDialog.platform === "google" ? (addDialog.result.url || addDialog.result.googleMapsUrl || `https://www.google.com/maps/place/?q=place_id:${addDialog.result.place_id || ""}`) : "",
         } : undefined}
       />
 
