@@ -46,6 +46,7 @@ import FollowUp from "./pages/FollowUp";
 import SmartAnalysis from "./pages/SmartAnalysis";
 import AIAgent from "./pages/AIAgent";
 import SerpQueue from "./pages/SerpQueue";
+import Seasons from "./pages/Seasons";
 function Router() {
   return (
     <Switch>
@@ -94,6 +95,7 @@ function Router() {
         <Route path="/smart-analysis" component={SmartAnalysis} />
         <Route path="/ai-agent" component={AIAgent} />
         <Route path="/serp-queue" component={SerpQueue} />
+        <Route path="/seasons" component={Seasons} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

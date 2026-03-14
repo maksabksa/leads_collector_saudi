@@ -1365,3 +1365,23 @@ export const serpSearchQueue = mysqlTable("serp_search_queue", {
 });
 export type SerpSearchQueue = typeof serpSearchQueue.$inferSelect;
 export type InsertSerpSearchQueue = typeof serpSearchQueue.$inferInsert;
+
+// ===== MARKETING SEASONS TABLE (المواسم التسويقية) =====
+export const marketingSeasons = mysqlTable("marketing_seasons", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),                           // اسم الموسم (رمضان، الصيف، اليوم الوطني...)
+  startDate: varchar("startDate", { length: 10 }).notNull(),                  // تاريخ البداية (MM-DD)
+  endDate: varchar("endDate", { length: 10 }).notNull(),                      // تاريخ النهاية (MM-DD)
+  year: int("year"),                                                           // السنة (null = يتكرر كل سنة)
+  opportunities: json("opportunities").$type<string[]>().notNull(),           // الفرص التسويقية
+  relatedBusinessTypes: json("relatedBusinessTypes").$type<string[]>(),       // أنواع الأنشطة المرتبطة (null = الكل)
+  description: text("description"),                                            // وصف الموسم
+  color: varchar("color", { length: 20 }).default("#f59e0b"),                 // لون الموسم في الواجهة
+  icon: varchar("icon", { length: 10 }).default("🌙"),                       // أيقونة الموسم
+  isActive: boolean("isActive").default(true).notNull(),                      // هل الموسم مفعّل؟
+  priority: int("priority").default(5).notNull(),                             // أولوية الظهور (1 = أعلى)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MarketingSeason = typeof marketingSeasons.$inferSelect;
+export type InsertMarketingSeason = typeof marketingSeasons.$inferInsert;

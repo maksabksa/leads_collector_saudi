@@ -7,6 +7,7 @@ import { storagePut } from "../storage";
 import { nanoid } from "nanoid";
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
+import { getActiveSeasonForBusiness, getUpcomingSeasonsForBusiness } from "./seasons";
 
 async function getCompanySettingsData() {
   try {
@@ -20,7 +21,11 @@ async function getCompanySettingsData() {
 
 async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses: any[]): Promise<Buffer> {
   const company = await getCompanySettingsData();
-  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company);
+  // جلب بيانات الموسم التسويقي الحالي
+  const businessType = lead.businessType || "";
+  const activeSeason = await getActiveSeasonForBusiness(businessType).catch(() => null);
+  const upcomingSeasons = await getUpcomingSeasonsForBusiness(businessType).catch(() => []);
+  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company, activeSeason, upcomingSeasons);
   
   let executablePath: string;
   try {
@@ -211,7 +216,7 @@ function computeSmartScores(lead: any, websiteAnalysis: any, socialAnalyses: any
 }
 
 // ===== HTML Template for PDF - النسخة المحسّنة =====
-function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any): string {
+function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any, activeSeason?: any, upcomingSeasons?: any[]): string {
   const stageLabels: Record<string, string> = {
     new: "جديد", contacted: "تم التواصل", interested: "مهتم",
     price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه",
@@ -232,6 +237,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   const scores = computeSmartScores(lead, websiteAnalysis, socialAnalyses);
   // حساب الفرص الضائعة
   const missedOpps = computeMissedOpportunities(lead, websiteAnalysis, socialAnalyses);
+
+  // بيانات صور العميل
+  const clientLogoUrl = lead.clientLogoUrl || "";
+  const placePhotos: string[] = Array.isArray(lead.placePhotos) ? lead.placePhotos.slice(0, 3) : [];
+  const instaAnalysis = socialAnalyses.find(s => s.platform?.toLowerCase().includes("instagram"));
+  const instaProfilePic = (instaAnalysis as any)?.profilePicUrl || "";
 
   // بناء بطاقات السوشيال ميديا
   const socialRows = socialAnalyses.length > 0 ? socialAnalyses.map(s => `
@@ -297,6 +308,50 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
       </div>
     </div>
   `).join("");
+
+  // ===== قسم القناة الأكثر جدوى =====
+  function detectPrimaryChannel(businessType: string, lead: any, socialAnalyses: any[]): { channel: string; icon: string; color: string; reason: string; secondaryChannels: Array<{name: string; icon: string; note: string}> } {
+    const bt = (businessType || "").toLowerCase();
+    const hasInsta = !!lead.instagramUrl;
+    const hasTiktok = !!lead.tiktokUrl;
+    const hasSnap = !!lead.snapchatUrl;
+    const hasWebsite = !!lead.website;
+    const instaFollowers = Number(socialAnalyses.find(s => s.platform === "instagram")?.followersCount || 0);
+    // مطاعم وكافيهات
+    if (bt.includes("مطعم") || bt.includes("كافيه") || bt.includes("مقهى") || bt.includes("حلويات") || bt.includes("مخبز")) {
+      return { channel: "إنستغرام وتيك توك", icon: "📸", color: "#e1306c", reason: "قطاع الأغذية والمشروبات يعتمد بشكل أساسي على المحتوى المرئي الجذاب. إنستغرام وتيك توك هما الأعلى تحويلاً للزوار إلى عملاء فعليين في هذا القطاع بالسوق السعودي.", secondaryChannels: [{name: "سناب شات", icon: "👻", note: "للعروض اليومية"}, {name: "Google Maps", icon: "📍", note: "للظهور في البحث المحلي"}] };
+    }
+    // صالونات وعيادات
+    if (bt.includes("صالون") || bt.includes("عيادة") || bt.includes("طبي") || bt.includes("صحة") || bt.includes("تجميل")) {
+      return { channel: "إنستغرام", icon: "📸", color: "#e1306c", reason: "الخدمات الشخصية والجمالية تعتمد على الثقة والمحتوى البصري. إنستغرام هو المنصة الأعلى تحويلاً لهذا القطاع مع إمكانية الحجز المباشر عبر الرابط في البايو.", secondaryChannels: [{name: "واتساب بيزنس", icon: "💬", note: "للحجوزات المباشرة"}, {name: "Google Maps", icon: "📍", note: "للتقييمات والظهور المحلي"}] };
+    }
+    // تعليم ودروس
+    if (bt.includes("تعليم") || bt.includes("دروس") || bt.includes("أكاديمية") || bt.includes("تدريب")) {
+      return { channel: "يوتيوب وإنستغرام", icon: "🎓", color: "#ff0000", reason: "قطاع التعليم يستفيد من المحتوى التعليمي الطويل على يوتيوب لبناء الثقة، مع إنستغرام للتواصل اليومي وعرض النتائج والشهادات.", secondaryChannels: [{name: "تيك توك", icon: "🎵", note: "لمقاطع تعليمية قصيرة"}, {name: "لينكدإن", icon: "💼", note: "للدورات المهنية"}] };
+    }
+    // عقارات
+    if (bt.includes("عقار") || bt.includes("مكتب عقاري") || bt.includes("شاليه") || bt.includes("فندق")) {
+      return { channel: "إنستغرام وGoogle", icon: "🏠", color: "#4285f4", reason: "قطاع العقارات يعتمد على المحتوى البصري الاحترافي وإعلانات Google المستهدفة. المشترون يبدأون رحلتهم بالبحث على Google ثم يتحققون من المصداقية عبر إنستغرام.", secondaryChannels: [{name: "يوتيوب", icon: "▶️", note: "لجولات افتراضية"}, {name: "واتساب", icon: "💬", note: "للتواصل المباشر"}] };
+    }
+    // ملابس وأزياء
+    if (bt.includes("ملابس") || bt.includes("أزياء") || bt.includes("عبايات") || bt.includes("مجوهرات") || bt.includes("عطور")) {
+      return { channel: "إنستغرام وسناب شات", icon: "👗", color: "#e1306c", reason: "قطاع الأزياء والموضة يعتمد بشكل كامل على المنصات البصرية. إنستغرام للمحتوى الاحترافي وسناب شات للوصول إلى الجمهور السعودي الشاب.", secondaryChannels: [{name: "تيك توك", icon: "🎵", note: "لمحتوى الترند"}, {name: "الموقع الإلكتروني", icon: "🌐", note: "للمتجر الإلكتروني"}] };
+    }
+    // خدمات B2B
+    if (bt.includes("محاسب") || bt.includes("محامي") || bt.includes("استشار") || bt.includes("برمجة") || bt.includes("تقنية")) {
+      return { channel: "لينكدإن والموقع الإلكتروني", icon: "💼", color: "#0077b5", reason: "الخدمات المهنية وB2B تعتمد على بناء المصداقية والخبرة. لينكدإن هو المنصة الأعلى جودة للوصول إلى صناع القرار، مع موقع إلكتروني احترافي يعزز الثقة.", secondaryChannels: [{name: "تويتر/X", icon: "🐦", note: "للقيادة الفكرية"}, {name: "Google Ads", icon: "🔍", note: "للاستهداف المحدد"}] };
+    }
+    // افتراضي
+    return { channel: "إنستغرام", icon: "📸", color: "#e1306c", reason: "بناءً على طبيعة النشاط والجمهور المستهدف في السوق السعودي، إنستغرام يمثل القناة الأعلى وصولاً وتحويلاً للعملاء المحتملين في هذه المرحلة.", secondaryChannels: [{name: "سناب شات", icon: "👻", note: "للجمهور الشاب"}, {name: "Google Maps", icon: "📍", note: "للبحث المحلي"}] };
+  }
+  const primaryChannel = detectPrimaryChannel(lead.businessType || "", lead, socialAnalyses);
+
+  // ===== QR Code لواتساب =====
+  const waPhone = (companyPhone || "").replace(/[^0-9]/g, "");
+  const waNumber = waPhone.startsWith("966") ? waPhone : waPhone.startsWith("0") ? "966" + waPhone.slice(1) : "966" + waPhone;
+  const waMessage = encodeURIComponent(`مرحباً، اطلعت على التقرير الخاص بـ ${lead.companyName} وأود الاستفسار عن خطة التنفيذ المخصصة`);
+  const waLink = `https://wa.me/${waNumber}?text=${waMessage}`;
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(waLink)}&bgcolor=ffffff&color=128C7E&margin=4`;
 
   // بناء قسم المنصات المتاحة
   const platforms = [
@@ -609,6 +664,25 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
       </div>
     </div>
 
+    <!-- صور العميل (Google Maps + Instagram) -->
+    ${(placePhotos.length > 0 || clientLogoUrl || instaProfilePic) ? `
+    <div class="section">
+      <div class="section-title">📸 معرض الصور</div>
+      <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+        ${(clientLogoUrl || instaProfilePic) ? `
+        <div style="text-align:center;">
+          <img src="${clientLogoUrl || instaProfilePic}" style="width:80px;height:80px;border-radius:12px;object-fit:cover;border:2px solid #e2e8f0;" alt="شعار العميل" onerror="this.style.display='none'" />
+          <div style="font-size:9px;color:#94a3b8;margin-top:4px;">شعار النشاط</div>
+        </div>` : ""}
+        ${placePhotos.map((photoUrl, idx) => `
+        <div style="text-align:center;">
+          <img src="${photoUrl}" style="width:${idx === 0 ? '140px' : '100px'};height:${idx === 0 ? '100px' : '80px'};border-radius:10px;object-fit:cover;border:1.5px solid #e2e8f0;" alt="صورة المكان" onerror="this.style.display='none'" />
+          <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Google Maps</div>
+        </div>
+        `).join("")}
+      </div>
+    </div>` : ""}
+
     <!-- التحليل الذكي إذا كان موجوداً -->
     ${(lead.iceBreaker || lead.salesEntryAngle || lead.marketingGapSummary || lead.primaryOpportunity) ? `
     <div class="section">
@@ -740,7 +814,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   </div>
 </div>
 
-<!-- ===== الصفحة 4: التوصيات والخطوات التالية ===== -->
+<<!-- ===== الصفحة 4: التوصيات + القناة + الموسم + خاتمة ===== -->
 <div class="page">
   <div class="header" style="padding:18px 36px;">
     <div class="header-top">
@@ -754,36 +828,97 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
       <div style="font-size:11px;opacity:0.7;">${lead.companyName} · ${now}</div>
     </div>
   </div>
-
   <div class="body">
+    <!-- التوصيات الاستراتيجية -->
     <div class="section">
       <div class="section-title">🎯 التوصيات الاستراتيجية</div>
       <div style="font-size:11px;color:#64748b;margin-bottom:14px;">خطة عمل مقترحة مرتبة حسب الأولوية والأثر التجاري المتوقع</div>
       ${recCards}
     </div>
 
-    <!-- CTA -->
-    <div class="cta-section">
-      <div class="cta-title">هل أنت مستعد للارتقاء بـ ${lead.companyName}؟</div>
-      <div class="cta-subtitle">
-        فريق مكسب متخصص في تحويل الفرص الضائعة إلى نتائج قابلة للقياس.<br>
-        احصل على استشارة مجانية وخطة عمل تسويقية مخصصة لنشاطك.
+    <!-- قسم القناة الأكثر جدوى -->
+    <div style="background:linear-gradient(135deg,#f0f9ff 0%,#e0f2fe 100%);border:1.5px solid #0ea5e9;border-radius:14px;padding:18px 22px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:800;color:#0369a1;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">📱</span>
+        <span>القناة الأكثر جدوى لهذا النشاط</span>
       </div>
-      <div class="cta-buttons">
-        <a href="https://${companyWebsite}" class="cta-btn cta-btn-primary">🌐 ${companyWebsite}</a>
-        ${companyEmail ? `<a href="mailto:${companyEmail}" class="cta-btn cta-btn-secondary">✉️ ${companyEmail}</a>` : ""}
-        ${companyPhone ? `<a href="tel:${companyPhone}" class="cta-btn cta-btn-secondary">📞 ${companyPhone}</a>` : ""}
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <div style="background:${primaryChannel.color};color:white;border-radius:12px;padding:10px 18px;font-size:22px;font-weight:900;white-space:nowrap;flex-shrink:0;">
+          ${primaryChannel.icon} ${primaryChannel.channel}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11.5px;color:#1e293b;line-height:1.7;margin-bottom:10px;">${primaryChannel.reason}</div>
+          <div style="font-size:10.5px;color:#64748b;font-weight:600;margin-bottom:6px;">منصات داعمة موصى بها أيضاً:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${primaryChannel.secondaryChannels.map((sc: any) => `
+              <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:4px 10px;font-size:10px;color:#475569;">
+                ${sc.icon} <strong>${sc.name}</strong> — ${sc.note}
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- قسم الموسم التسويقي -->
+    ${activeSeason ? `
+    <div style="background:linear-gradient(135deg,${activeSeason.color}15 0%,${activeSeason.color}08 100%);border:1.5px solid ${activeSeason.color};border-radius:14px;padding:16px 20px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:800;color:${activeSeason.color};margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:20px;">${activeSeason.icon}</span>
+        <span>تنبيه موسمي: ${activeSeason.name}</span>
+        <span style="background:${activeSeason.color};color:white;font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700;">نشط الآن</span>
+      </div>
+      <div style="font-size:11px;color:#475569;margin-bottom:10px;">${activeSeason.description || ""}</div>
+      <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:8px;">فرص تسويقية متاحة في هذا الموسم:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        ${((activeSeason.opportunities || []) as string[]).slice(0, 4).map((opp: string) => `
+          <div style="background:white;border-radius:8px;padding:6px 10px;font-size:10.5px;color:#374151;border-right:3px solid ${activeSeason.color};">
+            • ${opp}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+    ` : (upcomingSeasons && upcomingSeasons.length > 0 ? `
+    <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:14px;padding:14px 18px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:800;color:#b45309;margin-bottom:8px;">⏰ موسم تسويقي قادم خلال 30 يوماً: ${upcomingSeasons[0].icon} ${upcomingSeasons[0].name}</div>
+      <div style="font-size:11px;color:#78350f;">ابدأ التحضير مبكراً للاستفادة من هذا الموسم. ${upcomingSeasons[0].description || ""}</div>
+    </div>
+    ` : "")}
+
+    <!-- خاتمة ذكية + QR Code + واتساب -->
+    <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:16px;padding:22px 28px;color:white;margin-top:4px;">
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <!-- نص الخاتمة -->
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:900;margin-bottom:8px;">هذا التقرير بداية الطريق</div>
+          <div style="font-size:11.5px;opacity:0.85;line-height:1.8;margin-bottom:14px;">
+            ما تقرأه هنا هو تشخيص أولي للوضع الرقمي لـ <strong>${lead.companyName}</strong>.
+            التحليل الأعمق والخطة التنفيذية المخصصة تتطلب جلسة عمل مع فريقنا.
+            نحن لا نبيع خدمات — نبني شراكات تجارية قائمة على النتائج.
+          </div>
+          <div style="font-size:12px;font-weight:700;opacity:0.9;margin-bottom:10px;">للحصول على تحليل أعمق وخطة تنفيذية مخصصة:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${companyPhone ? `<a href="${waLink}" style="background:#25d366;color:white;padding:8px 16px;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">💬 تواصل عبر واتساب</a>` : ""}
+            ${companyEmail ? `<a href="mailto:${companyEmail}" style="background:rgba(255,255,255,0.15);color:white;padding:8px 16px;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;border:1px solid rgba(255,255,255,0.3)">✉️ ${companyEmail}</a>` : ""}
+            <a href="https://${companyWebsite}" style="background:rgba(255,255,255,0.15);color:white;padding:8px 16px;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;border:1px solid rgba(255,255,255,0.3)">🌐 ${companyWebsite}</a>
+          </div>
+        </div>
+        <!-- QR Code -->
+        ${companyPhone ? `
+        <div style="flex-shrink:0;text-align:center;">
+          <img src="${qrApiUrl}" width="110" height="110" style="border-radius:10px;border:3px solid rgba(255,255,255,0.3);display:block;margin-bottom:6px;" alt="QR Code" />
+          <div style="font-size:9px;opacity:0.7;">امسح للتواصل</div>
+        </div>
+        ` : ""}
       </div>
     </div>
   </div>
-
   <div class="footer">
     <div class="footer-brand">${companyName}</div>
     <div>${reportFooterText} · صفحة 4</div>
     <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
   </div>
 </div>
-
 </body>
 </html>`;
 }

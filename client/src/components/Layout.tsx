@@ -17,6 +17,7 @@ import {
   ClipboardList,
   CalendarClock,
   Bell,
+  CalendarDays,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -45,6 +46,7 @@ const FOLLOWUP_NAV = [
 /** قسم الإعدادات — للأدمن فقط */
 const SETTINGS_NAV = [
   { path: "/settings",          label: "الإعدادات",           icon: Settings2 },
+  { path: "/seasons",           label: "المواسم التسويقية",  icon: CalendarDays },
   { path: "/reports",           label: "التقارير",           icon: BarChart3 },
   { path: "/users",             label: "إدارة المستخدمين", icon: Shield },
   { path: "/audit-log",         label: "سجل التدقيق",      icon: ClipboardList },

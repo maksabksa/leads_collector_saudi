@@ -57,6 +57,7 @@ import { fetchSocialPlatformData, extractSocialStats } from "./lib/brightDataSoc
 import { brightDataAnalysisRouter } from "./routers/brightDataAnalysis";
 import { aiAgentRouter } from "./routers/aiAgent";
 import { serpQueueRouter } from "./routers/serpQueue";
+import { seasonsRouter } from "./routers/seasons";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -2456,5 +2457,6 @@ export const appRouter = router({
   bulkAnalysis: bulkAnalysisRouter,
   analysisSettings: analysisSettingsRouter,
   serpQueue: serpQueueRouter,
+  seasons: seasonsRouter,
 });
 export type AppRouter = typeof appRouter;
