@@ -15,6 +15,73 @@ const RESI_PORT = parseInt(process.env.BRIGHT_DATA_RESIDENTIAL_PORT || "33335");
 const RESI_USERNAME = process.env.BRIGHT_DATA_RESIDENTIAL_USERNAME || "";
 const RESI_PASSWORD = process.env.BRIGHT_DATA_RESIDENTIAL_PASSWORD || "";
 
+// ===== فلتر جغرافي: مؤشرات المملكة العربية السعودية =====
+const SAUDI_INDICATORS = [
+  // عربي
+  "السعودية", "سعودي", "سعودية", "الرياض", "جدة", "مكة", "المدينة", "الدمام",
+  "الخبر", "الطائف", "تبوك", "أبها", "القصيم", "حائل", "نجران", "جازان",
+  "ينبع", "خميس مشيط", "بريدة", "عرعر", "سكاكا", "الجبيل", "الأحساء",
+  "المنطقة الشرقية", "الغربية", "الشمالية", "الجنوبية", "الوسطى",
+  "ksa", "KSA", "saudi", "Saudi", "riyadh", "Riyadh", "jeddah", "Jeddah",
+  "mecca", "Mecca", "medina", "Medina", "dammam", "Dammam",
+  "المملكة", "المملكة العربية", "العربية السعودية",
+  // رموز وأكواد
+  "🇸🇦", "sa", "SA",
+];
+
+/**
+ * يفحص إذا كان النص يحتوي على مؤشر سعودي
+ * يُستخدم كفلتر ناعم (soft filter) - لا يرفض إلا إذا كان هناك مؤشر دولة أخرى
+ */
+function hasSaudiIndicator(text: string): boolean {
+  const lower = text.toLowerCase();
+  return SAUDI_INDICATORS.some(ind => lower.includes(ind.toLowerCase()));
+}
+
+/**
+ * يفحص إذا كان النص يحتوي على مؤشر دولة أخرى (غير السعودية)
+ * قائمة الدول العربية والخليجية المجاورة التي قد تظهر في نتائج البحث
+ */
+const NON_SAUDI_INDICATORS = [
+  "الإمارات", "إمارات", "دبي", "أبوظبي", "الشارقة", "عجمان", "uae", "UAE", "dubai", "Dubai",
+  "مصر", "القاهرة", "الإسكندرية", "egypt", "Egypt", "cairo", "Cairo",
+  "الكويت", "kuwait", "Kuwait",
+  "البحرين", "المنامة", "bahrain", "Bahrain",
+  "قطر", "الدوحة", "qatar", "Qatar", "doha", "Doha",
+  "عُمان", "مسقط", "oman", "Oman",
+  "الأردن", "عمّان", "jordan", "Jordan",
+  "لبنان", "بيروت", "lebanon", "Lebanon",
+  "العراق", "بغداد", "iraq", "Iraq",
+  "سوريا", "دمشق", "syria", "Syria",
+  "المغرب", "الرباط", "morocco", "Morocco",
+  "تونس", "tunisia", "Tunisia",
+  "الجزائر", "algeria", "Algeria",
+  "ليبيا", "طرابلس", "libya", "Libya",
+  "السودان", "الخرطوم", "sudan", "Sudan",
+  "اليمن", "صنعاء", "yemen", "Yemen",
+  "تركيا", "إسطنبول", "turkey", "Turkey", "istanbul", "Istanbul",
+  "باكستان", "pakistan", "Pakistan",
+  "الهند", "india", "India",
+];
+
+function hasNonSaudiIndicator(text: string): boolean {
+  const lower = text.toLowerCase();
+  return NON_SAUDI_INDICATORS.some(ind => lower.includes(ind.toLowerCase()));
+}
+
+/**
+ * فلتر جغرافي ناعم: يستبعد النتائج التي تحتوي على مؤشر دولة أخرى
+ * لا يرفض النتائج التي لا تذكر أي دولة (لأن كثيراً من الحسابات لا تذكر موقعها)
+ */
+function filterSaudiResults<T extends { displayName: string; bio: string; username: string }>(results: T[]): T[] {
+  return results.filter(r => {
+    const text = `${r.displayName} ${r.bio} ${r.username}`;
+    // استبعاد إذا كان هناك مؤشر دولة أخرى صريح
+    if (hasNonSaudiIndicator(text)) return false;
+    return true;
+  });
+}
+
 // ===== User-Agent Pool (30+ agents) =====
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -328,8 +395,10 @@ async function multiQuerySearch(
     }
   }
 
-  console.log(`[${label}] Total unique results: ${allResults.length}`);
-  return allResults;
+  // فلتر جغرافي: استبعاد النتائج التي تحتوي على مؤشر دولة أخرى
+  const filtered = filterSaudiResults(allResults);
+  console.log(`[${label}] Total unique results: ${allResults.length}, after geo-filter: ${filtered.length}`);
+  return filtered;
 }
 
 // ===== البحث في Google عن حسابات Instagram =====
