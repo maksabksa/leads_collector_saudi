@@ -56,6 +56,7 @@ import { scrapeWebsite, scrapeInstagram, scrapeLinkedIn, scrapeTwitter, scrapeTi
 import { fetchSocialPlatformData, extractSocialStats } from "./lib/brightDataSocialDatasets";
 import { brightDataAnalysisRouter } from "./routers/brightDataAnalysis";
 import { aiAgentRouter } from "./routers/aiAgent";
+import { serpQueueRouter } from "./routers/serpQueue";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -2234,5 +2235,6 @@ export const appRouter = router({
   pdfReport: pdfReportRouter,
   bulkAnalysis: bulkAnalysisRouter,
   analysisSettings: analysisSettingsRouter,
+  serpQueue: serpQueueRouter,
 });
 export type AppRouter = typeof appRouter;

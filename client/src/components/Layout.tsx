@@ -10,6 +10,7 @@ import {
   Shield,
   Zap,
   Globe,
+  DatabaseZap,
   Brain,
   Bot,
   Settings2,
@@ -30,6 +31,7 @@ const MAIN_NAV = [
   { path: "/",              label: "لوحة التحكم",      icon: BarChart3,     permission: null },
   { path: "/leads",         label: "قائمة العملاء",    icon: Users,         permission: "leads.view" },
   { path: "/search-hub",    label: "مركز البحث",       icon: Search,        permission: "search.use" },
+  { path: "/serp-queue",    label: "محرك البحث المتقدم", icon: DatabaseZap,   permission: "search.use" },
 ];
 
 /** قسم المتابعة — متاح لجميع المستخدمين */

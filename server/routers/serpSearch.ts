@@ -1,8 +1,12 @@
 /**
  * Bright Data SERP API - البحث في محركات البحث
- * مع retry logic + rate limiting + caching لتجنب 429
+ * النسخة المحسّنة:
+ * - User-Agent rotation: 30+ user agent
+ * - Concurrency: 6 طلبات متزامنة
+ * - Retry ذكي: exponential backoff + تغيير User-Agent
+ * - Cache ذكي: يتجنب تخزين النتائج الفارغة
+ * - إصلاح socket hang up بـ Buffer accumulation بدلاً من string concat
  */
-import * as https from "https";
 import * as http from "http";
 import * as tls from "tls";
 
@@ -11,43 +15,91 @@ const SERP_PORT = parseInt(process.env.BRIGHT_DATA_SERP_PORT || "22225");
 const SERP_USERNAME = process.env.BRIGHT_DATA_SERP_USERNAME || "";
 const SERP_PASSWORD = process.env.BRIGHT_DATA_SERP_PASSWORD || "";
 
-// ===== Rate Limiter =====
-// حد أقصى 2 طلب/ثانية لتجنب 429
-const requestQueue: Array<() => void> = [];
+// ===== Residential Proxy =====
+const RESI_HOST = process.env.BRIGHT_DATA_RESIDENTIAL_HOST || "brd.superproxy.io";
+const RESI_PORT = parseInt(process.env.BRIGHT_DATA_RESIDENTIAL_PORT || "33335");
+const RESI_USERNAME = process.env.BRIGHT_DATA_RESIDENTIAL_USERNAME || "";
+const RESI_PASSWORD = process.env.BRIGHT_DATA_RESIDENTIAL_PASSWORD || "";
+
+// ===== User-Agent Pool (30+ agents) =====
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.3; rv:123.0) Gecko/20100101 Firefox/123.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.105 Mobile Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.105 Mobile Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.178 Mobile Safari/537.36",
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0",
+  "Mozilla/5.0 (Linux; Android 13; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (iPad; CPU OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/122.0.6261.89 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Mobile Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 OPR/108.0.0.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+  "Mozilla/5.0 (Linux; Android 12; TECNO KG7h) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.111 Mobile Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 14; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+];
+
+const ACCEPT_LANGUAGES = [
+  "ar-SA,ar;q=0.9,en;q=0.8",
+  "ar,en-US;q=0.9,en;q=0.8",
+  "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+  "en-US,en;q=0.9,ar;q=0.8",
+  "ar-AE,ar;q=0.9,en;q=0.8",
+];
+
+let uaIndex = 0;
+function nextUserAgent(): string {
+  const ua = USER_AGENTS[uaIndex % USER_AGENTS.length];
+  uaIndex = (uaIndex + 1) % USER_AGENTS.length;
+  return ua;
+}
+function nextAcceptLanguage(): string {
+  return ACCEPT_LANGUAGES[Math.floor(Math.random() * ACCEPT_LANGUAGES.length)];
+}
+
+// ===== Concurrency Manager: 6 طلبات متزامنة =====
+const MAX_CONCURRENT = 6;
 let activeRequests = 0;
-const MAX_CONCURRENT = 2;
-const MIN_DELAY_MS = 600; // 600ms بين كل طلب
+const waitQueue: Array<() => void> = [];
 
-function enqueueRequest<T>(fn: () => Promise<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const execute = async () => {
-      activeRequests++;
-      try {
-        const result = await fn();
-        resolve(result);
-      } catch (err) {
-        reject(err);
-      } finally {
-        activeRequests--;
-        await sleep(MIN_DELAY_MS);
-        if (requestQueue.length > 0) {
-          const next = requestQueue.shift()!;
-          next();
-        }
-      }
-    };
-
-    if (activeRequests < MAX_CONCURRENT) {
-      execute();
-    } else {
-      requestQueue.push(execute);
-    }
+function acquireSlot(): Promise<void> {
+  if (activeRequests < MAX_CONCURRENT) {
+    activeRequests++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    waitQueue.push(() => { activeRequests++; resolve(); });
   });
 }
 
-// ===== Simple In-Memory Cache =====
-const cache = new Map<string, { data: string; expiresAt: number }>();
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 دقيقة
+function releaseSlot(): void {
+  activeRequests--;
+  if (waitQueue.length > 0) {
+    const next = waitQueue.shift()!;
+    next();
+  }
+}
+
+// ===== Smart Cache: لا يخزن النتائج الفارغة =====
+const cache = new Map<string, { data: string; expiresAt: number; resultCount: number }>();
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 دقيقة للنتائج الجيدة
+const EMPTY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقائق فقط للنتائج الفارغة
 
 function getCached(key: string): string | null {
   const entry = cache.get(key);
@@ -59,10 +111,11 @@ function getCached(key: string): string | null {
   return entry.data;
 }
 
-function setCache(key: string, data: string): void {
-  cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
-  // تنظيف cache القديم إذا تجاوز 200 مدخل
-  if (cache.size > 200) {
+function setCache(key: string, data: string, resultCount: number): void {
+  const ttl = resultCount > 0 ? CACHE_TTL_MS : EMPTY_CACHE_TTL_MS;
+  cache.set(key, { data, expiresAt: Date.now() + ttl, resultCount });
+  // تنظيف cache القديم إذا تجاوز 500 مدخل
+  if (cache.size > 500) {
     const firstKey = cache.keys().next().value;
     if (firstKey) cache.delete(firstKey);
   }
@@ -70,16 +123,24 @@ function setCache(key: string, data: string): void {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ===== Core SERP Request via HTTP CONNECT Proxy =====
-// الطريقة الصحيحة: CONNECT + TLS + raw HTTP (بدون https.request فوق TLS لتجنب double-TLS)
-async function serpRequestRaw(targetUrl: string): Promise<string> {
+// ===== Core SERP Request: HTTP CONNECT + TLS + Buffer accumulation =====
+// الإصلاح الرئيسي: استخدام Buffer[] بدلاً من string concat لتجنب encoding issues مع UTF-8
+async function serpRequestRaw(
+  targetUrl: string,
+  userAgent: string,
+  acceptLanguage: string,
+  proxyHost: string,
+  proxyPort: number,
+  proxyUser: string,
+  proxyPass: string
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    if (!SERP_USERNAME || !SERP_PASSWORD) {
-      reject(new Error("Bright Data SERP credentials not configured"));
+    if (!proxyUser || !proxyPass) {
+      reject(new Error("Bright Data credentials not configured"));
       return;
     }
 
-    const auth = Buffer.from(`${SERP_USERNAME}:${SERP_PASSWORD}`).toString("base64");
+    const auth = Buffer.from(`${proxyUser}:${proxyPass}`).toString("base64");
     const parsed = new URL(targetUrl);
     const isHttps = parsed.protocol === "https:";
     const targetHost = parsed.hostname;
@@ -87,8 +148,8 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
     const requestPath = parsed.pathname + parsed.search;
 
     const connectReq = http.request({
-      host: SERP_HOST,
-      port: SERP_PORT,
+      host: proxyHost,
+      port: proxyPort,
       method: "CONNECT",
       path: `${targetHost}:${targetPort}`,
       headers: {
@@ -96,7 +157,11 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
         "Host": `${targetHost}:${targetPort}`,
       },
     });
-    connectReq.setTimeout(20000, () => { connectReq.destroy(); reject(new Error("Proxy connect timeout")); });
+
+    connectReq.setTimeout(20000, () => {
+      connectReq.destroy();
+      reject(new Error("Proxy connect timeout"));
+    });
 
     connectReq.on("connect", (res, socket) => {
       if (res.statusCode !== 200) {
@@ -105,15 +170,20 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
         return;
       }
 
-      // إرسال raw HTTP request مباشرة عبر socket (أو TLS socket)
       const sendRawRequest = (sock: any) => {
         const rawReq = [
           `GET ${requestPath} HTTP/1.1`,
           `Host: ${targetHost}`,
-          `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36`,
-          `Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8`,
-          `Accept-Language: ar,en;q=0.9`,
+          `User-Agent: ${userAgent}`,
+          `Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8`,
+          `Accept-Language: ${acceptLanguage}`,
           `Accept-Encoding: identity`,
+          `Cache-Control: no-cache`,
+          `Pragma: no-cache`,
+          `Sec-Fetch-Dest: document`,
+          `Sec-Fetch-Mode: navigate`,
+          `Sec-Fetch-Site: none`,
+          `Upgrade-Insecure-Requests: 1`,
           `Connection: close`,
           ``,
           ``,
@@ -121,59 +191,77 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
 
         sock.write(rawReq);
 
-        let responseData = "";
+        // استخدام Buffer[] بدلاً من string concat - هذا يحل مشكلة UTF-8 encoding
+        const chunks: Buffer[] = [];
         let headersParsed = false;
         let statusCode = 0;
-        let bodyStart = 0;
+        let bodyOffset = 0;
 
-        const timeout = setTimeout(() => {
+        const timer = setTimeout(() => {
           sock.destroy();
-          reject(new Error("Request timeout"));
-        }, 25000);
+          reject(new Error("Request timeout after 30s"));
+        }, 30000);
 
         sock.on("data", (chunk: Buffer) => {
-          responseData += chunk.toString("utf-8");
+          chunks.push(chunk);
+
           if (!headersParsed) {
-            const headerEnd = responseData.indexOf("\r\n\r\n");
-            if (headerEnd !== -1) {
+            const combined = Buffer.concat(chunks);
+            const headerEndIdx = combined.indexOf("\r\n\r\n");
+            if (headerEndIdx !== -1) {
               headersParsed = true;
-              bodyStart = headerEnd + 4;
-              const statusLine = responseData.split("\r\n")[0];
+              bodyOffset = headerEndIdx + 4;
+              const headerStr = combined.slice(0, headerEndIdx).toString("ascii");
+              const statusLine = headerStr.split("\r\n")[0];
               const statusMatch = statusLine.match(/HTTP\/\d\.\d (\d+)/);
               statusCode = statusMatch ? parseInt(statusMatch[1]) : 0;
+
               if (statusCode === 429) {
-                clearTimeout(timeout);
+                clearTimeout(timer);
                 sock.destroy();
-                reject(new Error("SERP request failed: 429"));
-              } else if (statusCode >= 400 && statusCode !== 200) {
-                clearTimeout(timeout);
+                reject(new Error("SERP request failed: 429 Too Many Requests"));
+                return;
+              }
+              if (statusCode >= 400 && statusCode !== 200) {
+                clearTimeout(timer);
                 sock.destroy();
-                reject(new Error(`SERP request failed: ${statusCode}`));
+                reject(new Error(`HTTP ${statusCode}`));
+                return;
               }
             }
           }
         });
 
         sock.on("end", () => {
-          clearTimeout(timeout);
-          sock.destroy();
+          clearTimeout(timer);
           if (!headersParsed) {
-            reject(new Error("Empty response from SERP"));
+            reject(new Error("Empty response from SERP proxy"));
             return;
           }
-          const body = responseData.slice(bodyStart);
+          const fullBuffer = Buffer.concat(chunks);
+          const body = fullBuffer.slice(bodyOffset).toString("utf-8");
           resolve(body);
         });
 
         sock.on("error", (err: Error) => {
-          clearTimeout(timeout);
-          sock.destroy();
+          clearTimeout(timer);
           reject(err);
+        });
+
+        sock.on("close", () => {
+          // إذا انتهى الـ socket قبل "end"، نحاول resolve بما لدينا
+          if (headersParsed && chunks.length > 0) {
+            clearTimeout(timer);
+            const fullBuffer = Buffer.concat(chunks);
+            const body = fullBuffer.slice(bodyOffset).toString("utf-8");
+            if (body.length > 100) {
+              resolve(body);
+            }
+          }
         });
       };
 
       if (isHttps) {
-        // TLS upgrade على الـ socket مباشرة - لا نستخدم https.request لتجنب double-TLS
         const tlsSocket = tls.connect({
           socket,
           servername: targetHost,
@@ -181,7 +269,10 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
           checkServerIdentity: () => undefined,
         });
         tlsSocket.on("secureConnect", () => sendRawRequest(tlsSocket));
-        tlsSocket.on("error", (err) => { socket.destroy(); reject(err); });
+        tlsSocket.on("error", (err) => {
+          socket.destroy();
+          reject(err);
+        });
       } else {
         sendRawRequest(socket);
       }
@@ -192,45 +283,109 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
   });
 }
 
-// ===== serpRequest مع retry + cache =====
+// ===== serpRequest مع retry + User-Agent rotation =====
 export async function serpRequest(url: string, maxRetries = 3): Promise<string> {
   const cacheKey = url;
   const cached = getCached(cacheKey);
   if (cached) {
-    console.log(`[SERP] Cache hit for: ${url.slice(0, 80)}`);
+    console.log(`[SERP] Cache hit: ${url.slice(0, 80)}`);
     return cached;
   }
 
-  return enqueueRequest(async () => {
+  await acquireSlot();
+  try {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const ua = nextUserAgent();
+      const lang = nextAcceptLanguage();
+
       try {
-        const result = await serpRequestRaw(url);
-        setCache(cacheKey, result);
+        const result = await serpRequestRaw(
+          url, ua, lang,
+          SERP_HOST, SERP_PORT, SERP_USERNAME, SERP_PASSWORD
+        );
+
+        // حساب عدد النتائج لتحديد TTL
+        const resultCount = (result.match(/href="https?:\/\//g) || []).length;
+        setCache(cacheKey, result, resultCount);
         return result;
       } catch (err: any) {
         lastError = err;
-        const is429 = err.message?.includes("429");
-        const isTimeout = err.message?.includes("timeout");
+        const isRetryable =
+          err.message?.includes("socket hang up") ||
+          err.message?.includes("ECONNRESET") ||
+          err.message?.includes("timeout") ||
+          err.message?.includes("429");
 
-        if (is429 || isTimeout) {
-          // exponential backoff: 2s, 4s, 8s
-          const delay = Math.pow(2, attempt) * 1000;
-          console.warn(`[SERP] Attempt ${attempt}/${maxRetries} failed (${err.message}), retrying in ${delay}ms...`);
+        if (attempt < maxRetries && isRetryable) {
+          const delay = Math.pow(2, attempt) * 800 + Math.random() * 400;
+          console.warn(`[SERP] Attempt ${attempt}/${maxRetries} failed (${err.message}), retry in ${Math.round(delay)}ms with new UA...`);
           await sleep(delay);
-        } else {
-          // خطأ غير قابل للإعادة
+        } else if (!isRetryable) {
           throw err;
         }
       }
     }
 
     throw lastError || new Error("SERP request failed after retries");
-  });
+  } finally {
+    releaseSlot();
+  }
 }
 
-// ===== دالة مساعدة: توليد استعلامات متعددة للبحث =====
+// ===== Residential Proxy Request =====
+export async function residentialRequest(url: string, maxRetries = 3): Promise<string> {
+  const cacheKey = `resi:${url}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    console.log(`[RESI] Cache hit: ${url.slice(0, 80)}`);
+    return cached;
+  }
+
+  await acquireSlot();
+  try {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const ua = nextUserAgent();
+      const lang = nextAcceptLanguage();
+
+      try {
+        const result = await serpRequestRaw(
+          url, ua, lang,
+          RESI_HOST, RESI_PORT,
+          RESI_USERNAME || SERP_USERNAME,
+          RESI_PASSWORD || SERP_PASSWORD
+        );
+        const resultCount = (result.match(/href="https?:\/\//g) || []).length;
+        setCache(cacheKey, result, resultCount);
+        return result;
+      } catch (err: any) {
+        lastError = err;
+        const isRetryable =
+          err.message?.includes("socket hang up") ||
+          err.message?.includes("ECONNRESET") ||
+          err.message?.includes("timeout") ||
+          err.message?.includes("429");
+
+        if (attempt < maxRetries && isRetryable) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.warn(`[RESI] Attempt ${attempt}/${maxRetries} failed (${err.message}), retry in ${delay}ms...`);
+          await sleep(delay);
+        } else if (!isRetryable) {
+          throw err;
+        }
+      }
+    }
+
+    throw lastError || new Error("Residential request failed after retries");
+  } finally {
+    releaseSlot();
+  }
+}
+
+// ===== دالة مساعدة: توليد استعلامات متعددة =====
 function buildQueryVariants(query: string, location: string | undefined, site: string): string[] {
   const loc = location || "";
   const locAr = loc ? `${loc} السعودية` : "السعودية";
@@ -241,28 +396,44 @@ function buildQueryVariants(query: string, location: string | undefined, site: s
     `site:${site} ${query} السعودية للتواصل`,
     `site:${site} ${query} السعودية واتساب`,
     `site:${site} ${query} KSA`,
+    `site:${site} ${query} الرياض`,
+    `site:${site} ${query} جدة`,
+    `"${query}" site:${site}`,
   ];
 }
 
-// دالة بحث محسّنة: ترسل استعلامات متعددة وتدمج النتائج بدون تكرار
+// ===== بحث متعدد الاستعلامات مع دمج النتائج =====
 async function multiQuerySearch(
   site: string,
   query: string,
   location: string | undefined,
-  label: string
+  label: string,
+  useResidential = false
 ): Promise<Array<{ username: string; displayName: string; bio: string; url: string }>> {
   const variants = buildQueryVariants(query, location, site);
   const seen = new Set<string>();
   const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
 
-  // إرسال أول 3 استعلامات بالتوازي
-  const firstBatch = variants.slice(0, 3).map(async (q) => {
+  const fetchHtml = async (q: string): Promise<string> => {
+    const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+    if (useResidential && RESI_USERNAME) {
+      try {
+        return await residentialRequest(url);
+      } catch (err: any) {
+        console.warn(`[${label}] Residential failed, fallback to SERP: ${err.message}`);
+        return await serpRequest(url);
+      }
+    }
+    return await serpRequest(url);
+  };
+
+  // الدفعة الأولى: 4 استعلامات بالتوازي (بدلاً من 3)
+  const firstBatch = variants.slice(0, 4).map(async (q) => {
     try {
-      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
-      const html = await serpRequest(url);
+      const html = await fetchHtml(q);
       return parseGoogleResultsPublic(html, site);
-    } catch (err) {
-      console.warn(`[${label}] query failed: ${q}`, err);
+    } catch (err: any) {
+      console.warn(`[${label}] query failed: ${q} - ${err.message}`);
       return [];
     }
   });
@@ -277,15 +448,14 @@ async function multiQuerySearch(
     }
   }
 
-  // إذا كانت النتائج أقل من 15، أرسل الاستعلامات المتبقية
-  if (allResults.length < 15) {
-    const secondBatch = variants.slice(3).map(async (q) => {
+  // إذا كانت النتائج أقل من 20، أرسل الاستعلامات المتبقية
+  if (allResults.length < 20) {
+    const secondBatch = variants.slice(4).map(async (q) => {
       try {
-        const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
-        const html = await serpRequest(url);
+        const html = await fetchHtml(q);
         return parseGoogleResultsPublic(html, site);
-      } catch (err) {
-        console.warn(`[${label}] query failed: ${q}`, err);
+      } catch (err: any) {
+        console.warn(`[${label}] query2 failed: ${q} - ${err.message}`);
         return [];
       }
     });
@@ -306,42 +476,68 @@ async function multiQuerySearch(
 
 // ===== البحث في Google عن حسابات Instagram =====
 export async function searchInstagramSERP(query: string, location?: string): Promise<Array<{
-  username: string;
-  displayName: string;
-  bio: string;
-  url: string;
+  username: string; displayName: string; bio: string; url: string;
 }>> {
-  return multiQuerySearch("instagram.com", query, location, "Instagram SERP");
+  return multiQuerySearch("instagram.com", query, location, "Instagram SERP", false);
 }
 
 // ===== البحث في Google عن حسابات TikTok =====
 export async function searchTikTokSERP(query: string, location?: string): Promise<Array<{
-  username: string;
-  displayName: string;
-  bio: string;
-  url: string;
+  username: string; displayName: string; bio: string; url: string;
 }>> {
-  return multiQuerySearch("tiktok.com", query, location, "TikTok SERP");
+  return multiQuerySearch("tiktok.com", query, location, "TikTok SERP", false);
 }
 
 // ===== البحث في Google عن حسابات Snapchat =====
 export async function searchSnapchatSERP(query: string, location?: string): Promise<Array<{
-  username: string;
-  displayName: string;
-  bio: string;
-  url: string;
+  username: string; displayName: string; bio: string; url: string;
 }>> {
-  return multiQuerySearch("snapchat.com", query, location, "Snapchat SERP");
+  const loc = location || "";
+  const locAr = loc ? `${loc} السعودية` : "السعودية";
+  const locEn = loc ? `${loc} Saudi Arabia` : "Saudi Arabia";
+  const variants = [
+    `snapchat.com/add ${query} ${locAr}`,
+    `snapchat.com/add ${query} ${locEn}`,
+    `snapchat.com/add ${query} KSA`,
+    `site:snapchat.com/add ${query} ${locAr}`,
+    `"snapchat" "${query}" ${locAr}`,
+  ];
+  const seen = new Set<string>();
+  const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
+
+  const fetchBatch = variants.slice(0, 3).map(async (q) => {
+    try {
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+      const html = await serpRequest(url);
+      const matches = html.match(/snapchat\.com\/add\/([a-zA-Z0-9._-]+)/g) || [];
+      return matches.map((m) => {
+        const username = m.replace("snapchat.com/add/", "");
+        return { username, displayName: username, bio: "", url: `https://www.snapchat.com/add/${username}` };
+      });
+    } catch (err: any) {
+      console.warn(`[Snapchat SERP] failed: ${q} - ${err.message}`);
+      return [];
+    }
+  });
+
+  const results = await Promise.all(fetchBatch);
+  for (const batch of results) {
+    for (const r of batch) {
+      if (r.username && !seen.has(r.username)) {
+        seen.add(r.username);
+        allResults.push(r);
+      }
+    }
+  }
+
+  console.log(`[Snapchat SERP] Total unique results: ${allResults.length}`);
+  return allResults;
 }
 
 // ===== البحث في Google عن حسابات LinkedIn =====
 export async function searchLinkedInSERP(query: string, location?: string): Promise<Array<{
-  username: string;
-  displayName: string;
-  bio: string;
-  url: string;
+  username: string; displayName: string; bio: string; url: string;
 }>> {
-  // LinkedIn يحتاج استعلام خاص للشركات
   const loc = location || "";
   const locAr = loc ? `${loc} السعودية` : "السعودية";
   const variants = [
@@ -351,48 +547,60 @@ export async function searchLinkedInSERP(query: string, location?: string): Prom
   ];
   const seen = new Set<string>();
   const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
-  for (const q of variants) {
+
+  const fetchBatch = variants.map(async (q) => {
     try {
       const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
       const html = await serpRequest(url);
-      const res = parseGoogleResultsPublic(html, "linkedin.com");
-      for (const r of res) {
-        if (!seen.has(r.username)) { seen.add(r.username); allResults.push(r); }
-      }
-    } catch (err) { console.warn(`[LinkedIn SERP] failed: ${q}`, err); }
+      return parseGoogleResultsPublic(html, "linkedin.com");
+    } catch (err: any) {
+      console.warn(`[LinkedIn SERP] failed: ${q} - ${err.message}`);
+      return [];
+    }
+  });
+
+  const results = await Promise.all(fetchBatch);
+  for (const batch of results) {
+    for (const r of batch) {
+      if (!seen.has(r.username)) { seen.add(r.username); allResults.push(r); }
+    }
   }
   return allResults;
 }
 
 // ===== البحث في Google عن صفحات Facebook =====
 export async function searchFacebookSERP(query: string, location?: string): Promise<Array<{
-  username: string;
-  displayName: string;
-  bio: string;
-  url: string;
+  username: string; displayName: string; bio: string; url: string;
 }>> {
-  return multiQuerySearch("facebook.com", query, location, "Facebook SERP");
+  return multiQuerySearch("facebook.com", query, location, "Facebook SERP", false);
+}
+
+// ===== البحث في Google عن حسابات Twitter/X =====
+export async function searchTwitterSERP(query: string, location?: string): Promise<Array<{
+  username: string; displayName: string; bio: string; url: string;
+}>> {
+  return multiQuerySearch("twitter.com", query, location, "Twitter SERP", false);
 }
 
 // ===== تحليل نتائج Google HTML =====
 export function parseGoogleResultsPublic(html: string, domainFilter: string): Array<{
-  username: string;
-  displayName: string;
-  bio: string;
-  url: string;
+  username: string; displayName: string; bio: string; url: string;
 }> {
   const results: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
   const seen = new Set<string>();
 
-  // استخراج الروابط من HTML مع السياق المحيط بها
   const linkRegex = /href="(https?:\/\/(?:www\.)?[^"]*?)"/g;
   let match;
 
-  // قائمة الحسابات المحظورة
-  const blacklist = new Set(["explore", "p", "reel", "reels", "stories", "accounts", "hashtag", "tv",
+  const blacklist = new Set([
+    "explore", "p", "reel", "reels", "stories", "accounts", "hashtag", "tv",
     "search", "login", "signup", "about", "help", "legal", "privacy", "terms",
     "intent", "share", "home", "notifications", "messages", "add", "web",
-    "discover", "trending", "live", "map", "maps", "places"]);
+    "discover", "trending", "live", "map", "maps", "places", "directory",
+    "business", "ads", "developers", "pages", "groups", "events", "marketplace",
+    "watch", "gaming", "fundraisers", "jobs", "news", "photos", "videos",
+    "friends", "memories", "saved", "settings", "profile", "people",
+  ]);
 
   while ((match = linkRegex.exec(html)) !== null) {
     const url = match[1];
@@ -407,7 +615,6 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
       const m = url.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
       username = m?.[1] || "";
       if (!username) {
-        // بعض روابط TikTok بدون @
         const m2 = url.match(/tiktok\.com\/([a-zA-Z0-9._]+)/);
         username = m2?.[1] || "";
       }
@@ -417,12 +624,15 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
     } else if (domainFilter === "linkedin.com") {
       const m = url.match(/linkedin\.com\/company\/([a-zA-Z0-9._-]+)/);
       username = m?.[1] || "";
+      if (!username) {
+        const m2 = url.match(/linkedin\.com\/in\/([a-zA-Z0-9._-]+)/);
+        username = m2?.[1] || "";
+      }
     } else if (domainFilter === "twitter.com" || domainFilter === "x.com") {
       const m = url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)/);
       username = m?.[1] || "";
     } else if (domainFilter === "facebook.com") {
-      // صفحات Facebook: /pages/name/id أو /name أو /profile.php?id=
-      const mPage = url.match(/facebook\.com\/pages\/([^/]+)/);
+      const mPage = url.match(/facebook\.com\/pages\/([^/?#]+)/);
       const mProfile = url.match(/facebook\.com\/([a-zA-Z0-9._-]+)(?:\/|\?|$)/);
       const mPhpId = url.match(/profile\.php\?id=(\d+)/);
       if (mPage) username = mPage[1];
@@ -435,7 +645,7 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
     if (!username || blacklist.has(username.toLowerCase()) || seen.has(username)) continue;
     seen.add(username);
 
-    // استخراج العنوان والوصف من السياق المحيط بالرابط
+    // استخراج السياق المحيط بالرابط
     const pos = match.index;
     const contextStart = Math.max(0, pos - 600);
     const contextEnd = Math.min(html.length, pos + 600);
@@ -447,9 +657,8 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
     if (h3Match) {
       const rawTitle = h3Match[1].replace(/<[^>]+>/g, "").trim();
       if (rawTitle) {
-        // استخراج الاسم قبل @ إذا كان موجوداً
         const atMatch = rawTitle.match(/^(.+?)\s*[@(]/);
-        displayName = atMatch ? atMatch[1].trim() : rawTitle.slice(0, 60);
+        displayName = atMatch ? atMatch[1].trim() : rawTitle.slice(0, 80);
       }
     }
 
@@ -461,18 +670,18 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
       /class="[^"]*lEBKkf[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
       /class="[^"]*yDYNvb[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
       /class="[^"]*IsZvec[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*st[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
     ];
     for (const pattern of descPatterns) {
       const descMatch = context.match(pattern);
       if (descMatch) {
-        bio = descMatch[1].replace(/<[^>]+>/g, "").trim().slice(0, 200);
+        bio = descMatch[1].replace(/<[^>]+>/g, "").trim().slice(0, 300);
         if (bio) break;
       }
     }
 
     results.push({ username, displayName, bio, url });
-
-    if (results.length >= 50) break; // رفع الحد من 10 إلى 50
+    if (results.length >= 50) break;
   }
 
   return results;

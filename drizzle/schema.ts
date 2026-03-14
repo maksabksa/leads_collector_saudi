@@ -1297,3 +1297,70 @@ export const analysisSettings = mysqlTable("analysis_settings", {
 });
 export type AnalysisSettings = typeof analysisSettings.$inferSelect;
 export type InsertAnalysisSettings = typeof analysisSettings.$inferInsert;
+
+// ===== SERP SEARCH RESULTS TABLE =====
+// تخزين نتائج البحث من SERP API (Instagram, TikTok, Snapchat, Facebook, Twitter)
+export const serpSearchResults = mysqlTable("serp_search_results", {
+  id: int("id").autoincrement().primaryKey(),
+  // معلومات البحث
+  searchQuery: varchar("searchQuery", { length: 500 }).notNull(),
+  platform: mysqlEnum("platform", ["instagram", "tiktok", "snapchat", "facebook", "twitter", "linkedin", "google_maps"]).notNull(),
+  keyword: varchar("keyword", { length: 200 }).notNull(),
+  location: varchar("location", { length: 100 }).default("السعودية"),
+  // بيانات الحساب
+  username: varchar("username", { length: 200 }).notNull(),
+  displayName: varchar("displayName", { length: 300 }),
+  bio: text("bio"),
+  profileUrl: varchar("profileUrl", { length: 1000 }).notNull(),
+  // بيانات الاتصال المستخرجة
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 200 }),
+  website: varchar("website", { length: 500 }),
+  // بيانات التحليل
+  relevanceScore: float("relevanceScore"),
+  businessType: varchar("businessType", { length: 200 }),
+  priority: mysqlEnum("priority", ["high", "medium", "low"]).default("medium"),
+  isContactable: boolean("isContactable").default(false), // هل يمكن التواصل؟
+  // حالة المعالجة
+  status: mysqlEnum("status", ["new", "reviewed", "converted", "rejected"]).default("new").notNull(),
+  convertedToLeadId: int("convertedToLeadId"), // إذا تم تحويله لـ Lead
+  // ربط بمهمة البحث
+  jobId: int("jobId"),
+  // تواريخ
+  discoveredAt: timestamp("discoveredAt").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+});
+export type SerpSearchResult = typeof serpSearchResults.$inferSelect;
+export type InsertSerpSearchResult = typeof serpSearchResults.$inferInsert;
+
+// ===== SERP SEARCH QUEUE TABLE =====
+// قائمة انتظار عمليات البحث (Task Queue)
+export const serpSearchQueue = mysqlTable("serp_search_queue", {
+  id: int("id").autoincrement().primaryKey(),
+  // إعدادات المهمة
+  taskName: varchar("taskName", { length: 200 }).notNull(),
+  keyword: varchar("keyword", { length: 200 }).notNull(),
+  location: varchar("location", { length: 100 }).default("السعودية"),
+  platforms: json("platforms").$type<string[]>().notNull(), // ['instagram', 'tiktok', 'snapchat', ...]
+  targetCount: int("targetCount").default(50).notNull(),
+  // حالة المهمة
+  status: mysqlEnum("status", ["pending", "running", "paused", "completed", "failed"]).default("pending").notNull(),
+  priority: int("priority").default(5).notNull(), // 1 = أعلى أولوية، 10 = أدنى
+  // تقدم المهمة
+  totalFound: int("totalFound").default(0).notNull(),
+  totalProcessed: int("totalProcessed").default(0).notNull(),
+  currentPlatform: varchar("currentPlatform", { length: 50 }),
+  // سجل العمليات
+  log: json("log").$type<Array<{ time: string; message: string; type: "info" | "success" | "warning" | "error" }>>(),
+  errorMessage: text("errorMessage"),
+  // تواريخ
+  scheduledAt: timestamp("scheduledAt"),
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  // معرف المستخدم الذي أنشأ المهمة
+  createdBy: int("createdBy"),
+});
+export type SerpSearchQueue = typeof serpSearchQueue.$inferSelect;
+export type InsertSerpSearchQueue = typeof serpSearchQueue.$inferInsert;

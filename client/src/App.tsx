@@ -45,6 +45,7 @@ import LabelsManager from "./pages/LabelsManager";
 import FollowUp from "./pages/FollowUp";
 import SmartAnalysis from "./pages/SmartAnalysis";
 import AIAgent from "./pages/AIAgent";
+import SerpQueue from "./pages/SerpQueue";
 function Router() {
   return (
     <Switch>
@@ -92,6 +93,7 @@ function Router() {
         <Route path="/follow-up" component={FollowUp} />
         <Route path="/smart-analysis" component={SmartAnalysis} />
         <Route path="/ai-agent" component={AIAgent} />
+        <Route path="/serp-queue" component={SerpQueue} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

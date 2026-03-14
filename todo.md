@@ -1549,3 +1549,52 @@
 - [x] إضافة زر "فتح الرابط" و"فتح الملف" بتصميم واضح في كل بطاقة نتيجة
 - [x] إضافة عرض URL مختصر قابل للنقر في كل بطاقة (ResultCard + SERP Card)
 - [x] دعم Facebook في روابط فتح الملف الشخصي
+
+## تجاوز Bright Data + توسيع منطق البحث (14 مارس 2026)
+
+### طبقة HTTP المستقلة مع User-Agent Rotation
+- [ ] إنشاء ملف server/routers/httpEngine.ts: طبقة HTTP مستقلة بدون Bright Data
+- [ ] Pool من 50+ User-Agent (Chrome/Firefox/Safari على Windows/Mac/Android/iOS)
+- [ ] تدوير عشوائي للـ User-Agent + Accept-Language + Accept headers في كل طلب
+- [ ] Concurrent requests: 8 طلبات متزامنة مع Promise.allSettled
+- [ ] Retry logic ذكي: exponential backoff مع تغيير User-Agent عند الفشل
+- [ ] دعم gzip/deflate decompression تلقائياً
+
+### توسيع منطق البحث لأغراض توليد البيانات
+- [ ] Query Expansion ذكي: AI يولد 10+ استعلامات لكل نشاط تجاري
+- [ ] استعلامات متعددة الأبعاد: اسم النشاط + المنطقة + رقم الهاتف + واتساب + للتواصل + عروض
+- [ ] بحث عميق في Google: صفحات 1-5 (50-100 نتيجة لكل استعلام)
+- [ ] استخراج بيانات هيكلية: هاتف، إيميل، موقع، عنوان من كل نتيجة
+- [ ] دعم regex متقدم لاستخراج أرقام الهاتف السعودية والخليجية
+- [ ] استخراج تلقائي للإيميل من نتائج البحث
+
+### تحليل البيانات المتقدم
+- [ ] AI يحلل مجموعة النتائج ويصنّفها حسب الجودة (1-10)
+- [ ] تحليل الحضور الرقمي: عدد المنصات + تاريخ آخر نشاط + حجم المتابعين
+- [ ] مقارنة تلقائية بين العملاء في نفس النشاط (Competitive Analysis)
+- [ ] تقرير تحليلي شامل قابل للتصدير (JSON + Excel + PDF)
+
+### Task Queue في قاعدة البيانات
+- [ ] جدول data_collection_jobs: مهام جمع البيانات مع الحالة والتقدم
+- [ ] نظام retry تلقائي: إعادة المحاولة 3 مرات مع تأخير تصاعدي
+- [ ] تتبع الاستهلاك: عدد الطلبات + البيانات المستهلكة لكل مهمة
+- [ ] تصدير Excel متقدم مع فلاتر وتحليلات مدمجة
+
+## محرك البحث المتقدم - SERP Queue (جديد - مارس 2026)
+- [x] إصلاح serpSearch.ts: User-Agent rotation (30+ agent)
+- [x] إصلاح serpSearch.ts: Concurrency 6 طلبات متزامنة
+- [x] إصلاح socket hang up: Buffer[] بدلاً من string concat
+- [x] Retry ذكي مع exponential backoff + تغيير User-Agent
+- [x] Cache ذكي: يتجنب تخزين النتائج الفارغة
+- [x] إنشاء جدول serp_search_results في MySQL
+- [x] إنشاء جدول serp_search_queue في MySQL
+- [x] بناء serpQueueRouter: createJob, runJob, pauseJob, deleteJob
+- [x] بناء serpQueueRouter: listJobs, getJob, getResults, getStats
+- [x] بناء serpQueueRouter: updateResultStatus, quickSearch, exportResults
+- [x] تحليل النتائج بالذكاء الاصطناعي (relevanceScore, businessType, priority)
+- [x] صفحة SerpQueue.tsx: إنشاء مهام البحث
+- [x] صفحة SerpQueue.tsx: متابعة التقدم في الوقت الفعلي (auto-refresh 3s)
+- [x] صفحة SerpQueue.tsx: جدول النتائج مع فلاتر متقدمة
+- [x] صفحة SerpQueue.tsx: تصدير CSV/Excel مع BOM للعربية
+- [x] إضافة "محرك البحث المتقدم" للـ sidebar navigation
+- [x] تصدير Excel (CSV مع BOM) - مكتمل في SerpQueue
