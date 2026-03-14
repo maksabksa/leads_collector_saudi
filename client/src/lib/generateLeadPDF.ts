@@ -228,6 +228,82 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
   if (!lead) throw new Error("لا توجد بيانات للعميل");
 
+  // ─── Auto-fill missing data intelligently ────────────────────────────────────
+  function autoFillData() {
+    const biz = lead.businessType || "نشاط تجاري";
+    const city = lead.city || "الرياض";
+    const hasSocial = socialAnalyses.length > 0;
+    const hasWebsite = !!lead.website;
+    const avgSocialScore = hasSocial
+      ? socialAnalyses.reduce((sum: number, s: any) => sum + (Number(s.engagementScore) || 0), 0) / socialAnalyses.length
+      : 0;
+
+    // Auto-compute priority score if missing
+    if (!lead.leadPriorityScore) {
+      let score = 5.0;
+      if (hasSocial && avgSocialScore >= 7) score += 1.5;
+      else if (hasSocial && avgSocialScore >= 5) score += 0.8;
+      if (hasWebsite) score += 0.5;
+      if (lead.phone || lead.verifiedPhone) score += 0.5;
+      if (socialAnalyses.length >= 3) score += 0.5;
+      lead.leadPriorityScore = Math.min(score, 9.5).toFixed(1);
+    }
+
+    // Auto-compute data quality score if missing
+    if (!lead.dataQualityScore) {
+      let score = 3.0;
+      if (lead.phone || lead.verifiedPhone) score += 1.5;
+      if (hasWebsite) score += 1.0;
+      if (hasSocial) score += 1.5;
+      if (lead.city) score += 0.5;
+      if (lead.businessType) score += 0.5;
+      if (lead.instagramUrl || lead.tiktokUrl) score += 0.5;
+      lead.dataQualityScore = Math.min(score, 9.5).toFixed(1);
+    }
+
+    // Auto-generate marketing gaps if missing
+    if (!lead.biggestMarketingGap) {
+      const autoGaps: string[] = [];
+      if (!hasWebsite) autoGaps.push(`غياب الموقع الإلكتروني يُضعف المصداقية ويُفوّت عملاء يبحثون عن ${biz} في ${city}`);
+      if (!hasSocial) autoGaps.push(`لا يوجد حضور على منصات التواصل الاجتماعي مما يُقلّص الوصول للعملاء المحتملين`);
+      if (hasSocial && avgSocialScore < 6) autoGaps.push(`ضعف التفاعل على السوشيال ميديا (${avgSocialScore.toFixed(1)}/10) يُشير لمحتوى غير جذاب أو نشر غير منتظم`);
+      if (!lead.phone && !lead.verifiedPhone) autoGaps.push(`غياب معلومات الاتصال المباشر يُصعّب على العملاء التواصل والشراء`);
+      if (hasSocial && !lead.website) autoGaps.push(`وجود حضور رقمي دون موقع إلكتروني يُفوّت فرصة تحويل المتابعين لعملاء فعليين`);
+      if (!lead.instagramUrl && !lead.tiktokUrl) autoGaps.push(`غياب الحضور على إنستغرام وتيك توك يُضيّع شريحة واسعة من العملاء الشباب في ${city}`);
+      if (autoGaps.length === 0) autoGaps.push(`إمكانية تحسين استراتيجية المحتوى الرقمي لزيادة التفاعل والتحويل`);
+      lead.biggestMarketingGap = autoGaps.join("\n");
+    }
+
+    // Auto-generate recommendations if missing
+    if (!report) return;
+    if (!report.recommendations) {
+      const autoRecs: string[] = [];
+      if (!hasWebsite) autoRecs.push(`إنشاء موقع إلكتروني احترافي لـ${biz} في ${city} مع صفحة هبوط تُبرز الخدمات وتحتوي على نموذج تواصل واضح`);
+      if (hasSocial && avgSocialScore < 7) autoRecs.push(`تحسين استراتيجية المحتوى على ${socialAnalyses.map((s: any) => pm(s.platform).name).join(' و')} بنشر محتوى يومي منتظم يُظهر المنتجات والخدمات بشكل جذاب`);
+      if (!lead.instagramUrl) autoRecs.push(`إنشاء حساب إنستغرام احترافي مع هوية بصرية موحدة وجدول نشر أسبوعي منتظم`);
+      if (!lead.tiktokUrl) autoRecs.push(`الانطلاق على تيك توك بمقاطع قصيرة تُظهر ${biz} بأسلوب ترفيهي لاستهداف الجيل الجديد`);
+      autoRecs.push(`تفعيل حملات إعلانية مدفوعة على منصات التواصل الاجتماعي لاستهداف العملاء في ${city} وزيادة الوصول`);
+      report.recommendations = autoRecs.join("\n");
+    }
+
+    // Auto-generate executive summary if missing
+    if (!report.executiveSummary && !report.summary) {
+      const platforms = socialAnalyses.map((s: any) => pm(s.platform).name).join(" و ");
+      report.executiveSummary = `يمتلك ${lead.companyName || biz} في ${city} حضوراً رقمياً ${hasSocial ? `على منصات ${platforms}` : "محدوداً"} مع إمكانات نمو واعدة. ${hasWebsite ? "الموقع الإلكتروني موجود لكن يحتاج تحسيناً." : "غياب الموقع الإلكتروني يُمثّل فرصة كبيرة للتطوير."} التحليل يُشير إلى فرص واضحة لتعزيز الحضور الرقمي وزيادة قاعدة العملاء من خلال استراتيجية تسويقية متكاملة.`;
+    }
+
+    // Auto-generate revenue opportunity if missing
+    if (!lead.revenueOpportunity) {
+      lead.revenueOpportunity = `بناءً على حجم السوق في ${city} ونوع النشاط (${biz})، تُقدَّر الفرصة الإيرادية الشهرية بـ 15,000 - 45,000 ريال إضافية من خلال تحسين الحضور الرقمي واستهداف العملاء المحتملين بشكل أكثر فعالية.`;
+    }
+
+    // Auto-generate entry angle if missing
+    if (!lead.entryAngle) {
+      lead.entryAngle = `البدء بتقديم حزمة إدارة السوشيال ميديا المتكاملة لـ${biz} مع ضمان نتائج خلال 30 يوماً، مع تقديم تقرير أداء أسبوعي شفاف لبناء الثقة وإثبات الكفاءة.`;
+    }
+  }
+  autoFillData();
+
   const coName     = company?.companyName || "مكسب";
   const coLogo     = company?.logoUrl || "";
   const clLogo     = lead.clientLogoUrl || "";
@@ -430,6 +506,33 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
             </div>
             <span style="font-size:11.5px;color:#cbd5e1;line-height:1.6;">${g}</span>
           </div>`).join("")}
+        </div>
+      </div>` : ""}
+
+      <!-- Missed Opportunities Section -->
+      ${gaps.length ? `
+      <div style="margin-bottom:22px;">
+        ${sh("الفرص الضائعة وتأثيرها المالي", "كل فرصة ضائعة = إيراد مفقود يمكن استعادته")}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${gaps.map((g, i) => {
+            const colors = ["#ef4444","#f97316","#eab308","#22c55e","#0ea5e9"];
+            const icons = ["⚠️","📉","💡","🔗","🎯"];
+            const impacts = ["8,000 - 20,000 ريال/شهر","5,000 - 15,000 ريال/شهر","3,000 - 10,000 ريال/شهر","2,000 - 8,000 ريال/شهر","1,500 - 5,000 ريال/شهر"];
+            const solutions = ["حزمة مكسب الشاملة","إدارة سوشيال ميديا","تصميم موقع إلكتروني","حملات إعلانية مدفوعة","استشارة تسويقية"];
+            const c = colors[i % colors.length];
+            return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+              background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+              border-right:3px solid ${c};border-radius:0 10px 10px 0;">
+              <div style="flex-shrink:0;font-size:16px;margin-top:1px;">${icons[i % icons.length]}</div>
+              <div style="flex:1;">
+                <div style="font-size:11.5px;color:#cbd5e1;line-height:1.6;margin-bottom:6px;">${g}</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <span style="font-size:10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:2px 10px;color:#fca5a5;font-weight:700;">فرصة ضائعة: ${impacts[i % impacts.length]}</span>
+                  <span style="font-size:10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:2px 10px;color:#86efac;font-weight:700;">الحل: ${solutions[i % solutions.length]}</span>
+                </div>
+              </div>
+            </div>`;
+          }).join("")}
         </div>
       </div>` : ""}
 
