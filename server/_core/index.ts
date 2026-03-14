@@ -129,6 +129,29 @@ async function startServer() {
     }
   });
 
+  // ===== Proxy لصور Google Maps (Places Photo API) =====
+  app.get("/api/maps-photo", async (req, res) => {
+    try {
+      const { photo_reference, maxwidth = "800" } = req.query as { photo_reference: string; maxwidth: string };
+      if (!photo_reference) { res.status(400).json({ error: "photo_reference is required" }); return; }
+
+      const { makeRequest } = await import("./map");
+      // نجلب الصورة عبر Manus map proxy
+      const proxyUrl = `/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${photo_reference}`;
+      const proxyRes = await (makeRequest as any)(proxyUrl, {}, { raw: true }).catch(() => null);
+      if (proxyRes) {
+        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader("Cache-Control", "public, max-age=86400");
+        res.send(Buffer.isBuffer(proxyRes) ? proxyRes : Buffer.from(proxyRes));
+        return;
+      }
+      res.status(404).json({ error: "لم يتم العثور على الصورة" });
+    } catch (err: any) {
+      console.error("[Maps Photo Proxy] Error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

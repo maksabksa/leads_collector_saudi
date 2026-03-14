@@ -93,6 +93,9 @@ export default function LeadDetail() {
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
   const fetchClientLogoMutation = trpc.leads.fetchClientLogo.useMutation();
+  const fetchPlacePhotosMutation = trpc.leads.fetchPlacePhotos.useMutation();
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // جلب بيانات المنافسين عند توفر بيانات العميل
   const { data: competitorsData } = trpc.leads.getCompetitors.useQuery(
@@ -575,31 +578,69 @@ export default function LeadDetail() {
                     {(lead.companyName || '?').charAt(0)}
                   </div>
                 )}
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetchClientLogoMutation.mutateAsync({
-                        leadId: id,
-                        website: lead.website || undefined,
-                        instagramUrl: lead.instagramUrl || undefined,
-                        companyName: lead.companyName,
-                      });
-                      if (res.success) {
-                        toast.success('تم جلب الشعار بنجاح');
-                        utils.leads.getFullDetails.invalidate({ id });
-                      } else {
-                        toast.error('لم يتم العثور على شعار');
+                <div className="flex gap-1">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetchClientLogoMutation.mutateAsync({
+                          leadId: id,
+                          website: lead.website || undefined,
+                          instagramUrl: lead.instagramUrl || undefined,
+                          companyName: lead.companyName,
+                        });
+                        if (res.success) {
+                          toast.success('تم جلب الشعار بنجاح');
+                          utils.leads.getFullDetails.invalidate({ id });
+                        } else {
+                          toast.error('لم يتم العثور على شعار');
+                        }
+                      } catch (e: any) {
+                        toast.error('فشل جلب الشعار', { description: e.message });
                       }
-                    } catch (e: any) {
-                      toast.error('فشل جلب الشعار', { description: e.message });
-                    }
-                  }}
-                  disabled={fetchClientLogoMutation.isPending}
-                  className="text-xs px-2 py-1 rounded-lg transition-all"
-                  style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
-                  title="جلب الشعار تلقائياً">
-                  {fetchClientLogoMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "🖼️"}
-                </button>
+                    }}
+                    disabled={fetchClientLogoMutation.isPending}
+                    className="text-xs px-2 py-1 rounded-lg transition-all"
+                    style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
+                    title="جلب الشعار تلقائياً">
+                    {fetchClientLogoMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "🖼️"}
+                  </button>
+                  {/* زر جلب صور Google Maps */}
+                  {lead.googleMapsUrl && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetchPlacePhotosMutation.mutateAsync({
+                            leadId: id,
+                            googleMapsUrl: lead.googleMapsUrl || undefined,
+                          });
+                          if (res.success && res.photos.length > 0) {
+                            toast.success(`تم جلب ${res.photos.length} صورة من Google Maps`);
+                            utils.leads.getFullDetails.invalidate({ id });
+                          } else {
+                            toast.error(res.message || 'لا توجد صور لهذا المكان');
+                          }
+                        } catch (e: any) {
+                          toast.error('فشل جلب الصور', { description: e.message });
+                        }
+                      }}
+                      disabled={fetchPlacePhotosMutation.isPending}
+                      className="text-xs px-2 py-1 rounded-lg transition-all"
+                      style={{ background: "oklch(0.65 0.22 25 / 0.15)", color: "oklch(0.75 0.22 25)", border: "1px solid oklch(0.65 0.22 25 / 0.3)" }}
+                      title="جلب صور المكان من Google Maps">
+                      {fetchPlacePhotosMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "📸"}
+                    </button>
+                  )}
+                  {/* زر عرض المعرض */}
+                  {(lead as any).placePhotos?.length > 0 && (
+                    <button
+                      onClick={() => setShowPhotoGallery(true)}
+                      className="text-xs px-2 py-1 rounded-lg transition-all"
+                      style={{ background: "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)", border: "1px solid oklch(0.65 0.18 145 / 0.3)" }}
+                      title="عرض صور المكان">
+                      🖼️ {(lead as any).placePhotos.length}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             {lead.verifiedPhone && (
@@ -1746,6 +1787,102 @@ export default function LeadDetail() {
               لإرسال التقرير عبر واتساب، يرجى توصيل حساب واتساب أولاً من صفحة الإعدادات
             </div>
           )}
+        </div>
+      </div>
+    )}
+    {/* ===== معرض صور Google Maps ===== */}
+    {showPhotoGallery && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.85)" }}
+        onClick={() => { setShowPhotoGallery(false); setSelectedPhoto(null); }}
+      >
+        <div
+          className="relative w-full max-w-4xl rounded-2xl overflow-hidden"
+          style={{ background: "oklch(0.10 0.015 240)", border: "1px solid oklch(0.25 0.02 240)" }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: "oklch(0.2 0.02 240)" }}>
+            <div className="flex items-center gap-3">
+              {(lead as any).clientLogoUrl && (
+                <img src={(lead as any).clientLogoUrl} alt={lead.companyName}
+                  className="w-8 h-8 rounded-lg object-contain"
+                  onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
+              )}
+              <div>
+                <h3 className="text-sm font-bold text-foreground">{lead.companyName}</h3>
+                <p className="text-xs text-muted-foreground">{(lead as any).placePhotos?.length || 0} صورة من Google Maps</p>
+              </div>
+            </div>
+            <button onClick={() => { setShowPhotoGallery(false); setSelectedPhoto(null); }}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
+
+          {/* Selected Photo */}
+          {selectedPhoto && (
+            <div className="relative w-full" style={{ height: "400px" }}>
+              <img src={selectedPhoto} alt="صورة المكان"
+                className="w-full h-full object-contain"
+                onError={e => (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23222" width="100" height="100"/><text fill="%23666" x="50" y="55" text-anchor="middle" font-size="12">تعذر تحميل الصورة</text></svg>'}
+              />
+            </div>
+          )}
+
+          {/* Grid */}
+          <div className="p-4 grid grid-cols-5 gap-2 max-h-64 overflow-y-auto">
+            {((lead as any).placePhotos || []).map((photoUrl: string, idx: number) => (
+              <button
+                key={idx}
+                onClick={() => setSelectedPhoto(photoUrl)}
+                className="relative aspect-square rounded-xl overflow-hidden transition-all hover:scale-105"
+                style={{
+                  border: selectedPhoto === photoUrl ? "2px solid oklch(0.65 0.18 200)" : "2px solid transparent",
+                  background: "oklch(0.15 0.02 240)"
+                }}
+              >
+                <img
+                  src={photoUrl}
+                  alt={`صورة ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                  onError={e => (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23222" width="100" height="100"/></svg>'}
+                />
+                {idx === 0 && (
+                  <div className="absolute top-1 right-1 text-xs px-1 rounded"
+                    style={{ background: "oklch(0.65 0.18 200 / 0.9)", color: "white", fontSize: "9px" }}>
+                    رئيسي
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Footer actions */}
+          <div className="p-4 border-t flex gap-2 justify-end" style={{ borderColor: "oklch(0.2 0.02 240)" }}>
+            {selectedPhoto && (
+              <a href={selectedPhoto} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition-all"
+                style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+                <ExternalLink className="w-3 h-3" />
+                فتح الصورة
+              </a>
+            )}
+            {selectedPhoto && (
+              <button
+                onClick={async () => {
+                  // تعيين أول صورة كشعار للعميل
+                  await updateLead.mutateAsync({ id, clientLogoUrl: selectedPhoto } as any);
+                  toast.success('تم تعيين الصورة كشعار للعميل');
+                  utils.leads.getFullDetails.invalidate({ id });
+                }}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition-all"
+                style={{ background: "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)", border: "1px solid oklch(0.65 0.18 145 / 0.3)" }}>
+                ⭐ تعيين كشعار
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )}

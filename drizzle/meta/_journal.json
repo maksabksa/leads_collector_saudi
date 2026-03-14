@@ -246,6 +246,13 @@
       "when": 1773454599176,
       "tag": "0034_safe_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1773513422483,
+      "tag": "0035_aspiring_sabra",
+      "breakpoints": true
     }
   ]
 }

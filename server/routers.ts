@@ -491,6 +491,67 @@ const leadsRouter = router({
       return { success: false, logoUrl: null, source: null };
     }),
 
+  // جلب صور المكان من Google Maps وتخزينها
+  fetchPlacePhotos: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      googleMapsUrl: z.string().optional(),
+      placeId: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { leadId, googleMapsUrl, placeId } = input;
+      const { makeRequest } = await import("./_core/map");
+
+      // استخراج place_id من الرابط إذا لم يُعطَ مباشرة
+      let resolvedPlaceId = placeId;
+      if (!resolvedPlaceId && googleMapsUrl) {
+        const m = googleMapsUrl.match(/place_id[=:]([A-Za-z0-9_-]+)/) ||
+                  googleMapsUrl.match(/\/place\/[^/]+\/([A-Za-z0-9_-]{20,})/);
+        if (m) resolvedPlaceId = m[1];
+      }
+
+      if (!resolvedPlaceId) {
+        return { success: false, photos: [], message: 'لم يتم العثور على place_id' };
+      }
+
+      try {
+        const data = await makeRequest<{
+          result: {
+            photos?: Array<{ photo_reference: string; height: number; width: number }>;
+            name?: string;
+          };
+          status: string;
+        }>("/maps/api/place/details/json", {
+          place_id: resolvedPlaceId,
+          fields: "photos,name",
+          language: "ar",
+        });
+
+        if (data.status !== "OK" || !data.result.photos?.length) {
+          return { success: false, photos: [], message: 'لا توجد صور لهذا المكان' };
+        }
+
+        // بناء روابط الصور عبر Google Maps Photo API
+        const baseUrl = process.env.VITE_APP_URL || 'http://localhost:3000';
+        const photoUrls = data.result.photos.slice(0, 10).map(
+          (p) => `${baseUrl}/api/maps-photo?photo_reference=${encodeURIComponent(p.photo_reference)}&maxwidth=800`
+        );
+
+        // تخزين الصور في قاعدة البيانات
+        await updateLead(leadId, { placePhotos: photoUrls } as any);
+
+        // إذا لم يكن هناك لوجو محدد، استخدم أول صورة كشعار
+        const lead = await getLeadById(leadId);
+        if (!lead?.clientLogoUrl && photoUrls.length > 0) {
+          await updateLead(leadId, { clientLogoUrl: photoUrls[0] } as any);
+        }
+
+        return { success: true, photos: photoUrls, count: photoUrls.length };
+      } catch (err: any) {
+        return { success: false, photos: [], message: err.message };
+      }
+    }),
+
   bulkDelete: protectedProcedure
     .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
     .mutation(async ({ input }) => {
@@ -1308,6 +1369,7 @@ const searchRouter = router({
           opening_hours?: { open_now: boolean; weekday_text: string[] };
           reviews?: Array<{ author_name: string; rating: number; text: string }>;
           url?: string;
+          photos?: Array<{ photo_reference: string; height: number; width: number }>;
         };
         status: string;
         error_message?: string;
@@ -1322,7 +1384,11 @@ const searchRouter = router({
           message: `Place not found: ${data.status}`,
         });
       }
-      return data.result;
+      // تحويل photo_reference إلى روابط مباشرة
+      const photoUrls = (data.result.photos || []).slice(0, 10).map(
+        (p) => `/maps/api/place/photo?maxwidth=800&photo_reference=${p.photo_reference}`
+      );
+      return { ...data.result, photoUrls };
     }),
 
   // استخراج بيانات الأنشطة التجارية من رابط مخصص

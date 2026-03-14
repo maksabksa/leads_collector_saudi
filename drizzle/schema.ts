@@ -80,6 +80,7 @@ export const leads = mysqlTable("leads", {
   socialSince: varchar("socialSince", { length: 20 }),  // تاريخ الظهور على السوشيال ميديا (مثال: 2019، 2020-05)
   crNumber: varchar("crNumber", { length: 30 }),  // رقم السجل التجاري
   clientLogoUrl: varchar("clientLogoUrl", { length: 1000 }),  // لوجو العميل (favicon أو إنستغرام)
+  placePhotos: json("placePhotos").$type<string[]>(),  // صور المكان من Google Maps (روابط مباشرة)
   hasWhatsapp: mysqlEnum("hasWhatsapp", ["unknown", "yes", "no"]).default("unknown").notNull(),
   whatsappCheckedAt: timestamp("whatsappCheckedAt"),
   lastWhatsappSentAt: timestamp("lastWhatsappSentAt"),
