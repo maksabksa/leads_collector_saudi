@@ -469,12 +469,15 @@ export default function SearchHub() {
   const scrollDepthRef = useRef<number>(0);
   // ===== API ======
   const searchPlaces = trpc.search.searchPlaces.useMutation();
+  const searchInstagramMut = trpc.socialSearch.searchInstagram.useMutation();
   const searchTiktokMut = trpc.socialSearch.searchTikTok.useMutation();
   const searchSnapchatMut = trpc.socialSearch.searchSnapchat.useMutation();
   const searchTelegramMut = trpc.socialSearch.searchTelegram.useMutation();
-  const brightDataSearchMut = trpc.brightDataSearch.searchPlatform.useMutation();
   const brightDataConnectionQuery = trpc.brightDataSearch.checkConnection.useQuery();
   const instagramSearchMut = trpc.instagram.startSearch.useMutation();
+  const searchTwitterMut = trpc.socialSearch.searchTwitter.useMutation();
+  const searchLinkedInMut = trpc.socialSearch.searchLinkedIn.useMutation();
+  const searchFacebookMut = trpc.socialSearch.searchFacebook.useMutation();
   const suggestHashtagsMut = trpc.socialSearch.suggestSocialHashtags.useMutation();
   const createLead = trpc.leads.create.useMutation();
   const addInstagramAsLead = trpc.instagram.addAsLead.useMutation();
@@ -797,22 +800,25 @@ export default function SearchHub() {
 
   const searchInstagram = useCallback(async () => {
     if (!keyword.trim()) return;
+    sessionStartRef.current = Date.now();
+    trackClick();
     setLoadingPlatform("instagram", true);
     setResultsPlatform("instagram", []);
     setInstagramSearchId(null);
     try {
-      // استخدام Bright Data Browser API مباشرة بدون حاجة لأي Token
-      const res = await brightDataSearchMut.mutateAsync({ platform: "instagram", query: keyword, location: city, analyzeWithAI: true });
-      const data = res.results || [];
+      const res = await searchInstagramMut.mutateAsync({ keyword, city });
+      const data = (res as any)?.results || res || [];
       setResultsPlatform("instagram", data);
       if (!data.length) toast.info("لا توجد نتائج في إنستجرام");
       else toast.success(`تم العثور على ${data.length} نتيجة من إنستجرام`);
+      await logSession("instagram", keyword, data.length, 0, data.length > 0, { city });
     } catch (e: any) {
-      handleBrightDataError(e, "إنستجرام");
+      toast.error("خطأ في البحث في إنستجرام", { description: e.message });
+      await logSession("instagram", keyword, 0, 0, false, { city });
     } finally {
       setLoadingPlatform("instagram", false);
     }
-  }, [keyword, city]);
+  }, [keyword, city, logSession, searchInstagramMut]);
 
   const searchTiktok = useCallback(async () => {
     if (!keyword.trim()) return;
@@ -936,55 +942,55 @@ export default function SearchHub() {
     }
   };
 
-  // ===== دالة البحث في Twitter/X عبر Bright Data =====
+  // ===== دالة البحث في Twitter/X عبر SERP API =====
   const searchTwitter = useCallback(async () => {
     if (!keyword.trim()) return;
     setLoadingPlatform("twitter", true);
     setResultsPlatform("twitter", []);
     try {
-      const res = await brightDataSearchMut.mutateAsync({ platform: "twitter", query: keyword, location: city, analyzeWithAI: true });
+      const res = await searchTwitterMut.mutateAsync({ keyword, city });
       const data = res.results || [];
       setResultsPlatform("twitter", data);
       if (!data.length) toast.info("لا توجد نتائج في تويتر");
       else toast.success(`تم العثور على ${data.length} نتيجة من تويتر`);
     } catch (e: any) {
-      handleBrightDataError(e, "تويتر");
+      toast.error("خطأ في تويتر", { description: e.message });
     } finally {
       setLoadingPlatform("twitter", false);
     }
   }, [keyword, city]);
 
-  // ===== دالة البحث في LinkedIn عبر Bright Data =====
+  // ===== دالة البحث في LinkedIn عبر SERP API =====
   const searchLinkedIn = useCallback(async () => {
     if (!keyword.trim()) return;
     setLoadingPlatform("linkedin", true);
     setResultsPlatform("linkedin", []);
     try {
-      const res = await brightDataSearchMut.mutateAsync({ platform: "linkedin", query: keyword, location: city, analyzeWithAI: true });
+      const res = await searchLinkedInMut.mutateAsync({ keyword, city });
       const data = res.results || [];
       setResultsPlatform("linkedin", data);
       if (!data.length) toast.info("لا توجد نتائج في لينكدإن");
       else toast.success(`تم العثور على ${data.length} شركة من لينكدإن`);
     } catch (e: any) {
-      handleBrightDataError(e, "لينكدإن");
+      toast.error("خطأ في لينكدإن", { description: e.message });
     } finally {
       setLoadingPlatform("linkedin", false);
     }
   }, [keyword, city]);
 
-  // ===== دالة البحث في Facebook عبر Bright Data =====
+  // ===== دالة البحث في Facebook عبر SERP API =====
   const searchFacebook = useCallback(async () => {
     if (!keyword.trim()) return;
     setLoadingPlatform("facebook", true);
     setResultsPlatform("facebook", []);
     try {
-      const res = await brightDataSearchMut.mutateAsync({ platform: "facebook", query: keyword, location: city, analyzeWithAI: true });
+      const res = await searchFacebookMut.mutateAsync({ keyword, city });
       const data = res.results || [];
       setResultsPlatform("facebook", data);
       if (!data.length) toast.info("لا توجد نتائج في فيسبوك");
       else toast.success(`تم العثور على ${data.length} صفحة من فيسبوك`);
     } catch (e: any) {
-      handleBrightDataError(e, "فيسبوك");
+      toast.error("خطأ في فيسبوك", { description: e.message });
     } finally {
       setLoadingPlatform("facebook", false);
     }

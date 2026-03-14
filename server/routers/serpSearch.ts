@@ -430,14 +430,83 @@ export async function searchLinkedInSERP(query: string, location?: string): Prom
 export async function searchFacebookSERP(query: string, location?: string): Promise<Array<{
   username: string; displayName: string; bio: string; url: string;
 }>> {
-  return multiQuerySearch("facebook.com", query, location, "Facebook SERP", false);
+  const loc = location || "";
+  const locAr = loc ? `${loc} السعودية` : "السعودية";
+  const locEn = loc ? `${loc} Saudi Arabia` : "Saudi Arabia";
+  const queryEn = translateToEnglish(query);
+  const variants = [
+    `site:facebook.com ${query} ${locAr}`,
+    `site:facebook.com ${query} ${loc || "الرياض"}`,
+    `site:facebook.com/pages ${query} ${locAr}`,
+    `site:facebook.com ${queryEn} ${locEn}`,
+    `facebook ${query} ${locAr} صفحة`,
+    `facebook.com ${query} ${locAr}`,
+  ];
+  const seen = new Set<string>();
+  const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  for (let i = 0; i < variants.length; i++) {
+    const q = variants[i];
+    try {
+      if (i > 0) await sleep(800);
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const html = await serpRequest(url);
+      const parsed = parseGoogleResultsPublic(html, "facebook.com");
+      for (const r of parsed) {
+        if (!seen.has(r.username)) { seen.add(r.username); allResults.push(r); }
+      }
+      if (allResults.length >= 20) break;
+    } catch (err: any) {
+      console.warn(`[Facebook SERP] query failed: ${q} - ${err.message}`);
+    }
+  }
+
+  console.log(`[Facebook SERP] Total unique results: ${allResults.length}`);
+  return allResults;
 }
 
 // ===== البحث في Google عن حسابات Twitter/X =====
 export async function searchTwitterSERP(query: string, location?: string): Promise<Array<{
   username: string; displayName: string; bio: string; url: string;
 }>> {
-  return multiQuerySearch("twitter.com", query, location, "Twitter SERP", false);
+  const loc = location || "";
+  const locAr = loc ? `${loc} السعودية` : "السعودية";
+  const locEn = loc ? `${loc} Saudi Arabia` : "Saudi Arabia";
+  const queryEn = translateToEnglish(query);
+  // تويتر/X: نستخدم x.com لأن Google تفهرسه أفضل من twitter.com
+  const variants = [
+    `site:x.com ${query} ${locAr}`,
+    `site:x.com ${query} ${loc || "الرياض"}`,
+    `site:x.com ${queryEn} ${locEn}`,
+    `site:twitter.com ${query} ${locAr}`,
+    `x.com ${query} ${locAr} حساب`,
+    `twitter ${query} ${locAr} حساب`,
+  ];
+  const seen = new Set<string>();
+  const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  for (let i = 0; i < variants.length; i++) {
+    const q = variants[i];
+    try {
+      if (i > 0) await sleep(800);
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const html = await serpRequest(url);
+      // نحاول كلا النمطين: twitter.com و x.com
+      const parsedX = parseGoogleResultsPublic(html, "x.com");
+      const parsedT = parseGoogleResultsPublic(html, "twitter.com");
+      for (const r of [...parsedX, ...parsedT]) {
+        if (!seen.has(r.username)) { seen.add(r.username); allResults.push(r); }
+      }
+      if (allResults.length >= 20) break;
+    } catch (err: any) {
+      console.warn(`[Twitter SERP] query failed: ${q} - ${err.message}`);
+    }
+  }
+
+  console.log(`[Twitter SERP] Total unique results: ${allResults.length}`);
+  return allResults;
 }
 
 // ===== تحليل نتائج Google HTML =====

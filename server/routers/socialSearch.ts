@@ -12,7 +12,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { TRPCError } from "@trpc/server";
-import { searchTikTokSERP, searchSnapchatSERP } from "./serpSearch";
+import { searchTikTokSERP, searchSnapchatSERP, searchInstagramSERP, searchTwitterSERP, searchLinkedInSERP, searchFacebookSERP } from "./serpSearch";
 
 
 
@@ -242,6 +242,35 @@ async function generateSearchHashtags(keyword: string, city: string, platform: s
   }
 }
 
+// ===== Instagram Search - SERP API (Bright Data) =====
+async function searchInstagram(keyword: string, city: string): Promise<any[]> {
+  try {
+    const serpResults = await searchInstagramSERP(keyword, city);
+    if (serpResults.length > 0) {
+      console.log(`[Instagram SERP] Found ${serpResults.length} results`);
+      return serpResults.map((r: any) => ({
+        name: r.displayName || r.title || "",
+        username: r.username || "",
+        bio: r.description || r.snippet || r.bio || "",
+        followers: r.followers || 0,
+        businessType: "",
+        phone: r.phone || "",
+        website: "",
+        city: city,
+        profileUrl: r.profileUrl || r.url || r.link || `https://instagram.com/${r.username}`,
+        engagementLevel: "normal",
+        availablePhones: r.phone ? [r.phone] : [],
+        availableWebsites: [],
+        dataSource: "instagram_serp",
+        verified: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("[Instagram] SERP API failed:", err);
+  }
+  return [];
+}
+
 // ===== TikTok Search - SERP API (Bright Data) أولاً =====
 async function searchTikTok(keyword: string, city: string): Promise<any[]> {
   // المحاولة الأولى: Bright Data SERP API (الأسرع والأكثر موثوقية)
@@ -304,6 +333,93 @@ async function searchSnapchat(keyword: string, city: string): Promise<any[]> {
   return [];
 }
 
+// ===== Twitter/X Search - SERP API =====
+async function searchTwitter(keyword: string, city: string): Promise<any[]> {
+  try {
+    const serpResults = await searchTwitterSERP(keyword, city);
+    if (serpResults.length > 0) {
+      console.log(`[Twitter SERP] Found ${serpResults.length} results`);
+      return serpResults.map((r: any) => ({
+        name: r.displayName || r.username || "",
+        username: r.username || "",
+        bio: r.bio || "",
+        followers: 0,
+        businessType: "",
+        phone: "",
+        website: "",
+        city: city,
+        profileUrl: r.url || `https://x.com/${r.username}`,
+        engagementLevel: "normal",
+        availablePhones: [],
+        availableWebsites: [],
+        dataSource: "twitter_serp",
+        verified: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("[Twitter] SERP API failed:", err);
+  }
+  return [];
+}
+
+// ===== LinkedIn Search - SERP API =====
+async function searchLinkedIn(keyword: string, city: string): Promise<any[]> {
+  try {
+    const serpResults = await searchLinkedInSERP(keyword, city);
+    if (serpResults.length > 0) {
+      console.log(`[LinkedIn SERP] Found ${serpResults.length} results`);
+      return serpResults.map((r: any) => ({
+        name: r.displayName || r.username || "",
+        username: r.username || "",
+        bio: r.bio || "",
+        followers: 0,
+        businessType: "",
+        phone: "",
+        website: "",
+        city: city,
+        profileUrl: r.url || `https://linkedin.com/company/${r.username}`,
+        engagementLevel: "normal",
+        availablePhones: [],
+        availableWebsites: [],
+        dataSource: "linkedin_serp",
+        verified: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("[LinkedIn] SERP API failed:", err);
+  }
+  return [];
+}
+
+// ===== Facebook Search - SERP API =====
+async function searchFacebook(keyword: string, city: string): Promise<any[]> {
+  try {
+    const serpResults = await searchFacebookSERP(keyword, city);
+    if (serpResults.length > 0) {
+      console.log(`[Facebook SERP] Found ${serpResults.length} results`);
+      return serpResults.map((r: any) => ({
+        name: r.displayName || r.username || "",
+        username: r.username || "",
+        bio: r.bio || "",
+        followers: 0,
+        businessType: "",
+        phone: "",
+        website: "",
+        city: city,
+        profileUrl: r.url || `https://facebook.com/${r.username}`,
+        engagementLevel: "normal",
+        availablePhones: [],
+        availableWebsites: [],
+        dataSource: "facebook_serp",
+        verified: false,
+      }));
+    }
+  } catch (err) {
+    console.warn("[Facebook] SERP API failed:", err);
+  }
+  return [];
+}
+
 // ===== Telegram Search =====
 async function searchTelegram(keyword: string, city: string): Promise<any[]> {
   const queries = [`${keyword} ${city}`, `${keyword} السعودية`, `${keyword}`];
@@ -327,6 +443,17 @@ async function searchTelegram(keyword: string, city: string): Promise<any[]> {
 
 // ===== Router =====
 export const socialSearchRouter = router({
+  searchInstagram: protectedProcedure
+    .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
+    .mutation(async ({ input }) => {
+      try {
+        const results = await searchInstagram(input.keyword, input.city);
+        return { results, platform: "Instagram", total: results.length };
+      } catch (err: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
   searchTikTok: protectedProcedure
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
@@ -344,6 +471,39 @@ export const socialSearchRouter = router({
       try {
         const results = await searchSnapchat(input.keyword, input.city);
         return { results, platform: "Snapchat", total: results.length };
+      } catch (err: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
+  searchTwitter: protectedProcedure
+    .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
+    .mutation(async ({ input }) => {
+      try {
+        const results = await searchTwitter(input.keyword, input.city);
+        return { results, platform: "Twitter", total: results.length };
+      } catch (err: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
+  searchLinkedIn: protectedProcedure
+    .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
+    .mutation(async ({ input }) => {
+      try {
+        const results = await searchLinkedIn(input.keyword, input.city);
+        return { results, platform: "LinkedIn", total: results.length };
+      } catch (err: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
+      }
+    }),
+
+  searchFacebook: protectedProcedure
+    .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
+    .mutation(async ({ input }) => {
+      try {
+        const results = await searchFacebook(input.keyword, input.city);
+        return { results, platform: "Facebook", total: results.length };
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
       }
