@@ -21,41 +21,117 @@ async function getCompanySettingsData() {
 }
 
 // ===== Helper: جلب المنافسين من نفس المجال والمدينة =====
+// معاجم القطاعات لضمان مطابقة دقيقة لنوع النشاط
+const BUSINESS_CATEGORY_KEYWORDS: Record<string, string[]> = {
+  "ملابس": ["ملابس", "أزياء", "بوتيك", "عبايا", "خياط", "موضة", "فاشون", "أطفال", "رجال", "نساء"],
+  "مطعم": ["مطعم", "كافيه", "مقهى", "مطبخ", "وجبات", "برغر", "بيتزا", "سوشي", "مشوي", "شوارم", "فطور", "حلويات"],
+  "لحوم": ["لحم", "ملحمة", "قصاب", "مشوي", "شوارم", "برغر", "كباب"],
+  "صالون": ["صالون", "تجميل", "حلاقة", "سبا", "نايل", "بشرة", "شعر"],
+  "عقار": ["عقار", "شقق", "فلل", "بيوت", "مكاتب", "وساطة"],
+  "سيارات": ["سيارة", "سيارات", "مركبات", "معرض", "تأجير", "غيار"],
+  "تعليم": ["تعليم", "مدرسة", "أكاديمية", "دروس", "تدريب", "كورس"],
+  "طب": ["طب", "عيادة", "مستشفى", "صيدلية", "دكتور", "صحة"],
+  "سفر": ["سفر", "سياحة", "فندق", "شقق", "رحلات", "حجز"],
+  "تقنية": ["تقنية", "الكترونيك", "برمجة", "موبايل", "كمبيوتر", "صيانة"],
+};
+
+function getBusinessCategory(businessType: string): string | null {
+  const bt = (businessType || "").toLowerCase();
+  for (const [category, keywords] of Object.entries(BUSINESS_CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => bt.includes(kw))) return category;
+  }
+  return null;
+}
+
 async function getCompetitors(leadId: number, businessType: string, city: string): Promise<any[]> {
   try {
     const db = await getDb();
     if (!db) return [];
     const { leads } = await import("../../drizzle/schema");
     const { and, eq, ne, like, or } = await import("drizzle-orm");
-    // جلب عملاء من نفس المجال والمدينة (بدون العميل الحالي)
-    const competitors = await db
-      .select({
-        id: leads.id,
-        companyName: leads.companyName,
-        businessType: leads.businessType,
-        city: leads.city,
-        website: leads.website,
-        instagramUrl: leads.instagramUrl,
-        tiktokUrl: leads.tiktokUrl,
-        snapchatUrl: leads.snapchatUrl,
-        facebookUrl: leads.facebookUrl,
-        twitterUrl: leads.twitterUrl,
-        googleMapsUrl: leads.googleMapsUrl,
-        verifiedPhone: leads.verifiedPhone,
-        leadPriorityScore: leads.leadPriorityScore,
-      })
+
+    const selectFields = {
+      id: leads.id,
+      companyName: leads.companyName,
+      businessType: leads.businessType,
+      city: leads.city,
+      website: leads.website,
+      instagramUrl: leads.instagramUrl,
+      tiktokUrl: leads.tiktokUrl,
+      snapchatUrl: leads.snapchatUrl,
+      facebookUrl: leads.facebookUrl,
+      twitterUrl: leads.twitterUrl,
+      googleMapsUrl: leads.googleMapsUrl,
+      verifiedPhone: leads.verifiedPhone,
+      leadPriorityScore: leads.leadPriorityScore,
+    };
+
+    // المرحلة 1: بحث دقيق - نفس نوع النشاط + نفس المدينة
+    const firstWord = businessType.split(' ')[0];
+    let competitors = await db
+      .select(selectFields)
       .from(leads)
       .where(
         and(
           ne(leads.id, leadId),
-          or(
-            like(leads.businessType, `%${businessType.split(' ')[0]}%`),
-            eq(leads.city, city)
-          )
+          like(leads.businessType, `%${firstWord}%`),
+          eq(leads.city, city)
         )
       )
       .limit(5);
-    return competitors;
+
+    // المرحلة 2: إذا لم يكف، بحث بنفس نوع النشاط فقط (بدون شرط المدينة)
+    if (competitors.length < 3) {
+      const moreByType = await db
+        .select(selectFields)
+        .from(leads)
+        .where(
+          and(
+            ne(leads.id, leadId),
+            like(leads.businessType, `%${firstWord}%`)
+          )
+        )
+        .limit(5);
+      // دمج بدون تكرار
+      const existingIds = new Set(competitors.map((c: any) => c.id));
+      for (const c of moreByType) {
+        if (!existingIds.has(c.id)) {
+          competitors.push(c);
+          if (competitors.length >= 5) break;
+        }
+      }
+    }
+
+    // المرحلة 3: إذا لا يزال فارغ، ابحث بنفس الفئة العامة (ليس بالمدينة فقط)
+    if (competitors.length < 2) {
+      const category = getBusinessCategory(businessType);
+      if (category) {
+        const categoryKeywords = BUSINESS_CATEGORY_KEYWORDS[category] || [];
+        const existingIds = new Set(competitors.map((c: any) => c.id));
+        for (const kw of categoryKeywords.slice(0, 3)) {
+          if (competitors.length >= 5) break;
+          const byCategory = await db
+            .select(selectFields)
+            .from(leads)
+            .where(
+              and(
+                ne(leads.id, leadId),
+                like(leads.businessType, `%${kw}%`)
+              )
+            )
+            .limit(3);
+          for (const c of byCategory) {
+            if (!existingIds.has(c.id)) {
+              competitors.push(c);
+              existingIds.add(c.id);
+              if (competitors.length >= 5) break;
+            }
+          }
+        }
+      }
+    }
+
+    return competitors.slice(0, 5);
   } catch (e) {
     console.error('[Competitors]', e);
     return [];
