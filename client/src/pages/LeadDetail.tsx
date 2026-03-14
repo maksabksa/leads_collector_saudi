@@ -94,6 +94,19 @@ export default function LeadDetail() {
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
   const fetchClientLogoMutation = trpc.leads.fetchClientLogo.useMutation();
 
+  // جلب بيانات المنافسين عند توفر بيانات العميل
+  const { data: competitorsData } = trpc.leads.getCompetitors.useQuery(
+    {
+      leadId: id,
+      businessType: data?.lead?.businessType || '',
+      city: data?.lead?.city || '',
+      limit: 5,
+    },
+    {
+      enabled: !!data?.lead?.businessType && !!data?.lead?.city,
+    }
+  );
+
   const handleGeneratePDF = async () => {
     setPdfGenerating(true);
     try {
@@ -105,6 +118,7 @@ export default function LeadDetail() {
         socialAnalyses: data?.socialAnalyses || [],
         report: report,
         company: companySettingsData,
+        competitors: competitorsData || [],
       });
       toast.success("تم تحميل التقرير بنجاح");
     } catch (e: any) {
@@ -124,6 +138,7 @@ export default function LeadDetail() {
         socialAnalyses: data?.socialAnalyses || [],
         report: report,
         company: companySettingsData,
+        competitors: competitorsData || [],
       });
     } catch (e: any) {
       toast.error("فشل فتح المعاينة", { description: e.message });

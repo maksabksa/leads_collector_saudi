@@ -353,38 +353,38 @@ export async function searchSnapchatSERP(query: string, location?: string): Prom
   const loc = location || "";
   const locAr = loc ? `${loc} السعودية` : "السعودية";
   const locEn = loc ? `${loc} Saudi Arabia` : "Saudi Arabia";
+  const queryEn = translateToEnglish(query);
+  // سناب شات: نستخدم site:snapchat.com فقط لأن الاستعلامات بدون site: تُرجع نتائج غير مطابقة
   const variants = [
-    `snapchat.com/add ${query} ${locAr}`,
-    `snapchat.com/add ${query} ${locEn}`,
-    `snapchat.com/add ${query} KSA`,
     `site:snapchat.com/add ${query} ${locAr}`,
-    `"snapchat" "${query}" ${locAr}`,
+    `site:snapchat.com/add ${query} ${loc || "الرياض"}`,
+    `site:snapchat.com/add ${queryEn} ${locEn}`,
+    `site:snapchat.com/add ${queryEn} ${loc || "riyadh"}`,
+    `site:snapchat.com ${query} ${locAr}`,
+    `site:snapchat.com ${queryEn} ${locEn}`,
   ];
   const seen = new Set<string>();
   const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-  const fetchBatch = variants.slice(0, 3).map(async (q) => {
+  for (let i = 0; i < variants.length; i++) {
+    const q = variants[i];
     try {
-      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+      if (i > 0) await sleep(800);
+      // بدون cr=countrySA لأنه يُسبب 407 من SERP proxy
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
       const html = await serpRequest(url);
-      const matches = html.match(/snapchat\.com\/add\/([a-zA-Z0-9._-]+)/g) || [];
-      return matches.map((m) => {
-        const username = m.replace("snapchat.com/add/", "");
-        return { username, displayName: username, bio: "", url: `https://www.snapchat.com/add/${username}` };
-      });
-    } catch (err: any) {
-      console.warn(`[Snapchat SERP] failed: ${q} - ${err.message}`);
-      return [];
-    }
-  });
-
-  const results = await Promise.all(fetchBatch);
-  for (const batch of results) {
-    for (const r of batch) {
-      if (r.username && !seen.has(r.username)) {
-        seen.add(r.username);
-        allResults.push(r);
+      // استخدام parseGoogleResultsPublic للاستخراج الصحيح
+      const parsed = parseGoogleResultsPublic(html, "snapchat.com");
+      for (const r of parsed) {
+        if (r.username && !seen.has(r.username)) {
+          seen.add(r.username);
+          allResults.push(r);
+        }
       }
+      if (allResults.length >= 20) break;
+    } catch (err: any) {
+      console.warn(`[Snapchat SERP] query failed: ${q} - ${err.message}`);
     }
   }
 

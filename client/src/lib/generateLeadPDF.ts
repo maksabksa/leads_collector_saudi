@@ -10,6 +10,7 @@ interface GeneratePDFOptions {
   socialAnalyses?: any[];
   report?: any;
   company?: any;
+  competitors?: any[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ function infoRow(label: string, value: string, icon = "") {
 //  MAIN EXPORT
 // ═══════════════════════════════════════════════════════════════════════
 export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void> {
-  const { lead, websiteAnalysis, socialAnalyses = [], report, company } = options;
+  const { lead, websiteAnalysis, socialAnalyses = [], report, company, competitors = [] } = options;
   if (!lead) throw new Error("لا توجد بيانات للعميل");
 
   // ─── Auto-fill missing data intelligently ────────────────────────────────────
@@ -695,7 +696,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:9px;color:#334155;">${coName} · تقرير سري ومخصص</div>
-      <div style="font-size:9px;color:#334155;">صفحة 3 من 4</div>
+      <div style="font-size:9px;color:#334155;">صفحة 3 من 5</div>
     </div>
   `);
 
@@ -792,9 +793,178 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
-      <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 4 من 4</div>
+      <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 4 من 5</div>
     </div>
   `, false);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE 5 — COMPETITOR COMPARISON (DARK)
+  // ═══════════════════════════════════════════════════════════════════════
+  function buildCompetitorRow(comp: any, rank: number, isClient = false) {
+    const priScore = comp.leadPriorityScore ? Number(comp.leadPriorityScore) : null;
+    const qualScore = comp.dataQualityScore ? Number(comp.dataQualityScore) : null;
+    const platforms = [
+      comp.instagramUrl ? 'إنستغرام' : null,
+      comp.tiktokUrl ? 'تيك توك' : null,
+      comp.twitterUrl ? 'تويتر/X' : null,
+      comp.snapchatUrl ? 'سناب شات' : null,
+      comp.facebookUrl ? 'فيسبوك' : null,
+      comp.linkedinUrl ? 'لينكدإن' : null,
+    ].filter(Boolean);
+    const platformCount = platforms.length;
+    const hasWebsite = !!comp.website;
+    const hasPhone = !!(comp.phone || comp.verifiedPhone);
+    const accent = isClient ? '#22c55e' : rank === 1 ? '#f97316' : rank === 2 ? '#eab308' : '#64748b';
+    const bg = isClient ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)';
+    const border = isClient ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.06)';
+    const label = isClient ? '⭐ أنت' : `#${rank}`;
+    return `<div style="display:grid;grid-template-columns:32px 1fr 70px 70px 80px 80px 60px;gap:8px;align-items:center;
+      padding:12px 16px;background:${bg};border:1px solid ${border};
+      border-right:3px solid ${accent};border-radius:0 10px 10px 0;margin-bottom:6px;">
+      <div style="font-size:11px;font-weight:900;color:${accent};text-align:center;">${label}</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#f1f5f9;">${comp.companyName || 'غير معروف'}</div>
+        <div style="font-size:9.5px;color:#475569;margin-top:2px;">${comp.businessType || ''} ${comp.city ? '· ' + comp.city : ''}</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:14px;font-weight:900;color:${sc(priScore)};text-shadow:0 0 8px ${sc(priScore)}66;">${fmt(priScore)}</div>
+        <div style="font-size:8px;color:#475569;">الأولوية</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:14px;font-weight:900;color:${sc(qualScore)};text-shadow:0 0 8px ${sc(qualScore)}66;">${fmt(qualScore)}</div>
+        <div style="font-size:8px;color:#475569;">جودة البيانات</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:13px;font-weight:800;color:${platformCount >= 3 ? '#22c55e' : platformCount >= 1 ? '#eab308' : '#ef4444'};">${platformCount} منصة</div>
+        <div style="font-size:8px;color:#475569;">${platforms.slice(0, 2).join(' · ') || 'لا يوجد'}</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:13px;">${hasWebsite ? '✅' : '❌'}</div>
+        <div style="font-size:8px;color:#475569;">موقع إلكتروني</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:13px;">${hasPhone ? '✅' : '❌'}</div>
+        <div style="font-size:8px;color:#475569;">هاتف</div>
+      </div>
+    </div>`;
+  }
+
+  // حساب ترتيب العميل بين المنافسين
+  const allEntities = [
+    { ...lead, isClient: true },
+    ...competitors.slice(0, 5),
+  ].sort((a, b) => (Number(b.leadPriorityScore) || 0) - (Number(a.leadPriorityScore) || 0));
+
+  const clientRank = allEntities.findIndex((e: any) => e.isClient) + 1;
+  const totalInComparison = allEntities.length;
+
+  // تحليل نقاط القوة والضعف مقارنةً بالمنافسين
+  const avgCompPriority = competitors.length
+    ? competitors.reduce((s, c) => s + (Number(c.leadPriorityScore) || 0), 0) / competitors.length
+    : 0;
+  const avgCompPlatforms = competitors.length
+    ? competitors.reduce((s, c) => s + [c.instagramUrl, c.tiktokUrl, c.twitterUrl, c.snapchatUrl, c.facebookUrl, c.linkedinUrl].filter(Boolean).length, 0) / competitors.length
+    : 0;
+  const clientPlatforms = [lead.instagramUrl, lead.tiktokUrl, lead.twitterUrl, lead.snapchatUrl, lead.facebookUrl, lead.linkedinUrl].filter(Boolean).length;
+  const clientPri = Number(lead.leadPriorityScore) || 0;
+
+  const strengths: string[] = [];
+  const weaknesses: string[] = [];
+  if (clientPri > avgCompPriority + 0.5) strengths.push(`درجة الأولوية (${clientPri.toFixed(1)}) أعلى من متوسط المنافسين (${avgCompPriority.toFixed(1)})`);
+  else if (clientPri < avgCompPriority - 0.5) weaknesses.push(`درجة الأولوية (${clientPri.toFixed(1)}) أقل من متوسط المنافسين (${avgCompPriority.toFixed(1)})`);
+  if (clientPlatforms > avgCompPlatforms + 0.5) strengths.push(`حضور على ${clientPlatforms} منصات مقابل متوسط ${avgCompPlatforms.toFixed(1)} للمنافسين`);
+  else if (clientPlatforms < avgCompPlatforms - 0.5) weaknesses.push(`حضور على ${clientPlatforms} منصات فقط مقابل متوسط ${avgCompPlatforms.toFixed(1)} للمنافسين`);
+  if (lead.website && competitors.filter((c: any) => c.website).length < competitors.length / 2) strengths.push('يمتلك موقعاً إلكترونياً بينما أغلب المنافسين لا يمتلكون');
+  if (!lead.website && competitors.filter((c: any) => c.website).length > competitors.length / 2) weaknesses.push('لا يمتلك موقعاً إلكترونياً بينما أغلب المنافسين يمتلكون');
+  if (strengths.length === 0) strengths.push('يمتلك إمكانات تنافسية واعدة في السوق المحلي');
+  if (weaknesses.length === 0) weaknesses.push('يحتاج تعزيز الحضور الرقمي لمواكبة المنافسين');
+
+  const p5 = competitors.length === 0 ? '' : page(`
+    <!-- Decorative -->
+    <div style="position:absolute;top:-60px;left:-60px;width:300px;height:300px;border-radius:50%;
+      background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <!-- Header -->
+    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#0ea5e9,#a78bfa);box-shadow:0 0 12px rgba(14,165,233,0.5);"></div>
+        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">تحليل المنافسين والموقع التنافسي</div>
+      </div>
+      <div style="font-size:10px;color:#334155;">${lead.companyName || ''} · ${coName} · صفحة 5/5</div>
+    </div>
+
+    <div style="padding:20px 40px;">
+
+      <!-- Ranking badge -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="width:70px;height:70px;border-radius:50%;
+            background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(14,165,233,0.1));
+            border:2px solid rgba(34,197,94,0.4);
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            box-shadow:0 0 20px rgba(34,197,94,0.2);">
+            <div style="font-size:22px;font-weight:900;color:#22c55e;">#${clientRank}</div>
+            <div style="font-size:8px;color:#475569;">من ${totalInComparison}</div>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:#f1f5f9;">الترتيب التنافسي لـ ${lead.companyName || 'العميل'}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:3px;">في ${lead.businessType || 'المجال'} بـ${lead.city || 'المدينة'}</div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:12px 20px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
+          <div style="font-size:11px;color:#475569;margin-bottom:4px;">متوسط الأولوية للمنافسين</div>
+          <div style="font-size:20px;font-weight:900;color:${sc(avgCompPriority)};">${avgCompPriority.toFixed(1)}</div>
+        </div>
+      </div>
+
+      <!-- Comparison table header -->
+      <div style="margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:32px 1fr 70px 70px 80px 80px 60px;gap:8px;
+          padding:8px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="font-size:9px;color:#475569;text-align:center;">#</div>
+          <div style="font-size:9px;color:#475569;">الاسم</div>
+          <div style="font-size:9px;color:#475569;text-align:center;">الأولوية</div>
+          <div style="font-size:9px;color:#475569;text-align:center;">جودة البيانات</div>
+          <div style="font-size:9px;color:#475569;text-align:center;">المنصات</div>
+          <div style="font-size:9px;color:#475569;text-align:center;">موقع</div>
+          <div style="font-size:9px;color:#475569;text-align:center;">هاتف</div>
+        </div>
+        ${allEntities.map((e: any, i: number) => buildCompetitorRow(e, i + 1, !!e.isClient)).join('')}
+      </div>
+
+      <!-- Strengths & Weaknesses -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">
+        <div style="background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:14px 16px;">
+          <div style="font-size:12px;font-weight:800;color:#22c55e;margin-bottom:10px;">✅ نقاط القوة التنافسية</div>
+          ${strengths.map(s => `<div style="font-size:10.5px;color:#94a3b8;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);line-height:1.6;">• ${s}</div>`).join('')}
+        </div>
+        <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:14px 16px;">
+          <div style="font-size:12px;font-weight:800;color:#ef4444;margin-bottom:10px;">⚠️ فرص التحسين</div>
+          ${weaknesses.map(w => `<div style="font-size:10.5px;color:#94a3b8;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);line-height:1.6;">• ${w}</div>`).join('')}
+        </div>
+      </div>
+
+      <!-- Market opportunity note -->
+      <div style="margin-top:16px;padding:14px 18px;background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.15);border-radius:12px;">
+        <div style="font-size:11px;font-weight:700;color:#0ea5e9;margin-bottom:6px;">💡 الفرصة التنافسية</div>
+        <div style="font-size:11px;color:#64748b;line-height:1.7;">
+          ${clientRank <= Math.ceil(totalInComparison / 2)
+            ? `${lead.companyName || 'النشاط'} يحتل مركزاً تنافسياً متقدماً (#${clientRank} من ${totalInComparison}). تعزيز نقاط القوة الحالية وسد الثغرات المذكورة سيُرسّخ هذا التفوق ويزيد الحصة السوقية.`
+            : `${lead.companyName || 'النشاط'} لديه فرصة واضحة للارتقاء في الترتيب التنافسي. معالجة نقاط الضعف المذكورة أعلاه ستُحسّن الموقع التنافسي بشكل ملحوظ خلال 90 يوماً.`
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
+      background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 5 من 5</div>
+    </div>
+  `);
 
   // ═══════════════════════════════════════════════════════════════════════
   //  ASSEMBLE & OPEN PRINT WINDOW
@@ -883,6 +1053,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   <div class="page-wrapper">${p2}</div>
   <div class="page-wrapper">${p3}</div>
   <div class="page-wrapper">${p4}</div>
+  ${p5 ? `<div class="page-wrapper">${p5}</div>` : ''}
 </div>
 </body>
 </html>`;

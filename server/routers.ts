@@ -625,9 +625,86 @@ ${contextParts.join('\n')}
         return { businessType: null, city: null, phone: null, website: null, district: null, confidence: 0 };
       }
     }),
+
+  getCompetitors: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      businessType: z.string(),
+      city: z.string(),
+      limit: z.number().optional().default(5),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const { leads: leadsTable } = await import('../drizzle/schema');
+
+      // جلب منافسين من نفس نوع النشاط والمدينة (باستثناء العميل نفسه)
+      const competitors = await db
+        .select({
+          id: leadsTable.id,
+          companyName: leadsTable.companyName,
+          businessType: leadsTable.businessType,
+          city: leadsTable.city,
+          website: leadsTable.website,
+          instagramUrl: leadsTable.instagramUrl,
+          twitterUrl: leadsTable.twitterUrl,
+          tiktokUrl: leadsTable.tiktokUrl,
+          facebookUrl: leadsTable.facebookUrl,
+          snapchatUrl: leadsTable.snapchatUrl,
+          linkedinUrl: leadsTable.linkedinUrl,
+          reviewCount: leadsTable.reviewCount,
+          leadPriorityScore: leadsTable.leadPriorityScore,
+          dataQualityScore: leadsTable.dataQualityScore,
+          analysisStatus: leadsTable.analysisStatus,
+        })
+        .from(leadsTable)
+        .where(
+          and(
+            sql`${leadsTable.id} != ${input.leadId}`,
+            like(leadsTable.businessType, `%${input.businessType.split(' ')[0]}%`),
+            like(leadsTable.city, `%${input.city}%`),
+          )
+        )
+        .orderBy(desc(leadsTable.leadPriorityScore))
+        .limit(input.limit);
+
+      // إذا لم يجد منافسين بنفس النشاط، ابحث بنفس المدينة فقط
+      if (competitors.length === 0) {
+        const cityOnly = await db
+          .select({
+            id: leadsTable.id,
+            companyName: leadsTable.companyName,
+            businessType: leadsTable.businessType,
+            city: leadsTable.city,
+            website: leadsTable.website,
+            instagramUrl: leadsTable.instagramUrl,
+            twitterUrl: leadsTable.twitterUrl,
+            tiktokUrl: leadsTable.tiktokUrl,
+            facebookUrl: leadsTable.facebookUrl,
+            snapchatUrl: leadsTable.snapchatUrl,
+            linkedinUrl: leadsTable.linkedinUrl,
+          reviewCount: leadsTable.reviewCount,
+          leadPriorityScore: leadsTable.leadPriorityScore,
+          dataQualityScore: leadsTable.dataQualityScore,
+          analysisStatus: leadsTable.analysisStatus,
+        })
+        .from(leadsTable)
+        .where(
+          and(
+            sql`${leadsTable.id} != ${input.leadId}`,
+            like(leadsTable.city, `%${input.city}%`),
+          )
+        )
+        .orderBy(desc(leadsTable.leadPriorityScore))
+          .limit(input.limit);
+        return cityOnly;
+      }
+
+      return competitors;
+    }),
 });
 
-// ===== ANALYSIS ROUTER =====
+// ===== ANALYSIS ROUTER ==========
 
 // ===== ANALYSIS ROUTER =====
 const analysisRouter = router({
