@@ -8,13 +8,12 @@
  * 3. Poll: GET /datasets/v3/snapshot/{snapshot_id}?format=json
  * 4. Returns: full profile/posts data
  *
- * Dataset IDs (Bright Data Official):
- * - TikTok Profiles:    gd_l1vikfnt1wgvvqz95w  (confirmed in realSocialData.ts)
- * - TikTok Posts:       gd_lu702nij2f790tmv24
- * - Snapchat Posts:     gd_lkf0u1882c7ywfz3y
- * - Twitter/X Posts:    gd_lwxkxvnf1cynvib9co
- * - Facebook Pages:     gd_lyclm2p67xgu9o5v0  (keyword search variant)
- * - Facebook Page Posts: gd_ltppn6ug2l8oo3fj4
+ * Dataset IDs (Bright Data Official - Verified from Dashboard 2026-03-15):
+ * - TikTok Profiles:       gd_l1villgoiiidt09ci  ✅ ACTIVE - TikTok Profiles collect by URL
+ * - Facebook Profiles:     gd_mf0urb782734ik94dz ✅ ACTIVE - Facebook Profiles collect by URL
+ * - Facebook Page Posts:   gd_lkaxegm826bjpoo9m5 ✅ ACTIVE - Facebook Pages Posts by Profile URL
+ * - Twitter/X Posts:       gd_lwxkxvnf1cynvib9co ✅ ACTIVE - Twitter/X Posts
+ * - Snapchat:              NOT AVAILABLE in Bright Data Library (no scraper exists)
  */
 
 import { ENV } from "../_core/env";
