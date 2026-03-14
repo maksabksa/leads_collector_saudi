@@ -1,10 +1,11 @@
 import { trpc } from "@/lib/trpc";
 import PreSaveReviewModal from "@/components/PreSaveReviewModal";
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown } from "lucide-react";
+import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
+import { skipToken } from "@tanstack/react-query";
 
 const FALLBACK_BUSINESS_TYPES = [
   "ملحمة", "أغنام", "ماعز", "لحوم", "ذبح وتجهيز", "توصيل لحوم",
@@ -50,6 +51,74 @@ export default function AddLead() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showReviewModal, setShowReviewModal] = useState(false);
+
+  // جلب تفاصيل Google Maps تلقائياً
+  const [currentPlaceId, setCurrentPlaceId] = useState<string | null>(null);
+  const [isFetchingFromUrl, setIsFetchingFromUrl] = useState(false);
+  const placeDetailsQuery = trpc.search.getPlaceDetails.useQuery(
+    currentPlaceId ? { placeId: currentPlaceId } : skipToken,
+    { enabled: !!currentPlaceId, staleTime: 5 * 60 * 1000 }
+  );
+
+  // استخراج place_id من رابط Google Maps
+  const extractPlaceIdFromUrl = useCallback((url: string): string | null => {
+    if (!url) return null;
+    const directMatch = url.match(/[?&]q=place_id:([A-Za-z0-9_-]+)/);
+    if (directMatch) return directMatch[1];
+    const placeMatch = url.match(/\/place\/[^/]+\/([A-Za-z0-9_-]{20,})/);
+    if (placeMatch) return placeMatch[1];
+    const dataMatch = url.match(/!1s([A-Za-z0-9_-]{20,})/);
+    if (dataMatch) return dataMatch[1];
+    return null;
+  }, []);
+
+  // معالجة تغيير رابط Google Maps مع debounce
+  const handleGoogleMapsUrlChange = useCallback((url: string) => {
+    set("googleMapsUrl", url);
+    if (!url.trim()) return;
+    // انتظر حتى يكتمل الرابط (الحد الأدنى لطول place_id هو 27 حرفاً)
+    const placeId = extractPlaceIdFromUrl(url);
+    if (placeId && placeId.length >= 20 && placeId !== currentPlaceId) {
+      setCurrentPlaceId(placeId);
+      setIsFetchingFromUrl(true);
+    }
+  }, [currentPlaceId, extractPlaceIdFromUrl]);
+
+  // تحديث الحقول تلقائياً عند جلب تفاصيل Google Maps
+  useEffect(() => {
+    if (placeDetailsQuery.data && currentPlaceId) {
+      const d = placeDetailsQuery.data as any;
+      const phone = d.formatted_phone_number || d.international_phone_number || "";
+      const website = d.website || "";
+      const name = d.name || "";
+      let city = "";
+      let district = "";
+      if (d.formatted_address) {
+        const parts = d.formatted_address.split(",").map((p: string) => p.trim());
+        if (parts.length >= 3) {
+          city = parts[parts.length - 2] || "";
+          district = parts.length >= 4 ? parts[parts.length - 3] : "";
+        } else if (parts.length === 2) {
+          city = parts[0];
+        }
+      }
+      setForm(f => ({
+        ...f,
+        verifiedPhone: f.verifiedPhone || phone,
+        website: f.website || website,
+        companyName: f.companyName || name,
+        city: city ? city : f.city,
+        district: district ? district : f.district,
+      }));
+      if (isFetchingFromUrl) {
+        setIsFetchingFromUrl(false);
+        const filled = [phone && 'رقم الهاتف ✓', website && 'الموقع ✓', name && 'الاسم ✓', city && 'المدينة ✓'].filter(Boolean).join(' ');
+        if (filled) {
+          toast.success("تم جلب بيانات Google Maps تلقائياً", { description: filled });
+        }
+      }
+    }
+  }, [placeDetailsQuery.data, currentPlaceId, isFetchingFromUrl]);
 
   const STAGE_OPTIONS = [
     { value: "new", label: "جديد", color: "oklch(0.65 0.05 240)" },
@@ -252,9 +321,39 @@ export default function AddLead() {
             الحضور الرقمي
           </h3>
           <div className="grid grid-cols-2 gap-4">
+            {/* حقل Google Maps مع استدعاء تلقائي */}
+            <div className="col-span-2">
+              <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" style={{ color: isFetchingFromUrl || placeDetailsQuery.isFetching ? 'oklch(0.65 0.18 145)' : undefined }} />
+                رابط Google Maps
+                {(isFetchingFromUrl || placeDetailsQuery.isFetching) && (
+                  <span className="flex items-center gap-1 text-[10px] animate-pulse" style={{ color: 'oklch(0.65 0.18 145)' }}>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    جاري جلب البيانات...
+                  </span>
+                )}
+                {!placeDetailsQuery.isFetching && currentPlaceId && placeDetailsQuery.data && (
+                  <span className="flex items-center gap-1 text-[10px]" style={{ color: 'oklch(0.65 0.18 145)' }}>
+                    <CheckCircle2 className="w-3 h-3" />
+                    تم جلب البيانات
+                  </span>
+                )}
+              </label>
+              <input
+                value={form.googleMapsUrl}
+                onChange={e => handleGoogleMapsUrlChange(e.target.value)}
+                className={`w-full px-4 py-2.5 rounded-xl text-sm border bg-background text-foreground focus:outline-none transition-colors ${
+                  currentPlaceId && placeDetailsQuery.data ? 'border-green-500/50' : 'border-border focus:border-primary'
+                }`}
+                placeholder="الصق رابط Google Maps هنا لجلب البيانات تلقائياً..."
+                dir="ltr"
+              />
+              {!currentPlaceId && (
+                <p className="text-[10px] text-muted-foreground mt-1">الصق رابط المكان من Google Maps لجلب الهاتف والموقع والمدينة تلقائياً</p>
+              )}
+            </div>
             {[
               { field: "website", label: "الموقع الإلكتروني", placeholder: "https://example.com", icon: Globe },
-              { field: "googleMapsUrl", label: "رابط Google Maps", placeholder: "https://maps.google.com/...", icon: MapPin },
               { field: "instagramUrl", label: "إنستغرام", placeholder: "https://instagram.com/...", icon: Instagram },
               { field: "twitterUrl", label: "تويتر / X", placeholder: "https://twitter.com/...", icon: Twitter },
               { field: "snapchatUrl", label: "سناب شات", placeholder: "https://snapchat.com/...", icon: Globe },

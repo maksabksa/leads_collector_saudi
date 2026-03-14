@@ -131,6 +131,8 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
     socialSince: "",
   });
 
+  // حالة جلب تفاصيل Google Maps
+  const [isFetchingFromUrl, setIsFetchingFromUrl] = useState(false);
   // جلب تفاصيل Google Maps
   const [currentPlaceId, setCurrentPlaceId] = useState<string | null>(null);
   const placeDetailsQuery = trpc.search.getPlaceDetails.useQuery(
@@ -260,19 +262,74 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
     }
   };
 
+  // دالة استخراج place_id من رابط Google Maps
+  const extractPlaceIdFromUrl = useCallback((url: string): string | null => {
+    if (!url) return null;
+    // نمط place_id مباشر
+    const directMatch = url.match(/[?&]q=place_id:([A-Za-z0-9_-]+)/);
+    if (directMatch) return directMatch[1];
+    // نمط /place/ في الرابط
+    const placeMatch = url.match(/\/place\/[^/]+\/([A-Za-z0-9_-]{20,})/); 
+    if (placeMatch) return placeMatch[1];
+    // نمط data=...0x في الرابط
+    const dataMatch = url.match(/!1s([A-Za-z0-9_-]{20,})/);
+    if (dataMatch) return dataMatch[1];
+    // نمط cid=
+    const cidMatch = url.match(/[?&]cid=([0-9]+)/);
+    if (cidMatch) return cidMatch[1];
+    return null;
+  }, []);
+
+  // معالجة تغيير رابط Google Maps مع تحقق من طول place_id
+  const handleGoogleMapsUrlChange = useCallback((url: string) => {
+    setField("googleMapsUrl", url);
+    if (!url.trim()) return;
+    const placeId = extractPlaceIdFromUrl(url);
+    // الحد الأدنى لطول place_id الصحيح هو 20 حرفاً
+    if (placeId && placeId.length >= 20 && placeId !== currentPlaceId) {
+      setCurrentPlaceId(placeId);
+      setIsFetchingFromUrl(true);
+    }
+  }, [currentPlaceId, extractPlaceIdFromUrl]);
+
   // تحديث الهاتف والموقع من Google Places تلقائياً
   useEffect(() => {
     if (placeDetailsQuery.data && open) {
       const d = placeDetailsQuery.data as any;
       const phone = d.formatted_phone_number || d.international_phone_number || "";
       const website = d.website || "";
+      // استخراج المدينة من العنوان
+      let city = "";
+      let district = "";
+      if (d.formatted_address) {
+        const parts = d.formatted_address.split(",").map((p: string) => p.trim());
+        // عادة: اسم المكان, الحي, المدينة, المملكة العربية السعودية
+        if (parts.length >= 3) {
+          city = parts[parts.length - 2] || "";
+          district = parts.length >= 4 ? parts[parts.length - 3] : "";
+        } else if (parts.length === 2) {
+          city = parts[0];
+        }
+      }
       setForm(f => ({
         ...f,
         verifiedPhone: f.verifiedPhone || phone,
         website: f.website || website,
+        city: f.city || city,
+        district: f.district || district,
+        companyName: f.companyName || d.name || "",
+        businessType: f.businessType || (d.types?.[0] || ""),
       }));
+      if (isFetchingFromUrl) {
+        setIsFetchingFromUrl(false);
+        if (phone || website || city) {
+          toast.success("تم جلب بيانات Google Maps تلقائياً", {
+            description: `${phone ? 'رقم الهاتف ✓' : ''} ${website ? 'الموقع ✓' : ''} ${city ? 'المدينة ✓' : ''}`.trim(),
+          });
+        }
+      }
     }
-  }, [placeDetailsQuery.data, open]);
+  }, [placeDetailsQuery.data, open, isFetchingFromUrl]);
 
   const setField = useCallback((field: string, value: string) => {
     setForm(f => ({ ...f, [field]: value }));
@@ -689,22 +746,39 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
                 </div>
               </div>
 
-              {/* رابط Google Maps */}
-              {(form.googleMapsUrl || initialData?.googleMapsUrl) && (
-                <div>
-                  <Label className="text-xs mb-1 block">رابط Google Maps</Label>
-                  <div className="relative">
-                    <Input
-                      value={form.googleMapsUrl}
-                      onChange={e => setField("googleMapsUrl", e.target.value)}
-                      placeholder="https://maps.google.com/..."
-                      dir="ltr"
-                      className="pl-8 text-xs"
-                    />
-                    <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-green-400" />
-                  </div>
+              {/* رابط Google Maps - دائماً ظاهر مع استدعاء تلقائي للبيانات */}
+              <div>
+                <Label className="text-xs mb-1 flex items-center gap-1.5">
+                  رابط Google Maps
+                  {(placeDetailsQuery.isFetching || isFetchingFromUrl) && (
+                    <span className="flex items-center gap-1 text-[10px] text-green-400 animate-pulse">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      جاري جلب البيانات...
+                    </span>
+                  )}
+                  {!placeDetailsQuery.isFetching && currentPlaceId && placeDetailsQuery.data && (
+                    <span className="flex items-center gap-1 text-[10px] text-green-400">
+                      <CheckCircle2 className="w-3 h-3" />
+                      تم جلب البيانات
+                    </span>
+                  )}
+                </Label>
+                <div className="relative">
+                  <Input
+                    value={form.googleMapsUrl}
+                    onChange={e => handleGoogleMapsUrlChange(e.target.value)}
+                    placeholder="الصق رابط Google Maps هنا لجلب البيانات تلقائياً..."
+                    dir="ltr"
+                    className={`pl-8 text-xs ${currentPlaceId && placeDetailsQuery.data ? 'border-green-500/50' : ''}`}
+                  />
+                  <MapPin className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${currentPlaceId && placeDetailsQuery.data ? 'text-green-400' : 'text-muted-foreground'}`} />
                 </div>
-              )}
+                {!currentPlaceId && !form.googleMapsUrl && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    الصق رابط المكان من Google Maps لجلب الهاتف والموقع والمدينة تلقائياً
+                  </p>
+                )}
+              </div>
             </TabsContent>
 
             {/* ===== تبويب السوشيال ميديا ===== */}

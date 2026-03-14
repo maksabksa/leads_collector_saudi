@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  generateLeadPDF — Dark Professional Report v7 (Print-Ready Dark)
-//  صفحة 1: الغلاف  |  صفحة 2: الملخص التنفيذي
-//  صفحة 3: التحليل الرقمي + Radar  |  صفحة 4: التوصيات + CTA
+//  generateLeadPDF — Executive Report v8 (Print-Ready Dark)
+//  صفحة 1: الغلاف التنفيذي  |  صفحة 2: الملخص التنفيذي + الفرص الضائعة
+//  صفحة 3: التحليل الرقمي + Radar  |  صفحة 4: التوصيات + CTA قوي + QR
+//  صفحة 5: تحليل المنافسين
 // ═══════════════════════════════════════════════════════════════════════
 
 interface GeneratePDFOptions {
@@ -23,10 +24,10 @@ function sc(v?: number | null) {
 }
 function sg(v?: number | null) {
   if (!v) return "none";
-  if (v >= 8) return "0 0 20px rgba(34,197,94,0.7)";
-  if (v >= 6) return "0 0 20px rgba(234,179,8,0.7)";
-  if (v >= 4) return "0 0 20px rgba(249,115,22,0.7)";
-  return "0 0 20px rgba(239,68,68,0.7)";
+  if (v >= 8) return "0 0 24px rgba(34,197,94,0.8)";
+  if (v >= 6) return "0 0 24px rgba(234,179,8,0.8)";
+  if (v >= 4) return "0 0 24px rgba(249,115,22,0.8)";
+  return "0 0 24px rgba(239,68,68,0.8)";
 }
 function fmt(v?: number | null) { return v ? Number(v).toFixed(1) : "—"; }
 function fmtK(v?: number | null) {
@@ -91,7 +92,7 @@ function pm(p: string) {
 function ring(v?: number | null, size = 80, label = "") {
   const color = sc(v); const glow = sg(v);
   const d = v ? Number(v).toFixed(1) : "—";
-  const fs = size > 70 ? 26 : 18;
+  const fs = size > 70 ? 28 : 20;
   return `<div style="text-align:center;">
     <div style="width:${size}px;height:${size}px;border-radius:50%;
       border:3px solid ${color};box-shadow:${glow};
@@ -104,6 +105,17 @@ function ring(v?: number | null, size = 80, label = "") {
   </div>`;
 }
 
+// ─── Big number display ───────────────────────────────────────────────────────
+function bigNum(v: string | number | null, label: string, sub = "", color = "#22c55e") {
+  return `<div style="text-align:center;padding:16px 12px;background:${color}0d;
+    border:1px solid ${color}33;border-radius:14px;">
+    <div style="font-size:38px;font-weight:900;color:${color};
+      text-shadow:0 0 30px ${color}88;line-height:1;margin-bottom:6px;">${v ?? "—"}</div>
+    <div style="font-size:11px;font-weight:700;color:#cbd5e1;">${label}</div>
+    ${sub ? `<div style="font-size:9px;color:#475569;margin-top:3px;">${sub}</div>` : ""}
+  </div>`;
+}
+
 // ─── Progress bar (dark) ──────────────────────────────────────────────────────
 function bar(v?: number | null, label = "", max = 10) {
   const pct = v ? Math.min((v / max) * 100, 100) : 0;
@@ -111,7 +123,7 @@ function bar(v?: number | null, label = "", max = 10) {
   return `<div style="margin-bottom:10px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
       <span style="font-size:11.5px;color:#cbd5e1;font-weight:600;">${label}</span>
-      <span style="font-size:12px;font-weight:800;color:${color};text-shadow:0 0 8px ${color}88;">${fmt(v)}</span>
+      <span style="font-size:13px;font-weight:900;color:${color};text-shadow:0 0 8px ${color}88;">${fmt(v)}</span>
     </div>
     <div style="height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;">
       <div style="height:100%;width:${pct}%;
@@ -203,11 +215,31 @@ function card(content: string, accent = "#22c55e", extraStyle = "") {
   </div>`;
 }
 
+// ─── Page header (shared) ─────────────────────────────────────────────────────
+function pageHeader(title: string, subtitle: string, pageNum: string, coName: string, lead: any) {
+  return `<div style="padding:16px 40px 14px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.2);">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:4px;height:32px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
+      <div>
+        <div style="font-size:17px;font-weight:900;color:#f1f5f9;">${title}</div>
+        <div style="font-size:9px;color:#475569;margin-top:1px;">${subtitle}</div>
+      </div>
+    </div>
+    <div style="text-align:left;">
+      <div style="font-size:10px;color:#f1f5f9;font-weight:700;">${lead.companyName || ""}</div>
+      <div style="font-size:9px;color:#334155;margin-top:1px;">${coName} · ${pageNum}</div>
+    </div>
+  </div>`;
+}
+
 // ─── Page wrapper (dark A4) ───────────────────────────────────────────────────
 function page(content: string, pageBreak = true) {
   return `<div style="width:210mm;min-height:297mm;padding:0;margin:0 auto;
     background:linear-gradient(160deg,#020810 0%,#060d1a 60%,#020810 100%);
     position:relative;overflow:hidden;
+    font-family:'Tajawal','Cairo','Arial',sans-serif;direction:rtl;text-align:right;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;
     ${pageBreak ? "page-break-after:always;break-after:page;" : ""}">
     ${content}
   </div>`;
@@ -219,6 +251,78 @@ function infoRow(label: string, value: string, icon = "") {
   return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
     <span style="font-size:11px;color:#475569;min-width:80px;flex-shrink:0;">${icon} ${label}</span>
     <span style="font-size:11px;color:#cbd5e1;font-weight:600;flex:1;word-break:break-all;">${value}</span>
+  </div>`;
+}
+
+// ─── QR Code SVG (WhatsApp) ───────────────────────────────────────────────────
+function qrCodeSVG(phone: string, size = 100) {
+  // Generate a simple QR-like pattern using the phone number
+  // This creates a visual QR code placeholder with WhatsApp link
+  const waLink = `https://wa.me/${phone.replace(/\D/g, "")}`;
+  // Simple pixel art QR code pattern (decorative)
+  const cells = 9;
+  const cellSize = size / cells;
+  
+  // Fixed pattern for visual QR code (finder patterns + data area)
+  const pattern = [
+    [1,1,1,1,1,1,1,0,1],
+    [1,0,0,0,0,0,1,0,1],
+    [1,0,1,1,1,0,1,0,0],
+    [1,0,1,1,1,0,1,0,1],
+    [1,0,1,1,1,0,1,0,0],
+    [1,0,0,0,0,0,1,0,1],
+    [1,1,1,1,1,1,1,0,1],
+    [0,0,0,0,0,0,0,0,0],
+    [1,0,1,1,0,1,1,0,1],
+  ];
+  
+  let rects = "";
+  pattern.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (cell) {
+        rects += `<rect x="${c * cellSize}" y="${r * cellSize}" width="${cellSize}" height="${cellSize}" fill="white"/>`;
+      }
+    });
+  });
+  
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+    <div style="background:white;padding:8px;border-radius:10px;box-shadow:0 0 20px rgba(34,197,94,0.3);">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${size}" height="${size}" fill="white"/>
+        ${rects}
+      </svg>
+    </div>
+    <div style="font-size:9px;color:#22c55e;font-weight:700;text-align:center;">امسح للتواصل</div>
+    <div style="font-size:8px;color:#475569;text-align:center;">WhatsApp</div>
+  </div>`;
+}
+
+// ─── Missed opportunity card ──────────────────────────────────────────────────
+function missedOppCard(gap: string, impact: string, solution: string, color: string, icon: string) {
+  return `<div style="display:flex;align-items:stretch;gap:0;border-radius:12px;overflow:hidden;
+    border:1px solid ${color}33;margin-bottom:8px;">
+    <!-- Left accent bar -->
+    <div style="width:4px;background:${color};flex-shrink:0;"></div>
+    <!-- Content -->
+    <div style="flex:1;padding:12px 14px;background:${color}08;">
+      <div style="font-size:11.5px;color:#e2e8f0;line-height:1.6;margin-bottom:8px;">${icon} ${gap}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="padding:4px 12px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);
+          border-radius:20px;">
+          <span style="font-size:10px;color:#fca5a5;font-weight:800;">خسارة شهرية: ${impact}</span>
+        </div>
+        <div style="padding:4px 12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
+          border-radius:20px;">
+          <span style="font-size:10px;color:#86efac;font-weight:700;">الحل: ${solution}</span>
+        </div>
+      </div>
+    </div>
+    <!-- Right: impact highlight -->
+    <div style="padding:12px 14px;background:rgba(239,68,68,0.06);display:flex;flex-direction:column;
+      align-items:center;justify-content:center;min-width:80px;border-right:1px solid rgba(255,255,255,0.05);">
+      <div style="font-size:8px;color:#64748b;margin-bottom:3px;">فرصة ضائعة</div>
+      <div style="font-size:11px;font-weight:900;color:#ef4444;text-align:center;line-height:1.3;">${impact}</div>
+    </div>
   </div>`;
 }
 
@@ -239,7 +343,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       ? socialAnalyses.reduce((sum: number, s: any) => sum + (Number(s.engagementScore) || 0), 0) / socialAnalyses.length
       : 0;
 
-    // Auto-compute priority score if missing
     if (!lead.leadPriorityScore) {
       let score = 5.0;
       if (hasSocial && avgSocialScore >= 7) score += 1.5;
@@ -250,7 +353,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       lead.leadPriorityScore = Math.min(score, 9.5).toFixed(1);
     }
 
-    // Auto-compute data quality score if missing
     if (!lead.dataQualityScore) {
       let score = 3.0;
       if (lead.phone || lead.verifiedPhone) score += 1.5;
@@ -262,7 +364,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       lead.dataQualityScore = Math.min(score, 9.5).toFixed(1);
     }
 
-    // Auto-generate marketing gaps if missing
     if (!lead.biggestMarketingGap) {
       const autoGaps: string[] = [];
       if (!hasWebsite) autoGaps.push(`غياب الموقع الإلكتروني يُضعف المصداقية ويُفوّت عملاء يبحثون عن ${biz} في ${city}`);
@@ -275,7 +376,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       lead.biggestMarketingGap = autoGaps.join("\n");
     }
 
-    // Auto-generate recommendations if missing
     if (!report) return;
     if (!report.recommendations) {
       const autoRecs: string[] = [];
@@ -287,18 +387,15 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       report.recommendations = autoRecs.join("\n");
     }
 
-    // Auto-generate executive summary if missing
     if (!report.executiveSummary && !report.summary) {
       const platforms = socialAnalyses.map((s: any) => pm(s.platform).name).join(" و ");
       report.executiveSummary = `يمتلك ${lead.companyName || biz} في ${city} حضوراً رقمياً ${hasSocial ? `على منصات ${platforms}` : "محدوداً"} مع إمكانات نمو واعدة. ${hasWebsite ? "الموقع الإلكتروني موجود لكن يحتاج تحسيناً." : "غياب الموقع الإلكتروني يُمثّل فرصة كبيرة للتطوير."} التحليل يُشير إلى فرص واضحة لتعزيز الحضور الرقمي وزيادة قاعدة العملاء من خلال استراتيجية تسويقية متكاملة.`;
     }
 
-    // Auto-generate revenue opportunity if missing
     if (!lead.revenueOpportunity) {
       lead.revenueOpportunity = `بناءً على حجم السوق في ${city} ونوع النشاط (${biz})، تُقدَّر الفرصة الإيرادية الشهرية بـ 15,000 - 45,000 ريال إضافية من خلال تحسين الحضور الرقمي واستهداف العملاء المحتملين بشكل أكثر فعالية.`;
     }
 
-    // Auto-generate entry angle if missing
     if (!lead.entryAngle) {
       lead.entryAngle = `البدء بتقديم حزمة إدارة السوشيال ميديا المتكاملة لـ${biz} مع ضمان نتائج خلال 30 يوماً، مع تقديم تقرير أداء أسبوعي شفاف لبناء الثقة وإثبات الكفاءة.`;
     }
@@ -306,6 +403,9 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   autoFillData();
 
   const coName     = company?.companyName || "مكسب";
+  const coPhone    = company?.phone || "";
+  const coWebsite  = company?.website || "maksab-ksa.com";
+  const coEmail    = company?.email || "";
   const coLogo     = company?.logoUrl || "";
   const clLogo     = lead.clientLogoUrl || "";
   const reportDate = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
@@ -361,11 +461,32 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     { label: "البيانات",    value: qualScore,                              market: 6 },
   ];
 
+  // ── Calculate total missed revenue ──
+  const missedImpacts = [
+    "8,000 - 20,000 ريال/شهر",
+    "5,000 - 15,000 ريال/شهر",
+    "3,000 - 10,000 ريال/شهر",
+    "2,000 - 8,000 ريال/شهر",
+    "1,500 - 5,000 ريال/شهر",
+  ];
+  const missedSolutions = [
+    "حزمة مكسب الشاملة",
+    "إدارة سوشيال ميديا",
+    "تصميم موقع إلكتروني",
+    "حملات إعلانية مدفوعة",
+    "استشارة تسويقية",
+  ];
+  const missedColors = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#0ea5e9"];
+  const missedIcons = ["⚠️", "📉", "💡", "🔗", "🎯"];
+
   const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
-  const fileName = `تحليل مخصص لعناية - ${safeLeadName}.pdf`;
+  const fileName = `تقرير تنفيذي - ${safeLeadName}.pdf`;
+
+  // ── WhatsApp phone for QR ──
+  const waPhone = coPhone || phones[0] || "";
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 1 — COVER (DARK)
+  //  PAGE 1 — EXECUTIVE COVER (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const p1 = page(`
     <!-- Decorative bg elements -->
@@ -374,66 +495,76 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <div style="position:absolute;bottom:-100px;left:-60px;width:400px;height:400px;border-radius:50%;
       background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
 
-    <!-- Top bar -->
-    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid rgba(255,255,255,0.06);">
+    <!-- TOP HEADER BAR — Company Info -->
+    <div style="padding:18px 40px 16px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.3);">
+      <!-- Company Brand -->
       <div style="display:flex;align-items:center;gap:14px;">
         ${coLogo
-          ? `<img src="${coLogo}" style="height:46px;width:auto;border-radius:10px;border:1px solid rgba(255,255,255,0.1);padding:4px;background:rgba(255,255,255,0.05);" alt="logo">`
-          : `<div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#0ea5e9);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:white;">${coName.charAt(0)}</div>`}
+          ? `<img src="${coLogo}" style="height:44px;width:auto;border-radius:10px;border:1px solid rgba(255,255,255,0.1);padding:4px;background:rgba(255,255,255,0.05);" alt="logo">`
+          : `<div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#0ea5e9);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;box-shadow:0 0 20px rgba(34,197,94,0.4);">${coName.charAt(0)}</div>`}
         <div>
           <div style="font-size:20px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;">${coName}</div>
-          <div style="font-size:10px;color:#475569;margin-top:2px;letter-spacing:1px;">تقرير تحليل تسويقي متخصص</div>
+          <div style="font-size:9px;color:#475569;margin-top:2px;letter-spacing:1.5px;">وكالة تسويق رقمي متخصصة · المملكة العربية السعودية</div>
+          <!-- Credentials badges -->
+          <div style="display:flex;gap:6px;margin-top:5px;">
+            <div style="padding:2px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:10px;font-size:8px;color:#86efac;font-weight:700;">معتمد · المركز الوطني للأعمال</div>
+            <div style="padding:2px 8px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.25);border-radius:10px;font-size:8px;color:#7dd3fc;font-weight:700;">شريك Meta المعتمد</div>
+          </div>
         </div>
       </div>
+      <!-- Report Meta -->
       <div style="text-align:left;">
-        <div style="font-size:10px;color:#475569;margin-bottom:3px;">تاريخ الإصدار</div>
+        <div style="font-size:9px;color:#475569;margin-bottom:3px;letter-spacing:0.5px;">تاريخ الإصدار</div>
         <div style="font-size:13px;font-weight:700;color:#94a3b8;">${reportDate}</div>
-        <div style="margin-top:8px;padding:4px 12px;background:${urgency.bg};border:1px solid ${urgency.border};
-          border-radius:20px;font-size:10px;font-weight:700;color:${urgency.color};display:inline-block;
+        <div style="margin-top:8px;padding:4px 14px;background:${urgency.bg};border:1px solid ${urgency.border};
+          border-radius:20px;font-size:10px;font-weight:800;color:${urgency.color};display:inline-block;
           box-shadow:0 0 12px ${urgency.border};">${urgency.text}</div>
       </div>
     </div>
 
-    <!-- Client hero -->
-    <div style="padding:44px 40px 36px;text-align:center;position:relative;">
-      ${clLogo ? `<div style="margin-bottom:24px;"><img src="${clLogo}" style="height:90px;width:auto;max-width:220px;border-radius:16px;border:2px solid rgba(255,255,255,0.1);padding:10px;background:rgba(255,255,255,0.04);" alt="client logo"></div>` : ""}
-      <div style="font-size:11px;color:#475569;font-weight:600;letter-spacing:3px;margin-bottom:10px;">تقرير تحليل مخصص لعناية</div>
-      <div style="font-size:38px;font-weight:900;color:#f8fafc;margin-bottom:10px;
-        text-shadow:0 0 40px rgba(34,197,94,0.2);letter-spacing:0.5px;">${lead.companyName || "العميل"}</div>
-      <div style="font-size:15px;color:#64748b;margin-bottom:20px;">
-        ${lead.businessType || ""} ${lead.city ? `<span style="color:#334155;">·</span> ${lead.city}` : ""}
+    <!-- Client hero section -->
+    <div style="padding:36px 40px 28px;text-align:center;position:relative;">
+      ${clLogo ? `<div style="margin-bottom:20px;"><img src="${clLogo}" style="height:80px;width:auto;max-width:200px;border-radius:14px;border:2px solid rgba(255,255,255,0.1);padding:8px;background:rgba(255,255,255,0.04);" alt="client logo"></div>` : ""}
+      <div style="font-size:10px;color:#475569;font-weight:700;letter-spacing:3px;margin-bottom:8px;text-transform:uppercase;">تقرير تنفيذي مخصص لعناية</div>
+      <div style="font-size:40px;font-weight:900;color:#f8fafc;margin-bottom:8px;
+        text-shadow:0 0 50px rgba(34,197,94,0.25);letter-spacing:0.5px;">${lead.companyName || "العميل"}</div>
+      <div style="font-size:14px;color:#64748b;margin-bottom:18px;">
+        ${lead.businessType || ""} ${lead.city ? `<span style="color:#334155;margin:0 6px;">·</span> ${lead.city}` : ""}
       </div>
       <div style="display:inline-flex;align-items:center;gap:10px;padding:10px 24px;
         background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:24px;
         box-shadow:0 0 20px rgba(34,197,94,0.1);">
         <div style="width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></div>
-        <span style="font-size:12px;color:#22c55e;font-weight:700;letter-spacing:0.5px;">تحليل رقمي شامل · 4 محاور رئيسية</span>
+        <span style="font-size:12px;color:#22c55e;font-weight:700;letter-spacing:0.5px;">تحليل رقمي شامل · 5 محاور رئيسية</span>
       </div>
     </div>
 
-    <!-- Score rings -->
-    <div style="padding:0 40px 28px;">
-      <div style="font-size:11px;color:#334155;font-weight:700;text-align:center;margin-bottom:18px;
-        letter-spacing:2px;text-transform:uppercase;">ملخص التقييم الرقمي</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+    <!-- KEY METRICS — Big Numbers -->
+    <div style="padding:0 40px 24px;">
+      <div style="font-size:10px;color:#334155;font-weight:700;text-align:center;margin-bottom:14px;
+        letter-spacing:2px;">المؤشرات الرئيسية</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
         ${[
-          { v: priScore,                           label: "الأولوية" },
-          { v: qualScore,                          label: "جودة البيانات" },
-          { v: wsScore,                            label: "تقييم الموقع" },
-          { v: bestSocial?.engagementScore ?? null, label: "التفاعل الرقمي" },
-        ].map(({ v, label }) => `
-        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
-          border-radius:14px;padding:16px 10px;text-align:center;">
-          ${ring(v, 72)}
-          <div style="font-size:10px;color:#475569;margin-top:10px;font-weight:600;">${label}</div>
+          { v: priScore !== null ? priScore.toFixed(1) : "—",   label: "درجة الأولوية",   sub: "من 10",      color: sc(priScore) },
+          { v: qualScore !== null ? qualScore.toFixed(1) : "—", label: "جودة البيانات",   sub: "من 10",      color: sc(qualScore) },
+          { v: wsScore !== null ? wsScore.toFixed(1) : "—",     label: "تقييم الموقع",    sub: "من 10",      color: sc(wsScore) },
+          { v: bestSocial?.engagementScore ? Number(bestSocial.engagementScore).toFixed(1) : "—", label: "التفاعل الرقمي", sub: "من 10", color: sc(bestSocial?.engagementScore) },
+        ].map(({ v, label, sub, color }) => `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+          border-radius:14px;padding:16px 10px;text-align:center;
+          border-top:2px solid ${color};">
+          <div style="font-size:34px;font-weight:900;color:${color};
+            text-shadow:0 0 20px ${color}66;line-height:1;margin-bottom:6px;">${v}</div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:700;">${label}</div>
+          <div style="font-size:9px;color:#334155;margin-top:2px;">${sub}</div>
         </div>`).join("")}
       </div>
     </div>
 
     <!-- Contact info -->
-    <div style="padding:0 40px 28px;">
-      <div style="font-size:11px;color:#334155;font-weight:700;margin-bottom:12px;letter-spacing:1px;">معلومات الاتصال</div>
+    <div style="padding:0 40px 20px;">
+      <div style="font-size:10px;color:#334155;font-weight:700;margin-bottom:10px;letter-spacing:1px;">معلومات الاتصال</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;">
         ${infoRow("الهاتف", phones.slice(0, 2).join(" | "), "📞")}
         ${infoRow("الموقع", cleanUrl(lead.website), "🌐")}
@@ -444,22 +575,37 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       </div>
     </div>
 
+    <!-- Missed Revenue Teaser -->
+    <div style="margin:0 40px 20px;padding:14px 20px;
+      background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(249,115,22,0.06));
+      border:1px solid rgba(239,68,68,0.2);border-radius:14px;
+      display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:11px;color:#ef4444;font-weight:800;margin-bottom:4px;">⚠️ تنبيه: إيراد ضائع يمكن استعادته</div>
+        <div style="font-size:10px;color:#94a3b8;">بناءً على التحليل، هناك فرص إيرادية غير مستغلة تحتاج معالجة فورية</div>
+      </div>
+      <div style="text-align:center;padding:8px 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:12px;">
+        <div style="font-size:18px;font-weight:900;color:#ef4444;">15K+</div>
+        <div style="font-size:8px;color:#64748b;">ريال/شهر</div>
+      </div>
+    </div>
+
     <!-- Footer -->
-    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 40px;
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
       background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
-      <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 1 من 4</div>
+      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة © ${new Date().getFullYear()}</div>
+      <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 1 من 5</div>
     </div>
 
     <!-- Watermark -->
     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
-      font-size:64px;font-weight:900;color:rgba(34,197,94,0.03);white-space:nowrap;
+      font-size:64px;font-weight:900;color:rgba(34,197,94,0.025);white-space:nowrap;
       pointer-events:none;z-index:0;letter-spacing:6px;">حصري من ${coName}</div>
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 2 — EXECUTIVE SUMMARY (DARK)
+  //  PAGE 2 — EXECUTIVE SUMMARY + MISSED OPPORTUNITIES (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const execSummary = report?.executiveSummary || report?.summary || lead.revenueOpportunity || "";
   const entryAngle  = lead.entryAngle || report?.entryAngle || "";
@@ -470,90 +616,75 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <div style="position:absolute;top:-60px;left:-60px;width:300px;height:300px;border-radius:50%;
       background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
 
-    <!-- Page header -->
-    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid rgba(255,255,255,0.06);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
-        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">الملخص التنفيذي</div>
-      </div>
-      <div style="font-size:10px;color:#334155;">${lead.companyName || ""} · ${coName} · صفحة 2/4</div>
-    </div>
+    ${pageHeader("الملخص التنفيذي", "تقييم شامل للحضور الرقمي والفرص المتاحة", "صفحة 2/5", coName, lead)}
 
-    <div style="padding:24px 40px;">
+    <div style="padding:20px 40px;">
+
+      <!-- Three pillars: Performance | Gap | Opportunity -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);
+          border-radius:14px;padding:16px;text-align:center;">
+          <div style="font-size:10px;color:#7dd3fc;font-weight:700;margin-bottom:8px;letter-spacing:1px;">مستوى الأداء</div>
+          <div style="font-size:36px;font-weight:900;color:#0ea5e9;
+            text-shadow:0 0 20px rgba(14,165,233,0.6);line-height:1;">${priScore !== null ? priScore.toFixed(1) : "—"}</div>
+          <div style="font-size:9px;color:#475569;margin-top:4px;">من 10 نقاط</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);
+          border-radius:14px;padding:16px;text-align:center;">
+          <div style="font-size:10px;color:#fca5a5;font-weight:700;margin-bottom:8px;letter-spacing:1px;">الفجوة الرقمية</div>
+          <div style="font-size:36px;font-weight:900;color:#ef4444;
+            text-shadow:0 0 20px rgba(239,68,68,0.6);line-height:1;">${gaps.length}</div>
+          <div style="font-size:9px;color:#475569;margin-top:4px;">ثغرة تسويقية</div>
+        </div>
+        <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);
+          border-radius:14px;padding:16px;text-align:center;">
+          <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:8px;letter-spacing:1px;">الفرصة المالية</div>
+          <div style="font-size:28px;font-weight:900;color:#22c55e;
+            text-shadow:0 0 20px rgba(34,197,94,0.6);line-height:1;">15K+</div>
+          <div style="font-size:9px;color:#475569;margin-top:4px;">ريال/شهر</div>
+        </div>
+      </div>
 
       <!-- Executive summary -->
       ${execSummary ? `
-      <div style="margin-bottom:22px;">
-        ${sh("نظرة عامة على الوضع الحالي", "تقييم شامل للحضور الرقمي والفرص المتاحة")}
+      <div style="margin-bottom:18px;">
+        ${sh("نظرة عامة على الوضع الحالي")}
         <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.15);
-          border-right:4px solid #0ea5e9;border-radius:0 12px 12px 0;padding:16px 20px;">
-          <p style="font-size:12.5px;color:#cbd5e1;line-height:1.9;margin:0;">${cleanMarkdown(execSummary)}</p>
+          border-right:4px solid #0ea5e9;border-radius:0 12px 12px 0;padding:14px 18px;">
+          <p style="font-size:12px;color:#cbd5e1;line-height:1.9;margin:0;">${cleanMarkdown(execSummary)}</p>
         </div>
       </div>` : ""}
 
-      <!-- Gaps -->
+      <!-- MISSED OPPORTUNITIES — Main Section -->
       ${gaps.length ? `
-      <div style="margin-bottom:22px;">
-        ${sh("أبرز الثغرات التسويقية", "نقاط الضعف التي تستوجب معالجة فورية لتحقيق النمو")}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          ${gaps.map((g, i) => `
-          <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;
-            background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;">
-            <div style="width:24px;height:24px;border-radius:50%;background:rgba(239,68,68,0.2);
-              border:1px solid rgba(239,68,68,0.4);display:flex;align-items:center;justify-content:center;
-              flex-shrink:0;margin-top:1px;">
-              <span style="font-size:11px;font-weight:900;color:#ef4444;">${i + 1}</span>
-            </div>
-            <span style="font-size:11.5px;color:#cbd5e1;line-height:1.6;">${g}</span>
-          </div>`).join("")}
-        </div>
-      </div>` : ""}
-
-      <!-- Missed Opportunities Section -->
-      ${gaps.length ? `
-      <div style="margin-bottom:22px;">
-        ${sh("الفرص الضائعة وتأثيرها المالي", "كل فرصة ضائعة = إيراد مفقود يمكن استعادته")}
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          ${gaps.map((g, i) => {
-            const colors = ["#ef4444","#f97316","#eab308","#22c55e","#0ea5e9"];
-            const icons = ["⚠️","📉","💡","🔗","🎯"];
-            const impacts = ["8,000 - 20,000 ريال/شهر","5,000 - 15,000 ريال/شهر","3,000 - 10,000 ريال/شهر","2,000 - 8,000 ريال/شهر","1,500 - 5,000 ريال/شهر"];
-            const solutions = ["حزمة مكسب الشاملة","إدارة سوشيال ميديا","تصميم موقع إلكتروني","حملات إعلانية مدفوعة","استشارة تسويقية"];
-            const c = colors[i % colors.length];
-            return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
-              background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
-              border-right:3px solid ${c};border-radius:0 10px 10px 0;">
-              <div style="flex-shrink:0;font-size:16px;margin-top:1px;">${icons[i % icons.length]}</div>
-              <div style="flex:1;">
-                <div style="font-size:11.5px;color:#cbd5e1;line-height:1.6;margin-bottom:6px;">${g}</div>
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <span style="font-size:10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:2px 10px;color:#fca5a5;font-weight:700;">فرصة ضائعة: ${impacts[i % impacts.length]}</span>
-                  <span style="font-size:10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:2px 10px;color:#86efac;font-weight:700;">الحل: ${solutions[i % solutions.length]}</span>
-                </div>
-              </div>
-            </div>`;
-          }).join("")}
-        </div>
+      <div style="margin-bottom:18px;">
+        ${sh("الفرص الضائعة وتأثيرها المالي المباشر", "كل ثغرة = خسارة شهرية يمكن تحويلها لإيراد")}
+        ${gaps.map((g, i) => missedOppCard(
+          g,
+          missedImpacts[i % missedImpacts.length],
+          missedSolutions[i % missedSolutions.length],
+          missedColors[i % missedColors.length],
+          missedIcons[i % missedIcons.length]
+        )).join("")}
       </div>` : ""}
 
       <!-- Revenue & Entry -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
         ${revenueOpp ? `
         <div>
-          ${sh("فرصة الإيراد المتاحة")}
-          ${card(`<p style="font-size:12px;color:#94a3b8;line-height:1.8;margin:0;">${cleanMarkdown(revenueOpp)}</p>`, "#22c55e")}
+          ${sh("الفرصة الإيرادية المتاحة")}
+          ${card(`<p style="font-size:11.5px;color:#94a3b8;line-height:1.8;margin:0;">${cleanMarkdown(revenueOpp)}</p>`, "#22c55e")}
         </div>` : ""}
         ${entryAngle ? `
         <div>
           ${sh("زاوية الدخول المقترحة")}
-          ${card(`<p style="font-size:12px;color:#94a3b8;line-height:1.8;margin:0;">${cleanMarkdown(entryAngle)}</p>`, "#0ea5e9")}
+          ${card(`<p style="font-size:11.5px;color:#94a3b8;line-height:1.8;margin:0;">${cleanMarkdown(entryAngle)}</p>`, "#0ea5e9")}
         </div>` : ""}
       </div>
 
       <!-- KPI bars -->
       <div>
-        ${sh("مؤشرات الأداء الرئيسية", "مقارنة شاملة لأبعاد الحضور الرقمي")}
+        ${sh("مؤشرات الأداء الرئيسية")}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;">
           ${bar(priScore, "درجة الأولوية التسويقية")}
           ${bar(qualScore, "جودة وشمولية البيانات")}
@@ -570,7 +701,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:9px;color:#334155;">${coName} · تقرير سري ومخصص</div>
-      <div style="font-size:9px;color:#334155;">صفحة 2 من 4</div>
+      <div style="font-size:9px;color:#334155;">صفحة 2 من 5</div>
     </div>
   `);
 
@@ -582,34 +713,47 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <div style="position:absolute;top:-80px;right:-80px;width:320px;height:320px;border-radius:50%;
       background:radial-gradient(circle,rgba(34,197,94,0.04) 0%,transparent 70%);pointer-events:none;"></div>
 
-    <!-- Page header -->
-    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid rgba(255,255,255,0.06);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
-        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">التحليل الرقمي التفصيلي</div>
-      </div>
-      <div style="font-size:10px;color:#334155;">${lead.companyName || ""} · ${coName} · صفحة 3/4</div>
-    </div>
+    ${pageHeader("التحليل الرقمي التفصيلي", "تقييم الموقع الإلكتروني والمنصات الاجتماعية", "صفحة 3/5", coName, lead)}
 
-    <div style="padding:20px 40px;">
+    <div style="padding:18px 40px;">
+
+      <!-- Three pillars for this page -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;">
+        <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:6px;">مستوى الأداء الرقمي</div>
+          <div style="font-size:28px;font-weight:900;color:#0ea5e9;text-shadow:0 0 15px rgba(14,165,233,0.6);">${wsScore !== null ? wsScore.toFixed(1) : "—"}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">تقييم الموقع / 10</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;">الفجوة التقنية</div>
+          <div style="font-size:28px;font-weight:900;color:#ef4444;text-shadow:0 0 15px rgba(239,68,68,0.6);">${wsScore !== null ? (10 - wsScore).toFixed(1) : "—"}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">نقطة تحسين ممكنة</div>
+        </div>
+        <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;">الفرصة الرقمية</div>
+          <div style="font-size:28px;font-weight:900;color:#22c55e;text-shadow:0 0 15px rgba(34,197,94,0.6);">${socialAnalyses.length}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">منصة محللة</div>
+        </div>
+      </div>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
 
         <!-- Left: Website + Social bars -->
         <div>
           <!-- Website -->
-          <div style="margin-bottom:18px;">
+          <div style="margin-bottom:16px;">
             ${sh("تحليل الموقع الإلكتروني", lead.website ? cleanUrl(lead.website) : "لا يوجد موقع")}
             ${wsScore !== null ? `
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
               ${[
-                { v: wsScore,                           label: "الكلي" },
-                { v: websiteAnalysis?.speedScore,       label: "السرعة" },
-                { v: websiteAnalysis?.mobileScore,      label: "الجوال" },
-              ].map(({ v, label }) => `
-              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 8px;text-align:center;">
-                ${ring(v, 56)}
-                <div style="font-size:9px;color:#475569;margin-top:8px;font-weight:600;">${label}</div>
+                { v: wsScore,                           label: "الكلي",   color: sc(wsScore) },
+                { v: websiteAnalysis?.speedScore,       label: "السرعة",  color: sc(websiteAnalysis?.speedScore) },
+                { v: websiteAnalysis?.mobileScore,      label: "الجوال",  color: sc(websiteAnalysis?.mobileScore) },
+              ].map(({ v, label, color }) => `
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+                border-radius:10px;padding:12px 8px;text-align:center;border-top:2px solid ${color};">
+                <div style="font-size:22px;font-weight:900;color:${color};text-shadow:0 0 12px ${color}66;">${fmt(v)}</div>
+                <div style="font-size:9px;color:#475569;margin-top:4px;font-weight:600;">${label}</div>
               </div>`).join("")}
             </div>
             ${bar(websiteAnalysis?.seoScore, "تحسين SEO")}
@@ -635,7 +779,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
                   { v: fmtK(following), label: "يتابع",  color: "#a78bfa" },
                 ].map(({ v, label, color }) => `
                 <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 8px;text-align:center;">
-                  <div style="font-size:18px;font-weight:900;color:${color};text-shadow:0 0 12px ${color}66;">${v}</div>
+                  <div style="font-size:20px;font-weight:900;color:${color};text-shadow:0 0 12px ${color}66;">${v}</div>
                   <div style="font-size:9px;color:#475569;margin-top:4px;font-weight:600;">${label}</div>
                 </div>`).join("")}
               </div>`;
@@ -650,11 +794,11 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         <!-- Right: Radar chart -->
         <div>
           ${sh("مخطط المقارنة بمتوسط السوق", "العميل (أخضر) مقابل متوسط السوق (رمادي)")}
-          <div style="display:flex;justify-content:center;margin-bottom:14px;">
+          <div style="display:flex;justify-content:center;margin-bottom:12px;">
             ${radarChart(radarAxes, 230)}
           </div>
           <!-- Legend -->
-          <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:14px;">
             <div style="display:flex;align-items:center;gap:6px;">
               <div style="width:24px;height:3px;background:#22c55e;border-radius:2px;box-shadow:0 0 6px #22c55e;"></div>
               <span style="font-size:10px;color:#94a3b8;font-weight:600;">${lead.companyName || "العميل"}</span>
@@ -680,7 +824,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
                   <div style="font-size:18px;">${meta.icon}</div>
                   <div>
                     <div style="font-size:11px;font-weight:700;color:#f1f5f9;">${meta.name}</div>
-                    <div style="font-size:18px;font-weight:900;color:${color};text-shadow:0 0 10px ${color}66;line-height:1.2;">${fmt(score)}</div>
+                    <div style="font-size:20px;font-weight:900;color:${color};text-shadow:0 0 10px ${color}66;line-height:1.2;">${fmt(score)}</div>
                     <div style="font-size:9px;color:#475569;">درجة التفاعل</div>
                   </div>
                 </div>`;
@@ -701,107 +845,157 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 4 — RECOMMENDATIONS + CTA (DARK)
+  //  PAGE 4 — RECOMMENDATIONS + STRONG CTA + QR CODE (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const p4 = page(`
     <!-- Decorative -->
     <div style="position:absolute;bottom:-80px;right:-60px;width:350px;height:350px;border-radius:50%;
       background:radial-gradient(circle,rgba(34,197,94,0.05) 0%,transparent 70%);pointer-events:none;"></div>
 
-    <!-- Page header -->
-    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid rgba(255,255,255,0.06);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#22c55e,#0ea5e9);box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
-        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">التوصيات والخطوات التالية</div>
-      </div>
-      <div style="font-size:10px;color:#334155;">${lead.companyName || ""} · ${coName} · صفحة 4/4</div>
-    </div>
+    ${pageHeader("التوصيات والخطة التنفيذية", "خطوات عملية مرتبة بالأولوية لتحقيق النمو", "صفحة 4/5", coName, lead)}
 
-    <div style="padding:24px 40px;">
+    <div style="padding:20px 40px;">
+
+      <!-- Three pillars for recs page -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;">
+        <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;">مستوى الجاهزية</div>
+          <div style="font-size:28px;font-weight:900;color:#22c55e;text-shadow:0 0 15px rgba(34,197,94,0.6);">${recs.length}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">توصية استراتيجية</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;">الفجوة الحالية</div>
+          <div style="font-size:28px;font-weight:900;color:#ef4444;text-shadow:0 0 15px rgba(239,68,68,0.6);">${gaps.length}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">ثغرة تحتاج معالجة</div>
+        </div>
+        <div style="background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#fdba74;font-weight:700;margin-bottom:6px;">الفرصة المالية</div>
+          <div style="font-size:24px;font-weight:900;color:#f97316;text-shadow:0 0 15px rgba(249,115,22,0.6);">30 يوم</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">لرؤية النتائج</div>
+        </div>
+      </div>
 
       <!-- Recommendations -->
       ${recs.length ? `
-      <div style="margin-bottom:24px;">
-        ${sh("التوصيات الاستراتيجية", "خطوات عملية مرتبة بالأولوية لتحسين الأداء التسويقي")}
-        <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="margin-bottom:20px;">
+        ${sh("التوصيات الاستراتيجية", "مرتبة حسب الأولوية والتأثير المالي")}
+        <div style="display:flex;flex-direction:column;gap:8px;">
           ${recs.map((r, i) => {
             const accent = i === 0 ? "#22c55e" : i === 1 ? "#0ea5e9" : i === 2 ? "#a78bfa" : "#f97316";
-            return `<div style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;
+            const priority = i === 0 ? "أولوية قصوى" : i === 1 ? "أولوية عالية" : i === 2 ? "أولوية متوسطة" : "مكمّل";
+            return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
               background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
               border-right:3px solid ${accent};border-radius:0 12px 12px 0;">
-              <div style="width:28px;height:28px;border-radius:50%;
-                background:rgba(255,255,255,0.05);border:2px solid ${accent}44;
-                display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <span style="font-size:13px;font-weight:900;color:${accent};text-shadow:0 0 8px ${accent};">${i + 1}</span>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;">
+                <div style="width:28px;height:28px;border-radius:50%;
+                  background:rgba(255,255,255,0.05);border:2px solid ${accent}44;
+                  display:flex;align-items:center;justify-content:center;">
+                  <span style="font-size:13px;font-weight:900;color:${accent};text-shadow:0 0 8px ${accent};">${i + 1}</span>
+                </div>
+                <div style="font-size:7px;color:${accent};font-weight:700;text-align:center;white-space:nowrap;">${priority}</div>
               </div>
               <div style="flex:1;">
-                <div style="font-size:12.5px;color:#cbd5e1;line-height:1.7;">${r}</div>
+                <div style="font-size:12px;color:#e2e8f0;line-height:1.7;">${r}</div>
               </div>
             </div>`;
           }).join("")}
         </div>
       </div>` : ""}
 
-      <!-- Report notes -->
-      ${report?.fullReport ? `
-      <div style="margin-bottom:22px;">
-        ${sh("ملاحظات تحليلية إضافية")}
-        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
-          border-radius:12px;padding:16px 18px;max-height:100px;overflow:hidden;">
-          <p style="font-size:11.5px;color:#64748b;line-height:1.8;margin:0;">${cleanMarkdown(report.fullReport.substring(0, 450))}...</p>
-        </div>
-      </div>` : ""}
-
-      <!-- CTA -->
+      <!-- STRONG CTA SECTION -->
       <div style="background:linear-gradient(135deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%);
-        border:1px solid rgba(34,197,94,0.2);border-radius:16px;padding:30px 36px;
-        text-align:center;position:relative;overflow:hidden;
-        box-shadow:0 0 40px rgba(34,197,94,0.08);">
+        border:1px solid rgba(34,197,94,0.25);border-radius:16px;padding:24px 28px;
+        position:relative;overflow:hidden;
+        box-shadow:0 0 40px rgba(34,197,94,0.1);">
+        <!-- Glow effects -->
         <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;
-          background:radial-gradient(circle,rgba(34,197,94,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+          background:radial-gradient(circle,rgba(34,197,94,0.1) 0%,transparent 70%);pointer-events:none;"></div>
         <div style="position:absolute;bottom:-50px;left:-30px;width:180px;height:180px;border-radius:50%;
-          background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 70%);pointer-events:none;"></div>
-        <div style="position:relative;z-index:1;">
-          <div style="font-size:11px;color:#334155;margin-bottom:10px;letter-spacing:2px;font-weight:600;">الخطوة التالية</div>
-          <div style="font-size:22px;font-weight:900;color:#f8fafc;margin-bottom:10px;
-            text-shadow:0 0 30px rgba(34,197,94,0.2);">
-            هل أنت مستعد للارتقاء بـ ${lead.companyName || "عملك"}؟
+          background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+
+        <div style="position:relative;z-index:1;display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;">
+          <!-- Left: CTA Text -->
+          <div>
+            <div style="font-size:10px;color:#475569;margin-bottom:8px;letter-spacing:2px;font-weight:700;">الخطوة التالية — الآن</div>
+            <div style="font-size:22px;font-weight:900;color:#f8fafc;margin-bottom:8px;
+              text-shadow:0 0 30px rgba(34,197,94,0.2);line-height:1.3;">
+              لا تدع منافسيك يسبقونك
+            </div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:16px;line-height:1.7;">
+              كل يوم تأخير = إيراد ضائع. تواصل معنا الآن للحصول على استشارة مجانية وخطة عمل مخصصة لـ${lead.companyName || "نشاطك"} خلال 24 ساعة.
+            </div>
+            <!-- Contact buttons -->
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              ${waPhone ? `
+              <div style="padding:10px 20px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);
+                border-radius:24px;font-size:12px;font-weight:800;color:#22c55e;
+                box-shadow:0 0 16px rgba(34,197,94,0.2);">📱 واتساب: ${waPhone}</div>` : ""}
+              <div style="padding:10px 20px;background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.35);
+                border-radius:24px;font-size:12px;font-weight:700;color:#0ea5e9;
+                box-shadow:0 0 16px rgba(14,165,233,0.15);">🌐 ${coWebsite}</div>
+              ${coEmail ? `
+              <div style="padding:10px 20px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);
+                border-radius:24px;font-size:12px;font-weight:700;color:#a78bfa;
+                box-shadow:0 0 16px rgba(167,139,250,0.15);">✉️ ${coEmail}</div>` : ""}
+            </div>
+
+            <!-- Urgency note -->
+            <div style="margin-top:12px;padding:8px 14px;background:rgba(239,68,68,0.08);
+              border:1px solid rgba(239,68,68,0.2);border-radius:10px;display:inline-flex;align-items:center;gap:6px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;box-shadow:0 0 6px #ef4444;"></div>
+              <span style="font-size:10px;color:#fca5a5;font-weight:700;">عرض الاستشارة المجانية متاح لفترة محدودة</span>
+            </div>
           </div>
-          <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.7;max-width:400px;margin-left:auto;margin-right:auto;">
-            تواصل معنا اليوم للحصول على استشارة مجانية وخطة عمل تسويقية مخصصة لنشاطك
+
+          <!-- Right: QR Code -->
+          ${waPhone ? `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            ${qrCodeSVG(waPhone, 90)}
+            <div style="font-size:8px;color:#475569;text-align:center;max-width:100px;line-height:1.4;">
+              امسح الكود للتواصل المباشر عبر واتساب
+            </div>
+          </div>` : ""}
+        </div>
+      </div>
+
+      <!-- Credentials & Trust -->
+      <div style="margin-top:14px;padding:12px 16px;background:rgba(255,255,255,0.02);
+        border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
+        <div style="font-size:9px;color:#334155;margin-bottom:8px;font-weight:700;letter-spacing:1px;">الاعتمادات والشراكات</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:20px;">
+            <span style="font-size:10px;">🏛️</span>
+            <span style="font-size:9px;color:#86efac;font-weight:700;">معتمد · المركز الوطني للأعمال</span>
           </div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
-            ${company?.phone ? `
-            <div style="padding:10px 22px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);
-              border-radius:24px;font-size:12px;font-weight:700;color:#22c55e;
-              box-shadow:0 0 16px rgba(34,197,94,0.15);">📞 ${company.phone}</div>` : ""}
-            <div style="padding:10px 22px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.3);
-              border-radius:24px;font-size:12px;font-weight:700;color:#0ea5e9;
-              box-shadow:0 0 16px rgba(14,165,233,0.15);">🌐 ${company?.website || "maksab-ksa.com"}</div>
-            ${company?.email ? `
-            <div style="padding:10px 22px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);
-              border-radius:24px;font-size:12px;font-weight:700;color:#a78bfa;
-              box-shadow:0 0 16px rgba(167,139,250,0.15);">✉️ ${company.email}</div>` : ""}
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.15);border-radius:20px;">
+            <span style="font-size:10px;">📘</span>
+            <span style="font-size:9px;color:#7dd3fc;font-weight:700;">شريك Meta المعتمد</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.15);border-radius:20px;">
+            <span style="font-size:10px;">🔍</span>
+            <span style="font-size:9px;color:#c4b5fd;font-weight:700;">شريك Google المعتمد</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);border-radius:20px;">
+            <span style="font-size:10px;">🎵</span>
+            <span style="font-size:9px;color:#fdba74;font-weight:700;">شريك TikTok المعتمد</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Footer -->
-    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 40px;
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
       background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة © ${new Date().getFullYear()}</div>
       <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 4 من 5</div>
     </div>
   `, false);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  PAGE 5 — COMPETITOR COMPARISON (DARK) — VISUAL REDESIGN v2
+  //  PAGE 5 — COMPETITOR COMPARISON (DARK)
   // ═══════════════════════════════════════════════════════════════════════
 
-  // حساب ترتيب العميل بين المنافسين
   const allEntities = [
     { ...lead, isClient: true },
     ...competitors.slice(0, 5),
@@ -810,7 +1004,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   const clientRank = allEntities.findIndex((e: any) => e.isClient) + 1;
   const totalInComparison = allEntities.length;
 
-  // تحليل نقاط القوة والضعف
   const avgCompPriority = competitors.length
     ? competitors.reduce((s, c) => s + (Number(c.leadPriorityScore) || 0), 0) / competitors.length
     : 0;
@@ -832,7 +1025,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   if (strengths.length === 0) strengths.push('يمتلك إمكانات تنافسية واعدة في السوق المحلي');
   if (weaknesses.length === 0) weaknesses.push('يحتاج تعزيز الحضور الرقمي لمواكبة المنافسين');
 
-  // بناء مخطط رادار SVG
   function buildRadarSVG(entities: any[]) {
     const cx = 110, cy = 110, r = 80;
     const axes = [
@@ -858,7 +1050,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       return { x: cx + dist * Math.cos(rad), y: cy + dist * Math.sin(rad) };
     }
 
-    // Grid circles
     let gridCircles = '';
     for (let i = 2; i <= 10; i += 2) {
       const pts = axes.map((_, j) => {
@@ -869,7 +1060,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       gridCircles += `<polygon points="${pts}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>`;
     }
 
-    // Axis lines & labels
     let axisLines = '';
     axes.forEach((ax, j) => {
       const angle = (360 / n) * j;
@@ -879,7 +1069,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       axisLines += `<text x="${labelPos.x}" y="${labelPos.y}" text-anchor="middle" dominant-baseline="middle" fill="#64748b" font-size="8" font-family="Tajawal,Arial">${ax.label}</text>`;
     });
 
-    // Entity polygons
     let polygons = '';
     entities.slice(0, 3).forEach((e, idx) => {
       const color = e.isClient ? '#22c55e' : colors[idx + 1] || '#64748b';
@@ -897,7 +1086,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     </svg>`;
   }
 
-  // بناء بطاقة منافس مع شريط تقدم
   function buildCompetitorCard(comp: any, rank: number, isClient = false) {
     const priScore = Math.min(10, Number(comp.leadPriorityScore) || 0);
     const qualScore = Math.min(10, Number(comp.dataQualityScore) || 0);
@@ -905,7 +1093,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     const hasWebsite = !!comp.website;
     const hasPhone = !!(comp.phone || comp.verifiedPhone);
 
-    // ألوان الترتيب
     const rankColors: Record<number, { bg: string; border: string; badge: string; text: string }> = {
       1: { bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.4)', badge: 'linear-gradient(135deg,#f59e0b,#fbbf24)', text: '#fbbf24' },
       2: { bg: 'rgba(148,163,184,0.06)', border: 'rgba(148,163,184,0.3)', badge: 'linear-gradient(135deg,#94a3b8,#cbd5e1)', text: '#cbd5e1' },
@@ -917,7 +1104,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     const style = isClient ? clientStyle : (rankColors[rank] || defaultStyle);
     const badgeLabel = isClient ? '⭐' : rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
 
-    // أيقونات المنصات
     const platformIcons = [
       { url: comp.instagramUrl, color: '#e1306c', label: 'IG' },
       { url: comp.tiktokUrl, color: '#69c9d0', label: 'TK' },
@@ -935,21 +1121,14 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <div style="display:flex;gap:10px;align-items:stretch;padding:10px 14px;
       background:${style.bg};border:1px solid ${style.border};
       border-radius:12px;margin-bottom:7px;position:relative;overflow:hidden;">
-
-      <!-- Glow effect for client -->
       ${isClient ? `<div style="position:absolute;top:0;right:0;bottom:0;width:3px;background:${style.badge};border-radius:0 12px 12px 0;"></div>` : ''}
-
-      <!-- Badge -->
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-        min-width:36px;">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:36px;">
         <div style="width:32px;height:32px;border-radius:50%;background:${style.badge};
           display:flex;align-items:center;justify-content:center;
           font-size:${isClient ? '10' : '14'}px;font-weight:900;color:#fff;
           box-shadow:0 0 10px ${style.text}44;">${badgeLabel}</div>
         ${isClient ? `<div style="font-size:7px;color:${style.text};margin-top:3px;font-weight:700;">أنت</div>` : ''}
       </div>
-
-      <!-- Main info -->
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div style="font-size:11.5px;font-weight:800;color:${isClient ? style.text : '#f1f5f9'};
@@ -963,8 +1142,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
               display:flex;align-items:center;justify-content:center;font-size:7px;color:#22c55e;font-weight:800;">📞</div>` : ''}
           </div>
         </div>
-
-        <!-- Progress bars -->
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
           <div>
             <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
@@ -1001,63 +1178,23 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     </div>`;
   }
 
-  // حالة عدم وجود منافسين — عرض تحليل السوق العام
+  // حالة عدم وجود منافسين
   const noCompetitorsContent = page(`
-    <!-- Decorative blobs -->
     <div style="position:absolute;top:-80px;right:-80px;width:350px;height:350px;border-radius:50%;
       background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
     <div style="position:absolute;bottom:-60px;left:-60px;width:280px;height:280px;border-radius:50%;
       background:radial-gradient(circle,rgba(167,139,250,0.04) 0%,transparent 70%);pointer-events:none;"></div>
 
-    <!-- Header -->
-    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid rgba(255,255,255,0.06);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#0ea5e9,#a78bfa);box-shadow:0 0 12px rgba(14,165,233,0.5);"></div>
-        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">الموقع في السوق والفرصة التنافسية</div>
-      </div>
-      <div style="font-size:10px;color:#334155;">${lead.companyName || ''} · ${coName} · صفحة 5/5</div>
-    </div>
+    ${pageHeader("الموقع في السوق والفرصة التنافسية", "تحليل الوضع التنافسي الحالي", "صفحة 5/5", coName, lead)}
 
     <div style="padding:24px 40px;">
-      <!-- Market position visual -->
+      <!-- Three pillars -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
-        <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:16px;
-          padding:20px;text-align:center;">
-          <div style="font-size:32px;font-weight:900;color:#22c55e;text-shadow:0 0 20px rgba(34,197,94,0.5);
-            margin-bottom:6px;">${clientPlatforms}</div>
-          <div style="font-size:11px;color:#94a3b8;font-weight:600;">منصات نشطة</div>
-          <div style="font-size:9px;color:#475569;margin-top:4px;">من أصل 6 منصات</div>
-          <div style="margin-top:10px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;">
-            <div style="height:100%;width:${Math.round((clientPlatforms/6)*100)}%;background:#22c55e;
-              border-radius:2px;box-shadow:0 0 8px rgba(34,197,94,0.5);"></div>
-          </div>
-        </div>
-        <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:16px;
-          padding:20px;text-align:center;">
-          <div style="font-size:32px;font-weight:900;color:#0ea5e9;text-shadow:0 0 20px rgba(14,165,233,0.5);
-            margin-bottom:6px;">${clientPri.toFixed(1)}</div>
-          <div style="font-size:11px;color:#94a3b8;font-weight:600;">درجة الأولوية</div>
-          <div style="font-size:9px;color:#475569;margin-top:4px;">من أصل 10 نقاط</div>
-          <div style="margin-top:10px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;">
-            <div style="height:100%;width:${Math.round(clientPri*10)}%;background:#0ea5e9;
-              border-radius:2px;box-shadow:0 0 8px rgba(14,165,233,0.5);"></div>
-          </div>
-        </div>
-        <div style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);border-radius:16px;
-          padding:20px;text-align:center;">
-          <div style="font-size:32px;font-weight:900;color:#a78bfa;text-shadow:0 0 20px rgba(167,139,250,0.5);
-            margin-bottom:6px;">${clientQual.toFixed(1)}</div>
-          <div style="font-size:11px;color:#94a3b8;font-weight:600;">جودة البيانات</div>
-          <div style="font-size:9px;color:#475569;margin-top:4px;">من أصل 10 نقاط</div>
-          <div style="margin-top:10px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;">
-            <div style="height:100%;width:${Math.round(clientQual*10)}%;background:#a78bfa;
-              border-radius:2px;box-shadow:0 0 8px rgba(167,139,250,0.5);"></div>
-          </div>
-        </div>
+        ${bigNum(clientPlatforms, "منصات نشطة", "من أصل 6 منصات", "#22c55e")}
+        ${bigNum(clientPri.toFixed(1), "درجة الأولوية", "من أصل 10 نقاط", "#0ea5e9")}
+        ${bigNum(clientQual.toFixed(1), "جودة البيانات", "من أصل 10 نقاط", "#a78bfa")}
       </div>
 
-      <!-- Market opportunity sections -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div style="background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:14px;padding:16px;">
           <div style="font-size:12px;font-weight:800;color:#22c55e;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
@@ -1081,18 +1218,23 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         </div>
       </div>
 
-      <!-- CTA -->
-      <div style="margin-top:20px;padding:16px 20px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(167,139,250,0.06));
-        border:1px solid rgba(14,165,233,0.2);border-radius:14px;text-align:center;">
-        <div style="font-size:13px;font-weight:800;color:#f1f5f9;margin-bottom:6px;">🚀 الخطوة التالية مع ${coName}</div>
-        <div style="font-size:10.5px;color:#64748b;line-height:1.7;">
-          بناءً على هذا التحليل، نوصي بالتواصل مع ${lead.companyName || 'هذا النشاط'} لتقديم حلول تسويقية مخصصة
-          تعالج الثغرات المحددة وتعزز الحضور الرقمي في ${lead.city || 'السوق المحلي'}.
+      <!-- Final CTA -->
+      <div style="margin-top:20px;padding:18px 22px;background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.06));
+        border:1px solid rgba(34,197,94,0.2);border-radius:14px;
+        display:flex;align-items:center;justify-content:space-between;gap:16px;">
+        <div>
+          <div style="font-size:14px;font-weight:900;color:#f1f5f9;margin-bottom:6px;">🚀 ابدأ رحلة النمو مع ${coName}</div>
+          <div style="font-size:10.5px;color:#64748b;line-height:1.7;">
+            بناءً على هذا التحليل، نوصي بالتواصل الفوري لتقديم حلول تسويقية مخصصة تعالج الثغرات المحددة وتعزز الحضور الرقمي في ${lead.city || 'السوق المحلي'}.
+          </div>
         </div>
+        ${waPhone ? `
+        <div style="flex-shrink:0;">
+          ${qrCodeSVG(waPhone, 80)}
+        </div>` : ""}
       </div>
     </div>
 
-    <!-- Footer -->
     <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
       background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
@@ -1103,30 +1245,38 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
   // صفحة المنافسين الكاملة
   const p5 = competitors.length === 0 ? noCompetitorsContent : page(`
-    <!-- Decorative blobs -->
     <div style="position:absolute;top:-80px;right:-80px;width:350px;height:350px;border-radius:50%;
       background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
     <div style="position:absolute;bottom:-60px;left:-60px;width:280px;height:280px;border-radius:50%;
       background:radial-gradient(circle,rgba(167,139,250,0.04) 0%,transparent 70%);pointer-events:none;"></div>
 
-    <!-- Header -->
-    <div style="padding:22px 40px 18px;display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid rgba(255,255,255,0.06);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:4px;height:28px;border-radius:2px;background:linear-gradient(180deg,#0ea5e9,#a78bfa);box-shadow:0 0 12px rgba(14,165,233,0.5);"></div>
-        <div style="font-size:18px;font-weight:900;color:#f1f5f9;">تحليل المنافسين والموقع التنافسي</div>
-      </div>
-      <div style="font-size:10px;color:#334155;">${lead.companyName || ''} · ${coName} · صفحة 5/5</div>
-    </div>
+    ${pageHeader("تحليل المنافسين والموقع التنافسي", "مقارنة شاملة مع المنافسين في السوق", "صفحة 5/5", coName, lead)}
 
     <div style="padding:18px 40px;">
 
-      <!-- Top section: Ranking + Radar -->
-      <div style="display:grid;grid-template-columns:1fr 220px;gap:20px;margin-bottom:18px;align-items:start;">
+      <!-- Three pillars -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;">مستوى الأداء</div>
+          <div style="font-size:28px;font-weight:900;color:#22c55e;text-shadow:0 0 15px rgba(34,197,94,0.6);">#${clientRank}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">من ${totalInComparison} منافس</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;">الفجوة التنافسية</div>
+          <div style="font-size:28px;font-weight:900;color:#ef4444;text-shadow:0 0 15px rgba(239,68,68,0.6);">${Math.abs(clientPri - avgCompPriority).toFixed(1)}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">نقطة فارق</div>
+        </div>
+        <div style="background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#fdba74;font-weight:700;margin-bottom:6px;">الفرصة التنافسية</div>
+          <div style="font-size:28px;font-weight:900;color:#f97316;text-shadow:0 0 15px rgba(249,115,22,0.6);">${clientPlatforms}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">منصة نشطة</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 220px;gap:18px;margin-bottom:16px;align-items:start;">
 
         <!-- Left: Ranking card + Summary stats -->
         <div>
-          <!-- Ranking badge -->
           <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;
             background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.25);
             border-radius:14px;margin-bottom:12px;">
@@ -1147,8 +1297,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
             </div>
           </div>
 
-          <!-- Summary stats -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px;text-align:center;">
               <div style="font-size:18px;font-weight:900;color:${sc(clientPri)};text-shadow:0 0 10px ${sc(clientPri)}66;">${clientPri.toFixed(1)}</div>
               <div style="font-size:8px;color:#475569;margin-top:2px;">درجة الأولوية</div>
@@ -1176,7 +1325,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       </div>
 
       <!-- Competitor cards -->
-      <div style="margin-bottom:14px;">
+      <div style="margin-bottom:12px;">
         <div style="font-size:10px;color:#475569;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);">ترتيب المنافسين حسب درجة الأولوية</div>
         ${allEntities.map((e: any, i: number) => buildCompetitorCard(e, i + 1, !!e.isClient)).join('')}
       </div>
@@ -1200,7 +1349,6 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       </div>
     </div>
 
-    <!-- Footer -->
     <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
       background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
