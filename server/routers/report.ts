@@ -773,11 +773,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
     </div>` : ""}
 
     <!-- التحليل الذكي - ملخص الفجوة والفرص فقط (بدون زاوية الدخول أو كسر الجليد لأنها معلومات داخلية) -->
-    ${(lead.marketingGapSummary || lead.primaryOpportunity) ? `
+    ${(lead.biggestMarketingGap || lead.revenueOpportunity || lead.suggestedSalesEntryAngle || lead.marketingGapSummary || lead.primaryOpportunity) ? `
     <div class="section">
-      <div class="section-title">📊 تحليل الفجوة والفرص</div>
-      ${lead.marketingGapSummary ? `<div class="analysis-box gap-box"><div class="analysis-box-title">📊 ملخص الفجوة التسويقية</div><p>${lead.marketingGapSummary}</p></div>` : ""}
-      ${lead.primaryOpportunity ? `<div class="analysis-box"><div class="analysis-box-title">🚀 الفرصة الرئيسية</div><p>${lead.primaryOpportunity}</p></div>` : ""}
+      <div class="section-title">📊 التحليل التسويقي الذكي</div>
+      ${(lead.biggestMarketingGap || lead.marketingGapSummary) ? `<div class="analysis-box gap-box"><div class="analysis-box-title">⚠️ أكبر ثغرة تسويقية</div><p>${lead.biggestMarketingGap || lead.marketingGapSummary}</p></div>` : ""}
+      ${(lead.revenueOpportunity || lead.primaryOpportunity) ? `<div class="analysis-box"><div class="analysis-box-title">💰 فرصة الإيراد</div><p>${lead.revenueOpportunity || lead.primaryOpportunity}</p></div>` : ""}
+      ${lead.suggestedSalesEntryAngle ? `<div class="analysis-box" style="border-right:3px solid #0ea5e9;"><div class="analysis-box-title" style="color:#0369a1;">🎯 زاوية الدخول البيعية</div><p>${lead.suggestedSalesEntryAngle}</p></div>` : ""}
     </div>` : `
     <div class="section">
       <div class="section-title">📊 التحليل الأولي</div>
@@ -1216,6 +1217,25 @@ export const reportRouter = router({
         ],
       });
       return { summary: response.choices[0]?.message?.content || "لا يمكن إنشاء الملخص حالياً" };
+    }),
+
+  // ===== جلب HTML التقرير للمعاينة (نفس buildPDFHtml المستخدم في PDF) =====
+  getHtml: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ input }) => {
+      const lead = await getLeadById(input.leadId);
+      if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
+
+      const websiteAnalysis = await getWebsiteAnalysisByLeadId(input.leadId);
+      const socialAnalyses = await getSocialAnalysesByLeadId(input.leadId);
+      const company = await getCompanySettingsData();
+      const businessType = lead.businessType || "";
+      const activeSeason = await getActiveSeasonForBusiness(businessType).catch(() => null);
+      const upcomingSeasons = await getUpcomingSeasonsForBusiness(businessType).catch(() => []);
+      const competitors = await getCompetitors(lead.id, businessType, lead.city || "").catch(() => []);
+
+      const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company, activeSeason, upcomingSeasons, competitors);
+      return { html, companyName: lead.companyName };
     }),
 
   getEmployeePerformance: protectedProcedure

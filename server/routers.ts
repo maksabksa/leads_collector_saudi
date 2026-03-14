@@ -764,9 +764,8 @@ ${contextParts.join('\n')}
 
       return competitors;
     }),
-});
 
-// ===== ANALYSIS ROUTER ==========
+});
 
 // ===== ANALYSIS ROUTER =====
 const analysisRouter = router({

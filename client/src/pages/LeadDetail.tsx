@@ -89,6 +89,10 @@ export default function LeadDetail() {
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfCustomMessage, setPdfCustomMessage] = useState("");
+  // Preview modal state
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const getReportHtml = trpc.report.getHtml.useMutation();
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
@@ -134,15 +138,9 @@ export default function LeadDetail() {
   const handlePreviewPDF = async () => {
     setPdfGenerating(true);
     try {
-      const { previewLeadPDF } = await import("@/lib/generateLeadPDF");
-      await previewLeadPDF({
-        lead: data?.lead,
-        websiteAnalysis: data?.websiteAnalysis,
-        socialAnalyses: data?.socialAnalyses || [],
-        report: report,
-        company: companySettingsData,
-        competitors: competitorsData || [],
-      });
+      const result = await getReportHtml.mutateAsync({ leadId: id });
+      setPreviewHtml(result.html);
+      setShowPreviewModal(true);
     } catch (e: any) {
       toast.error("فشل فتح المعاينة", { description: e.message });
     } finally {
@@ -1883,6 +1881,39 @@ export default function LeadDetail() {
               </button>
             )}
           </div>
+        </div>
+      </div>
+    )}
+    {/* ===== معاينة التقرير (نفس HTML الذي يُولَّد في PDF) ===== */}
+    {showPreviewModal && previewHtml && (
+      <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }}>
+        <div className="flex items-center justify-between px-5 py-3 border-b flex-shrink-0" style={{ background: "oklch(0.10 0.015 240)", borderColor: "oklch(0.2 0.02 240)" }}>
+          <div className="flex items-center gap-3">
+            <Eye className="w-5 h-5" style={{ color: "oklch(0.72 0.18 285)" }} />
+            <span className="font-bold text-foreground text-sm">معاينة التقرير — {data?.lead?.companyName}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)" }}>نفس محتوى PDF</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGeneratePDF}
+              disabled={pdfGenerating}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+              style={{ background: "oklch(0.65 0.18 25 / 0.15)", color: "oklch(0.75 0.18 25)", border: "1px solid oklch(0.65 0.18 25 / 0.3)" }}>
+              {pdfGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              تحميل PDF
+            </button>
+            <button onClick={() => setShowPreviewModal(false)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <iframe
+            srcDoc={previewHtml}
+            className="w-full h-full border-0"
+            title="معاينة التقرير"
+            sandbox="allow-same-origin"
+          />
         </div>
       </div>
     )}
