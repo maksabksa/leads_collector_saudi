@@ -2295,11 +2295,13 @@ export default function SearchHub() {
           username: addDialog.result.username || undefined,
           bio: addDialog.result.bio || addDialog.result.description || "",
           followersCount: addDialog.result.followersCount || 0,
-          instagramUrl: addDialog.platform === "instagram" && addDialog.result.username ? `https://instagram.com/${addDialog.result.username}` : undefined,
-          tiktokUrl: addDialog.platform === "tiktok" && addDialog.result.username ? `https://tiktok.com/@${addDialog.result.username}` : undefined,
-          snapchatUrl: addDialog.platform === "snapchat" && addDialog.result.username ? `https://snapchat.com/add/${addDialog.result.username}` : undefined,
-          twitterUrl: addDialog.platform === "twitter" && addDialog.result.username ? `https://x.com/${addDialog.result.username}` : undefined,
-          linkedinUrl: addDialog.platform === "linkedin" && addDialog.result.username ? `https://linkedin.com/company/${addDialog.result.username}` : undefined,
+          instagramUrl: addDialog.platform === "instagram" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://instagram.com/${addDialog.result.username}` : undefined)) : undefined,
+          tiktokUrl: addDialog.platform === "tiktok" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://tiktok.com/@${addDialog.result.username}` : undefined)) : undefined,
+          snapchatUrl: addDialog.platform === "snapchat" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://snapchat.com/add/${addDialog.result.username}` : undefined)) : undefined,
+          twitterUrl: addDialog.platform === "twitter" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://x.com/${addDialog.result.username}` : undefined)) : undefined,
+          linkedinUrl: addDialog.platform === "linkedin" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://linkedin.com/company/${addDialog.result.username}` : undefined)) : undefined,
+          facebookUrl: addDialog.platform === "facebook" ? (addDialog.result.profileUrl || addDialog.result.url || (addDialog.result.username ? `https://facebook.com/${addDialog.result.username}` : undefined)) : undefined,
+          googleMapsUrl: addDialog.platform === "google" ? (addDialog.result.url || addDialog.result.googleMapsUrl || "") : "",
         } : undefined}
       />
 
