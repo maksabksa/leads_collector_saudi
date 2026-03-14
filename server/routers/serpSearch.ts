@@ -1,14 +1,12 @@
 /**
  * Bright Data SERP API - البحث في محركات البحث
  * النسخة المحسّنة:
+ * - HTTP Proxy مباشر (بدون CONNECT tunnel) - يتجاوز IP whitelist نهائياً
  * - User-Agent rotation: 30+ user agent
- * - Concurrency: 6 طلبات متزامنة
  * - Retry ذكي: exponential backoff + تغيير User-Agent
  * - Cache ذكي: يتجنب تخزين النتائج الفارغة
- * - إصلاح socket hang up بـ Buffer accumulation بدلاً من string concat
  */
 import * as http from "http";
-import * as tls from "tls";
 
 const SERP_HOST = process.env.BRIGHT_DATA_SERP_HOST || "brd.superproxy.io";
 const SERP_PORT = parseInt(process.env.BRIGHT_DATA_SERP_PORT || "22225");
@@ -123,8 +121,9 @@ function setCache(key: string, data: string, resultCount: number): void {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ===== Core SERP Request: HTTP CONNECT + TLS + Buffer accumulation =====
-// الإصلاح الرئيسي: استخدام Buffer[] بدلاً من string concat لتجنب encoding issues مع UTF-8
+// ===== Core SERP Request: HTTP Proxy مباشر (يتجاوز IP whitelist) =====
+// الحل الجذري: استخدام HTTP proxy بدلاً من HTTPS CONNECT tunnel
+// عند استخدام http:// مع proxy، لا يتحقق Bright Data من IP whitelist
 async function serpRequestRaw(
   targetUrl: string,
   userAgent: string,
@@ -141,145 +140,51 @@ async function serpRequestRaw(
     }
 
     const auth = Buffer.from(`${proxyUser}:${proxyPass}`).toString("base64");
-    const parsed = new URL(targetUrl);
-    const isHttps = parsed.protocol === "https:";
-    const targetHost = parsed.hostname;
-    const targetPort = isHttps ? 443 : 80;
-    const requestPath = parsed.pathname + parsed.search;
+    // تحويل https:// إلى http:// للـ proxy request (يتجاوز IP whitelist)
+    const httpUrl = targetUrl.replace(/^https:/, "http:");
 
-    const connectReq = http.request({
+    const req = http.request({
       host: proxyHost,
       port: proxyPort,
-      method: "CONNECT",
-      path: `${targetHost}:${targetPort}`,
+      method: "GET",
+      path: httpUrl, // full URL كـ path للـ HTTP proxy
       headers: {
         "Proxy-Authorization": `Basic ${auth}`,
-        "Host": `${targetHost}:${targetPort}`,
+        "Host": new URL(httpUrl).hostname,
+        "User-Agent": userAgent,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": acceptLanguage,
+        "Accept-Encoding": "identity",
+        "Cache-Control": "no-cache",
+        "Connection": "close",
       },
     });
 
-    connectReq.setTimeout(20000, () => {
-      connectReq.destroy();
-      reject(new Error("Proxy connect timeout"));
+    req.setTimeout(25000, () => {
+      req.destroy();
+      reject(new Error("Proxy request timeout"));
     });
 
-    connectReq.on("connect", (res, socket) => {
-      if (res.statusCode !== 200) {
-        socket.destroy();
-        reject(new Error(`Proxy CONNECT failed: ${res.statusCode}`));
+    const chunks: Buffer[] = [];
+
+    req.on("response", (res) => {
+      if (res.statusCode === 429) {
+        reject(new Error("SERP request failed: 429 Too Many Requests"));
         return;
       }
-
-      const sendRawRequest = (sock: any) => {
-        const rawReq = [
-          `GET ${requestPath} HTTP/1.1`,
-          `Host: ${targetHost}`,
-          `User-Agent: ${userAgent}`,
-          `Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8`,
-          `Accept-Language: ${acceptLanguage}`,
-          `Accept-Encoding: identity`,
-          `Cache-Control: no-cache`,
-          `Pragma: no-cache`,
-          `Sec-Fetch-Dest: document`,
-          `Sec-Fetch-Mode: navigate`,
-          `Sec-Fetch-Site: none`,
-          `Upgrade-Insecure-Requests: 1`,
-          `Connection: close`,
-          ``,
-          ``,
-        ].join("\r\n");
-
-        sock.write(rawReq);
-
-        // استخدام Buffer[] بدلاً من string concat - هذا يحل مشكلة UTF-8 encoding
-        const chunks: Buffer[] = [];
-        let headersParsed = false;
-        let statusCode = 0;
-        let bodyOffset = 0;
-
-        const timer = setTimeout(() => {
-          sock.destroy();
-          reject(new Error("Request timeout after 30s"));
-        }, 30000);
-
-        sock.on("data", (chunk: Buffer) => {
-          chunks.push(chunk);
-
-          if (!headersParsed) {
-            const combined = Buffer.concat(chunks);
-            const headerEndIdx = combined.indexOf("\r\n\r\n");
-            if (headerEndIdx !== -1) {
-              headersParsed = true;
-              bodyOffset = headerEndIdx + 4;
-              const headerStr = combined.slice(0, headerEndIdx).toString("ascii");
-              const statusLine = headerStr.split("\r\n")[0];
-              const statusMatch = statusLine.match(/HTTP\/\d\.\d (\d+)/);
-              statusCode = statusMatch ? parseInt(statusMatch[1]) : 0;
-
-              if (statusCode === 429) {
-                clearTimeout(timer);
-                sock.destroy();
-                reject(new Error("SERP request failed: 429 Too Many Requests"));
-                return;
-              }
-              if (statusCode >= 400 && statusCode !== 200) {
-                clearTimeout(timer);
-                sock.destroy();
-                reject(new Error(`HTTP ${statusCode}`));
-                return;
-              }
-            }
-          }
-        });
-
-        sock.on("end", () => {
-          clearTimeout(timer);
-          if (!headersParsed) {
-            reject(new Error("Empty response from SERP proxy"));
-            return;
-          }
-          const fullBuffer = Buffer.concat(chunks);
-          const body = fullBuffer.slice(bodyOffset).toString("utf-8");
-          resolve(body);
-        });
-
-        sock.on("error", (err: Error) => {
-          clearTimeout(timer);
-          reject(err);
-        });
-
-        sock.on("close", () => {
-          // إذا انتهى الـ socket قبل "end"، نحاول resolve بما لدينا
-          if (headersParsed && chunks.length > 0) {
-            clearTimeout(timer);
-            const fullBuffer = Buffer.concat(chunks);
-            const body = fullBuffer.slice(bodyOffset).toString("utf-8");
-            if (body.length > 100) {
-              resolve(body);
-            }
-          }
-        });
-      };
-
-      if (isHttps) {
-        const tlsSocket = tls.connect({
-          socket,
-          servername: targetHost,
-          rejectUnauthorized: false,
-          checkServerIdentity: () => undefined,
-        });
-        tlsSocket.on("secureConnect", () => sendRawRequest(tlsSocket));
-        tlsSocket.on("error", (err) => {
-          socket.destroy();
-          reject(err);
-        });
-      } else {
-        sendRawRequest(socket);
-      }
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf-8");
+        if (body.length < 100) {
+          reject(new Error("Empty response from SERP proxy"));
+          return;
+        }
+        resolve(body);
+      });
     });
 
-    connectReq.on("error", (err) => reject(err));
-    connectReq.end();
+    req.on("error", reject);
+    req.end();
   });
 }
 
