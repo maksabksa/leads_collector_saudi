@@ -8,6 +8,8 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   googlePagespeedApiKey: process.env.GOOGLE_PAGESPEED_API_KEY ?? "",
+  googleCustomSearchApiKey: process.env.GOOGLE_CUSTOM_SEARCH_API_KEY ?? "",
+  googleCustomSearchEngineId: process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID ?? "",
   // Bright Data
   brightDataWsEndpoint: process.env.BRIGHT_DATA_WS_ENDPOINT ?? "",
   brightDataApiToken: process.env.BRIGHT_DATA_API_TOKEN ?? "",

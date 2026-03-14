@@ -1358,6 +1358,122 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE BRAND — صفحة الهوية البصرية والبراند
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // جمع بيانات designQuality وcopyQuality وmissedOpportunities من جميع التحليلات
+  const brandData = socialAnalyses
+    .map((s: any) => {
+      const raw = parseSocialExtra(s.rawData);
+      return {
+        platform: s.platform,
+        designQuality: raw.designQuality || s.designQuality || null,
+        copyQuality: raw.copyQuality || s.copyQuality || null,
+        missedOpportunities: raw.missedOpportunities || s.missedOpportunities || null,
+      };
+    })
+    .filter((s: any) => s.designQuality || s.copyQuality || s.missedOpportunities);
+
+  const hasBrandData = brandData.length > 0;
+
+  // حساب متوسط درجة الهوية البصرية
+  const brandScores = brandData
+    .map((s: any) => Number(s.designQuality?.score || 0))
+    .filter((v: number) => v > 0);
+  const avgBrandScore = brandScores.length > 0
+    ? brandScores.reduce((a: number, b: number) => a + b, 0) / brandScores.length
+    : null;
+
+  const allDesignWeaknesses: string[] = brandData.flatMap((s: any) => s.designQuality?.weaknesses || []).slice(0, 4);
+  const allDesignImprovements: string[] = brandData.flatMap((s: any) => s.designQuality?.improvements || []).slice(0, 4);
+  const allCopyWeaknesses: string[] = brandData.flatMap((s: any) => s.copyQuality?.weaknesses || []).slice(0, 3);
+  const allCopyImprovements: string[] = brandData.flatMap((s: any) => s.copyQuality?.improvements || []).slice(0, 3);
+  const allLostReasons: string[] = brandData.flatMap((s: any) => s.missedOpportunities?.lostCustomerReasons || []).slice(0, 4);
+  const allUrgentFixes: string[] = brandData.flatMap((s: any) => s.missedOpportunities?.urgentFixes || []).slice(0, 3);
+  const allConversionBarriers: string[] = brandData.flatMap((s: any) => s.missedOpportunities?.conversionBarriers || []).slice(0, 3);
+
+  const brandColor = sc(avgBrandScore);
+
+  const p_brand = hasBrandData ? page(`
+    <div style="position:absolute;top:-80px;right:-80px;width:320px;height:320px;border-radius:50%;
+      background:radial-gradient(circle,rgba(168,85,247,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+
+    ${pageHeader("الهوية البصرية والبراند", "تحليل جودة التصميم والنصوص والفرص الضائعة", "صفحة 3/5", coName, lead)}
+
+    <div style="padding:14px 40px;">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.25);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#d8b4fe;font-weight:700;margin-bottom:6px;">درجة الهوية البصرية</div>
+          <div style="font-size:28px;font-weight:900;color:${brandColor};text-shadow:0 0 15px ${brandColor}66;">${fmt(avgBrandScore)}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">من 10 عبر جميع المنصات</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;">نقاط ضعف تصميمية</div>
+          <div style="font-size:28px;font-weight:900;color:#ef4444;text-shadow:0 0 15px rgba(239,68,68,0.6);">${allDesignWeaknesses.length}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">تحتاج معالجة عاجلة</div>
+        </div>
+        <div style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.25);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#fde047;font-weight:700;margin-bottom:6px;">فرص ضائعة</div>
+          <div style="font-size:28px;font-weight:900;color:#eab308;text-shadow:0 0 15px rgba(234,179,8,0.6);">${allLostReasons.length}</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">سبب خسارة عميل محتمل</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${allDesignWeaknesses.length > 0 ? `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(168,85,247,0.2);border-radius:12px;padding:12px;border-right:3px solid #a855f7;">
+            <div style="font-size:11px;font-weight:800;color:#d8b4fe;margin-bottom:8px;">🎨 نقاط ضعف التصميم</div>
+            ${allDesignWeaknesses.map((w: string) => `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;"><div style="width:5px;height:5px;border-radius:50%;background:#ef4444;margin-top:5px;flex-shrink:0;"></div><div style="font-size:10px;color:#cbd5e1;line-height:1.5;">${w}</div></div>`).join('')}
+          </div>` : ''}
+          ${allCopyWeaknesses.length > 0 ? `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(14,165,233,0.2);border-radius:12px;padding:12px;border-right:3px solid #0ea5e9;">
+            <div style="font-size:11px;font-weight:800;color:#7dd3fc;margin-bottom:8px;">✏️ ضعف النصوص والرسائل</div>
+            ${allCopyWeaknesses.map((w: string) => `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;"><div style="width:5px;height:5px;border-radius:50%;background:#0ea5e9;margin-top:5px;flex-shrink:0;"></div><div style="font-size:10px;color:#cbd5e1;line-height:1.5;">${w}</div></div>`).join('')}
+          </div>` : ''}
+          ${allDesignImprovements.length > 0 ? `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:12px;border-right:3px solid #22c55e;">
+            <div style="font-size:11px;font-weight:800;color:#86efac;margin-bottom:8px;">✨ تحسينات تصميمية مقترحة</div>
+            ${allDesignImprovements.map((imp: string) => `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;"><div style="width:5px;height:5px;border-radius:50%;background:#22c55e;margin-top:5px;flex-shrink:0;"></div><div style="font-size:10px;color:#cbd5e1;line-height:1.5;">${imp}</div></div>`).join('')}
+          </div>` : ''}
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${allLostReasons.length > 0 ? `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:12px;border-right:3px solid #ef4444;">
+            <div style="font-size:11px;font-weight:800;color:#fca5a5;margin-bottom:8px;">🚨 أسباب خسارة العملاء</div>
+            ${allLostReasons.map((r: string) => `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;"><div style="width:5px;height:5px;border-radius:50%;background:#ef4444;margin-top:5px;flex-shrink:0;"></div><div style="font-size:10px;color:#cbd5e1;line-height:1.5;">${r}</div></div>`).join('')}
+          </div>` : ''}
+          ${allConversionBarriers.length > 0 ? `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(249,115,22,0.25);border-radius:12px;padding:12px;border-right:3px solid #f97316;">
+            <div style="font-size:11px;font-weight:800;color:#fdba74;margin-bottom:8px;">🚧 عوائق التحويل إلى عميل</div>
+            ${allConversionBarriers.map((b: string) => `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;"><div style="width:5px;height:5px;border-radius:50%;background:#f97316;margin-top:5px;flex-shrink:0;"></div><div style="font-size:10px;color:#cbd5e1;line-height:1.5;">${b}</div></div>`).join('')}
+          </div>` : ''}
+          ${allUrgentFixes.length > 0 ? `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(234,179,8,0.25);border-radius:12px;padding:12px;border-right:3px solid #eab308;">
+            <div style="font-size:11px;font-weight:800;color:#fde047;margin-bottom:8px;">⚡ إصلاحات عاجلة (أكبر فرص ضائعة)</div>
+            ${allUrgentFixes.map((f: string) => `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;"><div style="width:5px;height:5px;border-radius:50%;background:#eab308;margin-top:5px;flex-shrink:0;"></div><div style="font-size:10px;color:#cbd5e1;line-height:1.5;">${f}</div></div>`).join('')}
+          </div>` : ''}
+          ${allCopyImprovements.length > 0 ? `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:12px;border-right:3px solid #22c55e;">
+            <div style="font-size:11px;font-weight:800;color:#86efac;margin-bottom:8px;">📝 تحسينات نصية مقترحة</div>
+            ${allCopyImprovements.map((imp: string) => `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;"><div style="width:5px;height:5px;border-radius:50%;background:#22c55e;margin-top:5px;flex-shrink:0;"></div><div style="font-size:10px;color:#cbd5e1;line-height:1.5;">${imp}</div></div>`).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
+      background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:#334155;">${coName} · تقرير سري ومخصص</div>
+      <div style="font-size:9px;color:#334155;">صفحة 3 من 5</div>
+    </div>
+  `) : null;
+
+  // ═══════════════════════════════════════════════════════════════════════
   //  DYNAMIC PAGE ASSEMBLY — حذف الصفحات الفارغة تلقائياً
   // ═══════════════════════════════════════════════════════════════════════
 
@@ -1372,6 +1488,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   activePages.push({ key: 'p1', html: p1 }); // الغلاف دائماً
   activePages.push({ key: 'p2', html: p2 }); // الملخص التنفيذي دائماً
   if (hasDigitalData) activePages.push({ key: 'p3', html: p3 }); // التحليل الرقمي فقط إذا كانت هناك بيانات
+  if (hasBrandData && p_brand) activePages.push({ key: 'p_brand', html: p_brand }); // الهوية البصرية فقط إذا كانت هناك بيانات
   activePages.push({ key: 'p4', html: p4 }); // التوصيات دائماً
   if (hasCompetitors) activePages.push({ key: 'p5', html: p5 }); // المنافسون فقط إذا كانوا موجودين
 

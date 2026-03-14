@@ -97,7 +97,7 @@ function getBrightDataProxyAgent() {
 }
 
 // ===== HTTP Fetch via Bright Data Proxy =====
-async function fetchViaProxy(url: string, timeoutMs = 15000): Promise<string> {
+export async function fetchViaProxy(url: string, timeoutMs = 15000): Promise<string> {
   const proxyHost = ENV.brightDataSerpHost;
   const proxyPort = ENV.brightDataSerpPort;
   const proxyUser = ENV.brightDataSerpUsername;
@@ -174,7 +174,7 @@ async function fetchViaProxy(url: string, timeoutMs = 15000): Promise<string> {
 }
 
 // ===== Bright Data Scraping Browser (WebSocket) =====
-async function fetchWithScrapingBrowser(url: string): Promise<string> {
+export async function fetchWithScrapingBrowser(url: string): Promise<string> {
   if (!ENV.brightDataWsEndpoint) {
     throw new Error("Bright Data WS endpoint not configured");
   }
