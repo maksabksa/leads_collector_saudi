@@ -1358,8 +1358,37 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  ASSEMBLE & OPEN PRINT WINDOW
+  //  DYNAMIC PAGE ASSEMBLY — حذف الصفحات الفارغة تلقائياً
   // ═══════════════════════════════════════════════════════════════════════
+
+  // تحديد الصفحات الفعلية بناءً على البيانات المتاحة
+  const hasWebsiteData = websiteAnalysis !== null && websiteAnalysis !== undefined;
+  const hasSocialData = socialAnalyses.length > 0;
+  const hasDigitalData = hasWebsiteData || hasSocialData;
+  const hasCompetitors = competitors.length > 0;
+
+  // بناء قائمة الصفحات الديناميكية
+  const activePages: Array<{ key: string; html: string }> = [];
+  activePages.push({ key: 'p1', html: p1 }); // الغلاف دائماً
+  activePages.push({ key: 'p2', html: p2 }); // الملخص التنفيذي دائماً
+  if (hasDigitalData) activePages.push({ key: 'p3', html: p3 }); // التحليل الرقمي فقط إذا كانت هناك بيانات
+  activePages.push({ key: 'p4', html: p4 }); // التوصيات دائماً
+  if (hasCompetitors) activePages.push({ key: 'p5', html: p5 }); // المنافسون فقط إذا كانوا موجودين
+
+  const totalPages = activePages.length;
+
+  // تحديث أرقام الصفحات ديناميكياً في HTML
+  function updatePageNumbers(html: string, pageNum: number, total: number): string {
+    return html
+      .replace(/صفحة \d+\/\d+/g, `صفحة ${pageNum}/${total}`)
+      .replace(/صفحة (\d+) من (\d+)/g, `صفحة ${pageNum} من ${total}`)
+      .replace(/CONFIDENTIAL · صفحة (\d+) من (\d+)/g, `CONFIDENTIAL · صفحة ${pageNum} من ${total}`);
+  }
+
+  const pagesHTML = activePages
+    .map((p, i) => `<div class="page-wrapper">${updatePageNumbers(p.html, i + 1, totalPages)}</div>`)
+    .join('\n  ');
+
   const printHTML = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -1440,11 +1469,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   </div>
 </div>
 <div class="pages-container">
-  <div class="page-wrapper">${p1}</div>
-  <div class="page-wrapper">${p2}</div>
-  <div class="page-wrapper">${p3}</div>
-  <div class="page-wrapper">${p4}</div>
-  ${p5 ? `<div class="page-wrapper">${p5}</div>` : ''}
+  ${pagesHTML}
 </div>
 </body>
 </html>`;
