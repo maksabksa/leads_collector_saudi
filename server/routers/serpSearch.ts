@@ -1,20 +1,15 @@
 /**
- * Bright Data SERP API - البحث في محركات البحث
- * النسخة المحسّنة:
- * - HTTPS Proxy مباشر (يعمل مع Bright Data SERP zone)
- * - User-Agent rotation: 30+ user agent
- * - Retry ذكي: exponential backoff + تغيير User-Agent
- * - Cache ذكي: يتجنب تخزين النتائج الفارغة
+ * Bright Data SERP REST API - البحث في محركات البحث
+ * الطريقة الصحيحة: REST API عبر https://api.brightdata.com/request
+ * وليس HTTP/HTTPS Proxy
  */
-import * as http from "http";
-import * as https from "https";
+import https from "https";
 
-const SERP_HOST = process.env.BRIGHT_DATA_SERP_HOST || "brd.superproxy.io";
-const SERP_PORT = parseInt(process.env.BRIGHT_DATA_SERP_PORT || "22225");
-const SERP_USERNAME = process.env.BRIGHT_DATA_SERP_USERNAME || "";
-const SERP_PASSWORD = process.env.BRIGHT_DATA_SERP_PASSWORD || "";
+// ===== Bright Data SERP REST API =====
+const SERP_API_KEY = process.env.BRIGHT_DATA_API_TOKEN || "";
+const SERP_ZONE = process.env.BRIGHT_DATA_SERP_ZONE || "serp_api1";
 
-// ===== Residential Proxy =====
+// ===== Residential Proxy (للاستخدام المباشر مع المواقع غير Google) =====
 const RESI_HOST = process.env.BRIGHT_DATA_RESIDENTIAL_HOST || "brd.superproxy.io";
 const RESI_PORT = parseInt(process.env.BRIGHT_DATA_RESIDENTIAL_PORT || "33335");
 const RESI_USERNAME = process.env.BRIGHT_DATA_RESIDENTIAL_USERNAME || "";
@@ -122,79 +117,70 @@ function setCache(key: string, data: string, resultCount: number): void {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ===== Core SERP Request: HTTPS Proxy مباشر =====
-// الحل الصحيح: استخدام https.request مع Bright Data SERP zone
-// HTTP يسبب 407 لأن Bright Data SERP zone يتطلب HTTPS
-async function serpRequestRaw(
-  targetUrl: string,
-  userAgent: string,
-  acceptLanguage: string,
-  proxyHost: string,
-  proxyPort: number,
-  proxyUser: string,
-  proxyPass: string
-): Promise<string> {
+// ===== Core SERP Request: Bright Data REST API =====
+// الطريقة الصحيحة: POST إلى https://api.brightdata.com/request
+// وليس HTTP/HTTPS proxy
+async function serpRequestRaw(targetUrl: string): Promise<string> {
+  if (!SERP_API_KEY) {
+    throw new Error("BRIGHT_DATA_API_TOKEN not configured");
+  }
+
+  const body = JSON.stringify({
+    zone: SERP_ZONE,
+    url: targetUrl,
+    format: "raw",
+  });
+
   return new Promise((resolve, reject) => {
-    if (!proxyUser || !proxyPass) {
-      reject(new Error("Bright Data credentials not configured"));
-      return;
-    }
-
-    const auth = Buffer.from(`${proxyUser}:${proxyPass}`).toString("base64");
-    // استخدام HTTPS مباشرة مع Bright Data SERP proxy
-    const parsedUrl = new URL(targetUrl);
-
-    const req = https.request({
-      hostname: proxyHost,
-      port: proxyPort,
-      method: "GET",
-      path: targetUrl, // full URL كـ path للـ HTTPS proxy
+    const options = {
+      hostname: "api.brightdata.com",
+      port: 443,
+      path: "/request",
+      method: "POST",
       headers: {
-        "Proxy-Authorization": `Basic ${auth}`,
-        "Host": parsedUrl.hostname,
-        "User-Agent": userAgent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": acceptLanguage,
-        "Accept-Encoding": "identity",
-        "Cache-Control": "no-cache",
-        "Connection": "close",
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SERP_API_KEY}`,
+        "Content-Length": Buffer.byteLength(body),
       },
-      rejectUnauthorized: false, // Bright Data يستخدم شهادة خاصة به
-    });
+    };
 
-    req.setTimeout(25000, () => {
-      req.destroy();
-      reject(new Error("Proxy request timeout"));
-    });
-
-    const chunks: Buffer[] = [];
-
-    req.on("response", (res) => {
-      if (res.statusCode === 407) {
-        reject(new Error(`SERP proxy auth failed: 407 - check credentials`));
-        return;
-      }
-      if (res.statusCode === 429) {
-        reject(new Error("SERP request failed: 429 Too Many Requests"));
-        return;
-      }
+    const req = https.request(options, (res: any) => {
+      const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
-        const body = Buffer.concat(chunks).toString("utf-8");
-        if (body.length < 100) {
-          reject(new Error("Empty response from SERP proxy"));
+        const responseBody = Buffer.concat(chunks).toString("utf-8");
+        if (res.statusCode === 401 || res.statusCode === 403) {
+          reject(new Error(`SERP API auth failed: ${res.statusCode} - check BRIGHT_DATA_API_TOKEN`));
           return;
         }
-        resolve(body);
+        if (res.statusCode === 429) {
+          reject(new Error("SERP API rate limit: 429 Too Many Requests"));
+          return;
+        }
+        if (res.statusCode !== 200) {
+          reject(new Error(`SERP API error: ${res.statusCode} - ${responseBody.slice(0, 200)}`));
+          return;
+        }
+        if (responseBody.length < 100) {
+          reject(new Error("Empty response from SERP API"));
+          return;
+        }
+        resolve(responseBody);
       });
     });
 
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error("SERP API request timeout"));
+    });
+
     req.on("error", reject);
+    req.write(body);
     req.end();
   });
 }
 
-// ===== serpRequest مع retry + User-Agent rotation =====
+// ===== serpRequest مع retry =====
 export async function serpRequest(url: string, maxRetries = 3): Promise<string> {
   const cacheKey = url;
   const cached = getCached(cacheKey);
@@ -208,30 +194,22 @@ export async function serpRequest(url: string, maxRetries = 3): Promise<string> 
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const ua = nextUserAgent();
-      const lang = nextAcceptLanguage();
-
       try {
-        const result = await serpRequestRaw(
-          url, ua, lang,
-          SERP_HOST, SERP_PORT, SERP_USERNAME, SERP_PASSWORD
-        );
-
-        // حساب عدد النتائج لتحديد TTL
+        const result = await serpRequestRaw(url);
         const resultCount = (result.match(/href="https?:\/\//g) || []).length;
         setCache(cacheKey, result, resultCount);
+        console.log(`[SERP] ✅ Got ${resultCount} links from: ${url.slice(0, 80)}`);
         return result;
       } catch (err: any) {
         lastError = err;
         const isRetryable =
-          err.message?.includes("socket hang up") ||
-          err.message?.includes("ECONNRESET") ||
           err.message?.includes("timeout") ||
-          err.message?.includes("429");
+          err.message?.includes("429") ||
+          err.message?.includes("ECONNRESET");
 
         if (attempt < maxRetries && isRetryable) {
-          const delay = Math.pow(2, attempt) * 800 + Math.random() * 400;
-          console.warn(`[SERP] Attempt ${attempt}/${maxRetries} failed (${err.message}), retry in ${Math.round(delay)}ms with new UA...`);
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+          console.warn(`[SERP] Attempt ${attempt}/${maxRetries} failed (${err.message}), retry in ${Math.round(delay)}ms...`);
           await sleep(delay);
         } else if (!isRetryable) {
           throw err;
@@ -246,54 +224,10 @@ export async function serpRequest(url: string, maxRetries = 3): Promise<string> 
 }
 
 // ===== Residential Proxy Request =====
+// الآن يستخدم SERP REST API أيضاً (لأن الـ Residential يحجب Google)
 export async function residentialRequest(url: string, maxRetries = 3): Promise<string> {
-  const cacheKey = `resi:${url}`;
-  const cached = getCached(cacheKey);
-  if (cached) {
-    console.log(`[RESI] Cache hit: ${url.slice(0, 80)}`);
-    return cached;
-  }
-
-  await acquireSlot();
-  try {
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const ua = nextUserAgent();
-      const lang = nextAcceptLanguage();
-
-      try {
-        const result = await serpRequestRaw(
-          url, ua, lang,
-          RESI_HOST, RESI_PORT,
-          RESI_USERNAME || SERP_USERNAME,
-          RESI_PASSWORD || SERP_PASSWORD
-        );
-        const resultCount = (result.match(/href="https?:\/\//g) || []).length;
-        setCache(cacheKey, result, resultCount);
-        return result;
-      } catch (err: any) {
-        lastError = err;
-        const isRetryable =
-          err.message?.includes("socket hang up") ||
-          err.message?.includes("ECONNRESET") ||
-          err.message?.includes("timeout") ||
-          err.message?.includes("429");
-
-        if (attempt < maxRetries && isRetryable) {
-          const delay = Math.pow(2, attempt) * 1000;
-          console.warn(`[RESI] Attempt ${attempt}/${maxRetries} failed (${err.message}), retry in ${delay}ms...`);
-          await sleep(delay);
-        } else if (!isRetryable) {
-          throw err;
-        }
-      }
-    }
-
-    throw lastError || new Error("Residential request failed after retries");
-  } finally {
-    releaseSlot();
-  }
+  // نستخدم SERP API كـ fallback لأنه يعمل مع جميع المواقع
+  return serpRequest(url, maxRetries);
 }
 
 // ===== ترجمة الكلمات العربية الشائعة للإنجليزية =====
