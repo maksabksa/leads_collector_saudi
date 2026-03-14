@@ -385,20 +385,53 @@ export async function residentialRequest(url: string, maxRetries = 3): Promise<s
   }
 }
 
+// ===== ترجمة الكلمات العربية الشائعة للإنجليزية =====
+const AR_TO_EN: Record<string, string> = {
+  "مطعم": "restaurant", "مطاعم": "restaurants",
+  "كافيه": "cafe", "كافيهات": "cafes", "قهوة": "coffee",
+  "صالون": "salon", "صالونات": "salons",
+  "عيادة": "clinic", "عيادات": "clinics",
+  "متجر": "store", "محل": "shop", "محلات": "shops",
+  "فندق": "hotel", "فنادق": "hotels",
+  "شركة": "company", "مؤسسة": "company",
+  "جيم": "gym", "نادي": "club",
+  "مدرسة": "school", "أكاديمية": "academy",
+  "الرياض": "riyadh", "جدة": "jeddah", "مكة": "mecca",
+  "الدمام": "dammam", "الخبر": "khobar", "المدينة": "medina",
+  "السعودية": "saudi", "سعودي": "saudi",
+};
+
+function translateToEnglish(text: string): string {
+  let result = text;
+  for (const [ar, en] of Object.entries(AR_TO_EN)) {
+    result = result.replace(new RegExp(ar, "g"), en);
+  }
+  return result.trim();
+}
+
 // ===== دالة مساعدة: توليد استعلامات متعددة =====
+// ملاحظة مهمة: site:instagram.com + نص عربي = 0 نتائج في Google
+// الحل: استخدام اسم المنصة كنص + ترجمة إنجليزية
 function buildQueryVariants(query: string, location: string | undefined, site: string): string[] {
   const loc = location || "";
   const locAr = loc ? `${loc} السعودية` : "السعودية";
-  const locEn = loc ? `${loc} Saudi Arabia` : "Saudi Arabia";
+  const locEn = loc ? `${translateToEnglish(loc)} Saudi Arabia` : "Saudi Arabia";
+  const queryEn = translateToEnglish(query);
+  const platformName = site.replace(".com", "").replace(".net", "");
+  // استعلامات بدون site: - هذه هي التي تعمل فعلاً مع Google
   return [
-    `site:${site} ${query} ${locAr}`,
-    `site:${site} ${query} ${locEn}`,
-    `site:${site} ${query} السعودية للتواصل`,
-    `site:${site} ${query} السعودية واتساب`,
-    `site:${site} ${query} KSA`,
-    `site:${site} ${query} الرياض`,
-    `site:${site} ${query} جدة`,
-    `"${query}" site:${site}`,
+    // إنجليزي + اسم المنصة (الأكثر فعالية)
+    `${platformName} ${queryEn} ${locEn}`,
+    `${platformName} ${queryEn} ${loc || "riyadh"} saudi`,
+    // عربي + اسم المنصة
+    `${platformName} ${query} ${locAr}`,
+    `${query} ${locAr} ${platformName}`,
+    // مزيج عربي + إنجليزي
+    `${queryEn} ${locEn} ${platformName} account`,
+    `${query} ${loc || "الرياض"} ${platformName} profile`,
+    // استعلام site: كـ fallback (قد يعمل أحياناً)
+    `site:${site} ${queryEn} ${locEn}`,
+    `"${queryEn}" ${locEn} ${platformName}`,
   ];
 }
 
@@ -427,46 +460,26 @@ async function multiQuerySearch(
     return await serpRequest(url);
   };
 
-  // الدفعة الأولى: 4 استعلامات بالتوازي (بدلاً من 3)
-  const firstBatch = variants.slice(0, 4).map(async (q) => {
+  // تشغيل الاستعلامات بشكل تسلسلي مع delay بين كل طلب لتجنب socket hang up
+  // الـ SERP proxy يفشل عند الطلبات المتزامنة
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  for (let i = 0; i < variants.length; i++) {
+    const q = variants[i];
     try {
+      if (i > 0) await sleep(800); // delay 800ms بين كل طلب
       const html = await fetchHtml(q);
-      return parseGoogleResultsPublic(html, site);
-    } catch (err: any) {
-      console.warn(`[${label}] query failed: ${q} - ${err.message}`);
-      return [];
-    }
-  });
-
-  const batchResults = await Promise.all(firstBatch);
-  for (const batch of batchResults) {
-    for (const r of batch) {
-      if (!seen.has(r.username)) {
-        seen.add(r.username);
-        allResults.push(r);
-      }
-    }
-  }
-
-  // إذا كانت النتائج أقل من 20، أرسل الاستعلامات المتبقية
-  if (allResults.length < 20) {
-    const secondBatch = variants.slice(4).map(async (q) => {
-      try {
-        const html = await fetchHtml(q);
-        return parseGoogleResultsPublic(html, site);
-      } catch (err: any) {
-        console.warn(`[${label}] query2 failed: ${q} - ${err.message}`);
-        return [];
-      }
-    });
-    const secondResults = await Promise.all(secondBatch);
-    for (const batch of secondResults) {
-      for (const r of batch) {
+      const parsed = parseGoogleResultsPublic(html, site);
+      for (const r of parsed) {
         if (!seen.has(r.username)) {
           seen.add(r.username);
           allResults.push(r);
         }
       }
+      // إذا وجدنا 20+ نتيجة، نوقف البحث
+      if (allResults.length >= 20) break;
+    } catch (err: any) {
+      console.warn(`[${label}] query failed: ${q} - ${err.message}`);
     }
   }
 
@@ -583,14 +596,12 @@ export async function searchTwitterSERP(query: string, location?: string): Promi
 }
 
 // ===== تحليل نتائج Google HTML =====
+// Google الحديث يُشفّر الروابط في JSON مضمّن أو يضعها في نصوص - نستخدم regex عام
 export function parseGoogleResultsPublic(html: string, domainFilter: string): Array<{
   username: string; displayName: string; bio: string; url: string;
 }> {
   const results: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
   const seen = new Set<string>();
-
-  const linkRegex = /href="(https?:\/\/(?:www\.)?[^"]*?)"/g;
-  let match;
 
   const blacklist = new Set([
     "explore", "p", "reel", "reels", "stories", "accounts", "hashtag", "tv",
@@ -600,55 +611,52 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
     "business", "ads", "developers", "pages", "groups", "events", "marketplace",
     "watch", "gaming", "fundraisers", "jobs", "news", "photos", "videos",
     "friends", "memories", "saved", "settings", "profile", "people",
+    "_n", "_u", "tagged", "saved", "highlights", "igtv",
   ]);
 
-  while ((match = linkRegex.exec(html)) !== null) {
-    const url = match[1];
-    if (!url.includes(domainFilter) || url.includes("google.com")) continue;
+  // استخراج الـ usernames مباشرة من HTML بـ regex عام
+  // هذا يعمل مع Google HTML الحديث الذي يُشفّر الروابط
+  let usernameRegex: RegExp;
+  let urlBuilder: (username: string) => string;
 
-    let username = "";
+  if (domainFilter === "instagram.com") {
+    usernameRegex = /instagram\.com\/([a-zA-Z0-9._]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    urlBuilder = (u) => `https://www.instagram.com/${u}/`;
+  } else if (domainFilter === "tiktok.com") {
+    usernameRegex = /tiktok\.com\/@([a-zA-Z0-9._]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    urlBuilder = (u) => `https://www.tiktok.com/@${u}`;
+  } else if (domainFilter === "snapchat.com") {
+    usernameRegex = /snapchat\.com\/(?:add\/)?([a-zA-Z0-9._-]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    urlBuilder = (u) => `https://www.snapchat.com/add/${u}`;
+  } else if (domainFilter === "linkedin.com") {
+    usernameRegex = /linkedin\.com\/(?:company|in)\/([a-zA-Z0-9._-]{3,50})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    urlBuilder = (u) => `https://www.linkedin.com/company/${u}`;
+  } else if (domainFilter === "twitter.com" || domainFilter === "x.com") {
+    usernameRegex = /(?:twitter|x)\.com\/([a-zA-Z0-9_]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    urlBuilder = (u) => `https://x.com/${u}`;
+  } else if (domainFilter === "facebook.com") {
+    usernameRegex = /facebook\.com\/(?:pages\/)?([a-zA-Z0-9._-]{3,50})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    urlBuilder = (u) => `https://www.facebook.com/${u}`;
+  } else {
+    return [];
+  }
 
-    if (domainFilter === "instagram.com") {
-      const m = url.match(/instagram\.com\/([a-zA-Z0-9._]+)\/?/);
-      username = m?.[1] || "";
-    } else if (domainFilter === "tiktok.com") {
-      const m = url.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
-      username = m?.[1] || "";
-      if (!username) {
-        const m2 = url.match(/tiktok\.com\/([a-zA-Z0-9._]+)/);
-        username = m2?.[1] || "";
-      }
-    } else if (domainFilter === "snapchat.com") {
-      const m = url.match(/snapchat\.com\/(?:add\/)?([a-zA-Z0-9._-]+)/);
-      username = m?.[1] || "";
-    } else if (domainFilter === "linkedin.com") {
-      const m = url.match(/linkedin\.com\/company\/([a-zA-Z0-9._-]+)/);
-      username = m?.[1] || "";
-      if (!username) {
-        const m2 = url.match(/linkedin\.com\/in\/([a-zA-Z0-9._-]+)/);
-        username = m2?.[1] || "";
-      }
-    } else if (domainFilter === "twitter.com" || domainFilter === "x.com") {
-      const m = url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)/);
-      username = m?.[1] || "";
-    } else if (domainFilter === "facebook.com") {
-      const mPage = url.match(/facebook\.com\/pages\/([^/?#]+)/);
-      const mProfile = url.match(/facebook\.com\/([a-zA-Z0-9._-]+)(?:\/|\?|$)/);
-      const mPhpId = url.match(/profile\.php\?id=(\d+)/);
-      if (mPage) username = mPage[1];
-      else if (mPhpId) username = mPhpId[1];
-      else if (mProfile) username = mProfile[1];
-    } else {
-      username = url;
-    }
-
-    if (!username || blacklist.has(username.toLowerCase()) || seen.has(username)) continue;
+  let match;
+  while ((match = usernameRegex.exec(html)) !== null) {
+    const username = match[1];
+    if (!username || username.length < 3) continue;
+    if (blacklist.has(username.toLowerCase())) continue;
+    if (seen.has(username)) continue;
+    // تجاهل الأرقام فقط (ليست usernames)
+    if (/^\d+$/.test(username)) continue;
     seen.add(username);
 
-    // استخراج السياق المحيط بالرابط
+    const url = urlBuilder(username);
+
+    // استخراج السياق المحيط
     const pos = match.index;
-    const contextStart = Math.max(0, pos - 600);
-    const contextEnd = Math.min(html.length, pos + 600);
+    const contextStart = Math.max(0, pos - 800);
+    const contextEnd = Math.min(html.length, pos + 800);
     const context = html.slice(contextStart, contextEnd);
 
     // استخراج العنوان من h3
@@ -656,13 +664,13 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
     const h3Match = context.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
     if (h3Match) {
       const rawTitle = h3Match[1].replace(/<[^>]+>/g, "").trim();
-      if (rawTitle) {
+      if (rawTitle && rawTitle.length > 2) {
         const atMatch = rawTitle.match(/^(.+?)\s*[@(]/);
         displayName = atMatch ? atMatch[1].trim() : rawTitle.slice(0, 80);
       }
     }
 
-    // استخراج الوصف
+    // استخراج الوصف - أنماط متعددة لـ Google HTML الحديث
     let bio = "";
     const descPatterns = [
       /class="[^"]*VwiC3b[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
@@ -671,17 +679,19 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
       /class="[^"]*yDYNvb[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
       /class="[^"]*IsZvec[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
       /class="[^"]*st[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*fzUZNc[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*lyLwlc[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
     ];
     for (const pattern of descPatterns) {
       const descMatch = context.match(pattern);
       if (descMatch) {
         bio = descMatch[1].replace(/<[^>]+>/g, "").trim().slice(0, 300);
-        if (bio) break;
+        if (bio && bio.length > 10) break;
       }
     }
 
     results.push({ username, displayName, bio, url });
-    if (results.length >= 50) break;
+    if (results.length >= 60) break;
   }
 
   return results;
