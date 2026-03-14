@@ -33,7 +33,8 @@ type SettingsTab =
   | "google-sheets"
   | "notifications"
   | "security"
-  | "account";
+  | "account"
+  | "report-style";
 
 interface TabConfig {
   id: SettingsTab;
@@ -55,6 +56,7 @@ const TABS: TabConfig[] = [
   { id: "notifications", label: "الإشعارات", icon: Bell, description: "إعدادات التنبيهات" },
   { id: "security", label: "الأمان", icon: Shield, description: "الصلاحيات والمستخدمين" },
   { id: "account", label: "الحساب", icon: User, description: "معلومات حسابك الشخصي" },
+  { id: "report-style", label: "أسلوب التقارير", icon: FileText, description: "تهيئة طريقة كتابة التقارير والفرص", badge: "جديد" },
 ];
 
 // ===== مكون بطاقة الإعداد =====
@@ -1356,6 +1358,191 @@ function AccountTab() {
   );
 }
 
+// ===== تبويب أسلوب الكتابة =====
+function ReportStyleTab() {
+  const { data, refetch } = trpc.reportStyle.get.useQuery();
+  const saveMutation = trpc.reportStyle.save.useMutation({
+    onSuccess: () => { toast.success("تم حفظ إعدادات أسلوب التقارير"); refetch(); },
+    onError: (e) => toast.error("فشل الحفظ", { description: e.message }),
+  });
+
+  const [tone, setTone] = React.useState("professional");
+  const [brandKeywords, setBrandKeywords] = React.useState("");
+  const [customInstructions, setCustomInstructions] = React.useState("");
+  const [opportunityCommentStyle, setOpportunityCommentStyle] = React.useState("");
+  const [closingStatement, setClosingStatement] = React.useState("");
+  const [mentionCompanyName, setMentionCompanyName] = React.useState(true);
+  const [includeSeasonSection, setIncludeSeasonSection] = React.useState(true);
+  const [includeCompetitorsSection, setIncludeCompetitorsSection] = React.useState(true);
+  const [detailLevel, setDetailLevel] = React.useState("standard");
+
+  React.useEffect(() => {
+    if (data) {
+      setTone(data.tone || "professional");
+      setBrandKeywords(((data.brandKeywords as string[]) || []).join("، "));
+      setCustomInstructions(data.customInstructions || "");
+      setOpportunityCommentStyle(data.opportunityCommentStyle || "");
+      setClosingStatement(data.closingStatement || "");
+      setMentionCompanyName(data.mentionCompanyName ?? true);
+      setIncludeSeasonSection(data.includeSeasonSection ?? true);
+      setIncludeCompetitorsSection(data.includeCompetitorsSection ?? true);
+      setDetailLevel(data.detailLevel || "standard");
+    }
+  }, [data]);
+
+  const handleSave = () => {
+    saveMutation.mutate({
+      tone: tone as any,
+      brandKeywords: brandKeywords.split(/[،,]+/).map(k => k.trim()).filter(Boolean),
+      customInstructions,
+      opportunityCommentStyle,
+      closingStatement,
+      mentionCompanyName,
+      includeSeasonSection,
+      includeCompetitorsSection,
+      detailLevel: detailLevel as any,
+    });
+  };
+
+  const TONES = [
+    { value: "professional", label: "احترافي رسمي", desc: "لغة مؤسسية رصينة تناسب الشركات الكبيرة" },
+    { value: "consultative", label: "استشاري", desc: "أسلوب مستشار خبير يقدم توصيات مدروسة" },
+    { value: "direct", label: "مباشر وحازم", desc: "نقاط واضحة وصريحة بدون مقدمات" },
+    { value: "friendly", label: "ودي ومحفز", desc: "أسلوب دافئ يشجع العميل على التحرك" },
+  ];
+
+  const DETAIL_LEVELS = [
+    { value: "brief", label: "موجز", desc: "نقاط رئيسية فقط" },
+    { value: "standard", label: "معياري", desc: "توازن بين التفصيل والإيجاز" },
+    { value: "detailed", label: "مفصّل", desc: "شرح وافٍ لكل نقطة" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* نبرة التقرير */}
+      <SettingCard title="نبرة الكتابة" icon={FileText} description="كيف يتحدث التقرير مع العميل">
+        <div className="grid grid-cols-2 gap-3">
+          {TONES.map(t => (
+            <button
+              key={t.value}
+              onClick={() => setTone(t.value)}
+              className={`p-3 rounded-xl text-right border-2 transition-all ${
+                tone === t.value
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-muted/20 hover:border-primary/40"
+              }`}
+            >
+              <p className={`text-sm font-semibold ${tone === t.value ? "text-primary" : "text-foreground"}`}>{t.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t.desc}</p>
+            </button>
+          ))}
+        </div>
+      </SettingCard>
+
+      {/* مستوى التفصيل */}
+      <SettingCard title="مستوى التفصيل" icon={Layers} description="مقدار الشرح في كل نقطة">
+        <div className="flex gap-3">
+          {DETAIL_LEVELS.map(d => (
+            <button
+              key={d.value}
+              onClick={() => setDetailLevel(d.value)}
+              className={`flex-1 p-3 rounded-xl text-center border-2 transition-all ${
+                detailLevel === d.value
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-muted/20 hover:border-primary/40"
+              }`}
+            >
+              <p className={`text-sm font-semibold ${detailLevel === d.value ? "text-primary" : "text-foreground"}`}>{d.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{d.desc}</p>
+            </button>
+          ))}
+        </div>
+      </SettingCard>
+
+      {/* الكلمات المفتاحية للبراند */}
+      <SettingCard title="كلمات مفتاحية للبراند" icon={Tag} description="كلمات تُدمج في نصوص التقرير لتعكس هوية شركتك">
+        <div className="space-y-2">
+          <Input
+            value={brandKeywords}
+            onChange={e => setBrandKeywords(e.target.value)}
+            placeholder="مثال: مكسب، استشارات، نمو، تحول رقمي (افصل بفاصلة)"
+            dir="rtl"
+          />
+          <p className="text-xs text-muted-foreground">ستُدرج هذه الكلمات بشكل طبيعي في توصيات التقرير</p>
+        </div>
+      </SettingCard>
+
+      {/* تعليمات مخصصة للـ AI */}
+      <SettingCard title="تعليمات مخصصة للذكاء الاصطناعي" icon={Brain} description="توجيهات إضافية يتبعها الـ AI عند كتابة التوصيات">
+        <Textarea
+          value={customInstructions}
+          onChange={e => setCustomInstructions(e.target.value)}
+          placeholder="مثال: ركز دائماً على الفرص الموسمية. اذكر أهمية SEO في كل تقرير. لا تذكر المنافسين بالاسم..."
+          rows={4}
+          dir="rtl"
+          className="text-sm"
+        />
+      </SettingCard>
+
+      {/* أسلوب التعليق على الفرص */}
+      <SettingCard title="أسلوب التعليق على الفرص" icon={TrendingUp} description="كيف يُعلّق التقرير على كل فرصة تسويقية">
+        <Textarea
+          value={opportunityCommentStyle}
+          onChange={e => setOpportunityCommentStyle(e.target.value)}
+          placeholder="مثال: اربط كل فرصة بالعائد المالي المتوقع. استخدم أرقاماً تقديرية. اذكر المدة الزمنية للتنفيذ..."
+          rows={3}
+          dir="rtl"
+          className="text-sm"
+        />
+      </SettingCard>
+
+      {/* جملة الختام */}
+      <SettingCard title="جملة الختام المخصصة" icon={Star} description="النص الذي يظهر في نهاية كل تقرير">
+        <Textarea
+          value={closingStatement}
+          onChange={e => setClosingStatement(e.target.value)}
+          placeholder="مثال: نحن في مكسب نؤمن أن كل تحدي رقمي هو فرصة نمو. تواصل معنا لنبدأ رحلتك..."
+          rows={3}
+          dir="rtl"
+          className="text-sm"
+        />
+      </SettingCard>
+
+      {/* خيارات الأقسام */}
+      <SettingCard title="أقسام التقرير" icon={Layers} description="تحكم في الأقسام التي تظهر في كل تقرير">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+            <div>
+              <p className="text-sm font-medium">قسم المواسم التسويقية</p>
+              <p className="text-xs text-muted-foreground">يُظهر الموسم الحالي وفرصه المخصصة لنوع النشاط</p>
+            </div>
+            <Switch checked={includeSeasonSection} onCheckedChange={setIncludeSeasonSection} />
+          </div>
+          <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+            <div>
+              <p className="text-sm font-medium">قسم مقارنة المنافسين</p>
+              <p className="text-xs text-muted-foreground">يُقارن العميل بأقرب المنافسين في نفس المدينة</p>
+            </div>
+            <Switch checked={includeCompetitorsSection} onCheckedChange={setIncludeCompetitorsSection} />
+          </div>
+          <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+            <div>
+              <p className="text-sm font-medium">ذكر اسم شركتك في التقرير</p>
+              <p className="text-xs text-muted-foreground">يُذكر اسم الشركة في الخاتمة وبعض التوصيات</p>
+            </div>
+            <Switch checked={mentionCompanyName} onCheckedChange={setMentionCompanyName} />
+          </div>
+        </div>
+      </SettingCard>
+
+      <Button onClick={handleSave} disabled={saveMutation.isPending} className="w-full">
+        {saveMutation.isPending ? <RefreshCw className="w-4 h-4 ml-2 animate-spin" /> : <Save className="w-4 h-4 ml-2" />}
+        حفظ إعدادات أسلوب التقارير
+      </Button>
+    </div>
+  );
+}
+
 // ===== الصفحة الرئيسية =====
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
@@ -1373,6 +1560,7 @@ export default function Settings() {
       case "notifications": return <NotificationsTab />;
       case "security": return <SecurityTab />;
       case "account": return <AccountTab />;
+      case "report-style": return <ReportStyleTab />;
       default: return <GeneralTab />;
     }
   };

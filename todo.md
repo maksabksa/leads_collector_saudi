@@ -1770,3 +1770,13 @@
 - [ ] تحديث زر "معاينة" في LeadDetail ليستدعي `report.getHtml` ويعرضه في iframe
 - [ ] حذف الاعتماد على generateLeadPDF.ts القديم في زر المعاينة
 - [ ] التأكد من أن المعاينة والـ PDF يستخدمان نفس buildPDFHtml بالضبط
+
+## الميزات الجديدة - مارس 2026 (الدفعة الحالية)
+
+- [x] ربط المواسم التسويقية بالتقرير مع توجيهات مخصصة لنوع النشاط
+- [x] إضافة جدول report_style_settings في قاعدة البيانات
+- [x] tRPC router لإعدادات أسلوب الكتابة (getReportStyleSettings / saveReportStyleSettings)
+- [x] صفحة إعدادات أسلوب الكتابة في تبويب الإعدادات (النبرة، الكلمات المفتاحية، الخاتمة، تضمين الأقسام)
+- [x] دمج إعدادات الأسلوب في buildPDFHtml (closingText، includeSeasonSection، includeCompetitorsSection)
+- [x] نافذة تأكيد اكتمال البيانات قبل التحليل الشامل (قائمة بالبيانات المتوفرة والناقصة)
+- [x] توحيد زر المعاينة مع تقرير PDF (يستخدم report.getHtml من السيرفر)

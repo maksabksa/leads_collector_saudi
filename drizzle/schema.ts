@@ -1385,3 +1385,31 @@ export const marketingSeasons = mysqlTable("marketing_seasons", {
 });
 export type MarketingSeason = typeof marketingSeasons.$inferSelect;
 export type InsertMarketingSeason = typeof marketingSeasons.$inferInsert;
+
+// ===== REPORT STYLE SETTINGS TABLE (إعدادات أسلوب كتابة التقارير) =====
+export const reportStyleSettings = mysqlTable("report_style_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  // أسلوب النبرة العام
+  tone: varchar("tone", { length: 50 }).default("professional").notNull(),
+  // "professional" | "friendly" | "direct" | "consultative"
+  // الكلمات المفتاحية للبراند (تُدمج في النصوص)
+  brandKeywords: json("brandKeywords").$type<string[]>().default([]).notNull(),
+  // تعليمات مخصصة للـ AI عند كتابة التوصيات
+  customInstructions: text("customInstructions"),
+  // تعليمات مخصصة للتعليق على الفرص
+  opportunityCommentStyle: text("opportunityCommentStyle"),
+  // هل يُذكر اسم الشركة (مكسب) في التقرير؟
+  mentionCompanyName: boolean("mentionCompanyName").default(true).notNull(),
+  // جملة الختام المخصصة
+  closingStatement: text("closingStatement"),
+  // هل يُضاف قسم الموسم التسويقي تلقائياً؟
+  includeSeasonSection: boolean("includeSeasonSection").default(true).notNull(),
+  // هل يُضاف قسم المنافسين؟
+  includeCompetitorsSection: boolean("includeCompetitorsSection").default(true).notNull(),
+  // مستوى التفصيل: "brief" | "standard" | "detailed"
+  detailLevel: varchar("detailLevel", { length: 20 }).default("standard").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ReportStyleSettings = typeof reportStyleSettings.$inferSelect;
+export type InsertReportStyleSettings = typeof reportStyleSettings.$inferInsert;

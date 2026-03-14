@@ -92,6 +92,8 @@ export default function LeadDetail() {
   // Preview modal state
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  // نافذة تأكيد اكتمال البيانات
+  const [showDataConfirmModal, setShowDataConfirmModal] = useState(false);
   const getReportHtml = trpc.report.getHtml.useMutation();
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
@@ -324,6 +326,12 @@ export default function LeadDetail() {
     finally { setAnalyzingPlatform(null); }
   };
   const handleAnalyzeAllPlatforms = async () => {
+    // فحص اكتمال البيانات أولاً
+    if (!showDataConfirmModal) {
+      setShowDataConfirmModal(true);
+      return;
+    }
+    setShowDataConfirmModal(false);
     setAnalyzingPlatform("all");
     try {
       const result = await bdAnalyzeAll.mutateAsync({ leadId: id });
@@ -1914,6 +1922,76 @@ export default function LeadDetail() {
             title="معاينة التقرير"
             sandbox="allow-same-origin"
           />
+        </div>
+    </div>
+    )}
+
+    {/* ===== نافذة تأكيد اكتمال البيانات ===== */}
+    {showDataConfirmModal && data?.lead && (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.75)" }}>
+        <div className="rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl" style={{ background: "oklch(0.12 0.02 240)", border: "1px solid oklch(0.25 0.05 240)" }}>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "oklch(0.65 0.18 60 / 0.2)" }}>
+              <AlertTriangle className="w-5 h-5" style={{ color: "oklch(0.78 0.16 75)" }} />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-foreground">تأكيد البيانات قبل التحليل</h3>
+              <p className="text-xs text-muted-foreground">تحقق من اكتمال البيانات لضمان أفضل نتائج</p>
+            </div>
+          </div>
+
+          {/* قائمة البيانات المتوفرة والناقصة */}
+          <div className="space-y-2 mb-5">
+            {[
+              { label: "اسم النشاط", value: data.lead.companyName, required: true },
+              { label: "نوع النشاط", value: data.lead.businessType, required: true },
+              { label: "المدينة", value: data.lead.city, required: true },
+              { label: "رقم الهاتف", value: data.lead.verifiedPhone, required: false },
+              { label: "الموقع الإلكتروني", value: data.lead.website, required: false },
+              { label: "حساب إنستغرام", value: data.lead.instagramUrl, required: false },
+              { label: "حساب تيك توك", value: (data.lead as any).tiktokUrl, required: false },
+              { label: "خرائط Google", value: data.lead.googleMapsUrl, required: false },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "oklch(0.16 0.02 240)" }}>
+                <span className="text-sm text-foreground">{item.label}</span>
+                <div className="flex items-center gap-2">
+                  {item.required && !item.value && (
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "oklch(0.55 0.18 25 / 0.2)", color: "oklch(0.65 0.18 25)" }}>مطلوب</span>
+                  )}
+                  {item.value ? (
+                    <CheckCircle className="w-4 h-4" style={{ color: "oklch(0.65 0.18 145)" }} />
+                  ) : (
+                    <XCircle className="w-4 h-4" style={{ color: item.required ? "oklch(0.65 0.18 25)" : "oklch(0.45 0.05 240)" }} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* تحذير إذا كانت بيانات أساسية ناقصة */}
+          {(!data.lead.businessType || !data.lead.city) && (
+            <div className="flex items-start gap-2 p-3 rounded-xl mb-4" style={{ background: "oklch(0.55 0.18 25 / 0.1)", border: "1px solid oklch(0.55 0.18 25 / 0.3)" }}>
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "oklch(0.65 0.18 25)" }} />
+              <p className="text-xs" style={{ color: "oklch(0.75 0.12 25)" }}>بيانات أساسية ناقصة (نوع النشاط أو المدينة). التحليل قد يكون أقل دقة.</p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDataConfirmModal(false)}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{ background: "oklch(0.2 0.02 240)", color: "oklch(0.7 0.05 240)", border: "1px solid oklch(0.3 0.05 240)" }}
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={handleAnalyzeAllPlatforms}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+              style={{ background: "oklch(0.65 0.18 145)", color: "white" }}
+            >
+              ابدأ التحليل الشامل
+            </button>
+          </div>
         </div>
       </div>
     )}

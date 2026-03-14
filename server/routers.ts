@@ -58,6 +58,7 @@ import { brightDataAnalysisRouter } from "./routers/brightDataAnalysis";
 import { aiAgentRouter } from "./routers/aiAgent";
 import { serpQueueRouter } from "./routers/serpQueue";
 import { seasonsRouter } from "./routers/seasons";
+import { reportStyleRouter } from "./routers/reportStyle";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -2457,5 +2458,6 @@ export const appRouter = router({
   analysisSettings: analysisSettingsRouter,
   serpQueue: serpQueueRouter,
   seasons: seasonsRouter,
+  reportStyle: reportStyleRouter,
 });
 export type AppRouter = typeof appRouter;

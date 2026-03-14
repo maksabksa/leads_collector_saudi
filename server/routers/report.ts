@@ -8,6 +8,7 @@ import { nanoid } from "nanoid";
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
 import { getActiveSeasonForBusiness, getUpcomingSeasonsForBusiness } from "./seasons";
+import { getReportStyleSettings } from "./reportStyle";
 
 async function getCompanySettingsData() {
   try {
@@ -68,7 +69,9 @@ async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses
   const activeSeason = await getActiveSeasonForBusiness(businessType).catch(() => null);
   const upcomingSeasons = await getUpcomingSeasonsForBusiness(businessType).catch(() => []);
   const competitors = await getCompetitors(lead.id, businessType, lead.city || "").catch(() => []);
-  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company, activeSeason, upcomingSeasons, competitors);
+  // جلب إعدادات أسلوب الكتابة
+  const styleSettings = await getReportStyleSettings().catch(() => null);
+  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company, activeSeason, upcomingSeasons, competitors, styleSettings);
   
   let executablePath: string;
   try {
@@ -305,7 +308,7 @@ function buildRadarChart(subjects: string[], datasets: Array<{label: string; dat
   </svg>`;
 }
 
-function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any, activeSeason?: any, upcomingSeasons?: any[], competitors?: any[]): string {
+function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any, activeSeason?: any, upcomingSeasons?: any[], competitors?: any[], styleSettings?: any): string {
   const stageLabels: Record<string, string> = {
     new: "جديد", contacted: "تم التواصل", interested: "مهتم",
     price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه",
@@ -321,6 +324,55 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   const primaryColor = company?.primaryColor || "#1a56db";
   const secondaryColor = company?.secondaryColor || "#0e9f6e";
   const reportFooterText = company?.reportFooterText || `جميع الحقوق محفوظة لـ ${companyName} ${new Date().getFullYear()}`;
+
+  // إعدادات أسلوب الكتابة
+  const styleTone = styleSettings?.tone || "professional";
+  const styleKeywords: string[] = (styleSettings?.brandKeywords as string[]) || [];
+  const styleClosing = styleSettings?.closingStatement || "";
+  const includeSeasonSection = styleSettings?.includeSeasonSection !== false;
+  const includeCompetitorsSection = styleSettings?.includeCompetitorsSection !== false;
+  const detailLevel = styleSettings?.detailLevel || "standard";
+  // نص الخاتمة بناءً على الإعدادات
+  const closingText = styleClosing || (
+    styleTone === "friendly" ? `نحن سعداء بمساعدتك في رحلة النمو الرقمي. تواصل معنا وابدأ التحول اليوم.` :
+    styleTone === "direct" ? `الفرصة متاحة الآن. تواصل معنا لنبدأ فوراً.` :
+    styleTone === "consultative" ? `بناءً على هذا التحليل، نوصي بجلسة عمل لوضع خطة تنفيذية مخصصة لـ ${lead.companyName}.` :
+    `ما تقرأه هنا هو تشخيص أولي للوضع الرقمي. التحليل الأعمق والخطة التنفيذية المخصصة تتطلب جلسة عمل مع فريقنا.`
+  );
+
+  // توجيهات مخصصة للموسم حسب نوع النشاط
+  function getSeasonBusinessGuidance(season: any, businessType: string): string {
+    if (!season) return "";
+    const bt = (businessType || "").toLowerCase();
+    const sn = (season.name || "").toLowerCase();
+    // رمضان
+    if (sn.includes("رمضان")) {
+      if (bt.includes("مطعم") || bt.includes("كافيه") || bt.includes("حلويات")) return `فرصة ذهبية: الطلب يرتفع 300% في رمضان. ركز على باقات السحور والإفطار والتوصيل.`;
+      if (bt.includes("ملابس") || bt.includes("أزياء") || bt.includes("عبايا")) return `موسم الملابس الرمضانية والعيدية. ابدأ الحملة قبل رمضان بأسبوعين على الأقل.`;
+      if (bt.includes("صالون") || bt.includes("تجميل")) return `الطلب يرتفع قبيل العيد. قدم باقات العروس وعروض الحجز المبكر.`;
+      return `رمضان فرصة لزيادة الحضور الرقمي وبناء الثقة مع العملاء.`;
+    }
+    // اليوم الوطني
+    if (sn.includes("وطني")) {
+      if (bt.includes("مطعم") || bt.includes("كافيه")) return `حملات اليوم الوطني تحقق تفاعلاً عالياً. قدم عروضاً خاصة ومحتوىً وطنياً.`;
+      if (bt.includes("ملابس") || bt.includes("أزياء")) return `الملابس الوطنية فرصة تسويقية ممتازة. استخدم الألوان الوطنية في محتواك.`;
+      return `اليوم الوطني فرصة لحملات إبداعية تعزز الانتماء وترفع التفاعل.`;
+    }
+    // الصيف
+    if (sn.includes("صيف")) {
+      if (bt.includes("سفر") || bt.includes("سياحة") || bt.includes("فندق")) return `موسم ذروتك. ركز على الحجز المبكر والعروض الحصرية.`;
+      if (bt.includes("ملابس") || bt.includes("أطفال")) return `موسم العودة للمدرسة فرصة كبيرة. ابدأ حملتك مبكراً.`;
+      return `الصيف فرصة لعروض خاصة وتنشيط المبيعات.`;
+    }
+    // العودة للمدرسة
+    if (sn.includes("مدرسة") || sn.includes("عودة")) {
+      if (bt.includes("ملابس") || bt.includes("أطفال")) return `موسم العودة للمدرسة هو موسمك. ابدأ حملة الزي المدرسي قبل شهر من بداية الدراسة.`;
+      if (bt.includes("تعليم") || bt.includes("دروس")) return `التسجيل للدورات يرتفع في هذا الموسم. قدم عروضاً للحجز المبكر.`;
+      return `موسم العودة للمدرسة يخلق طلباً عالياً على منتجاتك.`;
+    }
+    // افتراضي
+    return `هذا الموسم يمثل فرصة تسويقية مميزة لـ ${lead.companyName}. استغلها بحملة مخصصة.`;
+  }
 
   // حساب المؤشرات الذكية
   const scores = computeSmartScores(lead, websiteAnalysis, socialAnalyses);
@@ -949,14 +1001,18 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
     </div>
 
     <!-- قسم الموسم التسويقي -->
-    ${activeSeason ? `
+    ${includeSeasonSection ? (activeSeason ? `
     <div style="background:linear-gradient(135deg,${activeSeason.color}15 0%,${activeSeason.color}08 100%);border:1.5px solid ${activeSeason.color};border-radius:14px;padding:16px 20px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:800;color:${activeSeason.color};margin-bottom:8px;display:flex;align-items:center;gap:8px;">
         <span style="font-size:20px;">${activeSeason.icon}</span>
         <span>تنبيه موسمي: ${activeSeason.name}</span>
         <span style="background:${activeSeason.color};color:white;font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700;">نشط الآن</span>
       </div>
-      <div style="font-size:11px;color:#475569;margin-bottom:10px;">${activeSeason.description || ""}</div>
+      <div style="font-size:11px;color:#475569;margin-bottom:8px;">${activeSeason.description || ""}</div>
+      ${getSeasonBusinessGuidance(activeSeason, lead.businessType || "") ? `
+      <div style="background:${activeSeason.color}20;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:11px;font-weight:700;color:${activeSeason.color};border-right:3px solid ${activeSeason.color};">
+        🎯 توجيه مخصص لـ ${lead.businessType || "نشاطك"}: ${getSeasonBusinessGuidance(activeSeason, lead.businessType || "")}
+      </div>` : ""}
       <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:8px;">فرص تسويقية متاحة في هذا الموسم:</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
         ${((activeSeason.opportunities || []) as string[]).slice(0, 4).map((opp: string) => `
@@ -970,8 +1026,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
     <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:14px;padding:14px 18px;margin-bottom:16px;">
       <div style="font-size:12px;font-weight:800;color:#b45309;margin-bottom:8px;">⏰ موسم تسويقي قادم خلال 30 يوماً: ${upcomingSeasons[0].icon} ${upcomingSeasons[0].name}</div>
       <div style="font-size:11px;color:#78350f;">ابدأ التحضير مبكراً للاستفادة من هذا الموسم. ${upcomingSeasons[0].description || ""}</div>
+      ${getSeasonBusinessGuidance(upcomingSeasons[0], lead.businessType || "") ? `
+      <div style="background:#fef3c7;border-radius:8px;padding:6px 10px;margin-top:8px;font-size:10.5px;font-weight:600;color:#92400e;">
+        🎯 توجيه لـ ${lead.businessType || "نشاطك"}: ${getSeasonBusinessGuidance(upcomingSeasons[0], lead.businessType || "")}
+      </div>` : ""}
     </div>
-    ` : "")}
+    ` : "")) : ""}
 
     <!-- خاتمة ذكية + QR Code + واتساب -->
     <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:16px;padding:22px 28px;color:white;margin-top:4px;">
@@ -980,9 +1040,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
         <div style="flex:1;">
           <div style="font-size:15px;font-weight:900;margin-bottom:8px;">هذا التقرير بداية الطريق</div>
           <div style="font-size:11.5px;opacity:0.85;line-height:1.8;margin-bottom:14px;">
-            ما تقرأه هنا هو تشخيص أولي للوضع الرقمي لـ <strong>${lead.companyName}</strong>.
-            التحليل الأعمق والخطة التنفيذية المخصصة تتطلب جلسة عمل مع فريقنا.
-            نحن لا نبيع خدمات — نبني شراكات تجارية قائمة على النتائج.
+            ${closingText}
           </div>
           <div style="font-size:12px;font-weight:700;opacity:0.9;margin-bottom:10px;">للحصول على تحليل أعمق وخطة تنفيذية مخصصة:</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
