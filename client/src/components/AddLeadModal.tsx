@@ -99,6 +99,10 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
   const [socialSearchResults, setSocialSearchResults] = useState<Record<string, any[]>>({});
   const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({});
   const [searchErrors, setSearchErrors] = useState<Record<string, string>>({});
+  // حالة تحليل البايو بالذكاء الاصطناعي
+  const [isAnalyzingBio, setIsAnalyzingBio] = useState(false);
+  const [bioAnalysisApplied, setBioAnalysisApplied] = useState(false);
+  const [bioAnalysisConfidence, setBioAnalysisConfidence] = useState(0);
 
   const [form, setForm] = useState({
     // بيانات أساسية
@@ -136,6 +140,7 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
 
   const createLead = trpc.leads.create.useMutation();
   const smartFindMut = trpc.brightDataSearch.smartFindSocialAccounts.useMutation();
+  const analyzeFromBioMut = trpc.leads.analyzeFromBio.useMutation();
 
   // تعبئة النموذج من البيانات المبدئية
   useEffect(() => {
@@ -165,8 +170,95 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
     setSocialSearchResults({});
     setAiSuggestions({});
     setSearchErrors({});
+    setBioAnalysisApplied(false);
+    setBioAnalysisConfidence(0);
     setActiveTab("basic");
   }, [open, initialData]);
+
+  // تحليل البايو تلقائياً عند فتح النموذج مع بيانات سوشيال
+  useEffect(() => {
+    if (!open || !initialData) return;
+    const hasBio = !!(initialData.bio && initialData.bio.trim().length > 5);
+    const hasCompanyName = !!(initialData.companyName && initialData.companyName.trim());
+    const needsBusinessType = !initialData.businessType;
+    const needsCity = !initialData.city;
+    // شغّل التحليل فقط إذا كان هناك بيانات كافية وحقول مفقودة
+    if ((hasBio || hasCompanyName) && (needsBusinessType || needsCity)) {
+      const timer = setTimeout(async () => {
+        setIsAnalyzingBio(true);
+        try {
+          const result = await analyzeFromBioMut.mutateAsync({
+            bio: initialData.bio || "",
+            companyName: initialData.companyName || "",
+            platform: initialData.platform || "",
+            username: initialData.username || "",
+            city: initialData.city || "",
+          });
+          if (result.confidence > 30) {
+            setForm(f => ({
+              ...f,
+              businessType: (needsBusinessType && result.businessType) ? result.businessType : f.businessType,
+              city: (needsCity && result.city) ? result.city : f.city,
+              verifiedPhone: (!f.verifiedPhone && result.phone) ? result.phone : f.verifiedPhone,
+              website: (!f.website && result.website) ? result.website : f.website,
+              district: (!f.district && result.district) ? result.district : f.district,
+            }));
+            setBioAnalysisApplied(true);
+            setBioAnalysisConfidence(result.confidence);
+          }
+        } catch (e) {
+          console.error('[AddLeadModal] Bio analysis error:', e);
+        } finally {
+          setIsAnalyzingBio(false);
+        }
+      }, 800); // تأخير بسيط لإتاحة تحميل النموذج أولاً
+      return () => clearTimeout(timer);
+    }
+  }, [open, initialData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // دالة تحليل يدوي بالضغط على الزر
+  const handleManualBioAnalysis = async () => {
+    const bio = form.notes || initialData?.bio || "";
+    const companyName = form.companyName;
+    if (!bio && !companyName) {
+      toast.error("لا توجد بيانات كافية للتحليل");
+      return;
+    }
+    setIsAnalyzingBio(true);
+    setBioAnalysisApplied(false);
+    try {
+      const result = await analyzeFromBioMut.mutateAsync({
+        bio,
+        companyName,
+        platform: initialData?.platform || "",
+        username: initialData?.username || "",
+        city: form.city || "",
+      });
+      if (result.confidence > 20) {
+        setForm(f => ({
+          ...f,
+          businessType: result.businessType || f.businessType,
+          city: result.city || f.city,
+          verifiedPhone: result.phone || f.verifiedPhone,
+          website: result.website || f.website,
+          district: result.district || f.district,
+        }));
+        setBioAnalysisApplied(true);
+        setBioAnalysisConfidence(result.confidence);
+        toast.success("تم التحليل بالذكاء الاصطناعي", {
+          description: `ثقة التحليل: ${result.confidence}%`,
+        });
+      } else {
+        toast.info("لم يتمكن AI من استخراج بيانات كافية", {
+          description: "يمكنك إدخال البيانات يدوياً",
+        });
+      }
+    } catch (e: any) {
+      toast.error("خطأ في التحليل", { description: e.message });
+    } finally {
+      setIsAnalyzingBio(false);
+    }
+  };
 
   // تحديث الهاتف والموقع من Google Places تلقائياً
   useEffect(() => {
@@ -330,6 +422,18 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
                 {socialPlatforms.filter(p => !!(form as any)[p.key]).length} منصة مرتبطة
               </Badge>
             )}
+            {isAnalyzingBio && (
+              <Badge className="text-xs bg-purple-500/20 text-purple-400 border-purple-500/30 gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                AI يحلّل
+              </Badge>
+            )}
+            {!isAnalyzingBio && bioAnalysisApplied && (
+              <Badge className="text-xs bg-purple-500/20 text-purple-400 border-purple-500/30 gap-1">
+                <Sparkles className="w-3 h-3" />
+                تحليل AI ({bioAnalysisConfidence}%)
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -399,12 +503,36 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs mb-1 block">نوع النشاط *</Label>
-                  <Input
-                    value={form.businessType}
-                    onChange={e => setField("businessType", e.target.value)}
-                    placeholder="مطعم، صالون، متجر..."
-                  />
+                  <Label className="text-xs mb-1 flex items-center gap-1.5">
+                    نوع النشاط *
+                    {isAnalyzingBio && (
+                      <span className="flex items-center gap-1 text-[10px] text-purple-400 animate-pulse">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        AI يحلّل...
+                      </span>
+                    )}
+                    {!isAnalyzingBio && bioAnalysisApplied && form.businessType && (
+                      <span className="flex items-center gap-1 text-[10px] text-purple-400">
+                        <Sparkles className="w-3 h-3" />
+                        مليء بالذكاء ({bioAnalysisConfidence}%)
+                      </span>
+                    )}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      value={form.businessType}
+                      onChange={e => setField("businessType", e.target.value)}
+                      placeholder="مطعم، صالون، متجر..."
+                      className={bioAnalysisApplied && form.businessType ? "border-purple-500/50 pr-8" : ""}
+                      disabled={isAnalyzingBio}
+                    />
+                    {isAnalyzingBio && (
+                      <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-purple-400 animate-spin" />
+                    )}
+                    {!isAnalyzingBio && bioAnalysisApplied && form.businessType && (
+                      <Sparkles className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-purple-400" />
+                    )}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs mb-1 block">رقم السجل التجاري</Label>
@@ -424,12 +552,30 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
               {/* المدينة والمنطقة */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs mb-1 block">المدينة *</Label>
-                  <Input
-                    value={form.city}
-                    onChange={e => setField("city", e.target.value)}
-                    placeholder="الرياض"
-                  />
+                  <Label className="text-xs mb-1 flex items-center gap-1.5">
+                    المدينة *
+                    {!isAnalyzingBio && bioAnalysisApplied && form.city && (
+                      <span className="flex items-center gap-1 text-[10px] text-purple-400">
+                        <Sparkles className="w-3 h-3" />
+                        AI
+                      </span>
+                    )}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      value={form.city}
+                      onChange={e => setField("city", e.target.value)}
+                      placeholder="الرياض"
+                      className={bioAnalysisApplied && form.city ? "border-purple-500/50 pr-8" : ""}
+                      disabled={isAnalyzingBio}
+                    />
+                    {isAnalyzingBio && (
+                      <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-purple-400 animate-spin" />
+                    )}
+                    {!isAnalyzingBio && bioAnalysisApplied && form.city && (
+                      <Sparkles className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-purple-400" />
+                    )}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs mb-1 block">الحي / المنطقة</Label>
@@ -804,6 +950,21 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
             إلغاء
           </Button>
           <div className="flex gap-2">
+            {/* زر تحليل AI يدوي */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualBioAnalysis}
+              disabled={isAnalyzingBio || (!form.companyName && !form.notes && !initialData?.bio)}
+              className="gap-1.5 text-xs border-purple-500/40 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300"
+              title="تحليل البيانات بالذكاء الاصطناعي"
+            >
+              {isAnalyzingBio ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" />تحليل...</>
+              ) : (
+                <><Sparkles className="w-3.5 h-3.5" />AIتحليل </>
+              )}
+            </Button>
             {activeTab !== "social" && (
               <Button
                 variant="outline"

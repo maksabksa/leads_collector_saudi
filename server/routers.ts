@@ -548,6 +548,83 @@ const leadsRouter = router({
       }
       return { created, failed, errors };
     }),
+
+  // ===== تحليل البايو بالذكاء الاصطناعي =====
+  analyzeFromBio: protectedProcedure
+    .input(z.object({
+      bio: z.string().optional(),
+      companyName: z.string().optional(),
+      platform: z.string().optional(),
+      username: z.string().optional(),
+      city: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { bio, companyName, platform, username, city } = input;
+      if (!bio && !companyName) {
+        return { businessType: null, city: null, phone: null, website: null, district: null, confidence: 0 };
+      }
+
+      const contextParts: string[] = [];
+      if (companyName) contextParts.push(`اسم النشاط: ${companyName}`);
+      if (platform) contextParts.push(`المنصة: ${platform}`);
+      if (username) contextParts.push(`اسم المستخدم: @${username}`);
+      if (city) contextParts.push(`المدينة المعروفة: ${city}`);
+      if (bio) contextParts.push(`البيو / الوصف:\n${bio.substring(0, 500)}`);
+
+      const prompt = `أنت خبير تحليل بيانات الأعمال في السوق السعودي والخليجي.
+حلّل المعلومات التالية واستخرج منها البيانات المطلوبة:
+
+${contextParts.join('\n')}
+
+استخرج:
+1. نوع النشاط التجاري (مثل: مطعم، صالون، متجر ملابس، عيادة، شركة مقاولات، إلخ) - اختر الأدق والأكثر تحديداً
+2. المدينة (إذا ذُكرت صراحةً أو يمكن استنتاجها بثقة عالية)
+3. رقم الهاتف السعودي (إذا وُجد في النص - ابحث عن أرقام تبدأ بـ 05 أو +966 أو 966)
+4. الموقع الإلكتروني (إذا وُجد في النص)
+5. الحي أو المنطقة (إذا ذُكرت)
+
+قواعد مهمة:
+- لا تخترع بيانات غير موجودة في النص
+- إذا لم تكن متأكداً من قيمة، اجعلها null
+- confidence: نسبة ثقتك في نوع النشاط (0-100)
+- businessType يجب أن يكون بالعربية وموجزاً (1-3 كلمات)
+- city يجب أن تكون مدينة سعودية أو خليجية معروفة
+
+أجب بـ JSON فقط:
+{
+  "businessType": "نوع النشاط أو null",
+  "city": "المدينة أو null",
+  "phone": "رقم الهاتف أو null",
+  "website": "الموقع أو null",
+  "district": "الحي أو null",
+  "confidence": 85
+}`;
+
+      try {
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: "أنت محلل بيانات أعمال خبير في السوق السعودي. أجب دائماً بـ JSON صحيح فقط بدون أي نص إضافي." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" } as any,
+        });
+        const rawContent = response.choices[0]?.message?.content;
+        const content = typeof rawContent === 'string' ? rawContent : "{}";
+        let result: any = {};
+        try { result = JSON.parse(content); } catch { result = {}; }
+        return {
+          businessType: result.businessType || null,
+          city: result.city || null,
+          phone: result.phone || null,
+          website: result.website || null,
+          district: result.district || null,
+          confidence: typeof result.confidence === 'number' ? result.confidence : 0,
+        };
+      } catch (e) {
+        console.error('[analyzeFromBio] LLM error:', e);
+        return { businessType: null, city: null, phone: null, website: null, district: null, confidence: 0 };
+      }
+    }),
 });
 
 // ===== ANALYSIS ROUTER =====

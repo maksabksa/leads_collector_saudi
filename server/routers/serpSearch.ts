@@ -1,12 +1,13 @@
 /**
  * Bright Data SERP API - البحث في محركات البحث
  * النسخة المحسّنة:
- * - HTTP Proxy مباشر (بدون CONNECT tunnel) - يتجاوز IP whitelist نهائياً
+ * - HTTPS Proxy مباشر (يعمل مع Bright Data SERP zone)
  * - User-Agent rotation: 30+ user agent
  * - Retry ذكي: exponential backoff + تغيير User-Agent
  * - Cache ذكي: يتجنب تخزين النتائج الفارغة
  */
 import * as http from "http";
+import * as https from "https";
 
 const SERP_HOST = process.env.BRIGHT_DATA_SERP_HOST || "brd.superproxy.io";
 const SERP_PORT = parseInt(process.env.BRIGHT_DATA_SERP_PORT || "22225");
@@ -121,9 +122,9 @@ function setCache(key: string, data: string, resultCount: number): void {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ===== Core SERP Request: HTTP Proxy مباشر (يتجاوز IP whitelist) =====
-// الحل الجذري: استخدام HTTP proxy بدلاً من HTTPS CONNECT tunnel
-// عند استخدام http:// مع proxy، لا يتحقق Bright Data من IP whitelist
+// ===== Core SERP Request: HTTPS Proxy مباشر =====
+// الحل الصحيح: استخدام https.request مع Bright Data SERP zone
+// HTTP يسبب 407 لأن Bright Data SERP zone يتطلب HTTPS
 async function serpRequestRaw(
   targetUrl: string,
   userAgent: string,
@@ -140,17 +141,17 @@ async function serpRequestRaw(
     }
 
     const auth = Buffer.from(`${proxyUser}:${proxyPass}`).toString("base64");
-    // تحويل https:// إلى http:// للـ proxy request (يتجاوز IP whitelist)
-    const httpUrl = targetUrl.replace(/^https:/, "http:");
+    // استخدام HTTPS مباشرة مع Bright Data SERP proxy
+    const parsedUrl = new URL(targetUrl);
 
-    const req = http.request({
-      host: proxyHost,
+    const req = https.request({
+      hostname: proxyHost,
       port: proxyPort,
       method: "GET",
-      path: httpUrl, // full URL كـ path للـ HTTP proxy
+      path: targetUrl, // full URL كـ path للـ HTTPS proxy
       headers: {
         "Proxy-Authorization": `Basic ${auth}`,
-        "Host": new URL(httpUrl).hostname,
+        "Host": parsedUrl.hostname,
         "User-Agent": userAgent,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": acceptLanguage,
@@ -158,6 +159,7 @@ async function serpRequestRaw(
         "Cache-Control": "no-cache",
         "Connection": "close",
       },
+      rejectUnauthorized: false, // Bright Data يستخدم شهادة خاصة به
     });
 
     req.setTimeout(25000, () => {
@@ -168,6 +170,10 @@ async function serpRequestRaw(
     const chunks: Buffer[] = [];
 
     req.on("response", (res) => {
+      if (res.statusCode === 407) {
+        reject(new Error(`SERP proxy auth failed: 407 - check credentials`));
+        return;
+      }
       if (res.statusCode === 429) {
         reject(new Error("SERP request failed: 429 Too Many Requests"));
         return;
@@ -316,27 +322,26 @@ function translateToEnglish(text: string): string {
 
 // ===== دالة مساعدة: توليد استعلامات متعددة =====
 // ملاحظة مهمة: site:instagram.com + نص عربي = 0 نتائج في Google
-// الحل: استخدام اسم المنصة كنص + ترجمة إنجليزية
+// الحل: استخدام site: أولاً لأنه يعطي نتائج مباشرة من المنصة
 function buildQueryVariants(query: string, location: string | undefined, site: string): string[] {
   const loc = location || "";
   const locAr = loc ? `${loc} السعودية` : "السعودية";
   const locEn = loc ? `${translateToEnglish(loc)} Saudi Arabia` : "Saudi Arabia";
   const queryEn = translateToEnglish(query);
   const platformName = site.replace(".com", "").replace(".net", "");
-  // استعلامات بدون site: - هذه هي التي تعمل فعلاً مع Google
+  // site: أولاً - هذا يعطي نتائج مباشرة من المنصة وهو الأكثر فعالية
   return [
-    // إنجليزي + اسم المنصة (الأكثر فعالية)
-    `${platformName} ${queryEn} ${locEn}`,
-    `${platformName} ${queryEn} ${loc || "riyadh"} saudi`,
-    // عربي + اسم المنصة
-    `${platformName} ${query} ${locAr}`,
-    `${query} ${locAr} ${platformName}`,
-    // مزيج عربي + إنجليزي
-    `${queryEn} ${locEn} ${platformName} account`,
-    `${query} ${loc || "الرياض"} ${platformName} profile`,
-    // استعلام site: كـ fallback (قد يعمل أحياناً)
+    // site: بالعربي (الأكثر فعالية - يعطي روابط مباشرة)
+    `site:${site} ${query} ${locAr}`,
+    `site:${site} ${query} ${loc || "الرياض"}`,
+    // site: بالإنجليزي
     `site:${site} ${queryEn} ${locEn}`,
-    `"${queryEn}" ${locEn} ${platformName}`,
+    `site:${site} ${queryEn} ${loc || "riyadh"} saudi`,
+    // بدون site: كـ fallback
+    `${platformName} ${query} ${locAr}`,
+    `${platformName} ${queryEn} ${locEn}`,
+    `${query} ${locAr} ${platformName}`,
+    `${queryEn} ${locEn} ${platformName} account`,
   ];
 }
 
@@ -353,7 +358,8 @@ async function multiQuerySearch(
   const allResults: Array<{ username: string; displayName: string; bio: string; url: string }> = [];
 
   const fetchHtml = async (q: string): Promise<string> => {
-    const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+    // ملاحظة: cr=countrySA يسبب 407 من SERP proxy - تم حذفه
+    const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
     if (useResidential && RESI_USERNAME) {
       try {
         return await residentialRequest(url);
@@ -524,23 +530,25 @@ export function parseGoogleResultsPublic(html: string, domainFilter: string): Ar
   let usernameRegex: RegExp;
   let urlBuilder: (username: string) => string;
 
+  // ملاحظة: Google HTML يستخدم &amp; بدلاً من & لذا يجب دعمها في الـ regex
+  // النمط: instagram.com/username/ أو instagram.com/username&amp; أو instagram.com/username"
   if (domainFilter === "instagram.com") {
-    usernameRegex = /instagram\.com\/([a-zA-Z0-9._]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    usernameRegex = /instagram\.com\/([a-zA-Z0-9._]{3,30})(?:\/|\?|\\|"|\s|&|>|<|\n|\r|$)/g;
     urlBuilder = (u) => `https://www.instagram.com/${u}/`;
   } else if (domainFilter === "tiktok.com") {
-    usernameRegex = /tiktok\.com\/@([a-zA-Z0-9._]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    usernameRegex = /tiktok\.com\/@([a-zA-Z0-9._]{3,30})(?:\/|\?|\\|"|\s|&|>|<|\n|\r|$)/g;
     urlBuilder = (u) => `https://www.tiktok.com/@${u}`;
   } else if (domainFilter === "snapchat.com") {
-    usernameRegex = /snapchat\.com\/(?:add\/)?([a-zA-Z0-9._-]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    usernameRegex = /snapchat\.com\/(?:add\/)?([a-zA-Z0-9._-]{3,30})(?:\/|\?|\\|"|\s|&|>|<|\n|\r|$)/g;
     urlBuilder = (u) => `https://www.snapchat.com/add/${u}`;
   } else if (domainFilter === "linkedin.com") {
-    usernameRegex = /linkedin\.com\/(?:company|in)\/([a-zA-Z0-9._-]{3,50})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    usernameRegex = /linkedin\.com\/(?:company|in)\/([a-zA-Z0-9._-]{3,50})(?:\/|\?|\\|"|\s|&|>|<|\n|\r|$)/g;
     urlBuilder = (u) => `https://www.linkedin.com/company/${u}`;
   } else if (domainFilter === "twitter.com" || domainFilter === "x.com") {
-    usernameRegex = /(?:twitter|x)\.com\/([a-zA-Z0-9_]{3,30})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    usernameRegex = /(?:twitter|x)\.com\/([a-zA-Z0-9_]{3,30})(?:\/|\?|\\|"|\s|&|>|<|\n|\r|$)/g;
     urlBuilder = (u) => `https://x.com/${u}`;
   } else if (domainFilter === "facebook.com") {
-    usernameRegex = /facebook\.com\/(?:pages\/)?([a-zA-Z0-9._-]{3,50})(?:\/|\?|\\|"| |&|>|<|\n|\r|$)/g;
+    usernameRegex = /facebook\.com\/(?:pages\/)?([a-zA-Z0-9._-]{3,50})(?:\/|\?|\\|"|\s|&|>|<|\n|\r|$)/g;
     urlBuilder = (u) => `https://www.facebook.com/${u}`;
   } else {
     return [];
