@@ -814,7 +814,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   </div>
 </div>
 
-<<!-- ===== الصفحة 4: التوصيات + القناة + الموسم + خاتمة ===== -->
+<!-- ===== الصفحة 4: التوصيات + القناة + الموسم + خاتمة ===== -->
 <div class="page">
   <div class="header" style="padding:18px 36px;">
     <div class="header-top">
