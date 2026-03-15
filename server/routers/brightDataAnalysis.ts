@@ -873,6 +873,9 @@ ${realDataSummary}
       await updateLead(input.leadId, {
         analysisStatus: "completed",
         leadPriorityScore: report.digitalPresenceScore,
+        biggestMarketingGap: report.criticalGaps?.[0] ?? null,
+        revenueOpportunity: report.immediateOpportunities?.[0] ?? null,
+        suggestedSalesEntryAngle: report.salesScript ?? null,
       });
 
       // حفظ أرقام الهاتف المكتشفة
@@ -880,7 +883,47 @@ ${realDataSummary}
         await updateLead(input.leadId, { verifiedPhone: allData.website.phones[0] });
       }
 
-      // ملاحظة: instagramFollowers غير موجود في schema حالياً
+      // حفظ تحليل الموقع في جدول websiteAnalyses إذا كان هناك موقع
+      if (lead.website || allData.website) {
+        try {
+          await createWebsiteAnalysis({
+            leadId: input.leadId,
+            url: lead.website || "unknown",
+            hasWebsite: !!(lead.website),
+            overallScore: report.digitalPresenceScore ?? null,
+            summary: report.executiveSummary ?? null,
+            recommendations: report.recommendedActions ?? [],
+            technicalGaps: report.criticalGaps ?? [],
+            contentGaps: [],
+            rawAnalysis: JSON.stringify(report),
+          });
+        } catch (e) { /* تجاهل خطأ الحفظ */ }
+      }
+
+      // حفظ تحليل السوشيال ميديا في جدول socialAnalyses
+      const socialPlatforms: Array<{ key: "instagram" | "twitter" | "tiktok"; url: string | null | undefined; data: any }> = [
+        { key: "instagram", url: lead.instagramUrl, data: allData.instagram },
+        { key: "twitter", url: lead.twitterUrl, data: allData.twitter },
+        { key: "tiktok", url: lead.tiktokUrl, data: allData.tiktok },
+      ];
+      for (const sp of socialPlatforms) {
+        if (sp.url || sp.data) {
+          try {
+            await createSocialAnalysis({
+              leadId: input.leadId,
+              platform: sp.key,
+              profileUrl: sp.url ?? undefined,
+              hasAccount: !!(sp.url),
+              followersCount: sp.data?.followersCount ?? null,
+              summary: report.platformsSummary?.[sp.key] ?? null,
+              recommendations: report.recommendedActions ?? [],
+              gaps: report.criticalGaps ?? [],
+              rawAnalysis: JSON.stringify(sp.data ?? {}),
+              dataSource: "bright_data",
+            });
+          } catch (e) { /* تجاهل خطأ الحفظ */ }
+        }
+      }
 
       return {
         success: true,

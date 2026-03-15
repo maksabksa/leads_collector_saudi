@@ -1701,7 +1701,7 @@ export default function LeadDetail() {
           )}
 
           {/* Empty state for analysis */}
-          {!websiteAnalysis && socialAnalyses.length === 0 && !report && (
+          {!websiteAnalysis && socialAnalyses.length === 0 && !report && !bdResults.all && lead.analysisStatus !== "completed" && (
             <div className="rounded-2xl p-8 border border-border flex flex-col items-center gap-4" style={{ background: "oklch(0.12 0.015 240)" }}>
               <BarChart3 className="w-12 h-12 text-muted-foreground opacity-30" />
               <div className="text-center">

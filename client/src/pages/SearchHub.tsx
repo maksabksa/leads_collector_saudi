@@ -686,6 +686,26 @@ export default function SearchHub() {
     }
   }, [radiusKm, searchCenter, updateMapCircle]);
 
+  // تحريك الخريطة تلقائياً عند تغيير المدينة
+  useEffect(() => {
+    if (!city || !mapRef.current) return;
+    // استخدام Geocoder لتحديد إحداثيات المدينة الجديدة
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: city + ", Saudi Arabia" }, (results: any, status: any) => {
+      if (status === "OK" && results && results[0]) {
+        const loc = results[0].geometry.location;
+        const center = { lat: loc.lat(), lng: loc.lng() };
+        setSearchCenter(center);
+        if (mapRef.current) {
+          mapRef.current.setCenter(center);
+          mapRef.current.setZoom(12);
+          updateMapCircle(center, radiusKm * 1000, mapRef.current);
+        }
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city]);
+
   // عرض نتائج البحث كـ pins على الخريطة
   useEffect(() => {
     if (!mapRef.current) return;
@@ -1196,7 +1216,11 @@ export default function SearchHub() {
         (r.phone && r.phone.trim() !== "") ||
         (r.phones && r.phones.length > 0);
       const hasEmail = r.email && r.email.trim() !== "";
-      if (!hasPhone && !hasEmail) return false;
+      // للسوشيال ميديا: اعتبر وجود profileUrl أو bio يحتوي رابط كـ "قابل للتواصل"
+      const hasBioLink = r.bio && (r.bio.includes('http') || r.bio.includes('www') || r.bio.includes('.com'));
+      const hasProfileUrl = r.profileUrl && r.profileUrl.trim() !== "";
+      const hasWebsite = (r.availableWebsites && r.availableWebsites.length > 0) || (r.website && r.website.trim() !== "");
+      if (!hasPhone && !hasEmail && !hasBioLink && !hasWebsite && !hasProfileUrl) return false;
     }
     return true;
   });
