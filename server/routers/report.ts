@@ -384,6 +384,33 @@ function buildRadarChart(subjects: string[], datasets: Array<{label: string; dat
   </svg>`;
 }
 
+function getInspirationalQuote(businessType: string): { text: string; author: string } {
+  const bt = (businessType || "").toLowerCase();
+  if (bt.includes("مطعم") || bt.includes("طعام") || bt.includes("كافيه") || bt.includes("مقهى") || bt.includes("حلويات"))
+    return { text: "الطعام الجيد ليس مجرد وجبة — هو تجربة تستحق أن تُشارك", author: "جورج أوغست إسكوفييه" };
+  if (bt.includes("عقار") || bt.includes("تطوير") || bt.includes("مقاول"))
+    return { text: "الاستثمار في العقارات ليس مجرد شراء مكان — بل بناء مستقبل", author: "مبدأ الاستثمار الذكي" };
+  if (bt.includes("طب") || bt.includes("صحة") || bt.includes("عيادة") || bt.includes("مستشفى"))
+    return { text: "الصحة ليست كل شيء، لكن بدونها كل شيء لا يساوي شيئاً", author: "آرثر شوبنهاور" };
+  if (bt.includes("تعليم") || bt.includes("تدريب") || bt.includes("أكاديمية"))
+    return { text: "الاستثمار في المعرفة يدفع أفضل الفوائد دائماً", author: "بنجامين فرانكلين" };
+  if (bt.includes("تقنية") || bt.includes("برمجة") || bt.includes("تكنولوجيا"))
+    return { text: "التكنولوجيا تُحرك العالم، والابتكار يُعيد تشكيله", author: "مبدأ الريادة الرقمية" };
+  if (bt.includes("تجميل") || bt.includes("صالون") || bt.includes("سبا"))
+    return { text: "الجمال ليس في الوجه؛ الجمال نور في القلب", author: "خليل جبران" };
+  if (bt.includes("ملابس") || bt.includes("أزياء") || bt.includes("موضة"))
+    return { text: "الأناقة ليست ترفاً — إنها لغة تقولها قبل أن تتكلم", author: "كوكو شانيل" };
+  if (bt.includes("رياضة") || bt.includes("لياقة") || bt.includes("جيم"))
+    return { text: "الجسم يحقق ما يؤمن به العقل", author: "نابليون هيل" };
+  const general = [
+    { text: "النجاح ليس نهاية الطريق، والفشل ليس نهاية المشوار — الشجاعة هي الاستمرار", author: "ونستون تشرشل" },
+    { text: "أفضل وقت لزرع شجرة كان منذ عشرين عاماً، وأفضل وقت آخر هو الآن", author: "مثل صيني" },
+    { text: "لا تبنِ أحلامك على الفرص المتاحة — ابنِ الفرص لتحقيق أحلامك", author: "مبدأ ريادة الأعمال" },
+    { text: "التميز في السوق لا يأتي من المنافسة — بل من إعادة تعريف قواعد اللعبة", author: "مبدأ الاستراتيجية التسويقية" },
+  ];
+  return general[Math.abs(Math.floor(Date.now() / 1000)) % general.length];
+}
+
 function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any, activeSeason?: any, upcomingSeasons?: any[], competitors?: any[], styleSettings?: any): string {
   const stageLabels: Record<string, string> = {
     new: "جديد", contacted: "تم التواصل", interested: "مهتم",
@@ -821,6 +848,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
         <div style="font-size:9px;opacity:0.6;margin-top:3px;">حصري من مكسب</div>
       </div>
     </div>
+    <!-- اقتباس احترافي -->
+    ${(() => { const q = getInspirationalQuote(lead.businessType || ""); return `
+    <div style="margin-top:20px;padding:16px 24px;border-right:3px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.04);border-radius:0 10px 10px 0;position:relative;z-index:1;">
+      <div style="font-size:13.5px;font-weight:600;color:rgba(255,255,255,0.92);line-height:1.8;font-style:italic;margin-bottom:8px;">&#8220;${q.text}&#8221;</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.45);font-weight:500;">— ${q.author}</div>
+    </div>`; })()}
   </div>
 
   <div class="client-bar">
@@ -1059,7 +1092,160 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   </div>
 </div>
 
-<!-- ===== الصفحة 4: التوصيات + القناة + الموسم + خاتمة ===== -->
+<!-- ===== الصفحة 4: مقارنة المنافسين (تُضاف هنا ديناميكياً) ===== -->
+${(competitors && competitors.length > 0) ? (() => {
+  // حساب درجة الحضور الرقمي لكل منافس
+  function calcPresence(c: any): number {
+    let score = 0;
+    if (c.website) score += 2;
+    if (c.instagramUrl) score += 2;
+    if (c.tiktokUrl) score += 1.5;
+    if (c.snapchatUrl) score += 1.5;
+    if (c.googleMapsUrl) score += 1.5;
+    if (c.twitterUrl) score += 0.5;
+    if (c.facebookUrl) score += 0.5;
+    if (c.verifiedPhone) score += 0.5;
+    return Math.min(Math.round(score * 10) / 10, 10);
+  }
+  const leadPresence = calcPresence(lead);
+  const compData = competitors.slice(0, 4).map((c: any, i: number) => ({
+    ...c,
+    presence: calcPresence(c),
+    color: ['#6366f1','#f59e0b','#10b981','#ef4444'][i % 4],
+  }));
+  const radarSubjects = ['موقع', 'إنستغرام', 'تيك توك', 'سناب', 'خرائط', 'هاتف'];
+  function getRadarData(c: any): number[] {
+    return [
+      c.website ? 10 : 0,
+      c.instagramUrl ? 10 : 0,
+      c.tiktokUrl ? 10 : 0,
+      c.snapchatUrl ? 10 : 0,
+      c.googleMapsUrl ? 10 : 0,
+      c.verifiedPhone ? 10 : 0,
+    ];
+  }
+  const radarDatasets = [
+    { label: lead.companyName, data: getRadarData(lead), color: primaryColor },
+    ...compData.map((c: any) => ({ label: c.companyName, data: getRadarData(c), color: c.color }))
+  ];
+  const radarSvg = buildRadarChart(radarSubjects, radarDatasets);
+  const allEntities = [{ ...lead, presence: leadPresence, color: primaryColor, isMain: true }, ...compData.map((c: any) => ({ ...c, isMain: false }))];
+  const tableRows = allEntities.map((e: any) => `
+    <tr style="background:${e.isMain ? primaryColor + '12' : 'white'};">
+      <td style="padding:8px 12px;font-weight:${e.isMain ? '800' : '600'};font-size:11px;color:${e.isMain ? primaryColor : '#1e293b'};border-bottom:1px solid #f1f5f9;">
+        ${e.isMain ? '⭐ ' : ''}${e.companyName}
+        ${e.isMain ? '<span style="background:' + primaryColor + ';color:white;font-size:8px;padding:1px 6px;border-radius:10px;margin-right:4px;">عميلك</span>' : ''}
+      </td>
+      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.website ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
+      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.instagramUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
+      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.tiktokUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
+      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.snapchatUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
+      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.googleMapsUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
+      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.verifiedPhone ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
+      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">
+        <div style="display:inline-flex;align-items:center;gap:4px;">
+          <div style="width:40px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+            <div style="width:${e.presence * 10}%;height:100%;background:${e.isMain ? primaryColor : e.color};border-radius:3px;"></div>
+          </div>
+          <span style="font-size:10px;font-weight:700;color:${e.isMain ? primaryColor : '#475569'}">${e.presence}/10</span>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  const legendItems = radarDatasets.map((ds: any) => `
+    <div style="display:flex;align-items:center;gap:5px;">
+      <div style="width:10px;height:10px;border-radius:50%;background:${ds.color};"></div>
+      <span style="font-size:9px;color:#475569;">${ds.label.length > 15 ? ds.label.substring(0,15)+'...' : ds.label}</span>
+    </div>
+  `).join('');
+  return `
+<div class="page">
+  <div class="header" style="padding:18px 36px;">
+    <div class="header-top">
+      <div class="company-info">
+        ${companyLogo ? `<img src="${companyLogo}" class="company-logo" alt="شعار" style="width:38px;height:38px;">` : ''}
+        <div>
+          <div style="font-size:16px;font-weight:800;">${companyName}</div>
+          <div style="font-size:10px;opacity:0.6;">تحليل المنافسين والموقع التنافسي</div>
+        </div>
+      </div>
+      <div style="font-size:11px;opacity:0.7;">${lead.companyName} · ${now}</div>
+    </div>
+  </div>
+  <div class="body">
+    <div style="font-size:13px;font-weight:800;color:#1e293b;margin-bottom:4px;">📊 الموقع التنافسي لـ ${lead.companyName}</div>
+    <div style="font-size:10.5px;color:#64748b;margin-bottom:16px;">مقارنة الحضور الرقمي مع ${compData.length} منافس من نفس المجال في ${lead.city || 'السوق'}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px;">
+      <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+        <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:10px;text-align:center;">🕸️ مخطط الحضور الرقمي</div>
+        <div style="display:flex;justify-content:center;">${radarSvg}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center;">${legendItems}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="background:${primaryColor}12;border:1.5px solid ${primaryColor};border-radius:12px;padding:14px;">
+          <div style="font-size:11px;font-weight:800;color:${primaryColor};margin-bottom:6px;">⭐ ${lead.companyName}</div>
+          <div style="font-size:28px;font-weight:900;color:${primaryColor};">${leadPresence}<span style="font-size:14px;">/10</span></div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px;">درجة الحضور الرقمي</div>
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+            ${[{k:'website',l:'موقع'},{k:'instagramUrl',l:'إنستغرام'},{k:'tiktokUrl',l:'تيك توك'},{k:'snapchatUrl',l:'سناب'},{k:'googleMapsUrl',l:'خرائط'},{k:'verifiedPhone',l:'هاتف'}].map(p => `<span style="font-size:9px;padding:2px 7px;border-radius:10px;background:${(lead as any)[p.k] ? '#dcfce7' : '#fee2e2'};color:${(lead as any)[p.k] ? '#166534' : '#991b1b'};">${p.l}</span>`).join('')}
+          </div>
+        </div>
+        ${compData.map((c: any) => `
+        <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:10.5px;font-weight:700;color:#1e293b;">${c.companyName}</div>
+            <div style="font-size:9px;color:#64748b;">${c.city || ''}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:900;color:${c.color};">${c.presence}</div>
+            <div style="font-size:8px;color:#94a3b8;">/10</div>
+          </div>
+        </div>
+        `).join('')}
+      </div>
+    </div>
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
+      <div style="background:${primaryColor};color:white;padding:10px 16px;font-size:11px;font-weight:800;">📋 جدول المقارنة التفصيلي</div>
+      <table style="width:100%;border-collapse:collapse;font-family:Tajawal,sans-serif;">
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="padding:8px 12px;text-align:right;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">النشاط</th>
+            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">موقع</th>
+            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">إنستغرام</th>
+            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">تيك توك</th>
+            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">سناب</th>
+            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">خرائط</th>
+            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">هاتف</th>
+            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">الدرجة</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    ${(() => {
+      const avgCompPresence = compData.length > 0 ? compData.reduce((s: number, c: any) => s + c.presence, 0) / compData.length : 0;
+      const gap = leadPresence - avgCompPresence;
+      const gapText = gap > 0 
+        ? `<span style="color:#22c55e;font-weight:800;">يتقدم بـ ${gap.toFixed(1)} نقطة</span> على متوسط المنافسين — ميزة تنافسية واضحة يجب الحفاظ عليها وتعزيزها.`
+        : gap < -1
+        ? `<span style="color:#ef4444;font-weight:800;">يتأخر بـ ${Math.abs(gap).toFixed(1)} نقطة</span> عن متوسط المنافسين — فرصة تحسين عاجلة لاستعادة الموقع التنافسي.`
+        : `<span style="color:#f59e0b;font-weight:800;">متعادل تقريباً</span> مع متوسط المنافسين — التمييز يحتاج لجودة المحتوى وليس فقط الوجود على المنصات.`;
+      return `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin-top:12px;">
+        <div style="font-size:11px;font-weight:800;color:#1e293b;margin-bottom:6px;">🔍 تحليل الفجوة التنافسية</div>
+        <div style="font-size:10.5px;color:#475569;line-height:1.7;">${lead.companyName} ${gapText} متوسط حضور المنافسين: <strong>${avgCompPresence.toFixed(1)}/10</strong></div>
+      </div>`;
+    })()}
+  </div>
+  <div class="footer">
+    <div class="footer-brand">${companyName}</div>
+    <div>${reportFooterText} · صفحة 4</div>
+    <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
+  </div>
+</div>
+`;
+})() : ''}
+
+<!-- ===== الصفحة 5: التوصيات + القناة + الموسم + خاتمة ===== -->
 <div class="page">
   <div class="header" style="padding:18px 36px;">
     <div class="header-top">
@@ -1166,169 +1352,10 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   </div>
   <div class="footer">
     <div class="footer-brand">${companyName}</div>
-    <div>${reportFooterText} · صفحة 4</div>
-    <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
-  </div>
-</div>
-<!-- ===== الصفحة 5: مقارنة المنافسين ===== -->
-${(competitors && competitors.length > 0) ? (() => {
-  // حساب درجة الحضور الرقمي لكل منافس
-  function calcPresence(c: any): number {
-    let score = 0;
-    if (c.website) score += 2;
-    if (c.instagramUrl) score += 2;
-    if (c.tiktokUrl) score += 1.5;
-    if (c.snapchatUrl) score += 1.5;
-    if (c.googleMapsUrl) score += 1.5;
-    if (c.twitterUrl) score += 0.5;
-    if (c.facebookUrl) score += 0.5;
-    if (c.verifiedPhone) score += 0.5;
-    return Math.min(Math.round(score * 10) / 10, 10);
-  }
-  const leadPresence = calcPresence(lead);
-  const compData = competitors.slice(0, 4).map((c: any, i: number) => ({
-    ...c,
-    presence: calcPresence(c),
-    color: ['#6366f1','#f59e0b','#10b981','#ef4444'][i % 4],
-  }));
-  // بيانات radar chart
-  const radarSubjects = ['موقع', 'إنستغرام', 'تيك توك', 'سناب', 'خرائط', 'هاتف'];
-  function getRadarData(c: any): number[] {
-    return [
-      c.website ? 10 : 0,
-      c.instagramUrl ? 10 : 0,
-      c.tiktokUrl ? 10 : 0,
-      c.snapchatUrl ? 10 : 0,
-      c.googleMapsUrl ? 10 : 0,
-      c.verifiedPhone ? 10 : 0,
-    ];
-  }
-  const radarDatasets = [
-    { label: lead.companyName, data: getRadarData(lead), color: primaryColor },
-    ...compData.map((c: any) => ({ label: c.companyName, data: getRadarData(c), color: c.color }))
-  ];
-  const radarSvg = buildRadarChart(radarSubjects, radarDatasets);
-  // جدول المقارنة
-  const allEntities = [{ ...lead, presence: leadPresence, color: primaryColor, isMain: true }, ...compData.map((c: any) => ({ ...c, isMain: false }))];
-  const tableRows = allEntities.map((e: any) => `
-    <tr style="background:${e.isMain ? primaryColor + '12' : 'white'};">
-      <td style="padding:8px 12px;font-weight:${e.isMain ? '800' : '600'};font-size:11px;color:${e.isMain ? primaryColor : '#1e293b'};border-bottom:1px solid #f1f5f9;">
-        ${e.isMain ? '⭐ ' : ''}${e.companyName}
-        ${e.isMain ? '<span style="background:' + primaryColor + ';color:white;font-size:8px;padding:1px 6px;border-radius:10px;margin-right:4px;">عميلك</span>' : ''}
-      </td>
-      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.website ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
-      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.instagramUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
-      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.tiktokUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
-      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.snapchatUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
-      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.googleMapsUrl ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
-      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${e.verifiedPhone ? '<span style="color:#22c55e;font-size:14px;">✓</span>' : '<span style="color:#ef4444;font-size:14px;">✗</span>'}</td>
-      <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">
-        <div style="display:inline-flex;align-items:center;gap:4px;">
-          <div style="width:40px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
-            <div style="width:${e.presence * 10}%;height:100%;background:${e.isMain ? primaryColor : e.color};border-radius:3px;"></div>
-          </div>
-          <span style="font-size:10px;font-weight:700;color:${e.isMain ? primaryColor : '#475569'}">${e.presence}/10</span>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-  // legend للـ radar
-  const legendItems = radarDatasets.map((ds: any) => `
-    <div style="display:flex;align-items:center;gap:5px;">
-      <div style="width:10px;height:10px;border-radius:50%;background:${ds.color};"></div>
-      <span style="font-size:9px;color:#475569;">${ds.label.length > 15 ? ds.label.substring(0,15)+'...' : ds.label}</span>
-    </div>
-  `).join('');
-  return `
-<div class="page">
-  <div class="header" style="padding:18px 36px;">
-    <div class="header-top">
-      <div class="company-info">
-        ${companyLogo ? `<img src="${companyLogo}" class="company-logo" alt="شعار" style="width:38px;height:38px;">` : ''}
-        <div>
-          <div style="font-size:16px;font-weight:800;">${companyName}</div>
-          <div style="font-size:10px;opacity:0.6;">تحليل المنافسين والموقع التنافسي</div>
-        </div>
-      </div>
-      <div style="font-size:11px;opacity:0.7;">${lead.companyName} · ${now}</div>
-    </div>
-  </div>
-  <div class="body">
-    <div style="font-size:13px;font-weight:800;color:#1e293b;margin-bottom:4px;">📊 الموقع التنافسي لـ ${lead.companyName}</div>
-    <div style="font-size:10.5px;color:#64748b;margin-bottom:16px;">مقارنة الحضور الرقمي مع ${compData.length} منافس من نفس المجال في ${lead.city || 'السوق'}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px;">
-      <!-- Radar Chart -->
-      <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
-        <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:10px;text-align:center;">🕸️ مخطط الحضور الرقمي</div>
-        <div style="display:flex;justify-content:center;">${radarSvg}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center;">${legendItems}</div>
-      </div>
-      <!-- ملخص المقارنة -->
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <div style="background:${primaryColor}12;border:1.5px solid ${primaryColor};border-radius:12px;padding:14px;">
-          <div style="font-size:11px;font-weight:800;color:${primaryColor};margin-bottom:6px;">⭐ ${lead.companyName}</div>
-          <div style="font-size:28px;font-weight:900;color:${primaryColor};">${leadPresence}<span style="font-size:14px;">/10</span></div>
-          <div style="font-size:10px;color:#64748b;margin-top:4px;">درجة الحضور الرقمي</div>
-          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
-            ${[{k:'website',l:'موقع'},{k:'instagramUrl',l:'إنستغرام'},{k:'tiktokUrl',l:'تيك توك'},{k:'snapchatUrl',l:'سناب'},{k:'googleMapsUrl',l:'خرائط'},{k:'verifiedPhone',l:'هاتف'}].map(p => `<span style="font-size:9px;padding:2px 7px;border-radius:10px;background:${(lead as any)[p.k] ? '#dcfce7' : '#fee2e2'};color:${(lead as any)[p.k] ? '#166534' : '#991b1b'};">${p.l}</span>`).join('')}
-          </div>
-        </div>
-        ${compData.map((c: any) => `
-        <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <div style="font-size:10.5px;font-weight:700;color:#1e293b;">${c.companyName}</div>
-            <div style="font-size:9px;color:#64748b;">${c.city || ''}</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:18px;font-weight:900;color:${c.color};">${c.presence}</div>
-            <div style="font-size:8px;color:#94a3b8;">/10</div>
-          </div>
-        </div>
-        `).join('')}
-      </div>
-    </div>
-    <!-- جدول المقارنة التفصيلي -->
-    <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
-      <div style="background:${primaryColor};color:white;padding:10px 16px;font-size:11px;font-weight:800;">📋 جدول المقارنة التفصيلي</div>
-      <table style="width:100%;border-collapse:collapse;font-family:Tajawal,sans-serif;">
-        <thead>
-          <tr style="background:#f8fafc;">
-            <th style="padding:8px 12px;text-align:right;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">النشاط</th>
-            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">موقع</th>
-            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">إنستغرام</th>
-            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">تيك توك</th>
-            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">سناب</th>
-            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">خرائط</th>
-            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">هاتف</th>
-            <th style="padding:8px;text-align:center;font-size:10px;color:#64748b;font-weight:700;border-bottom:1px solid #e2e8f0;">الدرجة</th>
-          </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </div>
-    <!-- تحليل ذكي للفجوة التنافسية -->
-    ${(() => {
-      const avgCompPresence = compData.length > 0 ? compData.reduce((s: number, c: any) => s + c.presence, 0) / compData.length : 0;
-      const gap = leadPresence - avgCompPresence;
-      const gapText = gap > 0 
-        ? `<span style="color:#22c55e;font-weight:800;">يتقدم بـ ${gap.toFixed(1)} نقطة</span> على متوسط المنافسين — ميزة تنافسية واضحة يجب الحفاظ عليها وتعزيزها.`
-        : gap < -1
-        ? `<span style="color:#ef4444;font-weight:800;">يتأخر بـ ${Math.abs(gap).toFixed(1)} نقطة</span> عن متوسط المنافسين — فرصة تحسين عاجلة لاستعادة الموقع التنافسي.`
-        : `<span style="color:#f59e0b;font-weight:800;">متعادل تقريباً</span> مع متوسط المنافسين — التمييز يحتاج لجودة المحتوى وليس فقط الوجود على المنصات.`;
-      return `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin-top:12px;">
-        <div style="font-size:11px;font-weight:800;color:#1e293b;margin-bottom:6px;">🔍 تحليل الفجوة التنافسية</div>
-        <div style="font-size:10.5px;color:#475569;line-height:1.7;">${lead.companyName} ${gapText} متوسط حضور المنافسين: <strong>${avgCompPresence.toFixed(1)}/10</strong></div>
-      </div>`;
-    })()}
-  </div>
-  <div class="footer">
-    <div class="footer-brand">${companyName}</div>
     <div>${reportFooterText} · صفحة 5</div>
     <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
   </div>
 </div>
-`;
-})() : ''}
 </body>
 </html>`;
 }
