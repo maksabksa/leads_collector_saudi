@@ -70,14 +70,120 @@ function hasNonSaudiIndicator(text: string): boolean {
 }
 
 /**
- * فلتر جغرافي ناعم: يستبعد النتائج التي تحتوي على مؤشر دولة أخرى
- * لا يرفض النتائج التي لا تذكر أي دولة (لأن كثيراً من الحسابات لا تذكر موقعها)
+ * أنماط في الـ username تدل على دولة أخرى
+ * كثير من الحسابات الليبية والمصرية تحتوي على مؤشرات في الـ username
+ */
+const NON_SAUDI_USERNAME_PATTERNS = [
+  // ليبيا
+  /libya/i, /libyan/i, /tripoli/i, /benghazi/i, /misrata/i,
+  // مصر
+  /egypt/i, /egyptian/i, /cairo/i, /_eg_/i, /\.eg$/i,
+  // الإمارات
+  /dubai/i, /uae_/i, /_uae/i, /abudhabi/i, /sharjah/i,
+  // الكويت
+  /kuwait/i, /_kwt/i, /kwt_/i,
+  // البحرين
+  /bahrain/i, /manama/i,
+  // قطر
+  /qatar/i, /doha/i,
+  // عُمان
+  /muscat/i,
+  // الأردن
+  /jordan/i, /amman/i,
+  // لبنان
+  /lebanon/i, /beirut/i,
+  // العراق
+  /iraq/i, /baghdad/i,
+  // المغرب
+  /morocco/i, /maroc/i, /casablanca/i,
+  // تونس
+  /tunisia/i,
+  // الجزائر
+  /algeria/i, /algiers/i,
+  // السودان
+  /sudan/i, /khartoum/i,
+  // اليمن
+  /yemen/i, /sanaa/i,
+];
+
+function hasNonSaudiUsername(username: string): boolean {
+  return NON_SAUDI_USERNAME_PATTERNS.some(p => p.test(username));
+}
+
+/**
+ * خريطة المدن السعودية: الاسم العربي → مرادفاته وأسماؤه الإنجليزية
+ * تُستخدم لفلترة النتائج بناءً على المدينة المحددة في مركز البحث
+ */
+const CITY_ALIASES: Record<string, string[]> = {
+  "الرياض": ["الرياض", "riyadh", "riyad", "riadh"],
+  "جدة": ["جدة", "jeddah", "jidda", "jedda"],
+  "مكة المكرمة": ["مكة", "مكة المكرمة", "mecca", "makkah", "makka"],
+  "المدينة المنورة": ["المدينة", "المدينة المنورة", "medina", "madinah"],
+  "الدمام": ["الدمام", "dammam"],
+  "الخبر": ["الخبر", "khobar", "al khobar", "alkhobar"],
+  "الطائف": ["الطائف", "taif", "ta'if"],
+  "تبوك": ["تبوك", "tabuk"],
+  "أبها": ["أبها", "abha"],
+  "القصيم": ["القصيم", "qassim", "buraydah", "بريدة"],
+  "حائل": ["حائل", "hail", "ha'il"],
+  "نجران": ["نجران", "najran"],
+  "جازان": ["جازان", "jizan", "jazan"],
+  "الجوف": ["الجوف", "jouf", "al jouf"],
+  "عرعر": ["عرعر", "arar"],
+  "الأحساء": ["الأحساء", "الاحساء", "ahsa", "al ahsa", "hofuf", "الهفوف"],
+  "الجبيل": ["الجبيل", "jubail", "al jubail"],
+  "ينبع": ["ينبع", "yanbu"],
+  "خميس مشيط": ["خميس مشيط", "khamis mushait", "khamis"],
+  "الباحة": ["الباحة", "baha", "al baha"],
+};
+
+/**
+ * فلتر المدينة: يستبعد النتائج التي تذكر صراحةً مدينة مختلفة عن المدينة المحددة
+ * لا يستبعد النتائج التي لا تذكر أي مدينة (لأن كثيراً من الحسابات لا تذكر موقعها)
+ */
+export function filterByCityContext<T extends { displayName: string; bio: string; username: string }>(results: T[], targetCity: string): T[] {
+  if (!targetCity || targetCity === "الكل" || targetCity === "كل المدن") return results;
+
+  // الأسماء المقبولة للمدينة المستهدفة
+  const targetAliases = CITY_ALIASES[targetCity] || [targetCity.toLowerCase()];
+
+  // جمع أسماء المدن الأخرى (لاستبعاد النتائج التي تذكرها)
+  const otherCityNames: string[] = [];
+  for (const [cityName, aliases] of Object.entries(CITY_ALIASES)) {
+    if (cityName !== targetCity && !targetAliases.some(a => aliases.includes(a))) {
+      otherCityNames.push(...aliases);
+    }
+  }
+
+  return results.filter(r => {
+    const text = `${r.displayName} ${r.bio} ${r.username}`.toLowerCase();
+    // إذا ذكر النص مدينة أخرى صراحةً → استبعاد
+    const mentionsOtherCity = otherCityNames.some(name => text.includes(name.toLowerCase()));
+    if (mentionsOtherCity) {
+      console.log(`[CityFilter] Excluded (other city): ${r.username}`);
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * فلتر جغرافي مُعزَّز: يستبعد النتائج التي تحتوي على مؤشر دولة أخرى
+ * يفحص النص الكامل (displayName + bio) والـ username بشكل منفصل
  */
 function filterSaudiResults<T extends { displayName: string; bio: string; username: string }>(results: T[]): T[] {
   return results.filter(r => {
     const text = `${r.displayName} ${r.bio} ${r.username}`;
-    // استبعاد إذا كان هناك مؤشر دولة أخرى صريح
-    if (hasNonSaudiIndicator(text)) return false;
+    // الطبقة 1: استبعاد إذا كان هناك مؤشر دولة أخرى صريح في النص
+    if (hasNonSaudiIndicator(text)) {
+      console.log(`[GeoFilter] Excluded by text: ${r.username} | bio: ${r.bio.slice(0, 50)}`);
+      return false;
+    }
+    // الطبقة 2: استبعاد إذا كان الـ username يحتوي على مؤشر دولة أخرى
+    if (hasNonSaudiUsername(r.username)) {
+      console.log(`[GeoFilter] Excluded by username: ${r.username}`);
+      return false;
+    }
     return true;
   });
 }

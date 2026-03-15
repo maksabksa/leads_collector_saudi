@@ -12,7 +12,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { TRPCError } from "@trpc/server";
-import { searchTikTokSERP, searchSnapchatSERP, searchInstagramSERP, searchTwitterSERP, searchLinkedInSERP, searchFacebookSERP } from "./serpSearch";
+import { searchTikTokSERP, searchSnapchatSERP, searchInstagramSERP, searchTwitterSERP, searchLinkedInSERP, searchFacebookSERP, filterByCityContext } from "./serpSearch";
 
 
 
@@ -448,7 +448,9 @@ export const socialSearchRouter = router({
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
-        const results = await searchInstagram(input.keyword, input.city);
+        const raw = await searchInstagram(input.keyword, input.city);
+        const results = filterByCityContext(raw, input.city);
+        console.log(`[Instagram] ${raw.length} raw → ${results.length} after city filter (${input.city})`);
         return { results, platform: "Instagram", total: results.length };
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
@@ -459,7 +461,9 @@ export const socialSearchRouter = router({
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
-        const results = await searchTikTok(input.keyword, input.city);
+        const raw = await searchTikTok(input.keyword, input.city);
+        const results = filterByCityContext(raw, input.city);
+        console.log(`[TikTok] ${raw.length} raw → ${results.length} after city filter (${input.city})`);
         return { results, platform: "TikTok", total: results.length };
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
@@ -470,7 +474,9 @@ export const socialSearchRouter = router({
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
-        const results = await searchSnapchat(input.keyword, input.city);
+        const raw = await searchSnapchat(input.keyword, input.city);
+        const results = filterByCityContext(raw, input.city);
+        console.log(`[Snapchat] ${raw.length} raw → ${results.length} after city filter (${input.city})`);
         return { results, platform: "Snapchat", total: results.length };
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
@@ -481,7 +487,9 @@ export const socialSearchRouter = router({
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
-        const results = await searchTwitter(input.keyword, input.city);
+        const raw = await searchTwitter(input.keyword, input.city);
+        const results = filterByCityContext(raw, input.city);
+        console.log(`[Twitter] ${raw.length} raw → ${results.length} after city filter (${input.city})`);
         return { results, platform: "Twitter", total: results.length };
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
@@ -492,7 +500,9 @@ export const socialSearchRouter = router({
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
-        const results = await searchLinkedIn(input.keyword, input.city);
+        const raw = await searchLinkedIn(input.keyword, input.city);
+        const results = filterByCityContext(raw, input.city);
+        console.log(`[LinkedIn] ${raw.length} raw → ${results.length} after city filter (${input.city})`);
         return { results, platform: "LinkedIn", total: results.length };
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
@@ -503,7 +513,9 @@ export const socialSearchRouter = router({
     .input(z.object({ keyword: z.string().min(1), city: z.string().default("الرياض") }))
     .mutation(async ({ input }) => {
       try {
-        const results = await searchFacebook(input.keyword, input.city);
+        const raw = await searchFacebook(input.keyword, input.city);
+        const results = filterByCityContext(raw, input.city);
+        console.log(`[Facebook] ${raw.length} raw → ${results.length} after city filter (${input.city})`);
         return { results, platform: "Facebook", total: results.length };
       } catch (err: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message });
