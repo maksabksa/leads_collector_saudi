@@ -1356,7 +1356,7 @@ export const reportRouter = router({
   // ===== جلب HTML التقرير للمعاينة (نفس buildPDFHtml المستخدم في PDF) =====
   getHtml: protectedProcedure
     .input(z.object({ leadId: z.number() }))
-    .query(async ({ input }) => {
+    .mutation(async ({ input }) => {
       const lead = await getLeadById(input.leadId);
       if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
 
