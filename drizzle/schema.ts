@@ -1395,7 +1395,7 @@ export const reportStyleSettings = mysqlTable("report_style_settings", {
   tone: varchar("tone", { length: 50 }).default("professional").notNull(),
   // "professional" | "friendly" | "direct" | "consultative"
   // الكلمات المفتاحية للبراند (تُدمج في النصوص)
-  brandKeywords: json("brandKeywords").$type<string[]>().default([]).notNull(),
+  brandKeywords: json("brandKeywords").$type<string[]>(),
   // تعليمات مخصصة للـ AI عند كتابة التوصيات
   customInstructions: text("customInstructions"),
   // تعليمات مخصصة للتعليق على الفرص
