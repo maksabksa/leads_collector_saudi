@@ -108,6 +108,7 @@ function GeneralTab() {
   const [website, setWebsite] = React.useState("");
   const [address, setAddress] = React.useState("");
   const [licenseNumber, setLicenseNumber] = React.useState("");
+  const [commercialRegistration, setCommercialRegistration] = React.useState("");
   const [logoUrl, setLogoUrl] = React.useState("");
   const [primaryColor, setPrimaryColor] = React.useState("#1a56db");
   const [secondaryColor, setSecondaryColor] = React.useState("#0e9f6e");
@@ -132,6 +133,7 @@ function GeneralTab() {
       setWebsite(companyData.website || "");
       setAddress(companyData.address || "");
       setLicenseNumber(companyData.licenseNumber || "");
+      setCommercialRegistration((companyData as any).commercialRegistration || "");
       setLogoUrl(companyData.logoUrl || "");
       setPrimaryColor(companyData.primaryColor || "#1a56db");
       setSecondaryColor(companyData.secondaryColor || "#0e9f6e");
@@ -185,6 +187,7 @@ function GeneralTab() {
       website: website.trim() || undefined,
       address: address.trim() || undefined,
       licenseNumber: licenseNumber.trim() || undefined,
+      commercialRegistration: commercialRegistration.trim() || undefined,
       logoUrl: logoUrl || undefined,
       primaryColor: primaryColor || undefined,
       secondaryColor: secondaryColor || undefined,
@@ -253,7 +256,11 @@ function GeneralTab() {
               <Input placeholder="https://company.com" value={website} onChange={(e) => setWebsite(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">رقم الترخيص / السجل التجاري</label>
+              <label className="text-sm font-medium mb-1 block">رقم السجل التجاري <span className="text-xs text-muted-foreground">(يظهر كـ QR في التقرير)</span></label>
+              <Input placeholder="1010xxxxxx" value={commercialRegistration} onChange={(e) => setCommercialRegistration(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">رقم الترخيص</label>
               <Input placeholder="1010xxxxxx" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
             </div>
             <div>

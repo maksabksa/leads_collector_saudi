@@ -1248,6 +1248,7 @@ export const companySettings = mysqlTable("company_settings", {
   reportFooterText: text("reportFooterText"),
   reportIntroText: text("reportIntroText"),
   licenseNumber: varchar("licenseNumber", { length: 100 }),
+  commercialRegistration: varchar("commercialRegistration", { length: 50 }),
   address: text("address"),
   instagramUrl: varchar("instagramUrl", { length: 300 }),
   twitterUrl: varchar("twitterUrl", { length: 300 }),

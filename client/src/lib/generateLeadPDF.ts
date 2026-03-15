@@ -18,6 +18,7 @@ interface GeneratePDFOptions {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+import QRCode from "qrcode";
 function sc(v?: number | null) {
   if (!v) return "#64748b";
   if (v >= 8) return "#22c55e";
@@ -258,46 +259,28 @@ function infoRow(label: string, value: string, icon = "") {
 }
 
 // ─── QR Code SVG (WhatsApp) ───────────────────────────────────────────────────
-function qrCodeSVG(phone: string, size = 100) {
-  // Generate a simple QR-like pattern using the phone number
-  // This creates a visual QR code placeholder with WhatsApp link
-  const waLink = `https://wa.me/${phone.replace(/\D/g, "")}`;
-  // Simple pixel art QR code pattern (decorative)
-  const cells = 9;
-  const cellSize = size / cells;
-  
-  // Fixed pattern for visual QR code (finder patterns + data area)
-  const pattern = [
-    [1,1,1,1,1,1,1,0,1],
-    [1,0,0,0,0,0,1,0,1],
-    [1,0,1,1,1,0,1,0,0],
-    [1,0,1,1,1,0,1,0,1],
-    [1,0,1,1,1,0,1,0,0],
-    [1,0,0,0,0,0,1,0,1],
-    [1,1,1,1,1,1,1,0,1],
-    [0,0,0,0,0,0,0,0,0],
-    [1,0,1,1,0,1,1,0,1],
-  ];
-  
-  let rects = "";
-  pattern.forEach((row, r) => {
-    row.forEach((cell, c) => {
-      if (cell) {
-        rects += `<rect x="${c * cellSize}" y="${r * cellSize}" width="${cellSize}" height="${cellSize}" fill="white"/>`;
-      }
+// توليد QR حقيقي باستخدام مكتبة qrcode
+async function generateQRDataURL(text: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(text, {
+      width: 200,
+      margin: 1,
+      color: { dark: "#000000", light: "#ffffff" },
+      errorCorrectionLevel: "M",
     });
-  });
-  
-  return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-    <div style="background:white;padding:8px;border-radius:10px;box-shadow:0 0 20px rgba(34,197,94,0.3);">
-      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="${size}" height="${size}" fill="white"/>
-        ${rects}
-      </svg>
-    </div>
-    <div style="font-size:9px;color:#22c55e;font-weight:700;text-align:center;">امسح للتواصل</div>
-    <div style="font-size:8px;color:#475569;text-align:center;">WhatsApp</div>
-  </div>`;
+  } catch {
+    return "";
+  }
+}
+
+// دالة مزامنة لتوليد QR لواتساب
+async function qrCodeSVG(value: string, size = 100): Promise<string> {
+  const url = /^\d+$/.test(value.replace(/[\s+]/g, ""))
+    ? `https://wa.me/${value.replace(/\D/g, "")}`
+    : value;
+  const dataUrl = await generateQRDataURL(url);
+  if (!dataUrl) return "";
+  return `<img src="${dataUrl}" width="${size}" height="${size}" style="border-radius:6px;display:block;" />`;
 }
 
 // ─── Missed opportunity card (enhanced with why + action + timeframe) ─────────
@@ -452,11 +435,12 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   }
   autoFillData();
 
-  const coName     = company?.companyName || "مكسب";
-  const coPhone    = company?.phone || "";
-  const coWebsite  = company?.website || "maksab-ksa.com";
-  const coEmail    = company?.email || "";
-  const coLogo     = company?.logoUrl || "";
+  const coName          = company?.companyName || "مكسب";
+  const coPhone         = company?.phone || "";
+  const coWebsite       = company?.website || "maksab-ksa.com";
+  const coEmail         = company?.email || "";
+  const coLogo          = company?.logoUrl || "";
+  const coCommercialReg = (company as any)?.commercialRegistration || (company as any)?.crNumber || "";
   const clLogo     = lead.clientLogoUrl || "";
   const reportDate = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
   const urgency    = urg(lead.urgencyLevel || lead.priority);
@@ -590,6 +574,15 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   const fileName = `تقرير تنفيذي - ${safeLeadName}.pdf`;
   // ── WhatsApp phone for QR ──
   const waPhone = coPhone || phones[0] || "";
+  // ── Pre-generate QR Data URLs ──
+  const waQR44   = waPhone ? await generateQRDataURL(`https://wa.me/${waPhone.replace(/\D/g, "")}`) : "";
+  const crQR44   = coCommercialReg ? await generateQRDataURL(coCommercialReg) : "";
+  const waQR60   = waPhone ? await generateQRDataURL(`https://wa.me/${waPhone.replace(/\D/g, "")}`) : "";
+  const crQR60   = coCommercialReg ? await generateQRDataURL(coCommercialReg) : "";
+  const waQR80   = waPhone ? await generateQRDataURL(`https://wa.me/${waPhone.replace(/\D/g, "")}`) : "";
+  const waQR85   = waPhone ? await generateQRDataURL(`https://wa.me/${waPhone.replace(/\D/g, "")}`) : "";
+  const qrImg = (dataUrl: string, size: number) =>
+    dataUrl ? `<img src="${dataUrl}" width="${size}" height="${size}" style="border-radius:6px;display:block;" />` : "";
 
   // ═══════════════════════════════════════════════════════════════════════
   //  PAGE 1 — EXECUTIVE COVER (DARK)
@@ -612,10 +605,18 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         <div>
           <div style="font-size:20px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;">${coName}</div>
           <div style="font-size:9px;color:#475569;margin-top:2px;letter-spacing:1.5px;">وكالة تسويق رقمي متخصصة · المملكة العربية السعودية</div>
-          <!-- Credentials badges -->
-          <div style="display:flex;gap:6px;margin-top:5px;">
-            <div style="padding:2px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:10px;font-size:8px;color:#86efac;font-weight:700;">معتمد · المركز الوطني للأعمال</div>
-            <div style="padding:2px 8px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.25);border-radius:10px;font-size:8px;color:#7dd3fc;font-weight:700;">شريك Meta المعتمد</div>
+          <!-- QR Code badges -->
+          <div style="display:flex;gap:10px;margin-top:8px;align-items:center;">
+            ${waQR44 ? `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+              <div style="padding:3px;background:white;border-radius:6px;">${qrImg(waQR44, 44)}</div>
+              <div style="font-size:7px;color:#86efac;font-weight:700;letter-spacing:0.5px;">واتساب</div>
+            </div>` : ''}
+            ${crQR44 ? `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+              <div style="padding:3px;background:white;border-radius:6px;">${qrImg(crQR44, 44)}</div>
+              <div style="font-size:7px;color:#7dd3fc;font-weight:700;letter-spacing:0.5px;">السجل التجاري</div>
+            </div>` : ''}
           </div>
         </div>
       </div>
@@ -1189,7 +1190,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
           <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;">
             <div style="padding:8px;background:white;border-radius:12px;border:3px solid rgba(34,197,94,0.4);
               box-shadow:0 0 20px rgba(34,197,94,0.2);">
-              ${qrCodeSVG(waPhone, 85)}
+              ${qrImg(waQR85, 85)}
             </div>
             <div style="font-size:8px;color:#475569;text-align:center;max-width:110px;line-height:1.5;">
               امسح للتواصل الفوري عبر واتساب
@@ -1198,26 +1199,32 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         </div>
       </div>
 
-      <!-- Credentials & Trust -->
-      <div style="margin-top:14px;padding:12px 16px;background:rgba(255,255,255,0.02);
-        border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
-        <div style="font-size:9px;color:#334155;margin-bottom:8px;font-weight:700;letter-spacing:1px;">الاعتمادات والشراكات</div>
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:20px;">
-            <span style="font-size:10px;">🏛️</span>
-            <span style="font-size:9px;color:#86efac;font-weight:700;">معتمد · المركز الوطني للأعمال</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.15);border-radius:20px;">
-            <span style="font-size:10px;">📘</span>
-            <span style="font-size:9px;color:#7dd3fc;font-weight:700;">شريك Meta المعتمد</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.15);border-radius:20px;">
-            <span style="font-size:10px;">🔍</span>
-            <span style="font-size:9px;color:#c4b5fd;font-weight:700;">شريك Google المعتمد</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);border-radius:20px;">
-            <span style="font-size:10px;">🎵</span>
-            <span style="font-size:9px;color:#fdba74;font-weight:700;">شريك TikTok المعتمد</span>
+      <!-- QR Codes Section -->
+      <div style="margin-top:14px;padding:14px 18px;background:rgba(255,255,255,0.02);
+        border:1px solid rgba(255,255,255,0.06);border-radius:14px;">
+        <div style="font-size:9px;color:#475569;margin-bottom:10px;font-weight:700;letter-spacing:1px;">تواصل معنا مباشرةً</div>
+        <div style="display:flex;align-items:center;gap:20px;">
+          ${waPhone ? `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+            <div style="padding:6px;background:white;border-radius:10px;box-shadow:0 0 16px rgba(34,197,94,0.25);">
+              ${qrImg(waQR60, 60)}
+            </div>
+            <div style="font-size:8px;color:#86efac;font-weight:700;">📱 واتساب</div>
+            <div style="font-size:7.5px;color:#475569;">${waPhone}</div>
+          </div>` : ''}
+          ${coCommercialReg ? `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+            <div style="padding:6px;background:white;border-radius:10px;box-shadow:0 0 16px rgba(14,165,233,0.25);">
+              ${qrImg(crQR60, 60)}
+            </div>
+            <div style="font-size:8px;color:#7dd3fc;font-weight:700;">🏛️ السجل التجاري</div>
+            <div style="font-size:7.5px;color:#475569;">${coCommercialReg}</div>
+          </div>` : ''}
+          <div style="flex:1;">
+            <div style="font-size:10px;color:#94a3b8;line-height:1.8;">
+              ${rsClosingStmt || `هذا التقرير تشخيص أولي مخصص لك — تواصل معنا للحصول على خطة تنفيذية متكاملة وتحليل أعمق لنتائج أفضل.`}
+            </div>
+            ${coWebsite ? `<div style="margin-top:6px;font-size:9px;color:#64748b;">🌐 ${coWebsite}</div>` : ''}
           </div>
         </div>
       </div>
@@ -1470,7 +1477,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         </div>
         ${waPhone ? `
         <div style="flex-shrink:0;">
-          ${qrCodeSVG(waPhone, 80)}
+          ${qrImg(waQR80, 80)}
         </div>` : ""}
       </div>
     </div>
