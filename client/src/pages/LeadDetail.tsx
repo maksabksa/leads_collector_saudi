@@ -161,7 +161,7 @@ export default function LeadDetail() {
         reportStyle: reportStyleData || null,
         aiGapPercentages,
       });
-      toast.success("تم تحميل التقرير بنجاح");
+      toast.success("تم توليد التقرير — سيفتح في نافذة جديدة أو يُنزّل تلقائياً");
     } catch (e: any) {
       toast.error("فشل توليد التقرير", { description: e.message });
     } finally {

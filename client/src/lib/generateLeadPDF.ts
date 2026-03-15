@@ -2160,13 +2160,25 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 </body>
 </html>`;
 
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    throw new Error('تعذّر فتح نافذة جديدة. يرجى السماح بالنوافذ المنبثقة في المتصفح.');
+  // فتح التقرير بدون نوافذ منبثقة عبر Blob URL
+  const blob = new Blob([printHTML], { type: 'text/html;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+
+  // محاولة فتح نافذة جديدة أولاً (قد يعمل في بعض المتصفحات)
+  const newWin = window.open(blobUrl, '_blank');
+  if (newWin) {
+    // تنظيف الذاكرة بعد 60 ثانية
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } else {
+    // النافذة محجوبة — تنزيل مباشر كملف HTML
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `${fileName}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
   }
-  printWindow.document.open();
-  printWindow.document.write(printHTML);
-  printWindow.document.close();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
