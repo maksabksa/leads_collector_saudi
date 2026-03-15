@@ -685,8 +685,8 @@ export default function LeadDetail() {
             )}
           </div>
 
-          {/* WhatsApp Section */}
-          <div className="rounded-2xl p-4 border space-y-3" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.55 0.2 145 / 0.3)" }}>
+          {/* WhatsApp Section — hidden */}
+          {false && <div className="rounded-2xl p-4 border space-y-3" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.55 0.2 145 / 0.3)" }}>
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <MessageCircle className="w-4 h-4" style={{ color: "oklch(0.65 0.2 145)" }} />
               واتساب
@@ -764,7 +764,7 @@ export default function LeadDetail() {
                 </div>
               </>
             )}
-          </div>
+          </div>}
 
           {/* Digital presence */}
           <div className="rounded-2xl p-4 border border-border space-y-3" style={{ background: "oklch(0.12 0.015 240)" }}>

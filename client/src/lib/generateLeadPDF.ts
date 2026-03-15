@@ -309,7 +309,9 @@ function missedOppCard(
   icon: string,
   whyItMatters?: string,
   actionStep?: string,
-  timeframe?: string
+  timeframe?: string,
+  gapPercent?: number,
+  seasonAlert?: string
 ) {
   return `<div style="border-radius:14px;overflow:hidden;border:1px solid ${color}33;margin-bottom:10px;
     background:linear-gradient(135deg,${color}06 0%,rgba(0,0,0,0) 100%);
@@ -320,11 +322,23 @@ function missedOppCard(
         <!-- Title row -->
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:7px;">
           <div style="font-size:12px;font-weight:800;color:#e2e8f0;line-height:1.5;">${icon} ${gap}</div>
-          <div style="flex-shrink:0;padding:3px 10px;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.35);
-            border-radius:16px;white-space:nowrap;">
-            <span style="font-size:9.5px;color:#fca5a5;font-weight:900;">📉 ${impact}</span>
+          <div style="display:flex;gap:5px;flex-shrink:0;align-items:center;">
+            ${gapPercent ? `<div style="padding:3px 10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);
+              border-radius:16px;white-space:nowrap;">
+              <span style="font-size:9.5px;color:#fca5a5;font-weight:900;">متأخر ${gapPercent}%</span>
+            </div>` : ''}
+            <div style="flex-shrink:0;padding:3px 10px;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.35);
+              border-radius:16px;white-space:nowrap;">
+              <span style="font-size:9.5px;color:#fca5a5;font-weight:900;">📉 ${impact}</span>
+            </div>
           </div>
         </div>
+        <!-- Season alert -->
+        ${seasonAlert ? `<div style="margin-bottom:7px;padding:5px 10px;background:rgba(234,179,8,0.1);
+          border:1px solid rgba(234,179,8,0.3);border-radius:8px;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:10px;">⚡</span>
+          <span style="font-size:9.5px;color:#fbbf24;font-weight:700;">${seasonAlert}</span>
+        </div>` : ''}
         <!-- Why it matters -->
         ${whyItMatters ? `<div style="font-size:10.5px;color:#94a3b8;line-height:1.7;margin-bottom:8px;
           padding:7px 12px;background:rgba(255,255,255,0.03);border-radius:8px;
@@ -550,9 +564,30 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     "نتائج خلال 30 يوم",
   ];
 
-  const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
-  const fileName = `تقرير تنفيذي - ${safeLeadName}.pdf`;
+  // ── حساب نسبة الفجوة مقارنةً بالمنافسين ──
+  const avgCompPri2 = competitors.length
+    ? competitors.reduce((s: number, c: any) => s + (Number(c.leadPriorityScore) || 0), 0) / competitors.length
+    : 0;
+  const gapPercentages: number[] = gaps.map((_, i) => {
+    const base = [40, 35, 30, 25, 20];
+    if (i === 0 && priScore !== null && avgCompPri2 > 0) {
+      const diff = Math.max(0, avgCompPri2 - (priScore || 0));
+      return Math.round((diff / avgCompPri2) * 100);
+    }
+    return base[i % base.length];
+  });
 
+  // ── تنبيه الموسم للفرص الضائعة ──
+  const seasonName = activeSeason?.name || '';
+  const seasonAlerts: (string | undefined)[] = gaps.map((g, i) => {
+    if (!seasonName) return undefined;
+    if (i === 0) return `هذه الفرصة أكثر إلحاحاً في موسم ${seasonName} — الآن هو الوقت المثالي للتحرك`;
+    if (i === 1) return `منافسوك يستغلون موسم ${seasonName} الآن — لا تتأخر`;
+    return undefined;
+  });
+
+  const safeLeadName = (lead.companyName || "عميل").replace(/[\/\\?%*:|"<>]/g, "-");
+  const fileName = `تقرير تنفيذي - ${safeLeadName}.pdf`;
   // ── WhatsApp phone for QR ──
   const waPhone = coPhone || phones[0] || "";
 
@@ -737,7 +772,9 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
           missedIcons[i % missedIcons.length],
           missedWhyItMatters[i % missedWhyItMatters.length],
           missedActionSteps[i % missedActionSteps.length],
-          missedTimeframes[i % missedTimeframes.length]
+          missedTimeframes[i % missedTimeframes.length],
+          gapPercentages[i] || 0,
+          seasonAlerts[i]
         )).join("")}}
       </div>` : ""}
 
@@ -1575,6 +1612,31 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
               ${cell(hasWeb ? '✅' : '❌', hasWeb ? '#22c55e' : '#ef4444')}
               ${cell(hasPhone ? '✅' : '❌', hasPhone ? '#22c55e' : '#ef4444')}
               ${cell(pri >= 7 ? '★★★' : pri >= 5 ? '★★☆' : '★☆☆', sc(pri))}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Bar Chart: Visual Competitor Comparison -->
+      <div style="margin-bottom:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 16px;">
+        <div style="font-size:11px;font-weight:800;color:#f1f5f9;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:14px;">📊</span>
+          <span>مقارنة بصرية لدرجات الأداء</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          ${allEntities.slice(0, 5).map((e: any) => {
+            const isC = !!e.isClient;
+            const pri = Math.min(10, Number(e.leadPriorityScore) || 0);
+            const barW = Math.round(pri * 10);
+            const barColor = isC ? '#22c55e' : sc(pri);
+            const name = (e.companyName || 'غير معروف').substring(0, 16);
+            return `<div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:90px;font-size:9px;font-weight:${isC ? '800' : '600'};color:${isC ? '#22c55e' : '#94a3b8'};text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${isC ? '⭐ ' : ''}${name}</div>
+              <div style="flex:1;background:rgba(255,255,255,0.04);border-radius:20px;height:14px;overflow:hidden;position:relative;">
+                <div style="height:100%;width:${barW}%;background:linear-gradient(90deg,${barColor}cc,${barColor});border-radius:20px;
+                  box-shadow:0 0 8px ${barColor}44;transition:width 0.3s;"></div>
+                <div style="position:absolute;top:50%;right:6px;transform:translateY(-50%);font-size:8px;font-weight:800;color:rgba(255,255,255,0.6);">${pri.toFixed(1)}</div>
+              </div>
             </div>`;
           }).join('')}
         </div>
