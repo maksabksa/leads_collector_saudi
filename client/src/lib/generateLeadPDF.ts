@@ -300,31 +300,57 @@ function qrCodeSVG(phone: string, size = 100) {
   </div>`;
 }
 
-// ─── Missed opportunity card ──────────────────────────────────────────────────
-function missedOppCard(gap: string, impact: string, solution: string, color: string, icon: string) {
-  return `<div style="display:flex;align-items:stretch;gap:0;border-radius:12px;overflow:hidden;
-    border:1px solid ${color}33;margin-bottom:8px;">
-    <!-- Left accent bar -->
-    <div style="width:4px;background:${color};flex-shrink:0;"></div>
-    <!-- Content -->
-    <div style="flex:1;padding:12px 14px;background:${color}08;">
-      <div style="font-size:11.5px;color:#e2e8f0;line-height:1.6;margin-bottom:8px;">${icon} ${gap}</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <div style="padding:4px 12px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);
-          border-radius:20px;">
-          <span style="font-size:10px;color:#fca5a5;font-weight:800;">خسارة شهرية: ${impact}</span>
+// ─── Missed opportunity card (enhanced with why + action + timeframe) ─────────
+function missedOppCard(
+  gap: string,
+  impact: string,
+  solution: string,
+  color: string,
+  icon: string,
+  whyItMatters?: string,
+  actionStep?: string,
+  timeframe?: string
+) {
+  return `<div style="border-radius:14px;overflow:hidden;border:1px solid ${color}33;margin-bottom:10px;
+    background:linear-gradient(135deg,${color}06 0%,rgba(0,0,0,0) 100%);
+    box-shadow:0 2px 12px ${color}15;">
+    <div style="display:flex;align-items:stretch;">
+      <div style="width:5px;background:${color};flex-shrink:0;"></div>
+      <div style="flex:1;padding:11px 14px 10px 14px;">
+        <!-- Title row -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:7px;">
+          <div style="font-size:12px;font-weight:800;color:#e2e8f0;line-height:1.5;">${icon} ${gap}</div>
+          <div style="flex-shrink:0;padding:3px 10px;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.35);
+            border-radius:16px;white-space:nowrap;">
+            <span style="font-size:9.5px;color:#fca5a5;font-weight:900;">📉 ${impact}</span>
+          </div>
         </div>
-        <div style="padding:4px 12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
-          border-radius:20px;">
-          <span style="font-size:10px;color:#86efac;font-weight:700;">الحل: ${solution}</span>
+        <!-- Why it matters -->
+        ${whyItMatters ? `<div style="font-size:10.5px;color:#94a3b8;line-height:1.7;margin-bottom:8px;
+          padding:7px 12px;background:rgba(255,255,255,0.03);border-radius:8px;
+          border-right:3px solid ${color}66;">
+          <strong style="color:${color};font-size:9.5px;">لماذا هذا مهم؟</strong> ${whyItMatters}
+        </div>` : ''}
+        <!-- Action row -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="padding:4px 12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);
+            border-radius:20px;display:flex;align-items:center;gap:5px;">
+            <span style="font-size:10px;">✅</span>
+            <span style="font-size:10px;color:#86efac;font-weight:700;">حل مكسب: ${solution}</span>
+          </div>
+          ${timeframe ? `<div style="padding:4px 12px;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25);
+            border-radius:20px;">
+            <span style="font-size:9.5px;color:#7dd3fc;font-weight:700;">⏱ ${timeframe}</span>
+          </div>` : ''}
         </div>
+        <!-- Action step -->
+        ${actionStep ? `<div style="margin-top:7px;font-size:10px;color:#64748b;line-height:1.6;
+          padding:6px 10px;background:rgba(34,197,94,0.04);border-radius:8px;
+          display:flex;align-items:flex-start;gap:6px;">
+          <span style="color:#22c55e;font-size:11px;flex-shrink:0;">▶</span>
+          <span>${actionStep}</span>
+        </div>` : ''}
       </div>
-    </div>
-    <!-- Right: impact highlight -->
-    <div style="padding:12px 14px;background:rgba(239,68,68,0.06);display:flex;flex-direction:column;
-      align-items:center;justify-content:center;min-width:80px;border-right:1px solid rgba(255,255,255,0.05);">
-      <div style="font-size:8px;color:#64748b;margin-bottom:3px;">فرصة ضائعة</div>
-      <div style="font-size:11px;font-weight:900;color:#ef4444;text-align:center;line-height:1.3;">${impact}</div>
     </div>
   </div>`;
 }
@@ -333,8 +359,15 @@ function missedOppCard(gap: string, impact: string, solution: string, color: str
 //  MAIN EXPORT
 // ═══════════════════════════════════════════════════════════════════════
 export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void> {
-  const { lead, websiteAnalysis, socialAnalyses = [], report, company, competitors = [] } = options;
+  const { lead, websiteAnalysis, socialAnalyses = [], report, company, competitors = [], activeSeason, upcomingSeasons = [], reportStyle } = options;
   if (!lead) throw new Error("لا توجد بيانات للعميل");
+
+  // ── استخراج إعدادات التقرير ──
+  const rsWritingStyle  = reportStyle?.writingStyle  || 'formal';
+  const rsBrandKeywords = Array.isArray(reportStyle?.brandKeywords) ? reportStyle.brandKeywords : [];
+  const rsFooterText    = reportStyle?.reportFooterText || '';
+  const rsClosingStmt   = reportStyle?.closingStatement || '';
+  const rsAgencyBadges  = reportStyle?.agencyBadges !== false;
 
   // ─── Auto-fill missing data intelligently ────────────────────────────────────
   function autoFillData() {
@@ -491,6 +524,31 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   ];
   const missedColors = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#0ea5e9"];
   const missedIcons = ["⚠️", "📉", "💡", "🔗", "🎯"];
+
+  // ── بيانات تفصيلية لكل فرصة ضائعة ──
+  const biz2 = lead.businessType || "النشاط";
+  const city2 = lead.city || "الرياض";
+  const missedWhyItMatters = [
+    `العملاء اليوم يبحثون عن ${biz2} عبر جوجل ومنصات التواصل قبل اتخاذ أي قرار — غياب حضورك الرقمي يعني أنهم يذهبون لمنافسيك مباشرةً.`,
+    `المحتوى الضعيف يرسل رسالة خاطئة للعميل المحتمل: إذا كان التسويق ضعيفاً، فكيف يثق بالخدمة؟ المحتوى هو واجهتك الأولى مع كل عميل جديد.`,
+    `بدون موقع إلكتروني، أنت تعتمد كلياً على التوصيات الشخصية — وهي محدودة وغير قابلة للتوسع. الموقع = موظف مبيعات يعمل 24/7.`,
+    `الإعلانات المدفوعة تضعك أمام عملاء يبحثون عن ${biz2} في ${city2} الآن — بدونها أنت غير ظاهر لمن يبحث عنك.`,
+    `السمعة الرقمية هي أول ما يفحصه العميل قبل الشراء — غياب التقييمات الإيجابية يجعل العميل يتردد ويذهب للمنافس.`,
+  ];
+  const missedActionSteps = [
+    `الخطوة الأولى: نجلس معك 30 دقيقة لتحديد أولويات الحضور الرقمي ونضع خطة عمل مخصصة لـ${biz2} في ${city2}.`,
+    `الخطوة الأولى: نبدأ بإعداد خطة محتوى شهرية مع جدول نشر منتظم ومحتوى يعكس هوية ${biz2} ويجذب عملاء ${city2}.`,
+    `الخطوة الأولى: نصمم لك موقعاً احترافياً في 7 أيام بصفحة هبوط ونموذج تواصل وعرض خدماتك بشكل جذاب.`,
+    `الخطوة الأولى: نطلق حملة إعلانية تجريبية بميزانية محدودة لقياس العائد وتحسين الاستهداف قبل التوسع.`,
+    `الخطوة الأولى: نضع استراتيجية لجمع التقييمات الإيجابية من عملائك الحاليين وتعزيز سمعتك الرقمية.`,
+  ];
+  const missedTimeframes = [
+    "نتائج خلال 30 يوم",
+    "نتائج خلال 21 يوم",
+    "نتائج خلال 7 أيام",
+    "نتائج خلال 14 يوم",
+    "نتائج خلال 30 يوم",
+  ];
 
   const safeLeadName = (lead.companyName || "عميل").replace(/[/\\?%*:|"<>]/g, "-");
   const fileName = `تقرير تنفيذي - ${safeLeadName}.pdf`;
@@ -671,14 +729,16 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       <!-- MISSED OPPORTUNITIES — Main Section -->
       ${gaps.length ? `
       <div style="margin-bottom:18px;">
-        ${sh("الفرص الضائعة وتأثيرها المالي المباشر", "كل ثغرة = خسارة شهرية يمكن تحويلها لإيراد")}
-        ${gaps.map((g, i) => missedOppCard(
+        ${sh("الفرص الضائعة وتأثيرها المالي المباشر", "كل ثغرة = خسارة شهرية يمكن تحويلها لإيراد")}        ${gaps.map((g, i) => missedOppCard(
           g,
           missedImpacts[i % missedImpacts.length],
           missedSolutions[i % missedSolutions.length],
           missedColors[i % missedColors.length],
-          missedIcons[i % missedIcons.length]
-        )).join("")}
+          missedIcons[i % missedIcons.length],
+          missedWhyItMatters[i % missedWhyItMatters.length],
+          missedActionSteps[i % missedActionSteps.length],
+          missedTimeframes[i % missedTimeframes.length]
+        )).join("")}}
       </div>` : ""}
 
       <!-- Revenue & Entry -->
@@ -693,6 +753,44 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
           ${sh("زاوية الدخول المقترحة")}
           ${card(`<p style="font-size:11.5px;color:#94a3b8;line-height:1.8;margin:0;">${cleanMarkdown(entryAngle)}</p>`, "#0ea5e9")}
         </div>` : ""}
+      </div>
+
+      <!-- خطة مكسب 90 يوم -->
+      <div style="margin-bottom:18px;background:linear-gradient(135deg,rgba(34,197,94,0.04),rgba(14,165,233,0.03));
+        border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:16px 20px;">
+        <div style="font-size:12px;font-weight:800;color:#22c55e;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px;">🚀</span>
+          <span>خطة مكسب للعمل معك — 90 يوماً لتحويل الفرص لنتائج</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:10px;padding:12px;">
+            <div style="font-size:9px;color:#86efac;font-weight:800;margin-bottom:6px;letter-spacing:1px;">📅 الشهر الأول (1-30 يوم)</div>
+            <div style="font-size:9.5px;color:#94a3b8;line-height:1.7;">
+              إعداد الهوية البصرية وإطلاق الحضور الرقمي الأساسي. تفعيل الحسابات وبدء نشر محتوى يومي منتظم يعكس قيمة ${lead.companyName || 'النشاط'}.
+            </div>
+            <div style="margin-top:8px;padding:4px 10px;background:rgba(34,197,94,0.1);border-radius:8px;">
+              <div style="font-size:9px;color:#22c55e;font-weight:700;">✅ الهدف: حضور رقمي متكامل</div>
+            </div>
+          </div>
+          <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:10px;padding:12px;">
+            <div style="font-size:9px;color:#7dd3fc;font-weight:800;margin-bottom:6px;letter-spacing:1px;">📅 الشهر الثاني (31-60 يوم)</div>
+            <div style="font-size:9.5px;color:#94a3b8;line-height:1.7;">
+              إطلاق حملات إعلانية مستهدفة وقياس النتائج. تحسين المحتوى بناءً على التفاعل وبناء جمهور متفاعل في ${city2}.
+            </div>
+            <div style="margin-top:8px;padding:4px 10px;background:rgba(14,165,233,0.1);border-radius:8px;">
+              <div style="font-size:9px;color:#0ea5e9;font-weight:700;">✅ الهدف: أول عملاء جدد</div>
+            </div>
+          </div>
+          <div style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);border-radius:10px;padding:12px;">
+            <div style="font-size:9px;color:#c4b5fd;font-weight:800;margin-bottom:6px;letter-spacing:1px;">📅 الشهر الثالث (61-90 يوم)</div>
+            <div style="font-size:9.5px;color:#94a3b8;line-height:1.7;">
+              توسيع الحملات وبناء قناة مبيعات رقمية مستدامة. تحويل المتابعين لعملاء فعليين وقياس العائد على الاستثمار.
+            </div>
+            <div style="margin-top:8px;padding:4px 10px;background:rgba(167,139,250,0.1);border-radius:8px;">
+              <div style="font-size:9px;color:#a78bfa;font-weight:700;">✅ الهدف: نمو مستدام</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- KPI bars -->
@@ -915,6 +1013,52 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         </div>
       </div>` : ""}
 
+      <!-- ===== قسم الموسم التسويقي الحالي ===== -->
+      ${activeSeason ? `
+      <div style="margin-bottom:14px;background:linear-gradient(135deg,rgba(234,179,8,0.05),rgba(249,115,22,0.04));
+        border:1px solid rgba(234,179,8,0.25);border-radius:14px;padding:14px 18px;">
+        <div style="font-size:12px;font-weight:800;color:#fbbf24;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px;">📅</span>
+          <span>الموسم التسويقي الحالي: ${activeSeason.name || 'موسم نشط'}</span>
+          <span style="margin-right:auto;padding:3px 10px;background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.35);
+            border-radius:12px;font-size:9px;color:#fbbf24;font-weight:700;">نشط الآن</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            ${activeSeason.description ? `
+            <div style="font-size:10.5px;color:#94a3b8;line-height:1.7;margin-bottom:8px;
+              padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;
+              border-right:3px solid rgba(234,179,8,0.5);">
+              ${activeSeason.description}
+            </div>` : ''}
+            ${activeSeason.guidance ? `
+            <div style="padding:8px 12px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);
+              border-radius:8px;">
+              <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:4px;">💡 توجيه مخصص لـ${lead.businessType || 'نشاطك'}</div>
+              <div style="font-size:10px;color:#94a3b8;line-height:1.6;">${activeSeason.guidance}</div>
+            </div>` : ''}
+          </div>
+          <div>
+            ${activeSeason.keyOpportunities?.length ? `
+            <div style="margin-bottom:8px;">
+              <div style="font-size:9px;color:#fbbf24;font-weight:700;margin-bottom:5px;">✨ فرص هذا الموسم</div>
+              ${activeSeason.keyOpportunities.slice(0, 3).map((opp: string) => `
+              <div style="display:flex;gap:6px;align-items:flex-start;padding:3px 0;">
+                <span style="color:#fbbf24;font-size:10px;flex-shrink:0;">▶</span>
+                <div style="font-size:9.5px;color:#94a3b8;line-height:1.5;">${opp}</div>
+              </div>`).join('')}
+            </div>` : ''}
+            ${upcomingSeasons.length > 0 ? `
+            <div style="padding:8px 12px;background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.15);
+              border-radius:8px;">
+              <div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:5px;">⏳ مواسم قادمة</div>
+              ${upcomingSeasons.slice(0, 2).map((s: any) => `
+              <div style="font-size:9px;color:#64748b;padding:2px 0;">▸ ${s.name || ''} ${s.startDate ? '(' + s.startDate + ')' : ''}</div>`).join('')}
+            </div>` : ''}
+          </div>
+        </div>
+      </div>` : ''}
+
       <!-- ===== قسم مستقبل السوق ===== -->
       <div style="margin-bottom:14px;background:linear-gradient(135deg,rgba(14,165,233,0.04) 0%,rgba(167,139,250,0.04) 100%);
         border:1px solid rgba(14,165,233,0.15);border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;">
@@ -993,8 +1137,15 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
               border:1px solid rgba(239,68,68,0.25);border-radius:10px;display:inline-flex;align-items:center;gap:8px;">
               <div style="width:7px;height:7px;border-radius:50%;background:#ef4444;
                 box-shadow:0 0 8px #ef4444;animation:pulse 2s infinite;"></div>
-              <span style="font-size:10px;color:#fca5a5;font-weight:700;">عرض الاستشارة المجانية متاح لفترة محدودة — احجز مكانك الآن</span>
+              <span style="font-size:10px;color:#fca5a5;font-weight:700;">${rsClosingStmt || 'عرض الاستشارة المجانية متاح لفترة محدودة — احجز مكانك الآن'}</span>
             </div>
+            <!-- Brand keywords from settings -->
+            ${rsBrandKeywords.length > 0 ? `
+            <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+              ${rsBrandKeywords.slice(0, 5).map((kw: string) => `<span style="padding:3px 10px;background:rgba(34,197,94,0.08);
+                border:1px solid rgba(34,197,94,0.2);border-radius:12px;
+                font-size:9px;color:#86efac;font-weight:600;">${kw}</span>`).join('')}
+            </div>` : ''}
           </div>
           <!-- Right: QR Code -->
           ${waPhone ? `
@@ -1039,7 +1190,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
       background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة © ${new Date().getFullYear()}</div>
+      <div style="font-size:9px;color:#334155;">${rsFooterText || `حصري من ${coName} — جميع الحقوق محفوظة © ${new Date().getFullYear()}`}</div>
       <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 4 من 5</div>
     </div>
   `, false);
@@ -1290,7 +1441,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
       background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:#334155;">${rsFooterText || `حصري من ${coName} — جميع الحقوق محفوظة`}</div>
       <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 5 من 5</div>
     </div>
   `);
@@ -1382,21 +1533,86 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         ${allEntities.map((e: any, i: number) => buildCompetitorCard(e, i + 1, !!e.isClient)).join('')}
       </div>
 
-      <!-- Strengths & Weaknesses -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div style="background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:12px;padding:12px 14px;">
-          <div style="font-size:11px;font-weight:800;color:#22c55e;margin-bottom:8px;">✅ نقاط القوة التنافسية</div>
-          ${strengths.map(s => `<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-            <div style="width:5px;height:5px;border-radius:50%;background:#22c55e;margin-top:4px;flex-shrink:0;"></div>
-            <div style="font-size:9.5px;color:#94a3b8;line-height:1.5;">${s}</div>
-          </div>`).join('')}
+      <!-- Strategic Comparison Table -->
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:800;color:#f1f5f9;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:14px;">📊</span>
+          <span>جدول المقارنة الاستراتيجية</span>
         </div>
-        <div style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.15);border-radius:12px;padding:12px 14px;">
-          <div style="font-size:11px;font-weight:800;color:#ef4444;margin-bottom:8px;">🎯 فرص التحسين</div>
-          ${weaknesses.map(w => `<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-            <div style="width:5px;height:5px;border-radius:50%;background:#ef4444;margin-top:4px;flex-shrink:0;"></div>
-            <div style="font-size:9.5px;color:#94a3b8;line-height:1.5;">${w}</div>
-          </div>`).join('')}
+        <div style="border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden;">
+          <!-- Table header -->
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;background:rgba(255,255,255,0.04);
+            padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:9px;color:#64748b;font-weight:700;">النشاط</div>
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-align:center;">الأولوية</div>
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-align:center;">المنصات</div>
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-align:center;">الموقع</div>
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-align:center;">التواصل</div>
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-align:center;">التقييم</div>
+          </div>
+          <!-- Table rows -->
+          ${allEntities.slice(0, 5).map((e: any, i: number) => {
+            const isC = !!e.isClient;
+            const pri = Number(e.leadPriorityScore) || 0;
+            const plats = [e.instagramUrl, e.tiktokUrl, e.twitterUrl, e.snapchatUrl, e.facebookUrl, e.linkedinUrl].filter(Boolean).length;
+            const hasWeb = !!e.website;
+            const hasPhone = !!(e.phone || e.verifiedPhone);
+            const rowBg = isC ? 'rgba(34,197,94,0.06)' : i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent';
+            const rowBorder = isC ? 'border-right:3px solid #22c55e;' : '';
+            const nameColor = isC ? '#22c55e' : '#e2e8f0';
+            const priColor = sc(pri);
+            const cell = (content: string, color = '#94a3b8') =>
+              `<div style="text-align:center;font-size:9.5px;font-weight:700;color:${color};">${content}</div>`;
+            return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;
+              padding:7px 12px;background:${rowBg};${rowBorder}
+              border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;">
+              <div style="font-size:9.5px;font-weight:${isC ? '800' : '600'};color:${nameColor};
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${isC ? '⭐ ' : ''}${(e.companyName || 'غير معروف').substring(0, 18)}
+              </div>
+              ${cell(pri.toFixed(1), priColor)}
+              ${cell(plats + '/6', plats >= 4 ? '#22c55e' : plats >= 2 ? '#eab308' : '#ef4444')}
+              ${cell(hasWeb ? '✅' : '❌', hasWeb ? '#22c55e' : '#ef4444')}
+              ${cell(hasPhone ? '✅' : '❌', hasPhone ? '#22c55e' : '#ef4444')}
+              ${cell(pri >= 7 ? '★★★' : pri >= 5 ? '★★☆' : '★☆☆', sc(pri))}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Competitive Gap Analysis -->
+      <div style="margin-bottom:12px;background:linear-gradient(135deg,rgba(239,68,68,0.04),rgba(249,115,22,0.03));
+        border:1px solid rgba(239,68,68,0.15);border-radius:12px;padding:12px 16px;">
+        <div style="font-size:11px;font-weight:800;color:#fca5a5;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:14px;">🔍</span>
+          <span>تحليل الثغرات التنافسية — فرص التفوق على المنافسين</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;">✅ ميزاتك التنافسية</div>
+            ${strengths.map(s => `<div style="display:flex;gap:6px;align-items:flex-start;padding:3px 0;">
+              <div style="width:5px;height:5px;border-radius:50%;background:#22c55e;margin-top:4px;flex-shrink:0;"></div>
+              <div style="font-size:9px;color:#94a3b8;line-height:1.5;">${s}</div>
+            </div>`).join('')}
+          </div>
+          <div>
+            <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;">🎯 ثغرات يمكن استغلالها</div>
+            ${weaknesses.map(w => `<div style="display:flex;gap:6px;align-items:flex-start;padding:3px 0;">
+              <div style="width:5px;height:5px;border-radius:50%;background:#ef4444;margin-top:4px;flex-shrink:0;"></div>
+              <div style="font-size:9px;color:#94a3b8;line-height:1.5;">${w}</div>
+            </div>`).join('')}
+          </div>
+        </div>
+        <!-- Competitive recommendation -->
+        <div style="margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.06);
+          border-right:3px solid #22c55e;border-radius:0 8px 8px 0;">
+          <div style="font-size:10px;color:#94a3b8;line-height:1.7;">
+            <strong style="color:#22c55e;">💡 توصية مكسب:</strong>
+            ${clientRank === 1
+              ? `${lead.companyName || 'النشاط'} يتصدر المنافسين حالياً — التحدي هو الحفاظ على هذا التفوق وتوسيع الفجوة مع المنافسين.`
+              : `الفرصة متاحة لـ${lead.companyName || 'النشاط'} للتفوق على ${competitors.filter((c: any) => (Number(c.leadPriorityScore)||0) > clientPri).length} منافسين من خلال معالجة الثغرات المحددة في هذا التقرير.`
+            }
+          </div>
         </div>
       </div>
     </div>
@@ -1404,7 +1620,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
       background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
       display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة</div>
+      <div style="font-size:9px;color:#334155;">${rsFooterText || `حصري من ${coName} — جميع الحقوق محفوظة`}</div>
       <div style="font-size:9px;color:#334155;">CONFIDENTIAL · صفحة 5 من 5</div>
     </div>
   `);
