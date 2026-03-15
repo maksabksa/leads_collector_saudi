@@ -1,10 +1,10 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
-  Loader2, Upload, AlertTriangle,
+  Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -22,6 +22,9 @@ const statusColors: Record<string, { color: string; bg: string; label: string }>
   failed: { color: "oklch(0.7 0.22 25)", bg: "oklch(0.58 0.22 25 / 0.15)", label: "فشل" },
 };
 
+// المراحل التي تعني "تم التواصل" أو ما بعدها
+const CONTACTED_STAGES = ["contacted", "interested", "price_offer", "meeting", "won", "lost"];
+
 export default function Leads() {
   const [search, setSearch] = useState("");
   const [filterCountry, setFilterCountry] = useState("");
@@ -37,20 +40,39 @@ export default function Leads() {
   const [targetSegmentId, setTargetSegmentId] = useState<string>("");
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
+  // التبويب النشط: "all" = قائمة العملاء الجديدة | "contacted" = تم التواصل
+  const [activeListTab, setActiveListTab] = useState<"all" | "contacted">("all");
 
   const availableFilterCities = filterCountry
     ? (COUNTRIES_DATA.find(c => c.name === filterCountry)?.cities ?? [])
     : [];
 
-  const { data: leads, isLoading } = trpc.leads.list.useQuery({
+  // جلب كل العملاء بدون فلتر stage (نصفّي في الـ frontend)
+  const { data: allLeads, isLoading } = trpc.leads.list.useQuery({
     search: search || undefined,
     city: filterCity || undefined,
     analysisStatus: filterStatus || undefined,
     zoneId: filterZone,
     hasWhatsapp: filterWhatsapp || undefined,
-    stage: (filterStage || undefined) as "new" | "contacted" | "interested" | "price_offer" | "meeting" | "won" | "lost" | undefined,
     priority: (filterPriority || undefined) as "high" | "medium" | "low" | undefined,
   });
+
+  // تصفية حسب التبويب النشط
+  const leads = (() => {
+    if (!allLeads) return [];
+    if (activeListTab === "contacted") {
+      return allLeads.filter(l => CONTACTED_STAGES.includes((l as any).stage ?? ""));
+    }
+    // التبويب الرئيسي: العملاء الجدد (stage = new أو فارغ)
+    return allLeads.filter(l => !CONTACTED_STAGES.includes((l as any).stage ?? ""));
+  })();
+
+  // تطبيق فلتر stage الإضافي داخل التبويب
+  const filteredLeads = filterStage
+    ? leads.filter(l => (l as any).stage === filterStage)
+    : leads;
+
   const { data: zones } = trpc.zones.list.useQuery();
   const { data: segmentsList } = trpc.segments.list.useQuery();
   const deleteLead = trpc.leads.delete.useMutation();
@@ -63,6 +85,25 @@ export default function Leads() {
       utils.leads.stats.invalidate();
     },
     onError: (e) => toast.error("فشل الحذف: " + e.message),
+  });
+  const bulkUpdateStage = trpc.leads.bulkUpdateStage.useMutation({
+    onSuccess: (data) => {
+      toast.success(`✅ تم ترحيل ${data.updated} عميل إلى قائمة "تم التواصل"`);
+      setSelectedIds(new Set());
+      setShowMigrateConfirm(false);
+      utils.leads.list.invalidate();
+      utils.leads.stats.invalidate();
+    },
+    onError: (e) => toast.error("فشل الترحيل: " + e.message),
+  });
+  const bulkReturnToNew = trpc.leads.bulkUpdateStage.useMutation({
+    onSuccess: (data) => {
+      toast.success(`✅ تم إرجاع ${data.updated} عميل للقائمة الرئيسية`);
+      setSelectedIds(new Set());
+      utils.leads.list.invalidate();
+      utils.leads.stats.invalidate();
+    },
+    onError: (e) => toast.error("فشل الإرجاع: " + e.message),
   });
   const exportCSV = trpc.export.exportCSV.useMutation();
   const bulkAnalyze = trpc.analysis.bulkAnalyze.useMutation({
@@ -114,11 +155,10 @@ export default function Leads() {
   };
 
   const toggleSelectAll = () => {
-    if (!leads) return;
-    if (selectedIds.size === leads.length) {
+    if (selectedIds.size === filteredLeads.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(leads.map((l) => l.id)));
+      setSelectedIds(new Set(filteredLeads.map((l) => l.id)));
     }
   };
 
@@ -130,17 +170,44 @@ export default function Leads() {
     });
   };
 
+  // عدد العملاء في كل تبويب
+  const newCount = (allLeads ?? []).filter(l => !CONTACTED_STAGES.includes((l as any).stage ?? "")).length;
+  const contactedCount = (allLeads ?? []).filter(l => CONTACTED_STAGES.includes((l as any).stage ?? "")).length;
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">قائمة العملاء</h1>
-          <p className="text-muted-foreground text-sm mt-1">{leads?.length ?? 0} عميل مسجل</p>
+          <p className="text-muted-foreground text-sm mt-1">{allLeads?.length ?? 0} عميل مسجل</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {selectedIds.size > 0 && (
             <>
+              {/* زر الترحيل — يظهر فقط في التبويب الرئيسي */}
+              {activeListTab === "all" && (
+                <button
+                  onClick={() => setShowMigrateConfirm(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
+                >
+                  <ArrowRightLeft className="w-4 h-4" />
+                  ترحيل {selectedIds.size} للمتواصَل معهم
+                </button>
+              )}
+              {/* زر الإرجاع — يظهر فقط في تبويب "تم التواصل" */}
+              {activeListTab === "contacted" && (
+                <button
+                  onClick={() => bulkReturnToNew.mutate({ ids: Array.from(selectedIds), stage: "new" })}
+                  disabled={bulkReturnToNew.isPending}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: "oklch(0.78 0.16 75 / 0.15)", color: "oklch(0.85 0.16 75)", border: "1px solid oklch(0.78 0.16 75 / 0.3)" }}
+                >
+                  <ArrowRightLeft className="w-4 h-4" />
+                  {bulkReturnToNew.isPending ? "جاري الإرجاع..." : `إرجاع ${selectedIds.size} للقائمة الرئيسية`}
+                </button>
+              )}
               <button
                 onClick={() => bulkAnalyze.mutate({ leadIds: Array.from(selectedIds) })}
                 disabled={bulkAnalyze.isPending}
@@ -170,7 +237,7 @@ export default function Leads() {
           )}
           <button
             onClick={handleExport}
-            disabled={exportCSV.isPending || !leads?.length}
+            disabled={exportCSV.isPending || !allLeads?.length}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "oklch(0.65 0.18 145 / 0.1)", color: "var(--brand-green)", border: "1px solid oklch(0.65 0.18 145 / 0.25)" }}
           >
@@ -193,6 +260,42 @@ export default function Leads() {
             </button>
           </Link>
         </div>
+      </div>
+
+      {/* ===== تبويبات القائمة ===== */}
+      <div className="flex items-center gap-1 p-1 rounded-xl border border-border" style={{ background: "oklch(0.10 0.015 240)", width: "fit-content" }}>
+        <button
+          onClick={() => { setActiveListTab("all"); setSelectedIds(new Set()); setFilterStage(""); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+          style={activeListTab === "all"
+            ? { background: "oklch(0.65 0.18 200)", color: "white" }
+            : { color: "oklch(0.6 0.01 240)" }}
+        >
+          <Users className="w-4 h-4" />
+          العملاء الجدد
+          <span className="px-1.5 py-0.5 rounded-full text-xs font-bold"
+            style={activeListTab === "all"
+              ? { background: "oklch(1 0 0 / 0.2)", color: "white" }
+              : { background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.65 0.18 200)" }}>
+            {newCount}
+          </span>
+        </button>
+        <button
+          onClick={() => { setActiveListTab("contacted"); setSelectedIds(new Set()); setFilterStage(""); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+          style={activeListTab === "contacted"
+            ? { background: "oklch(0.65 0.18 145)", color: "white" }
+            : { color: "oklch(0.6 0.01 240)" }}
+        >
+          <UserCheck className="w-4 h-4" />
+          تم التواصل
+          <span className="px-1.5 py-0.5 rounded-full text-xs font-bold"
+            style={activeListTab === "contacted"
+              ? { background: "oklch(1 0 0 / 0.2)", color: "white" }
+              : { background: "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)" }}>
+            {contactedCount}
+          </span>
+        </button>
       </div>
 
       {/* Search & Filters */}
@@ -269,13 +372,17 @@ export default function Leads() {
               <select value={filterStage} onChange={e => setFilterStage(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
                 <option value="">الكل</option>
-                <option value="new">جديد</option>
-                <option value="contacted">تم التواصل</option>
-                <option value="interested">مهتم</option>
-                <option value="price_offer">عرض سعر</option>
-                <option value="meeting">اجتماع</option>
-                <option value="won">عميل فعلي</option>
-                <option value="lost">خسرناه</option>
+                {activeListTab === "all" && <option value="new">جديد</option>}
+                {activeListTab === "contacted" && (
+                  <>
+                    <option value="contacted">تم التواصل</option>
+                    <option value="interested">مهتم</option>
+                    <option value="price_offer">عرض سعر</option>
+                    <option value="meeting">اجتماع</option>
+                    <option value="won">عميل فعلي</option>
+                    <option value="lost">خسرناه</option>
+                  </>
+                )}
               </select>
             </div>
             <div>
@@ -293,10 +400,10 @@ export default function Leads() {
       </div>
 
       {/* Bulk action bar */}
-      {leads && leads.length > 0 && (
+      {filteredLeads.length > 0 && (
         <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-border text-sm" style={{ background: "oklch(0.12 0.015 240)" }}>
           <button onClick={toggleSelectAll} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-            {selectedIds.size === leads.length && leads.length > 0
+            {selectedIds.size === filteredLeads.length && filteredLeads.length > 0
               ? <CheckSquare className="w-4 h-4 text-primary" />
               : <Square className="w-4 h-4" />}
             تحديد الكل
@@ -304,7 +411,6 @@ export default function Leads() {
           {selectedIds.size > 0 && (
             <span className="text-muted-foreground">
               — تم تحديد <span className="text-foreground font-medium">{selectedIds.size}</span> عميل
-
             </span>
           )}
         </div>
@@ -317,16 +423,24 @@ export default function Leads() {
             <div key={i} className="h-16 rounded-xl animate-pulse border border-border" style={{ background: "oklch(0.12 0.015 240)" }} />
           ))}
         </div>
-      ) : (leads?.length ?? 0) === 0 ? (
+      ) : filteredLeads.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <Search className="w-16 h-16 text-muted-foreground opacity-20" />
-          <p className="text-muted-foreground">لا توجد نتائج</p>
-          <Link href="/leads/add">
-            <button className="px-4 py-2 rounded-xl text-sm font-medium"
-              style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
-              أضف أول Lead
-            </button>
-          </Link>
+          {activeListTab === "contacted"
+            ? <UserCheck className="w-16 h-16 text-muted-foreground opacity-20" />
+            : <Search className="w-16 h-16 text-muted-foreground opacity-20" />}
+          <p className="text-muted-foreground">
+            {activeListTab === "contacted"
+              ? "لا يوجد عملاء في قائمة التواصل بعد — رحّل عملاء من القائمة الرئيسية"
+              : "لا توجد نتائج"}
+          </p>
+          {activeListTab === "all" && (
+            <Link href="/leads/add">
+              <button className="px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+                أضف أول Lead
+              </button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-border overflow-hidden" style={{ background: "oklch(0.12 0.015 240)" }}>
@@ -334,7 +448,7 @@ export default function Leads() {
           <div className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-border text-xs text-muted-foreground font-medium">
             <div className="col-span-1 flex items-center justify-center">
               <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground transition-colors">
-                {selectedIds.size === (leads?.length ?? 0) && (leads?.length ?? 0) > 0
+                {selectedIds.size === filteredLeads.length && filteredLeads.length > 0
                   ? <CheckSquare className="w-4 h-4 text-primary" />
                   : <Square className="w-4 h-4" />}
               </button>
@@ -348,7 +462,7 @@ export default function Leads() {
           </div>
           {/* Table rows */}
           <div className="divide-y divide-border">
-            {leads?.map((lead) => {
+            {filteredLeads.map((lead) => {
               const statusInfo = statusColors[lead.analysisStatus];
               const isSelected = selectedIds.has(lead.id);
               return (
@@ -419,7 +533,6 @@ export default function Leads() {
                           <Phone className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                           <span className="text-xs text-foreground font-mono">{lead.verifiedPhone}</span>
                         </div>
-
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">لا يوجد</span>
@@ -479,6 +592,46 @@ export default function Leads() {
         </div>
       )}
 
+      {/* ===== نافذة تأكيد الترحيل ===== */}
+      <Dialog open={showMigrateConfirm} onOpenChange={setShowMigrateConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5" style={{ color: "oklch(0.75 0.18 200)" }} />
+              تأكيد الترحيل
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-center space-y-3">
+            <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
+              style={{ background: "oklch(0.65 0.18 200 / 0.15)", border: "2px solid oklch(0.65 0.18 200 / 0.3)" }}>
+              <UserCheck className="w-8 h-8" style={{ color: "oklch(0.75 0.18 200)" }} />
+            </div>
+            <p className="text-base font-semibold">ترحيل {selectedIds.size} عميل إلى قائمة "تم التواصل"</p>
+            <p className="text-sm text-muted-foreground">
+              سيتم نقل هؤلاء العملاء من القائمة الرئيسية إلى قائمة "تم التواصل" مع الإبقاء على جميع بياناتهم.
+              يمكنك إرجاعهم في أي وقت.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowMigrateConfirm(false)}
+              disabled={bulkUpdateStage.isPending}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => bulkUpdateStage.mutate({ ids: Array.from(selectedIds), stage: "contacted" })}
+              disabled={bulkUpdateStage.isPending}
+              style={{ background: "oklch(0.65 0.18 200)", color: "white" }}
+            >
+              {bulkUpdateStage.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin ml-2" /> جاري الترحيل...</>
+              ) : (
+                <><ArrowRightLeft className="w-4 h-4 ml-2" /> ترحيل {selectedIds.size} عميل</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog إضافة للشريحة */}
       <Dialog open={showSegmentDialog} onOpenChange={setShowSegmentDialog}>
         <DialogContent className="max-w-sm">
@@ -519,7 +672,6 @@ export default function Leads() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
 
       {/* ===== نافذة تأكيد الحذف الجماعي ===== */}
       <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
