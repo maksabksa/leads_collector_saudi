@@ -1780,3 +1780,12 @@
 - [x] دمج إعدادات الأسلوب في buildPDFHtml (closingText، includeSeasonSection، includeCompetitorsSection)
 - [x] نافذة تأكيد اكتمال البيانات قبل التحليل الشامل (قائمة بالبيانات المتوفرة والناقصة)
 - [x] توحيد زر المعاينة مع تقرير PDF (يستخدم report.getHtml من السيرفر)
+
+## ربط المواسم بأنواع النشاط + تحذير البيانات الناقصة (مارس 2026)
+
+- [x] إضافة حقل targetBusinessTypes (JSON) في جدول marketing_seasons
+- [ ] migration وتطبيق التغييرات
+- [x] تحديث seasons router لدعم حفظ/جلب targetBusinessTypes
+- [x] تحديث صفحة المواسم: إضافة حقل "أنواع النشاط المستهدفة" مع tags input
+- [x] تحديث getActiveSeasonForBusiness لتصفية المواسم حسب نوع النشاط
+- [x] إضافة أيقونة تحذير في جدول العملاء للبيانات الناقصة (نوع النشاط أو المدينة)

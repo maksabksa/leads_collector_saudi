@@ -109,6 +109,16 @@ function SeasonCard({
                 معطّل
               </span>
             )}
+            {related.length > 0 && (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
+                style={{ background: "oklch(0.18 0.04 260)", color: "oklch(0.65 0.12 260)", border: "1px solid oklch(0.28 0.06 260)" }}
+                title={`مخصص لـ: ${related.join('، ')}`}
+              >
+                <Tag className="w-2.5 h-2.5" />
+                {related.length} نوع نشاط
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -120,6 +130,12 @@ function SeasonCard({
               <Sparkles className="w-3 h-3" />
               {opportunities.length} فرصة
             </span>
+            {related.length === 0 && (
+              <span className="flex items-center gap-1 text-muted-foreground/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500/60 inline-block" />
+                يشمل جميع الأنشطة
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">

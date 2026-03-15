@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
-  Loader2, Upload,
+  Loader2, Upload, AlertTriangle,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -371,9 +371,25 @@ export default function Leads() {
                       {lead.companyName.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{lead.companyName}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-foreground truncate">{lead.companyName}</p>
+                        {(!lead.businessType || !lead.city) && (
+                          <span
+                            title={[
+                              !lead.businessType ? "نوع النشاط غير محدد" : "",
+                              !lead.city ? "المدينة غير محددة" : "",
+                            ].filter(Boolean).join(" • ")}
+                            className="flex-shrink-0 cursor-help"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" style={{ color: "oklch(0.75 0.18 60)" }} />
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-xs text-muted-foreground truncate">{lead.businessType}</span>
+                        {lead.businessType
+                          ? <span className="text-xs text-muted-foreground truncate">{lead.businessType}</span>
+                          : <span className="text-xs" style={{ color: "oklch(0.65 0.15 60)" }}>✕ نوع النشاط</span>
+                        }
                         <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: statusInfo.bg, color: statusInfo.color }}>
                           {statusInfo.label}
                         </span>
@@ -389,7 +405,10 @@ export default function Leads() {
                   </div>
                   {/* City / Zone */}
                   <div className="col-span-2">
-                    <p className="text-sm text-foreground">{lead.city}</p>
+                    {lead.city
+                      ? <p className="text-sm text-foreground">{lead.city}</p>
+                      : <span className="text-xs flex items-center gap-1" style={{ color: "oklch(0.65 0.15 60)" }}><AlertTriangle className="w-3 h-3" />غير محددة</span>
+                    }
                     {lead.zoneName && <p className="text-xs text-muted-foreground truncate">{lead.zoneName}</p>}
                   </div>
                   {/* Contact */}
