@@ -25,7 +25,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, LogOut, PanelLeft, Users, UserPlus, Search,
   MessageSquare, Send, Smartphone, BarChart2, Globe, Bot, Database,
-  MapPin, Upload, Key, Bell, ChevronDown, ChevronRight, TrendingUp,
+  MapPin, Upload, Key, ChevronDown, ChevronRight, TrendingUp,
   Activity, Shield, UserCheck, FileText, Zap, Target, PieChart,
   Settings, Heart, Phone, Star, BarChart, LineChart, Megaphone,
   Package, RefreshCw, AlertTriangle
@@ -70,10 +70,9 @@ const menuGroups = [
     ]
   },
   {
-    group: "التذكيرات والمتابعة",
-    icon: Bell,
+    group: "المتابعة",
+    icon: Zap,
     items: [
-      { icon: Bell, label: "نظام التذكيرات", path: "/reminders", badge: "جديد" },
       { icon: FileText, label: "التقارير الأسبوعية", path: "/weekly-reports", badge: null },
       { icon: Zap, label: "تنشيط التواصل", path: "/activation", badge: "جديد" },
     ]

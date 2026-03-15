@@ -98,6 +98,11 @@ export default function LeadDetail() {
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
+  const { data: reportStyleData } = trpc.reportStyle.get.useQuery();
+  const { data: activeSeasonData } = trpc.seasons.getActiveForBusiness.useQuery(
+    { businessType: data?.lead?.businessType || 'general' },
+    { enabled: true }
+  );
   const fetchClientLogoMutation = trpc.leads.fetchClientLogo.useMutation();
   const fetchPlacePhotosMutation = trpc.leads.fetchPlacePhotos.useMutation();
   const [showPhotoGallery, setShowPhotoGallery] = useState(false);
@@ -128,6 +133,9 @@ export default function LeadDetail() {
         report: report,
         company: companySettingsData,
         competitors: competitorsData || [],
+        activeSeason: activeSeasonData?.active || null,
+        upcomingSeasons: activeSeasonData?.upcoming || [],
+        reportStyle: reportStyleData || null,
       });
       toast.success("تم تحميل التقرير بنجاح");
     } catch (e: any) {

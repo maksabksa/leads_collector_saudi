@@ -15,8 +15,6 @@ import {
   Bot,
   Settings2,
   ClipboardList,
-  CalendarClock,
-  Bell,
   CalendarDays,
 } from "lucide-react";
 import { useState } from "react";
@@ -37,8 +35,6 @@ const MAIN_NAV = [
 
 /** قسم المتابعة — متاح لجميع المستخدمين */
 const FOLLOWUP_NAV = [
-  { path: "/follow-up",       label: "المتابعة التلقائية", icon: CalendarClock },
-  { path: "/reminders",      label: "التذكيرات",          icon: Bell },
   { path: "/smart-analysis", label: "التحليل الذكي",      icon: Brain },
   { path: "/ai-agent",       label: "وكيل الذكاء الاصطناعي", icon: Bot },
 ];

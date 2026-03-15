@@ -12,6 +12,9 @@ interface GeneratePDFOptions {
   report?: any;
   company?: any;
   competitors?: any[];
+  activeSeason?: any;       // الموسم التسويقي الحالي
+  upcomingSeasons?: any[];  // المواسم القادمة خلال 30 يوم
+  reportStyle?: any;        // إعدادات أسلوب التقرير
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
