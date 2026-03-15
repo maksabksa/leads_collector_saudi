@@ -1807,3 +1807,48 @@
 - [ ] تقوية تحليل المنافسين بمقارنة مرئية وبيانات أعمق
 - [ ] ربط المواسم التسويقية بالتقارير تلقائياً
 - [ ] ربط إعدادات الشركة بالتقارير
+
+## PHASE 1 - Identity Linkage Engine (16 مارس 2026)
+
+### الأنواع الموحدة (shared/types/lead-intelligence.ts)
+- [x] تعريف DiscoveryCandidate مع verifiedPhones/candidatePhones/verifiedWebsite/candidateWebsites
+- [x] تعريف SourceRecord مع platform/rawData/scrapedAt/confidence
+- [x] تعريف ResolvedGroup مع primary/duplicates/mergeConfidence/allSources
+- [x] تعريف MarketAudit مع candidates/resolvedGroups/totalRaw/totalUnique
+- [x] تعريف LinkageScore مع breakdown/matchedSignals/reason/shouldMerge
+- [x] تعريف LinkageWeights مع الأوزان المرجحة (phone 0.40, website 0.20, bioLink 0.15, name 0.15, cityCategory 0.05, socialHandle 0.05)
+
+### محرك الربط الذكي (server/lib/identityLinkage.ts)
+- [x] إعادة كتابة كاملة مع الأوزان الجديدة من البرومبت
+- [x] normalizeName: إزالة كلمات الوقف العربية والإنجليزية
+- [x] comparePhones: تطبيع الأرقام السعودية (966/0) قبل المقارنة
+- [x] compareWebsites: مقارنة الدومين الجذري فقط (بدون www/https)
+- [x] compareSocialHandles: مقارنة handles بعد التطبيع
+- [x] shouldMerge: تطابق الهاتف وحده كافٍ، تطابق الموقع وحده كافٍ (بدون شرط الاسم)
+- [x] clusterCandidates: Union-Find algorithm للكفاءة
+- [x] resolveGroup: دمج الحقول من جميع المصادر
+
+### URL Builder المركزي (server/lib/googleUrlBuilder.ts)
+- [x] buildGoogleMapsUrl: رابط Google Maps للاسم والمدينة
+- [x] buildGoogleSearchUrl: رابط بحث Google عام
+- [x] buildInstagramUrl: رابط ملف إنستغرام
+- [x] buildTikTokUrl: رابط ملف تيك توك
+- [x] buildSnapchatUrl: رابط ملف سناب شات
+- [x] buildFacebookUrl: رابط صفحة فيسبوك
+- [x] buildLinkedInUrl: رابط شركة لينكدإن
+- [x] buildTwitterUrl: رابط حساب تويتر
+- [x] buildWhatsAppUrl: رابط واتساب مع رسالة
+
+### leadIntelligenceRouter (server/routers/leadIntelligence.ts)
+- [x] discover: skeleton قابل للتجميع (يقبل DiscoveryCandidate[] ويُرجع MarketAudit)
+- [x] compareTwo: مقارنة كيانين وإرجاع LinkageScore
+- [x] clusterPreview: معاينة التجميع بدون حفظ
+- [x] searchAndBuild: skeleton للبحث والبناء (جاهز لـ PHASE 2)
+
+### الاختبارات (server/identity.linkage.test.ts)
+- [x] 273 اختبار تمر بنجاح (0 أخطاء TypeScript)
+- [x] اختبار تطابق الهاتف (عربي vs إنجليزي)
+- [x] اختبار تطابق الموقع (بدون شرط الاسم)
+- [x] اختبار تطابق الاسم العالي + نفس المدينة
+- [x] اختبار كيانات مختلفة (لا يجب دمجها)
+- [x] اختبار clusterCandidates

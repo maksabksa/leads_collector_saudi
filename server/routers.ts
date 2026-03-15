@@ -59,6 +59,7 @@ import { aiAgentRouter } from "./routers/aiAgent";
 import { serpQueueRouter } from "./routers/serpQueue";
 import { seasonsRouter } from "./routers/seasons";
 import { reportStyleRouter } from "./routers/reportStyle";
+import { leadIntelligenceRouter } from "./routers/leadIntelligence";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -2496,5 +2497,6 @@ export const appRouter = router({
   serpQueue: serpQueueRouter,
   seasons: seasonsRouter,
   reportStyle: reportStyleRouter,
+  leadIntelligence: leadIntelligenceRouter,
 });
 export type AppRouter = typeof appRouter;
