@@ -93,6 +93,8 @@ const PRIORITIES = [
   { value: "low", label: "منخفضة", color: "text-green-400" },
 ];
 
+const DRAFT_STORAGE_KEY = "addLeadModal_draft";
+
 export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadModalProps) {
   const [activeTab, setActiveTab] = useState("basic");
   const [isSearchingAccounts, setIsSearchingAccounts] = useState(false);
@@ -103,6 +105,7 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
   const [isAnalyzingBio, setIsAnalyzingBio] = useState(false);
   const [bioAnalysisApplied, setBioAnalysisApplied] = useState(false);
   const [bioAnalysisConfidence, setBioAnalysisConfidence] = useState(0);
+  const [hasDraft, setHasDraft] = useState(false);
 
   const [form, setForm] = useState({
     // بيانات أساسية
@@ -144,6 +147,22 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
   const smartFindMut = trpc.brightDataSearch.smartFindSocialAccounts.useMutation();
   const analyzeFromBioMut = trpc.leads.analyzeFromBio.useMutation();
 
+  // حفظ تلقائي في localStorage عند كل تغيير في النموذج
+  useEffect(() => {
+    if (!open) return;
+    // لا نحفظ المسودة إذا كانت جميع الحقول فارغة
+    const hasData = form.companyName || form.businessType || form.city || form.verifiedPhone ||
+      form.website || form.instagramUrl || form.tiktokUrl || form.snapchatUrl ||
+      form.twitterUrl || form.notes || form.googleMapsUrl;
+    if (hasData) {
+      try {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form));
+      } catch (e) {
+        // تجاهل أخطاء localStorage
+      }
+    }
+  }, [form, open]);
+
   // تعبئة النموذج من البيانات المبدئية
   useEffect(() => {
     if (!open) return;
@@ -168,13 +187,31 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
       if (initialData.placeId) {
         setCurrentPlaceId(initialData.placeId);
       }
+      setSocialSearchResults({});
+      setAiSuggestions({});
+      setSearchErrors({});
+      setBioAnalysisApplied(false);
+      setBioAnalysisConfidence(0);
+      setActiveTab("basic");
+      setHasDraft(false);
+      // مسح المسودة عند فتح النموذج ببيانات مبدئية جديدة
+      try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch (e) {}
+    } else {
+      // لا توجد بيانات مبدئية - استعادة المسودة إن وجدت
+      try {
+        const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+        if (saved) {
+          const draft = JSON.parse(saved);
+          const hasData = draft.companyName || draft.businessType || draft.city;
+          if (hasData) {
+            setForm(f => ({ ...f, ...draft }));
+            setHasDraft(true);
+          }
+        }
+      } catch (e) {
+        // تجاهل أخطاء الاستعادة
+      }
     }
-    setSocialSearchResults({});
-    setAiSuggestions({});
-    setSearchErrors({});
-    setBioAnalysisApplied(false);
-    setBioAnalysisConfidence(0);
-    setActiveTab("basic");
   }, [open, initialData]);
 
   // تحليل البايو تلقائياً عند فتح النموذج مع بيانات سوشيال
@@ -448,6 +485,9 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
         priority: form.priority as any,
       });
       toast.success("تمت إضافة العميل بنجاح", { description: form.companyName });
+      // مسح المسودة بعد الحفظ الناجح
+      try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch (e) {}
+      setHasDraft(false);
       onSuccess?.(result.id);
       onClose();
     } catch (e: any) {
@@ -493,6 +533,35 @@ export function AddLeadModal({ open, onClose, onSuccess, initialData }: AddLeadM
             )}
           </DialogTitle>
         </DialogHeader>
+
+        {/* شريط إشعار المسودة المحفوظة */}
+        {hasDraft && !initialData && (
+          <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs shrink-0">
+            <div className="flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>تم استعادة مسودة محفوظة</span>
+            </div>
+            <button
+              onClick={() => {
+                setForm({
+                  companyName: "", businessType: "", city: "", country: "SA",
+                  district: "", crNumber: "", verifiedPhone: "",
+                  hasWhatsapp: "unknown" as "yes" | "no" | "unknown",
+                  website: "", googleMapsUrl: "", instagramUrl: "",
+                  tiktokUrl: "", snapchatUrl: "", twitterUrl: "",
+                  linkedinUrl: "", facebookUrl: "", notes: "", socialSince: "",
+                  stage: "new", priority: "medium",
+                });
+                try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch (e) {}
+                setHasDraft(false);
+              }}
+              className="flex items-center gap-1 text-amber-400/70 hover:text-amber-400 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>مسح</span>
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
