@@ -450,6 +450,16 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   if (!recs.length && lead.entryAngle) {
     lead.entryAngle.split(/\n/).map((s: string) => s.trim()).filter(Boolean).slice(0, 3).forEach((r: string) => recs.push(r));
   }
+  // توليد توصيات تلقائية إذا لم تتوفر توصيات محفوظة
+  if (!recs.length) {
+    const biz2 = lead.businessType || "النشاط";
+    const city2 = lead.city || "الرياض";
+    if (!lead.website) recs.push(`إنشاء موقع إلكتروني احترافي لـ${biz2} في ${city2} مع صفحة هبوط تُبرز الخدمات وتحتوي على نموذج تواصل واضح`);
+    if (!lead.instagramUrl) recs.push(`إنشاء حساب إنستغرام احترافي مع هوية بصرية موحدة وجدول نشر أسبوعي منتظم لبناء جمهور مخلص`);
+    if (!lead.tiktokUrl) recs.push(`الانطلاق على تيك توك بمقاطع قصيرة تُظهر ${biz2} بأسلوب ترفيهي لاستهداف الجيل الجديد`);
+    recs.push(`تفعيل حملات إعلانية مدفوعة على منصات التواصل الاجتماعي لاستهداف العملاء في ${city2} وزيادة الوصول`);
+    recs.push(`تحسين التقييمات والسمعة الرقمية عبر استراتيجية منهجية لجمع تقييمات إيجابية وبناء ثقة العملاء الجدد`);
+  }
 
   // ── Radar axes ──
   const radarAxes = [
