@@ -701,69 +701,95 @@ ${contextParts.join('\n')}
       if (!db) return [];
       const { leads: leadsTable } = await import('../drizzle/schema');
 
-      // جلب منافسين من نفس نوع النشاط والمدينة (باستثناء العميل نفسه)
-      const competitors = await db
-        .select({
-          id: leadsTable.id,
-          companyName: leadsTable.companyName,
-          businessType: leadsTable.businessType,
-          city: leadsTable.city,
-          website: leadsTable.website,
-          instagramUrl: leadsTable.instagramUrl,
-          twitterUrl: leadsTable.twitterUrl,
-          tiktokUrl: leadsTable.tiktokUrl,
-          facebookUrl: leadsTable.facebookUrl,
-          snapchatUrl: leadsTable.snapchatUrl,
-          linkedinUrl: leadsTable.linkedinUrl,
-          reviewCount: leadsTable.reviewCount,
-          leadPriorityScore: leadsTable.leadPriorityScore,
-          dataQualityScore: leadsTable.dataQualityScore,
-          analysisStatus: leadsTable.analysisStatus,
-        })
-        .from(leadsTable)
-        .where(
-          and(
-            sql`${leadsTable.id} != ${input.leadId}`,
-            like(leadsTable.businessType, `%${input.businessType.split(' ')[0]}%`),
-            like(leadsTable.city, `%${input.city}%`),
-          )
-        )
-        .orderBy(desc(leadsTable.leadPriorityScore))
-        .limit(input.limit);
+      // خوارزمية مطابقة نوع النشاط الصارمة
+      // تصنيف الأنشطة في فئات متمايزة - لا يجوز الخلط بين الفئات
+      const CATEGORY_KEYWORDS: Record<string, string[]> = {
+        'ملابس': ['ملابس', 'أزياء', 'بوتيك', 'عبايا', 'خياط', 'موضة', 'فاشون', 'clothing', 'fashion', 'apparel', 'wear'],
+        'أطفال': ['أطفال', 'طفل', 'kids', 'children', 'baby', 'بيبي'],
+        'مطعم': ['مطعم', 'restaurant', 'كافيه', 'مقهى', 'cafe', 'وجبات', 'food', 'فطور', 'حلويات', 'مطبخ'],
+        'لحوم': ['ملحمة', 'لحوم', 'قصاب', 'ذبائح', 'لحم'],
+        'صالون': ['صالون', 'تجميل', 'حلاقة', 'سبا', 'بشرة', 'شعر', 'salon', 'beauty'],
+        'عقار': ['عقار', 'شقق', 'فلل', 'بيوت', 'مكاتب', 'وساطة', 'real estate'],
+        'سيارات': ['سيارة', 'سيارات', 'مركبات', 'معرض', 'تأجير', 'غيار', 'car', 'auto'],
+        'تعليم': ['تعليم', 'مدرسة', 'أكاديمية', 'دروس', 'تدريب', 'كورس', 'school', 'academy'],
+        'طب': ['طب', 'عيادة', 'مستشفى', 'صيدلية', 'دكتور', 'صحة', 'dental', 'clinic', 'dentist'],
+        'تقنية': ['تقنية', 'الكترونيك', 'برمجة', 'موبايل', 'كمبيوتر', 'صيانة', 'tech', 'software'],
+        'شواء': ['شواء', 'شوارم', 'مشوي', 'كباب', 'برغر', 'grill'],
+        'دليل': ['دليل', 'guide', 'directory', 'استعراض', 'مطاعم الرياض'],
+        'نادي': ['نادي', 'night_club', 'club', 'ملهى'],
+        'تأسيس': ['تأسيس', 'استشارات', 'شركات', 'point_of_interest'],
+      };
 
-      // إذا لم يجد منافسين بنفس النشاط، ابحث بنفس المدينة فقط
-      if (competitors.length === 0) {
-        const cityOnly = await db
-          .select({
-            id: leadsTable.id,
-            companyName: leadsTable.companyName,
-            businessType: leadsTable.businessType,
-            city: leadsTable.city,
-            website: leadsTable.website,
-            instagramUrl: leadsTable.instagramUrl,
-            twitterUrl: leadsTable.twitterUrl,
-            tiktokUrl: leadsTable.tiktokUrl,
-            facebookUrl: leadsTable.facebookUrl,
-            snapchatUrl: leadsTable.snapchatUrl,
-            linkedinUrl: leadsTable.linkedinUrl,
-          reviewCount: leadsTable.reviewCount,
-          leadPriorityScore: leadsTable.leadPriorityScore,
-          dataQualityScore: leadsTable.dataQualityScore,
-          analysisStatus: leadsTable.analysisStatus,
-        })
-        .from(leadsTable)
-        .where(
-          and(
-            sql`${leadsTable.id} != ${input.leadId}`,
-            like(leadsTable.city, `%${input.city}%`),
-          )
-        )
-        .orderBy(desc(leadsTable.leadPriorityScore))
-          .limit(input.limit);
-        return cityOnly;
+      // دالة تحديد الفئة
+      function detectCategory(bt: string): string[] {
+        const btLower = (bt || '').toLowerCase();
+        const matched: string[] = [];
+        for (const [cat, kws] of Object.entries(CATEGORY_KEYWORDS)) {
+          if (kws.some(kw => btLower.includes(kw.toLowerCase()))) {
+            matched.push(cat);
+          }
+        }
+        return matched;
       }
 
-      return competitors;
+      const selectFields = {
+        id: leadsTable.id,
+        companyName: leadsTable.companyName,
+        businessType: leadsTable.businessType,
+        city: leadsTable.city,
+        website: leadsTable.website,
+        instagramUrl: leadsTable.instagramUrl,
+        twitterUrl: leadsTable.twitterUrl,
+        tiktokUrl: leadsTable.tiktokUrl,
+        facebookUrl: leadsTable.facebookUrl,
+        snapchatUrl: leadsTable.snapchatUrl,
+        linkedinUrl: leadsTable.linkedinUrl,
+        reviewCount: leadsTable.reviewCount,
+        leadPriorityScore: leadsTable.leadPriorityScore,
+        dataQualityScore: leadsTable.dataQualityScore,
+        analysisStatus: leadsTable.analysisStatus,
+      };
+
+      const myCategories = detectCategory(input.businessType);
+      const allLeads = await db
+        .select(selectFields)
+        .from(leadsTable)
+        .where(sql`${leadsTable.id} != ${input.leadId}`)
+        .orderBy(desc(leadsTable.leadPriorityScore))
+        .limit(200);
+
+      // فلترة: نفس الفئة فقط (لا خلط بين ملابس ولحوم)
+      let sameCategory: typeof allLeads = [];
+      if (myCategories.length > 0) {
+        sameCategory = allLeads.filter(lead => {
+          const theirCats = detectCategory(lead.businessType || '');
+          // يجب أن يشتركا في فئة واحدة على الأقل
+          return theirCats.some(c => myCategories.includes(c));
+        });
+      }
+
+      // المرحلة 1: نفس الفئة + نفس المدينة
+      const phase1 = sameCategory.filter(l =>
+        input.city && input.city !== 'جميع المدن'
+          ? (l.city || '').includes(input.city) || input.city.includes(l.city || '')
+          : true
+      );
+      if (phase1.length >= 2) return phase1.slice(0, input.limit);
+
+      // المرحلة 2: نفس الفئة بدون شرط المدينة
+      if (sameCategory.length >= 2) return sameCategory.slice(0, input.limit);
+
+      // المرحلة 3: بحث بالكلمات المشتركة في نوع النشاط (بدون المدينة)
+      // فقط إذا لم تُحدَّد فئة واضحة
+      const btWords = (input.businessType || '').split(/[\s،,]+/).filter(w => w.length > 2);
+      const wordMatches = allLeads.filter(lead => {
+        const theirBt = (lead.businessType || '').toLowerCase();
+        return btWords.some(w => theirBt.includes(w.toLowerCase()));
+      });
+      if (wordMatches.length > 0) return wordMatches.slice(0, input.limit);
+
+      // المرحلة 4: لا منافسين مناسبين — أعد مصفوفة فارغة بدلاً من أي عميل عشوائي
+      return [];
     }),
 
 });
