@@ -831,7 +831,113 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
 </head>
 <body>
 
-<!-- ===== الصفحة 1: الغلاف والملخص ===== -->
+<!-- ===== الصفحة 1: غلاف فاخر ===== -->
+<div class="page" style="background:#0a0f1e;min-height:297mm;display:flex;flex-direction:column;position:relative;overflow:hidden;">
+  <!-- خلفية فاخرة: دوائر ضوئية وتأثيرات ذهبية -->
+  <div style="position:absolute;top:-80px;right:-80px;width:400px;height:400px;background:radial-gradient(circle,rgba(212,175,55,0.12) 0%,transparent 70%);border-radius:50%;pointer-events:none;"></div>
+  <div style="position:absolute;bottom:-100px;left:-100px;width:500px;height:500px;background:radial-gradient(circle,rgba(99,102,241,0.1) 0%,transparent 70%);border-radius:50%;pointer-events:none;"></div>
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(30,58,95,0.3) 0%,transparent 70%);border-radius:50%;pointer-events:none;"></div>
+  <!-- خطوط ذهبية زخرفية -->
+  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#d4af37,#f5e27a,#d4af37,transparent);"></div>
+  <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#d4af37,#f5e27a,#d4af37,transparent);"></div>
+  <div style="position:absolute;top:0;right:0;bottom:0;width:3px;background:linear-gradient(180deg,transparent,#d4af37,#f5e27a,#d4af37,transparent);"></div>
+  <div style="position:absolute;top:0;left:0;bottom:0;width:3px;background:linear-gradient(180deg,transparent,#d4af37,#f5e27a,#d4af37,transparent);"></div>
+
+  <!-- شعار الشركة في الأعلى -->
+  <div style="position:relative;z-index:2;padding:28px 48px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(212,175,55,0.15);">
+    <div style="display:flex;align-items:center;gap:12px;">
+      ${companyLogo ? `<img src="${companyLogo}" style="width:44px;height:44px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,0.05);padding:4px;" alt="شعار" onerror="this.style.display='none'">` : `<div style="width:44px;height:44px;background:linear-gradient(135deg,#d4af37,#f5e27a);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;">✦</div>`}
+      <div>
+        <div style="font-size:15px;font-weight:800;color:#f5e27a;letter-spacing:1px;">${companyName}</div>
+        <div style="font-size:9px;color:rgba(212,175,55,0.6);letter-spacing:2px;text-transform:uppercase;">استشارات تسويقية متخصصة</div>
+      </div>
+    </div>
+    <div style="text-align:left;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1px;text-transform:uppercase;">CONFIDENTIAL REPORT</div>
+      <div style="font-size:10px;color:rgba(212,175,55,0.7);margin-top:3px;">${now}</div>
+    </div>
+  </div>
+
+  <!-- المحتوى الرئيسي للغلاف -->
+  <div style="position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 60px;text-align:center;">
+    <!-- شعار العميل -->
+    ${(clientLogoUrl || instaProfilePic) ? `
+    <div style="margin-bottom:28px;">
+      <div style="width:110px;height:110px;border-radius:50%;border:3px solid rgba(212,175,55,0.5);padding:6px;background:rgba(255,255,255,0.04);margin:0 auto;box-shadow:0 0 40px rgba(212,175,55,0.2);">
+        <img src="${clientLogoUrl || instaProfilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="شعار العميل" onerror="this.style.display='none'">
+      </div>
+    </div>` : `
+    <div style="margin-bottom:28px;">
+      <div style="width:90px;height:90px;border-radius:50%;border:2px solid rgba(212,175,55,0.4);background:linear-gradient(135deg,rgba(212,175,55,0.1),rgba(99,102,241,0.1));margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:36px;box-shadow:0 0 40px rgba(212,175,55,0.15);">
+        ${lead.businessType?.includes('مطعم') || lead.businessType?.includes('طعام') ? '🍽️' : lead.businessType?.includes('عياد') || lead.businessType?.includes('طب') ? '🏥' : lead.businessType?.includes('فندق') ? '🏨' : '🏢'}
+      </div>
+    </div>`}
+
+    <!-- نوع التقرير -->
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:30px;padding:6px 20px;margin-bottom:20px;">
+      <span style="width:6px;height:6px;background:#d4af37;border-radius:50%;display:inline-block;"></span>
+      <span style="font-size:10px;color:#d4af37;letter-spacing:2px;text-transform:uppercase;font-weight:700;">تقرير تحليل تسويقي شامل</span>
+      <span style="width:6px;height:6px;background:#d4af37;border-radius:50%;display:inline-block;"></span>
+    </div>
+
+    <!-- اسم العميل -->
+    <h1 style="font-size:38px;font-weight:900;color:white;margin-bottom:10px;line-height:1.2;text-shadow:0 0 40px rgba(212,175,55,0.3);">${lead.companyName}</h1>
+    <div style="font-size:14px;color:rgba(212,175,55,0.8);margin-bottom:32px;letter-spacing:1px;">${[lead.businessType, lead.city].filter(Boolean).join(" · ")}</div>
+
+    <!-- خط فاصل ذهبي -->
+    <div style="width:80px;height:2px;background:linear-gradient(90deg,transparent,#d4af37,transparent);margin:0 auto 32px;"></div>
+
+    <!-- المقدمة الاحترافية -->
+    <div style="max-width:520px;margin:0 auto 36px;">
+      <p style="font-size:13.5px;color:rgba(255,255,255,0.75);line-height:2;font-weight:400;">
+        يسعدنا تقديم هذا التقرير التحليلي الشامل المُعدّ خصيصاً لـ <strong style="color:rgba(212,175,55,0.9);">${lead.companyName}</strong>،
+        والذي يتضمن تشخيصاً دقيقاً للحضور الرقمي، وتحليلاً معمّقاً للفرص التسويقية المتاحة،
+        وخارطة طريق استراتيجية قابلة للتنفيذ لتحقيق نمو ملموس وقابل للقياس.
+      </p>
+    </div>
+
+    <!-- مؤشرات الدرجات بتصميم فاخر -->
+    <div style="display:flex;gap:16px;justify-content:center;margin-bottom:36px;flex-wrap:wrap;">
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(212,175,55,0.2);border-radius:14px;padding:16px 22px;min-width:100px;text-align:center;">
+        <div style="font-size:28px;font-weight:900;color:#d4af37;">${scores.priorityScore}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:4px;letter-spacing:0.5px;">درجة الأولوية</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(99,102,241,0.3);border-radius:14px;padding:16px 22px;min-width:100px;text-align:center;">
+        <div style="font-size:28px;font-weight:900;color:#818cf8;">${scores.socialScore}<span style="font-size:14px;color:rgba(255,255,255,0.3);">/10</span></div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:4px;letter-spacing:0.5px;">التفاعل الاجتماعي</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(96,165,250,0.3);border-radius:14px;padding:16px 22px;min-width:100px;text-align:center;">
+        <div style="font-size:28px;font-weight:900;color:#60a5fa;">${scores.platformsCount}<span style="font-size:14px;color:rgba(255,255,255,0.3);">/8</span></div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:4px;letter-spacing:0.5px;">منصة مفعّلة</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(${scores.urgencyLevel === 'high' ? '239,68,68' : scores.urgencyLevel === 'medium' ? '245,158,11' : '34,197,94'},0.3);border-radius:14px;padding:16px 22px;min-width:100px;text-align:center;">
+        <div style="font-size:22px;font-weight:900;color:${urgencyColors[scores.urgencyLevel]};">${scores.urgencyLabel}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:4px;letter-spacing:0.5px;">مستوى الإلحاح</div>
+      </div>
+    </div>
+
+    <!-- الاقتباس الاحترافي -->
+    ${(() => { const q = getInspirationalQuote(lead.businessType || ""); return `
+    <div style="max-width:480px;margin:0 auto;padding:20px 28px;border:1px solid rgba(212,175,55,0.2);border-radius:12px;background:rgba(212,175,55,0.04);">
+      <div style="font-size:28px;color:rgba(212,175,55,0.3);line-height:1;margin-bottom:8px;">&#8220;</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65);line-height:1.9;font-style:italic;margin-bottom:10px;">${q.text}</div>
+      <div style="font-size:10px;color:rgba(212,175,55,0.6);font-weight:600;">— ${q.author}</div>
+    </div>`; })()}
+  </div>
+
+  <!-- فوتر الغلاف -->
+  <div style="position:relative;z-index:2;padding:20px 48px;border-top:1px solid rgba(212,175,55,0.15);display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:1px;">حصري من ${companyName} · CONFIDENTIAL</div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div style="width:4px;height:4px;background:#d4af37;border-radius:50%;"></div>
+      <div style="font-size:9px;color:rgba(212,175,55,0.5);">صفحة 1</div>
+      <div style="width:4px;height:4px;background:#d4af37;border-radius:50%;"></div>
+    </div>
+    <div style="font-size:9px;color:rgba(255,255,255,0.25);">${now}</div>
+  </div>
+</div>
+
+<!-- ===== الصفحة 2: ملخص النشاط والحضور الرقمي ===== -->
 <div class="page">
   <div class="header">
     <div class="header-top">
@@ -843,17 +949,11 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
         </div>
       </div>
       <div class="report-badge">
-        <strong>تقرير تحليل تسويقي</strong>
+        <strong>ملخص النشاط التجاري</strong>
         ${now}
         <div style="font-size:9px;opacity:0.6;margin-top:3px;">حصري من مكسب</div>
       </div>
     </div>
-    <!-- اقتباس احترافي -->
-    ${(() => { const q = getInspirationalQuote(lead.businessType || ""); return `
-    <div style="margin-top:20px;padding:16px 24px;border-right:3px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.04);border-radius:0 10px 10px 0;position:relative;z-index:1;">
-      <div style="font-size:13.5px;font-weight:600;color:rgba(255,255,255,0.92);line-height:1.8;font-style:italic;margin-bottom:8px;">&#8220;${q.text}&#8221;</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.45);font-weight:500;">— ${q.author}</div>
-    </div>`; })()}
   </div>
 
   <div class="client-bar">
@@ -933,7 +1033,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
       </div>
     </div>` : ""}
 
-    <!-- التحليل الذكي - ملخص الفجوة والفرص فقط (بدون زاوية الدخول أو كسر الجليد لأنها معلومات داخلية) -->
+    <!-- التحليل الذكي -->
     ${(lead.biggestMarketingGap || lead.revenueOpportunity || lead.suggestedSalesEntryAngle || lead.marketingGapSummary || lead.primaryOpportunity) ? `
     <div class="section">
       <div class="section-title">📊 التحليل التسويقي الذكي</div>
@@ -949,7 +1049,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
       </div>
     </div>`}
 
-    <!-- ===== ملخص الفرص التسويقية والتطور المتوقع (يظهر دائماً إذا توفرت البيانات) ===== -->
+    <!-- ملخص الفرص التسويقية والتطور المتوقع -->
     ${(lead.marketingOpportunitiesSummary || lead.growthDevelopmentPlan) ? `
     <div class="section" style="margin-top:14px;">
       <div class="section-title" style="color:#0f172a;font-size:13px;font-weight:700;border-bottom:2px solid #6366f1;padding-bottom:6px;margin-bottom:12px;">🚀 ملخص الفرص التسويقية والتطور المتوقع</div>
@@ -959,7 +1059,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
           <div style="position:absolute;top:0;right:0;width:4px;height:100%;background:linear-gradient(180deg,#22c55e,#16a34a);"></div>
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
             <span style="font-size:16px;">📈</span>
-            <span style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.5px;">الفرص التسويقية المتاحة</span>
+            <span style="font-size:11px;font-weight:700;color:#15803d;">الفرص التسويقية المتاحة</span>
           </div>
           <p style="font-size:10.5px;color:#166534;line-height:1.7;margin:0;">${lead.marketingOpportunitiesSummary}</p>
         </div>` : ""}
@@ -968,7 +1068,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
           <div style="position:absolute;top:0;right:0;width:4px;height:100%;background:linear-gradient(180deg,#3b82f6,#1d4ed8);"></div>
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
             <span style="font-size:16px;">🔮</span>
-            <span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.5px;">خطة التطور والنمو المتوقع</span>
+            <span style="font-size:11px;font-weight:700;color:#1d4ed8;">خطة التطور والنمو المتوقع</span>
           </div>
           <p style="font-size:10.5px;color:#1e40af;line-height:1.7;margin:0;">${lead.growthDevelopmentPlan}</p>
         </div>` : ""}
@@ -981,12 +1081,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
 
   <div class="footer">
     <div class="footer-brand">${companyName}</div>
-    <div>${reportFooterText} · صفحة 1</div>
+    <div>${reportFooterText} · صفحة 2</div>
     <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
   </div>
 </div>
 
-<!-- ===== الصفحة 2: التحليل الرقمي التفصيلي ===== -->
+<!-- ===== الصفحة 3: التحليل الرقمي التفصيلي ===== -->
 <div class="page">
   <div class="header" style="padding:18px 36px;">
     <div class="header-top">
@@ -1049,12 +1149,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
 
   <div class="footer">
     <div class="footer-brand">${companyName}</div>
-    <div>${reportFooterText} · صفحة 2</div>
+    <div>${reportFooterText} · صفحة 3</div>
     <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
   </div>
 </div>
 
-<!-- ===== الصفحة 3: الفرص الضائعة ===== -->
+<!-- ===== الصفحة 4: الفرص الضائعة ===== -->
 <div class="page">
   <div class="header" style="padding:18px 36px;">
     <div class="header-top">
@@ -1087,12 +1187,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
 
   <div class="footer">
     <div class="footer-brand">${companyName}</div>
-    <div>${reportFooterText} · صفحة 3</div>
+    <div>${reportFooterText} · صفحة 4</div>
     <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
   </div>
 </div>
 
-<!-- ===== الصفحة 4: مقارنة المنافسين (تُضاف هنا ديناميكياً) ===== -->
+<!-- ===== الصفحة 5: مقارنة المنافسين (تُضاف هنا ديناميكياً) ===== -->
 ${(competitors && competitors.length > 0) ? (() => {
   // حساب درجة الحضور الرقمي لكل منافس
   function calcPresence(c: any): number {
@@ -1238,14 +1338,14 @@ ${(competitors && competitors.length > 0) ? (() => {
   </div>
   <div class="footer">
     <div class="footer-brand">${companyName}</div>
-    <div>${reportFooterText} · صفحة 4</div>
+    <div>${reportFooterText} · صفحة 5</div>
     <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
   </div>
 </div>
 `;
 })() : ''}
 
-<!-- ===== الصفحة 5: التوصيات + القناة + الموسم + خاتمة ===== -->
+<!-- ===== الصفحة 6: التوصيات + القناة + الموسم + خاتمة ===== -->
 <div class="page">
   <div class="header" style="padding:18px 36px;">
     <div class="header-top">
@@ -1352,7 +1452,7 @@ ${(competitors && competitors.length > 0) ? (() => {
   </div>
   <div class="footer">
     <div class="footer-brand">${companyName}</div>
-    <div>${reportFooterText} · صفحة 5</div>
+    <div>${reportFooterText} · صفحة 6</div>
     <div class="footer-watermark">حصري من شركة مكسب · CONFIDENTIAL</div>
   </div>
 </div>
