@@ -12,9 +12,10 @@ interface GeneratePDFOptions {
   report?: any;
   company?: any;
   competitors?: any[];
-  activeSeason?: any;       // الموسم التسويقي الحالي
-  upcomingSeasons?: any[];  // المواسم القادمة خلال 30 يوم
-  reportStyle?: any;        // إعدادات أسلوب التقرير
+  activeSeason?: any;            // الموسم التسويقي الحالي
+  upcomingSeasons?: any[];       // المواسم القادمة خلال 30 يوم
+  reportStyle?: any;             // إعدادات أسلوب التقرير
+  aiGapPercentages?: number[];   // نسب الفجوة المحسوبة بالذكاء الاصطناعي
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -356,7 +357,7 @@ function missedOppCard(
 //  MAIN EXPORT
 // ═══════════════════════════════════════════════════════════════════════
 export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void> {
-  const { lead, websiteAnalysis, socialAnalyses = [], report, company, competitors = [], activeSeason, upcomingSeasons = [], reportStyle } = options;
+  const { lead, websiteAnalysis, socialAnalyses = [], report, company, competitors = [], activeSeason, upcomingSeasons = [], reportStyle, aiGapPercentages } = options;
   if (!lead) throw new Error("لا توجد بيانات للعميل");
 
   // ── استخراج إعدادات التقرير ──
@@ -548,11 +549,16 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     "نتائج خلال 30 يوم",
   ];
 
-  // ── حساب نسبة الفجوة مقارنةً بالمنافسين ──
+  // ── حساب نسبة الفجوة — من AI إن توفرت، وإلا بالحساب المحلي ──
   const avgCompPri2 = competitors.length
     ? competitors.reduce((s: number, c: any) => s + (Number(c.leadPriorityScore) || 0), 0) / competitors.length
     : 0;
   const gapPercentages: number[] = gaps.map((_, i) => {
+    // إذا توفرت نسب AI من السيرفر، استخدمها مباشرة
+    if (aiGapPercentages && aiGapPercentages[i] !== undefined) {
+      return aiGapPercentages[i];
+    }
+    // فول باك: حساب محلي بسيط
     const base = [40, 35, 30, 25, 20];
     if (i === 0 && priScore !== null && avgCompPri2 > 0) {
       const diff = Math.max(0, avgCompPri2 - (priScore || 0));
@@ -560,6 +566,54 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     }
     return base[i % base.length];
   });
+
+  // ── ترتيب التوصيات حسب الموسم النشط ──
+  if (activeSeason && recs.length > 1) {
+    // كلمات مفتاحية للموسم من الاسم والوصف والفرص
+    const seasonKeywords: string[] = [
+      ...(activeSeason.name || '').split(/\s+/),
+      ...(activeSeason.description || '').split(/\s+/).slice(0, 10),
+      ...(activeSeason.keyOpportunities || []).join(' ').split(/\s+/).slice(0, 15),
+      ...(activeSeason.guidance || '').split(/\s+/).slice(0, 10),
+    ].map((w: string) => w.replace(/[^\u0600-\u06FFa-zA-Z]/g, '').toLowerCase()).filter((w: string) => w.length > 2);
+
+    // كلمات إضافية حسب نوع الموسم الشائعة
+    const seasonTypeMap: Record<string, string[]> = {
+      رمضان: ['محتوى', 'عروض', 'خصومات', 'تواصل', 'إعلان', 'سوشيال'],
+      صيف: ['سياحة', 'ترفيه', 'نشاط', 'عروض', 'إعلان'],
+      عيد: ['عروض', 'خصومات', 'هدايا', 'إعلان', 'محتوى'],
+      'الوطني': ['هوية', 'محتوى', 'إعلان', 'سوشيال'],
+      'اليوم الوطني': ['هوية', 'محتوى', 'إعلان', 'سوشيال'],
+      'الجمعة البيضاء': ['خصومات', 'عروض', 'إعلان', 'موقع'],
+      'بلاك فرايدي': ['خصومات', 'عروض', 'إعلان', 'موقع'],
+      'موسم الرياض': ['ترفيه', 'نشاط', 'إعلان', 'سوشيال', 'محتوى'],
+    };
+    const seasonNameLower = (activeSeason.name || '').toLowerCase();
+    for (const [key, words] of Object.entries(seasonTypeMap)) {
+      if (seasonNameLower.includes(key.toLowerCase())) {
+        seasonKeywords.push(...words);
+        break;
+      }
+    }
+
+    // حساب درجة ارتباط كل توصية بالموسم
+    const scoredRecs = recs.map((rec: string) => {
+      const recWords = rec.split(/\s+/).map((w: string) => w.replace(/[^\u0600-\u06FFa-zA-Z]/g, '').toLowerCase());
+      const score = recWords.reduce((s: number, w: string) => {
+        return s + (seasonKeywords.includes(w) ? 2 : 0);
+      }, 0);
+      return { rec, score };
+    });
+
+    // ترتيب: التوصيات المرتبطة بالموسم تأتي أولاً، ثم الباقي بترتيبه الأصلي
+    const seasonRelated = scoredRecs.filter((x: any) => x.score > 0).sort((a: any, b: any) => b.score - a.score);
+    const notRelated = scoredRecs.filter((x: any) => x.score === 0);
+    const sortedRecs = [...seasonRelated, ...notRelated].map((x: any) => x.rec);
+
+    // استبدال recs بالترتيب الجديد
+    recs.length = 0;
+    sortedRecs.forEach((r: string) => recs.push(r));
+  }
 
   // ── تنبيه الموسم للفرص الضائعة ──
   const seasonName = activeSeason?.name || '';
@@ -1027,7 +1081,14 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       <!-- Recommendations -->
       ${recs.length ? `
       <div style="margin-bottom:20px;">
-        ${sh("التوصيات الاستراتيجية", "مرتبة حسب الأولوية والتأثير المالي")}
+        ${sh("التوصيات الاستراتيجية", activeSeason ? `مُرتَّبة حسب موسم ${activeSeason.name || 'النشط'} ثم الأولوية والتأثير المالي` : "مرتبة حسب الأولوية والتأثير المالي")}
+        ${activeSeason ? `
+        <div style="display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:4px 12px;
+          background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:20px;">
+          <span style="font-size:11px;">📅</span>
+          <span style="font-size:9px;color:#fbbf24;font-weight:700;">الترتيب مُحسَّن تلقائياً لموسم ${activeSeason.name}</span>
+          <span style="font-size:9px;color:#78716c;">— التوصيات الأكثر ارتباطاً بالموسم في المقدمة</span>
+        </div>` : ''}
         <div style="display:flex;flex-direction:column;gap:8px;">
           ${recs.map((r, i) => {
             const accent = i === 0 ? "#22c55e" : i === 1 ? "#0ea5e9" : i === 2 ? "#a78bfa" : "#f97316";

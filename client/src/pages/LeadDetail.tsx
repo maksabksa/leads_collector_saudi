@@ -97,6 +97,7 @@ export default function LeadDetail() {
   const getReportHtml = trpc.report.getHtml.useMutation();
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
+  const computeGapPercentages = trpc.report.computeGapPercentages.useMutation();
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
   const { data: reportStyleData } = trpc.reportStyle.get.useQuery();
   const { data: activeSeasonData } = trpc.seasons.getActiveForBusiness.useQuery(
@@ -124,8 +125,30 @@ export default function LeadDetail() {
   const handleGeneratePDF = async () => {
     setPdfGenerating(true);
     try {
-      // Client-side PDF generation - no server/Chromium needed
       const { generateLeadPDF } = await import("@/lib/generateLeadPDF");
+
+      // حساب نسب الفجوة بالذكاء الاصطناعي من السيرفر
+      let aiGapPercentages: number[] | undefined;
+      try {
+        const lead = data?.lead;
+        if (lead) {
+          const gapNames: string[] = [];
+          if (!lead.website) gapNames.push("غياب الموقع الإلكتروني");
+          if (!lead.instagramUrl) gapNames.push("غياب الحضور على إنستغرام");
+          if (!lead.tiktokUrl) gapNames.push("غياب الحضور على تيك توك");
+          if (!lead.snapchatUrl) gapNames.push("غياب الحضور على سناب شات");
+          if (!lead.verifiedPhone) gapNames.push("غياب معلومات التواصل الموثقة");
+          gapNames.push("ضعف SEO ومحركات البحث");
+          gapNames.push("ضعف التفاعل على السوشيال ميديا");
+          if (gapNames.length > 0) {
+            const result = await computeGapPercentages.mutateAsync({ leadId: lead.id, gaps: gapNames });
+            aiGapPercentages = result.percentages;
+          }
+        }
+      } catch {
+        // فشل AI — سيستخدم generateLeadPDF النسب الاحتياطية
+      }
+
       await generateLeadPDF({
         lead: data?.lead,
         websiteAnalysis: data?.websiteAnalysis,
@@ -136,6 +159,7 @@ export default function LeadDetail() {
         activeSeason: activeSeasonData?.active || null,
         upcomingSeasons: activeSeasonData?.upcoming || [],
         reportStyle: reportStyleData || null,
+        aiGapPercentages,
       });
       toast.success("تم تحميل التقرير بنجاح");
     } catch (e: any) {
