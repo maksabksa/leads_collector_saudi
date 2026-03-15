@@ -432,23 +432,27 @@ function translateToEnglish(text: string): string {
 // الحل: استخدام site: أولاً لأنه يعطي نتائج مباشرة من المنصة
 function buildQueryVariants(query: string, location: string | undefined, site: string): string[] {
   const loc = location || "";
-  const locAr = loc ? `${loc} السعودية` : "السعودية";
+  // دمج المدينة مع الكلمة المفتاحية لتكون متكاملة في الاستعلام المُرسَل لـ Bright Data
+  const combinedAr = loc ? `"${query} ${loc}"` : `"${query} السعودية"`;
+  const combinedArLoose = loc ? `${query} ${loc}` : `${query} السعودية`;
   const locEn = loc ? `${translateToEnglish(loc)} Saudi Arabia` : "Saudi Arabia";
   const queryEn = translateToEnglish(query);
+  const combinedEn = loc ? `"${queryEn} ${translateToEnglish(loc)}"` : `"${queryEn} Saudi Arabia"`;
+  const combinedEnLoose = loc ? `${queryEn} ${translateToEnglish(loc)} saudi` : `${queryEn} Saudi Arabia`;
   const platformName = site.replace(".com", "").replace(".net", "");
-  // site: أولاً - هذا يعطي نتائج مباشرة من المنصة وهو الأكثر فعالية
+  // الاستعلام المدمج: الكلمة + المدينة كوحدة واحدة تمنع Google من تجاهل الموقع الجغرافي
   return [
-    // site: بالعربي (الأكثر فعالية - يعطي روابط مباشرة)
-    `site:${site} ${query} ${locAr}`,
-    `site:${site} ${query} ${loc || "الرياض"}`,
-    // site: بالإنجليزي
-    `site:${site} ${queryEn} ${locEn}`,
-    `site:${site} ${queryEn} ${loc || "riyadh"} saudi`,
-    // بدون site: كـ fallback
-    `${platformName} ${query} ${locAr}`,
-    `${platformName} ${queryEn} ${locEn}`,
-    `${query} ${locAr} ${platformName}`,
-    `${queryEn} ${locEn} ${platformName} account`,
+    // الأولوية القصوى: site: + كلمة + مدينة مدمجتان (عربي)
+    `site:${site} ${combinedAr}`,
+    `site:${site} ${combinedArLoose}`,
+    // site: + كلمة + مدينة مدمجتان (إنجليزي)
+    `site:${site} ${combinedEn}`,
+    `site:${site} ${combinedEnLoose}`,
+    // بدون site: كـ fallback - كلمة + مدينة مدمجتان
+    `${platformName} ${combinedArLoose}`,
+    `${platformName} ${combinedEnLoose}`,
+    `${combinedArLoose} ${platformName}`,
+    `${combinedEnLoose} ${platformName} account`,
   ];
 }
 
