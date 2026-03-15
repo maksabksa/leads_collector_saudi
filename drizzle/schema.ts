@@ -1249,6 +1249,8 @@ export const companySettings = mysqlTable("company_settings", {
   reportIntroText: text("reportIntroText"),
   licenseNumber: varchar("licenseNumber", { length: 100 }),
   commercialRegistration: varchar("commercialRegistration", { length: 50 }),
+  analystName: varchar("analystName", { length: 200 }),  // اسم المحلل الذي يظهر في التوقيع الرقمي
+  analystTitle: varchar("analystTitle", { length: 200 }), // لقب المحلل (مثال: محلل تسويق رقمي أول)
   address: text("address"),
   instagramUrl: varchar("instagramUrl", { length: 300 }),
   twitterUrl: varchar("twitterUrl", { length: 300 }),

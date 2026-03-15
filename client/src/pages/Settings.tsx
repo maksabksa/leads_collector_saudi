@@ -109,6 +109,8 @@ function GeneralTab() {
   const [address, setAddress] = React.useState("");
   const [licenseNumber, setLicenseNumber] = React.useState("");
   const [commercialRegistration, setCommercialRegistration] = React.useState("");
+  const [analystName, setAnalystName] = React.useState("");
+  const [analystTitle, setAnalystTitle] = React.useState("");
   const [logoUrl, setLogoUrl] = React.useState("");
   const [primaryColor, setPrimaryColor] = React.useState("#1a56db");
   const [secondaryColor, setSecondaryColor] = React.useState("#0e9f6e");
@@ -134,6 +136,8 @@ function GeneralTab() {
       setAddress(companyData.address || "");
       setLicenseNumber(companyData.licenseNumber || "");
       setCommercialRegistration((companyData as any).commercialRegistration || "");
+      setAnalystName((companyData as any).analystName || "");
+      setAnalystTitle((companyData as any).analystTitle || "");
       setLogoUrl(companyData.logoUrl || "");
       setPrimaryColor(companyData.primaryColor || "#1a56db");
       setSecondaryColor(companyData.secondaryColor || "#0e9f6e");
@@ -188,6 +192,8 @@ function GeneralTab() {
       address: address.trim() || undefined,
       licenseNumber: licenseNumber.trim() || undefined,
       commercialRegistration: commercialRegistration.trim() || undefined,
+      analystName: analystName.trim() || undefined,
+      analystTitle: analystTitle.trim() || undefined,
       logoUrl: logoUrl || undefined,
       primaryColor: primaryColor || undefined,
       secondaryColor: secondaryColor || undefined,
@@ -262,6 +268,14 @@ function GeneralTab() {
             <div>
               <label className="text-sm font-medium mb-1 block">رقم الترخيص</label>
               <Input placeholder="1010xxxxxx" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">اسم المحلل <span className="text-xs text-muted-foreground">(يظهر كتوقيع في التقرير)</span></label>
+              <Input placeholder="محمد العمري" value={analystName} onChange={(e) => setAnalystName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">لقب المحلل <span className="text-xs text-muted-foreground">(يظهر تحت التوقيع)</span></label>
+              <Input placeholder="محلل تسويق رقمي" value={analystTitle} onChange={(e) => setAnalystTitle(e.target.value)} />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">المدينة</label>

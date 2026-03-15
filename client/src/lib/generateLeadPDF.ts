@@ -442,6 +442,8 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   const coEmail         = company?.email || "";
   const coLogo          = company?.logoUrl || "";
   const coCommercialReg = (company as any)?.commercialRegistration || (company as any)?.crNumber || "";
+  const coAnalystName   = (company as any)?.analystName || coName;
+  const coAnalystTitle  = (company as any)?.analystTitle || "محلل تسويق رقمي";
   const clLogo     = lead.clientLogoUrl || "";
   const reportDate = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
   const urgency    = urg(lead.urgencyLevel || lead.priority);
@@ -635,6 +637,11 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   const crQR60   = coCommercialReg ? await generateQRDataURL(coCommercialReg) : "";
   const waQR80   = waPhone ? await generateQRDataURL(`https://wa.me/${waPhone.replace(/\D/g, "")}`) : "";
   const waQR85   = waPhone ? await generateQRDataURL(`https://wa.me/${waPhone.replace(/\D/g, "")}`) : "";
+  // ── Signature page QR codes ──
+  const signWaQR  = waPhone ? await generateQRDataURL(`https://wa.me/${waPhone.replace(/\D/g, "")}`) : "";
+  const signCrQR  = coCommercialReg ? await generateQRDataURL(coCommercialReg) : "";
+  // ── Report Reference Number ──
+  const reportRef = `RPT-${Date.now().toString(36).toUpperCase()}-${(lead.id || 0).toString().padStart(4, '0')}`;
   const qrImg = (dataUrl: string, size: number) =>
     dataUrl ? `<img src="${dataUrl}" width="${size}" height="${size}" style="border-radius:6px;display:block;" />` : "";
 
@@ -1872,6 +1879,169 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   `) : null;
 
   // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE SIGNATURE — صفحة التوقيع الرقمي الاحترافية
+  // ═══════════════════════════════════════════════════════════════════════
+  const pSign = page(`
+    <!-- Decorative bg -->
+    <div style="position:absolute;top:-60px;right:-60px;width:300px;height:300px;border-radius:50%;
+      background:radial-gradient(circle,rgba(34,197,94,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-80px;left:-40px;width:350px;height:350px;border-radius:50%;
+      background:radial-gradient(circle,rgba(14,165,233,0.04) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <!-- Header -->
+    <div style="padding:28px 40px 20px;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          ${coLogo
+            ? `<img src="${coLogo}" style="height:40px;width:auto;border-radius:8px;border:1px solid rgba(255,255,255,0.1);padding:4px;background:rgba(255,255,255,0.05);" alt="logo">`
+            : `<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#22c55e,#0ea5e9);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:white;">${coName.charAt(0)}</div>`}
+          <div>
+            <div style="font-size:16px;font-weight:900;color:#f1f5f9;">${coName}</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">تقرير سري ومخصص</div>
+          </div>
+        </div>
+        <div style="text-align:left;">
+          <div style="font-size:10px;color:#475569;">رقم التقرير</div>
+          <div style="font-size:13px;font-weight:800;color:#22c55e;font-family:monospace;letter-spacing:1px;">${reportRef}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div style="padding:30px 40px;">
+
+      <!-- Title -->
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="font-size:11px;color:#22c55e;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">توقيع رقمي معتمد</div>
+        <div style="font-size:26px;font-weight:900;color:#f1f5f9;margin-bottom:6px;">شهادة إعداد التقرير</div>
+        <div style="font-size:12px;color:#64748b;">تم إعداد هذا التقرير بشكل حصري ومخصص بناءً على تحليل دقيق لبيانات العميل</div>
+      </div>
+
+      <!-- Signature block -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">
+
+        <!-- Analyst info -->
+        <div style="background:linear-gradient(135deg,rgba(34,197,94,0.04),rgba(14,165,233,0.03));
+          border:1px solid rgba(34,197,94,0.15);border-radius:16px;padding:24px;">
+          <div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:1px;margin-bottom:16px;">المحلل المعتمد</div>
+
+          <!-- Signature line -->
+          <div style="border-bottom:2px solid rgba(34,197,94,0.3);margin-bottom:12px;padding-bottom:12px;">
+            <div style="font-size:22px;font-weight:900;color:#22c55e;
+              font-family:'Tajawal',cursive;letter-spacing:1px;
+              text-shadow:0 0 20px rgba(34,197,94,0.4);">${coAnalystName}</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;"></div>
+              <div style="font-size:11px;color:#94a3b8;">${coAnalystTitle}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#0ea5e9;flex-shrink:0;"></div>
+              <div style="font-size:11px;color:#94a3b8;">${coName}</div>
+            </div>
+            ${coEmail ? `<div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#8b5cf6;flex-shrink:0;"></div>
+              <div style="font-size:11px;color:#94a3b8;">${coEmail}</div>
+            </div>` : ''}
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></div>
+              <div style="font-size:11px;color:#94a3b8;">تاريخ الإصدار: ${reportDate}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Report details -->
+        <div style="background:linear-gradient(135deg,rgba(14,165,233,0.04),rgba(139,92,246,0.03));
+          border:1px solid rgba(14,165,233,0.15);border-radius:16px;padding:24px;">
+          <div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:1px;margin-bottom:16px;">بيانات التقرير</div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;
+              padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+              <span style="font-size:10px;color:#64748b;">اسم العميل</span>
+              <span style="font-size:11px;font-weight:700;color:#f1f5f9;">${lead.companyName || 'غير محدد'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;
+              padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+              <span style="font-size:10px;color:#64748b;">رقم التقرير</span>
+              <span style="font-size:11px;font-weight:800;color:#22c55e;font-family:monospace;">${reportRef}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;
+              padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+              <span style="font-size:10px;color:#64748b;">تاريخ الإصدار</span>
+              <span style="font-size:11px;font-weight:700;color:#f1f5f9;">${reportDate}</span>
+            </div>
+            ${coCommercialReg ? `<div style="display:flex;justify-content:space-between;align-items:center;
+              padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+              <span style="font-size:10px;color:#64748b;">سجل تجاري</span>
+              <span style="font-size:11px;font-weight:700;color:#f1f5f9;">${coCommercialReg}</span>
+            </div>` : ''}
+            ${coLogo ? `<div style="display:flex;justify-content:space-between;align-items:center;
+              padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+              <span style="font-size:10px;color:#64748b;">درجة التحليل</span>
+              <span style="font-size:11px;font-weight:700;color:#22c55e;">شامل ومتعمق</span>
+            </div>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <!-- QR codes row -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:40px;margin-bottom:28px;">
+        ${signWaQR ? `<div style="text-align:center;">
+          <div style="background:white;padding:8px;border-radius:12px;display:inline-block;
+            box-shadow:0 0 20px rgba(34,197,94,0.2);margin-bottom:8px;">
+            <img src="${signWaQR}" width="90" height="90" style="display:block;border-radius:4px;" />
+          </div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:600;">تواصل عبر واتساب</div>
+          <div style="font-size:9px;color:#475569;margin-top:2px;">${waPhone}</div>
+        </div>` : ''}
+
+        <!-- Seal -->
+        <div style="text-align:center;">
+          <div style="width:100px;height:100px;border-radius:50%;
+            border:3px solid rgba(34,197,94,0.4);border-style:dashed;
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            background:rgba(34,197,94,0.04);margin:0 auto 8px;
+            box-shadow:0 0 20px rgba(34,197,94,0.1);">
+            <div style="font-size:20px;margin-bottom:2px;">✅</div>
+            <div style="font-size:8px;font-weight:800;color:#22c55e;text-align:center;line-height:1.4;">تقرير<br>معتمد</div>
+          </div>
+          <div style="font-size:9px;color:#475569;">ختم رقمي</div>
+        </div>
+
+        ${signCrQR ? `<div style="text-align:center;">
+          <div style="background:white;padding:8px;border-radius:12px;display:inline-block;
+            box-shadow:0 0 20px rgba(14,165,233,0.2);margin-bottom:8px;">
+            <img src="${signCrQR}" width="90" height="90" style="display:block;border-radius:4px;" />
+          </div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:600;">سجل تجاري</div>
+          <div style="font-size:9px;color:#475569;margin-top:2px;">${coCommercialReg}</div>
+        </div>` : ''}
+      </div>
+
+      <!-- Legal disclaimer -->
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+        border-radius:12px;padding:16px 20px;">
+        <div style="font-size:9px;color:#475569;line-height:1.8;text-align:center;">
+          هذا التقرير سري ومخصص حصريًا لعناية العميل المذكور أعلاه ويحظر توزيعه أو نسخه دون إذن كتابي مسبق من ${coName}.
+          جميع التحليلات والتوصيات الواردة في هذا التقرير هي آراء مهنية مبنية على بيانات متاحة وقت إعداده ولا تمثل ضمانًا لنتائج محددة.
+          رقم التقرير: <strong style="color:#22c55e;font-family:monospace;">${reportRef}</strong> &nbsp;·&nbsp; تاريخ الإصدار: ${reportDate}
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
+      background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:#334155;">حصري من ${coName} — جميع الحقوق محفوظة © ${new Date().getFullYear()}</div>
+      <div style="font-size:9px;color:#334155;font-family:monospace;">${reportRef}</div>
+    </div>
+  `, false); // آخر صفحة — بدون page-break
+
+  // ═══════════════════════════════════════════════════════════════════════
   //  DYNAMIC PAGE ASSEMBLY — حذف الصفحات الفارغة تلقائياً
   // ═══════════════════════════════════════════════════════════════════════
 
@@ -1889,6 +2059,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   if (hasBrandData && p_brand) activePages.push({ key: 'p_brand', html: p_brand }); // الهوية البصرية فقط إذا كانت هناك بيانات
   activePages.push({ key: 'p4', html: p4 }); // التوصيات دائماً
   if (hasCompetitors) activePages.push({ key: 'p5', html: p5 }); // المنافسون فقط إذا كانوا موجودين
+  activePages.push({ key: 'pSign', html: pSign }); // صفحة التوقيع الرقمي دائماً في الآخر
 
   const totalPages = activePages.length;
 
