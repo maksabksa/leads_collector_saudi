@@ -312,7 +312,14 @@ export default function LeadDetail() {
     );
   }
 
-  const { lead, websiteAnalysis, socialAnalyses } = data;
+  const { lead, websiteAnalysis, socialAnalyses: rawSocialAnalyses } = data;
+  // إبقاء آخر تحليل لكل منصة فقط لتجنب المفاتيح المكررة
+  const socialAnalyses = rawSocialAnalyses.reduce((acc: typeof rawSocialAnalyses, sa) => {
+    const idx = acc.findIndex(x => x.platform === sa.platform);
+    if (idx === -1) acc.push(sa);
+    else if (sa.id > acc[idx].id) acc[idx] = sa; // احتفظ بالأحدث
+    return acc;
+  }, []);
 
    const handleAnalyzeWebsite = async () => {
     if (!lead.website) { toast.error("لا يوجد موقع إلكتروني لهذا النشاط"); return; }
