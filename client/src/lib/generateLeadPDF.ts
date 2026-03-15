@@ -912,59 +912,98 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
         </div>
       </div>` : ""}
 
-      <!-- STRONG CTA SECTION -->
-      <div style="background:linear-gradient(135deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%);
-        border:1px solid rgba(34,197,94,0.25);border-radius:16px;padding:24px 28px;
-        position:relative;overflow:hidden;
-        box-shadow:0 0 40px rgba(34,197,94,0.1);">
-        <!-- Glow effects -->
-        <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;
-          background:radial-gradient(circle,rgba(34,197,94,0.1) 0%,transparent 70%);pointer-events:none;"></div>
-        <div style="position:absolute;bottom:-50px;left:-30px;width:180px;height:180px;border-radius:50%;
-          background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+      <!-- ===== قسم مستقبل السوق ===== -->
+      <div style="margin-bottom:14px;background:linear-gradient(135deg,rgba(14,165,233,0.04) 0%,rgba(167,139,250,0.04) 100%);
+        border:1px solid rgba(14,165,233,0.15);border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-30px;left:-30px;width:150px;height:150px;border-radius:50%;
+          background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 70%);pointer-events:none;"></div>
+        <div style="font-size:12px;font-weight:800;color:#7dd3fc;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px;">🔭</span>
+          <span>مستقبل السوق في ${lead.city || 'المملكة'} — رؤية استراتيجية 2025–2030</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:10px;padding:10px 12px;">
+            <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:4px;">📈 نمو القطاع</div>
+            <div style="font-size:11px;color:#e2e8f0;line-height:1.6;">قطاع ${lead.businessType || 'الأعمال'} في السوق السعودي يشهد نمواً سنوياً يتجاوز <strong style="color:#22c55e;">18%</strong> مدفوعاً برؤية 2030 والتحول الرقمي.</div>
+          </div>
+          <div style="background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);border-radius:10px;padding:10px 12px;">
+            <div style="font-size:9px;color:#fdba74;font-weight:700;margin-bottom:4px;">⚡ شدة المنافسة</div>
+            <div style="font-size:11px;color:#e2e8f0;line-height:1.6;">المنافسة الرقمية تتصاعد بسرعة — <strong style="color:#f97316;">73%</strong> من الأنشطة في ${lead.city || 'المنطقة'} ستعتمد على التسويق الرقمي بحلول 2026.</div>
+          </div>
+          <div style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.15);border-radius:10px;padding:10px 12px;">
+            <div style="font-size:9px;color:#c4b5fd;font-weight:700;margin-bottom:4px;">🎯 نافذة الفرصة</div>
+            <div style="font-size:11px;color:#e2e8f0;line-height:1.6;">النشاطات التي تبني حضورها الرقمي <strong style="color:#a78bfa;">الآن</strong> ستحتل المراكز الأولى قبل أن تُغلق نافذة الفرصة التنافسية.</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border-right:3px solid #7dd3fc;border-radius:0 8px 8px 0;padding:10px 14px;">
+          <div style="font-size:10px;color:#94a3b8;line-height:1.7;">
+            <strong style="color:#7dd3fc;">التعليق الاستشاري:</strong> بناءً على تحليل وضع ${lead.companyName || 'نشاطك'} الحالي، يمتلك النشاط إمكانات نمو حقيقية في سوق ${lead.city || 'المملكة'}. الفجوات المُحددة في هذا التقرير ليست نقاط ضعف دائمة — بل هي <strong style="color:#22c55e;">فرص تنافسية قابلة للاستثمار</strong> إذا تحرّكنا بسرعة وذكاء. كل يوم تأخير يمنح المنافسين ميزة يصعب تجاوزها لاحقاً.
+          </div>
+        </div>
+      </div>
 
+      <!-- ===== STRONG CTA SECTION ===== -->
+      <div style="background:linear-gradient(135deg,#020810 0%,#0a1628 40%,#0d1f3c 70%,#020810 100%);
+        border:1.5px solid rgba(34,197,94,0.35);border-radius:16px;padding:22px 28px;
+        position:relative;overflow:hidden;
+        box-shadow:0 0 60px rgba(34,197,94,0.12),inset 0 0 40px rgba(34,197,94,0.03);">
+        <!-- Glow effects -->
+        <div style="position:absolute;top:-60px;right:-60px;width:220px;height:220px;border-radius:50%;
+          background:radial-gradient(circle,rgba(34,197,94,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+        <div style="position:absolute;bottom:-60px;left:-40px;width:200px;height:200px;border-radius:50%;
+          background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+        <!-- Top badge -->
+        <div style="display:flex;justify-content:center;margin-bottom:14px;">
+          <div style="padding:4px 18px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);
+            border-radius:20px;font-size:9px;color:#86efac;font-weight:800;letter-spacing:2px;">
+            ● الخطوة التالية — الآن
+          </div>
+        </div>
         <div style="position:relative;z-index:1;display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;">
           <!-- Left: CTA Text -->
           <div>
-            <div style="font-size:10px;color:#475569;margin-bottom:8px;letter-spacing:2px;font-weight:700;">الخطوة التالية — الآن</div>
-            <div style="font-size:22px;font-weight:900;color:#f8fafc;margin-bottom:8px;
-              text-shadow:0 0 30px rgba(34,197,94,0.2);line-height:1.3;">
+            <div style="font-size:24px;font-weight:900;color:#f8fafc;margin-bottom:8px;
+              text-shadow:0 0 40px rgba(34,197,94,0.25);line-height:1.2;">
               لا تدع منافسيك يسبقونك
             </div>
-            <div style="font-size:12px;color:#64748b;margin-bottom:16px;line-height:1.7;">
-              كل يوم تأخير = إيراد ضائع. تواصل معنا الآن للحصول على استشارة مجانية وخطة عمل مخصصة لـ${lead.companyName || "نشاطك"} خلال 24 ساعة.
+            <div style="font-size:11.5px;color:#64748b;margin-bottom:16px;line-height:1.8;">
+              كل يوم تأخير = إيراد ضائع. تواصل معنا الآن للحصول على
+              <strong style="color:#94a3b8;">استشارة مجانية وخطة عمل مخصصة</strong>
+              لـ${lead.companyName || 'نشاطك'} خلال 24 ساعة.
             </div>
             <!-- Contact buttons -->
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
               ${waPhone ? `
-              <div style="padding:10px 20px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);
-                border-radius:24px;font-size:12px;font-weight:800;color:#22c55e;
-                box-shadow:0 0 16px rgba(34,197,94,0.2);">📱 واتساب: ${waPhone}</div>` : ""}
-              <div style="padding:10px 20px;background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.35);
+              <div style="padding:10px 22px;background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(34,197,94,0.1));
+                border:1px solid rgba(34,197,94,0.5);border-radius:24px;font-size:12px;font-weight:800;color:#22c55e;
+                box-shadow:0 0 20px rgba(34,197,94,0.25);">📱 واتساب: ${waPhone}</div>` : ''}
+              <div style="padding:10px 22px;background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.4);
                 border-radius:24px;font-size:12px;font-weight:700;color:#0ea5e9;
                 box-shadow:0 0 16px rgba(14,165,233,0.15);">🌐 ${coWebsite}</div>
               ${coEmail ? `
-              <div style="padding:10px 20px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);
+              <div style="padding:10px 22px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.35);
                 border-radius:24px;font-size:12px;font-weight:700;color:#a78bfa;
-                box-shadow:0 0 16px rgba(167,139,250,0.15);">✉️ ${coEmail}</div>` : ""}
+                box-shadow:0 0 16px rgba(167,139,250,0.15);">✉️ ${coEmail}</div>` : ''}
             </div>
-
-            <!-- Urgency note -->
-            <div style="margin-top:12px;padding:8px 14px;background:rgba(239,68,68,0.08);
-              border:1px solid rgba(239,68,68,0.2);border-radius:10px;display:inline-flex;align-items:center;gap:6px;">
-              <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;box-shadow:0 0 6px #ef4444;"></div>
-              <span style="font-size:10px;color:#fca5a5;font-weight:700;">عرض الاستشارة المجانية متاح لفترة محدودة</span>
+            <!-- Urgency strip -->
+            <div style="padding:8px 16px;background:linear-gradient(90deg,rgba(239,68,68,0.1),rgba(239,68,68,0.05));
+              border:1px solid rgba(239,68,68,0.25);border-radius:10px;display:inline-flex;align-items:center;gap:8px;">
+              <div style="width:7px;height:7px;border-radius:50%;background:#ef4444;
+                box-shadow:0 0 8px #ef4444;animation:pulse 2s infinite;"></div>
+              <span style="font-size:10px;color:#fca5a5;font-weight:700;">عرض الاستشارة المجانية متاح لفترة محدودة — احجز مكانك الآن</span>
             </div>
           </div>
-
           <!-- Right: QR Code -->
           ${waPhone ? `
-          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-            ${qrCodeSVG(waPhone, 90)}
-            <div style="font-size:8px;color:#475569;text-align:center;max-width:100px;line-height:1.4;">
-              امسح الكود للتواصل المباشر عبر واتساب
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;">
+            <div style="padding:8px;background:white;border-radius:12px;border:3px solid rgba(34,197,94,0.4);
+              box-shadow:0 0 20px rgba(34,197,94,0.2);">
+              ${qrCodeSVG(waPhone, 85)}
             </div>
-          </div>` : ""}
+            <div style="font-size:8px;color:#475569;text-align:center;max-width:110px;line-height:1.5;">
+              امسح للتواصل الفوري عبر واتساب
+            </div>
+          </div>` : ''}
         </div>
       </div>
 
@@ -1123,8 +1162,8 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       { url: comp.linkedinUrl, color: '#0a66c2', label: 'LI' },
     ];
 
-    const priBarWidth = Math.round(priScore * 10);
-    const qualBarWidth = Math.round(qualScore * 10);
+    const priBarWidth = priScore !== null && priScore !== undefined ? Math.round(Number(priScore) * 10) : 50;
+    const qualBarWidth = qualScore !== null && qualScore !== undefined ? Math.round(Number(qualScore) * 10) : 50;
     const platBarWidth = Math.round((platforms / 6) * 100);
 
     return `
@@ -1156,7 +1195,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
           <div>
             <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
               <span style="font-size:7.5px;color:#475569;">الأولوية</span>
-              <span style="font-size:7.5px;font-weight:800;color:${sc(priScore)};">${priScore.toFixed(1)}</span>
+              <span style="font-size:7.5px;font-weight:800;color:${sc(priScore)};">${priScore !== null && priScore !== undefined ? Number(priScore).toFixed(1) : '—'}</span>
             </div>
             <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
               <div style="height:100%;width:${priBarWidth}%;background:${sc(priScore)};border-radius:2px;
@@ -1166,7 +1205,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
           <div>
             <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
               <span style="font-size:7.5px;color:#475569;">جودة البيانات</span>
-              <span style="font-size:7.5px;font-weight:800;color:${sc(qualScore)};">${qualScore.toFixed(1)}</span>
+              <span style="font-size:7.5px;font-weight:800;color:${sc(qualScore)};">${qualScore !== null && qualScore !== undefined ? Number(qualScore).toFixed(1) : '—'}</span>
             </div>
             <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
               <div style="height:100%;width:${qualBarWidth}%;background:${sc(qualScore)};border-radius:2px;
@@ -1201,8 +1240,8 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
       <!-- Three pillars -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
         ${bigNum(clientPlatforms, "منصات نشطة", "من أصل 6 منصات", "#22c55e")}
-        ${bigNum(clientPri.toFixed(1), "درجة الأولوية", "من أصل 10 نقاط", "#0ea5e9")}
-        ${bigNum(clientQual.toFixed(1), "جودة البيانات", "من أصل 10 نقاط", "#a78bfa")}
+        ${bigNum(clientPri !== null && clientPri !== undefined ? Number(clientPri).toFixed(1) : '—', "درجة الأولوية", "من أصل 10 نقاط", "#0ea5e9")}
+        ${bigNum(clientQual !== null && clientQual !== undefined ? Number(clientQual).toFixed(1) : '—', "جودة البيانات", "من أصل 10 نقاط", "#a78bfa")}
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">

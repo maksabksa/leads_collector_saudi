@@ -159,6 +159,9 @@ export const leads = mysqlTable("leads", {
   retryCount: int("retry_count").default(0),
   lastRetryAt: timestamp("last_retry_at"),
 
+  // ===== Custom Recommendations =====
+  customRecommendations: text("custom_recommendations"),  // توصيات مخصصة يُدخلها المستخدم يدوياً
+
   // ===== Phase 1: PDF Report =====
   pdfGenerationStatus: mysqlEnum("pdf_generation_status", ["not_generated", "generating", "ready", "failed"]).default("not_generated"),
   pdfTemplateVersion: varchar("pdf_template_version", { length: 20 }),

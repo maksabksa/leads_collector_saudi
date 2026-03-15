@@ -95,14 +95,12 @@ const zonesRouter = router({
       region: z.string().optional(),
       status: z.enum(["not_started", "in_progress", "completed"]).optional(),
       targetLeads: z.number().optional(),
-      notes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
       await updateZone(id, data);
       return { success: true };
     }),
-
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
@@ -418,6 +416,7 @@ const leadsRouter = router({
       nextStep: z.string().optional(),
       nextFollowup: z.number().optional(),
       ownerUserId: z.number().optional(),
+      customRecommendations: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
