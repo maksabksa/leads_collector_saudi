@@ -111,6 +111,8 @@ async function analyzeSingleLead(
       iceBreaker: analysis.iceBreaker,
       sectorInsights: analysis.sectorInsights,
       benchmarkComparison: analysis.benchmarkComparison,
+      marketingOpportunitiesSummary: analysis.marketingOpportunitiesSummary,
+      growthDevelopmentPlan: analysis.growthDevelopmentPlan,
     })
     .where(eq(leads.id, leadId));
 }

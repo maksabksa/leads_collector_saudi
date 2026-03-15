@@ -107,6 +107,8 @@ export const sectorAnalysisRouter = router({
             iceBreaker: analysis.iceBreaker,
             sectorInsights: analysis.sectorInsights,
             benchmarkComparison: analysis.benchmarkComparison,
+            marketingOpportunitiesSummary: analysis.marketingOpportunitiesSummary,
+            growthDevelopmentPlan: analysis.growthDevelopmentPlan,
           })
           .where(eq(leads.id, input.leadId));
 
@@ -226,6 +228,8 @@ export const sectorAnalysisRouter = router({
           iceBreaker: analysis.iceBreaker,
           sectorInsights: analysis.sectorInsights,
           benchmarkComparison: analysis.benchmarkComparison,
+          marketingOpportunitiesSummary: analysis.marketingOpportunitiesSummary,
+          growthDevelopmentPlan: analysis.growthDevelopmentPlan,
         })
         .where(eq(leads.id, input.leadId));
 
@@ -254,6 +258,8 @@ export const sectorAnalysisRouter = router({
         iceBreaker: leads.iceBreaker,
         sectorInsights: leads.sectorInsights,
         benchmarkComparison: leads.benchmarkComparison,
+        marketingOpportunitiesSummary: leads.marketingOpportunitiesSummary,
+        growthDevelopmentPlan: leads.growthDevelopmentPlan,
         leadPriorityScore: leads.leadPriorityScore,
         aiConfidenceScore: leads.aiConfidenceScore,
         lastAnalyzedAt: leads.lastAnalyzedAt,

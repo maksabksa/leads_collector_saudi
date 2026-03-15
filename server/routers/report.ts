@@ -915,6 +915,35 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
         <p>${lead.companyName} هو نشاط تجاري في قطاع ${lead.businessType || "الأعمال"} بمدينة ${lead.city || "الرياض"}. يملك النشاط حضوراً رقمياً ${activePlatforms.length > 4 ? 'متوسطاً' : 'محدوداً'} على ${activePlatforms.length} منصة من أصل ${platforms.length} منصة رئيسية. ${lead.verifiedPhone ? 'رقم الهاتف متوفر مما يسهل التواصل المباشر.' : 'لا يوجد رقم هاتف موثق مما يصعّب التواصل.'} ${lead.website ? 'يملك موقعاً إلكترونياً يحتاج لتقييم SEO.' : 'لا يوجد موقع إلكتروني وهو فرصة تسويقية كبيرة.'}</p>
       </div>
     </div>`}
+
+    <!-- ===== ملخص الفرص التسويقية والتطور المتوقع (يظهر دائماً إذا توفرت البيانات) ===== -->
+    ${(lead.marketingOpportunitiesSummary || lead.growthDevelopmentPlan) ? `
+    <div class="section" style="margin-top:14px;">
+      <div class="section-title" style="color:#0f172a;font-size:13px;font-weight:700;border-bottom:2px solid #6366f1;padding-bottom:6px;margin-bottom:12px;">🚀 ملخص الفرص التسويقية والتطور المتوقع</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        ${lead.marketingOpportunitiesSummary ? `
+        <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:10px;padding:14px;position:relative;overflow:hidden;">
+          <div style="position:absolute;top:0;right:0;width:4px;height:100%;background:linear-gradient(180deg,#22c55e,#16a34a);"></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="font-size:16px;">📈</span>
+            <span style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.5px;">الفرص التسويقية المتاحة</span>
+          </div>
+          <p style="font-size:10.5px;color:#166534;line-height:1.7;margin:0;">${lead.marketingOpportunitiesSummary}</p>
+        </div>` : ""}
+        ${lead.growthDevelopmentPlan ? `
+        <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1.5px solid #93c5fd;border-radius:10px;padding:14px;position:relative;overflow:hidden;">
+          <div style="position:absolute;top:0;right:0;width:4px;height:100%;background:linear-gradient(180deg,#3b82f6,#1d4ed8);"></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="font-size:16px;">🔮</span>
+            <span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.5px;">خطة التطور والنمو المتوقع</span>
+          </div>
+          <p style="font-size:10.5px;color:#1e40af;line-height:1.7;margin:0;">${lead.growthDevelopmentPlan}</p>
+        </div>` : ""}
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;background:#fafafa;border:1px dashed #cbd5e1;border-radius:8px;font-size:9.5px;color:#64748b;text-align:center;">
+        ⚡ هذا التحليل مبني على دراسة السوق المحلي في ${lead.city || "المملكة العربية السعودية"} وبيانات القطاع · ${new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long" })}
+      </div>
+    </div>` : ""}
   </div>
 
   <div class="footer">

@@ -45,6 +45,9 @@ export interface SectorAnalysisOutput {
   // التحليل القطاعي
   sectorInsights: string;                 // رؤى قطاعية
   benchmarkComparison: string;            // مقارنة بالسوق
+  // ملخص الفرص التسويقية وخطة التطور
+  marketingOpportunitiesSummary: string;  // ملخص شامل للفرص التسويقية بناءً على دراسة السوق
+  growthDevelopmentPlan: string;          // خطة التطور والنمو المتوقع
   // درجة الأولوية
   leadPriorityScore: number;              // 1-10
   confidenceScore: number;               // 0-100
@@ -184,6 +187,8 @@ ${input.notes ? `- ملاحظات: ${input.notes}` : ""}
   "iceBreaker": "<جملة الافتتاح المقترحة للتواصل مع العميل>",
   "sectorInsights": "<رؤى خاصة بهذا القطاع>",
   "benchmarkComparison": "<مقارنة وضع العميل بمعيار السوق>",
+  "marketingOpportunitiesSummary": "<ملخص شامل ومفصّل للفرص التسويقية المتاحة بناءً على دراسة السوق ووضع المنافسين في هذا القطاع بالمدينة - فقرة كاملة 3-4 جمل>",
+  "growthDevelopmentPlan": "<خطة مرحلية للتطور والنمو المتوقع لهذا النشاط خلال 6-12 شهراً بناءً على اتجاهات السوق وفرص النمو الرقمي - فقرة كاملة 3-4 جمل>",
   "leadPriorityScore": <1-10>,
   "confidenceScore": <0-100>
 }`;
@@ -235,6 +240,8 @@ export function parseSectorAnalysisResponse(rawContent: string): SectorAnalysisO
       iceBreaker: parsed.iceBreaker || "",
       sectorInsights: parsed.sectorInsights || "",
       benchmarkComparison: parsed.benchmarkComparison || "",
+      marketingOpportunitiesSummary: parsed.marketingOpportunitiesSummary || "",
+      growthDevelopmentPlan: parsed.growthDevelopmentPlan || "",
       leadPriorityScore: Math.min(10, Math.max(1, parsed.leadPriorityScore || 5)),
       confidenceScore: Math.min(100, Math.max(0, parsed.confidenceScore || 50)),
     };

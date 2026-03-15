@@ -143,6 +143,8 @@ export const leads = mysqlTable("leads", {
   iceBreaker: text("ice_breaker"),
   sectorInsights: text("sector_insights"),
   benchmarkComparison: text("benchmark_comparison"),
+  marketingOpportunitiesSummary: text("marketing_opportunities_summary"),
+  growthDevelopmentPlan: text("growth_development_plan"),
   aiConfidenceScore: float("ai_confidence_score").default(0),
   lastAnalyzedAt: bigint("last_analyzed_at", { mode: "number" }),
 
