@@ -506,9 +506,42 @@ export default function SearchHub() {
   const existingNames = new Set(
     (existingLeadsQuery.data || []).map((l: any) => (l.name || "").trim().toLowerCase())
   );
+  // مجموعات للمقارنة بالـ usernames من الـ URLs
+  const extractUsername = (url: string) => {
+    if (!url) return "";
+    return url.toLowerCase()
+      .replace(/.*instagram\.com\//, "")
+      .replace(/.*tiktok\.com\/@?/, "")
+      .replace(/.*(?:twitter|x)\.com\//, "")
+      .replace(/.*snapchat\.com\/add\//, "")
+      .replace(/.*snapchat\.com\//, "")
+      .replace(/[/?#].*$/, "")
+      .replace(/^@/, "")
+      .trim();
+  };
+  const existingInstagramUsernames = new Set(
+    (existingLeadsQuery.data || []).filter((l: any) => l.instagram).map((l: any) => extractUsername(l.instagram))
+  );
+  const existingTiktokUsernames = new Set(
+    (existingLeadsQuery.data || []).filter((l: any) => l.tiktok).map((l: any) => extractUsername(l.tiktok))
+  );
+  const existingTwitterUsernames = new Set(
+    (existingLeadsQuery.data || []).filter((l: any) => l.twitter).map((l: any) => extractUsername(l.twitter))
+  );
   const isExistingLead = (result: any): boolean => {
-    const name = (result.name || result.fullName || result.username || "").trim().toLowerCase();
-    return name.length > 0 && existingNames.has(name);
+    // مقارنة بالاسم
+    const name = (result.name || result.fullName || "").trim().toLowerCase();
+    if (name.length > 0 && existingNames.has(name)) return true;
+    // مقارنة بـ Instagram username
+    const igUser = (result.username || result.instagramUsername || "").trim().toLowerCase().replace(/^@/, "");
+    if (igUser.length > 0 && existingInstagramUsernames.has(igUser)) return true;
+    // مقارنة بـ TikTok username
+    const ttUser = (result.uniqueId || result.tiktokUsername || "").trim().toLowerCase().replace(/^@/, "");
+    if (ttUser.length > 0 && existingTiktokUsernames.has(ttUser)) return true;
+    // مقارنة بـ Twitter username
+    const twUser = (result.twitterUsername || result.screenName || "").trim().toLowerCase().replace(/^@/, "");
+    if (twUser.length > 0 && existingTwitterUsernames.has(twUser)) return true;
+    return false;
   };
 
   const instagramAccountsQuery = trpc.instagram.getAccounts.useQuery(
@@ -1549,7 +1582,7 @@ export default function SearchHub() {
                         result={r}
                         platform={p}
                         onAdd={(res) => handleOpenAddDialog(res, p.id)}
-                        isDuplicate={addedNames.has(r.name || r.fullName || r.username || "")}
+                        isDuplicate={isExistingLead(r) || addedNames.has(r.name || r.fullName || r.username || "")}
                       />
                     ))
                   )}
@@ -2267,7 +2300,7 @@ export default function SearchHub() {
                         result={result}
                         platform={p}
                         onAdd={(r) => handleOpenAddDialog(r, p.id)}
-                        isDuplicate={addedNames.has(result.name || result.fullName || result.username || "")}
+                        isDuplicate={isExistingLead(result) || addedNames.has(result.name || result.fullName || result.username || "")}
                       />
                       )
                     ))}
