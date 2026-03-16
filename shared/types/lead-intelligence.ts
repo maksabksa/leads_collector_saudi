@@ -437,3 +437,31 @@ export type LegacyBusinessLead = {
   assets?: LeadAsset[];
   createdAt?: Date;
 };
+
+// ─── PHASE 3: AutoFill Types ───────────────────────────────────────────────────
+
+/**
+ * Analysis readiness state — computed deterministically from missing-field counts.
+ * NOT an AI score. NOT an audit result.
+ */
+export type AnalysisReadinessState =
+  | "ready_for_analysis"
+  | "partially_analyzable"
+  | "missing_critical_data"
+  | "not_analyzable";
+
+/**
+ * Result returned by runAutofill() after processing a lead.
+ * candidatePhones/Emails/Websites are in-memory only — NOT persisted in PHASE 3.
+ */
+export type AutoFillResult = {
+  leadId: number;
+  fieldsUpdated: string[];
+  missingCount: number;
+  readinessState: AnalysisReadinessState;
+  confidenceScore: number;
+  /** In-memory only — NOT persisted to DB in PHASE 3 */
+  candidatePhones: string[];
+  candidateEmails: string[];
+  candidateWebsites: string[];
+};

@@ -421,15 +421,35 @@ export async function createLeadWithResolution(data: InsertLead): Promise<number
 
     const id = await createLead(enrichedData);
     console.log(`[PHASE2] resolution_applied lead_id=${id} dedup=${enrichedData.deduplicationStatus} reason=${dupResult.reason}`);
+    // PHASE 3 — autofill pipeline (non-blocking, structured observability)
+    import("./autofill/index.js").then(({ runAutofill }) => {
+      runAutofill(id).then(result => {
+        console.log(`[AUTOFILL] lead_id=${id} filled=${result.fieldsUpdated.length} missing=${result.missingCount} readiness=${result.readinessState} confidence=${result.confidenceScore.toFixed(2)}`);
+      }).catch((autofillErr: unknown) => {
+        console.error(`[AUTOFILL] lead_id=${id} failed: ${autofillErr instanceof Error ? autofillErr.message : String(autofillErr)}`);
+      });
+    }).catch((importErr: unknown) => {
+      console.error(`[AUTOFILL] import_failed lead_id=${id}: ${importErr instanceof Error ? importErr.message : String(importErr)}`);
+    });
     return id;
   } catch (err) {
     console.error(`[PHASE2] resolution_failed — fallback to createLead. Error: ${err instanceof Error ? err.message : String(err)}`);
     const id = await createLead(data);
     console.log(`[PHASE2] fallback_used lead_id=${id}`);
+    // PHASE 3 — autofill on fallback path
+    import("./autofill/index.js").then(({ runAutofill }) => {
+      runAutofill(id).then(result => {
+        console.log(`[AUTOFILL] fallback_path lead_id=${id} filled=${result.fieldsUpdated.length} missing=${result.missingCount} readiness=${result.readinessState}`);
+      }).catch((autofillErr: unknown) => {
+        console.error(`[AUTOFILL] fallback_path lead_id=${id} failed: ${autofillErr instanceof Error ? autofillErr.message : String(autofillErr)}`);
+      });
+    }).catch((importErr: unknown) => {
+      console.error(`[AUTOFILL] import_failed fallback lead_id=${id}: ${importErr instanceof Error ? importErr.message : String(importErr)}`);
+    });
     return id;
   }
 }
-// TODO: PHASE 3 — asset persistence: linkAssetsToLead(leadId, assets: LeadAsset[])
+// PHASE 3 — asset persistence deferred: linkAssetsToLead(leadId, assets: LeadAsset[])
 
 // ===== INSTAGRAM HELPERS =====
 import {
