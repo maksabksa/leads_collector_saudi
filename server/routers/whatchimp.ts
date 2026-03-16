@@ -62,11 +62,13 @@ async function sendLeadToWhatchimp(
 
   try {
     // 1. Create subscriber
+    // NOTE: subscriber/create uses camelCase params (phoneNumberID, phoneNumber, name)
+    // unlike other endpoints which use snake_case. See Whatchimp API docs.
     const subRes = await whatchimpPost("/whatsapp/subscriber/create", {
       apiToken: settings.apiToken,
-      phone_number_id: settings.phoneNumberId,
-      phone_number: phone,
-      first_name: lead.companyName,
+      phoneNumberID: settings.phoneNumberId,
+      phoneNumber: phone,
+      name: lead.companyName,
     });
 
     // 2. Assign label if configured (non-fatal)
@@ -150,16 +152,32 @@ export const whatchimpRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const existing = await db.select().from(whatchimpSettings).limit(1);
       if (existing.length > 0) {
-        await db.update(whatchimpSettings)
-          .set({
-            apiToken: input.apiToken,
-            phoneNumberId: input.phoneNumberId,
-            defaultLabelId: input.defaultLabelId ?? null,
-            defaultLabelName: input.defaultLabelName ?? null,
-            isActive: true,
-          })
-          .where(eq(whatchimpSettings.id, existing[0].id));
+        // If __KEEP__ is sent, don't overwrite the stored token
+        if (input.apiToken !== "__KEEP__") {
+          await db.update(whatchimpSettings)
+            .set({
+              apiToken: input.apiToken,
+              phoneNumberId: input.phoneNumberId,
+              defaultLabelId: input.defaultLabelId ?? null,
+              defaultLabelName: input.defaultLabelName ?? null,
+              isActive: true,
+            })
+            .where(eq(whatchimpSettings.id, existing[0].id));
+        } else {
+          // Only update non-token fields
+          await db.update(whatchimpSettings)
+            .set({
+              phoneNumberId: input.phoneNumberId,
+              defaultLabelId: input.defaultLabelId ?? null,
+              defaultLabelName: input.defaultLabelName ?? null,
+              isActive: true,
+            })
+            .where(eq(whatchimpSettings.id, existing[0].id));
+        }
       } else {
+        if (input.apiToken === "__KEEP__") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "يجب إدخال API Token" });
+        }
         await db.insert(whatchimpSettings).values({
           apiToken: input.apiToken,
           phoneNumberId: input.phoneNumberId,

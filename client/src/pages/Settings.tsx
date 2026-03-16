@@ -1672,12 +1672,26 @@ function WhatchimpSettingsTab() {
               اختبار الاتصال
             </Button>
             <Button
-              onClick={() => saveMutation.mutate({
-                apiToken: apiToken || (settings?.apiToken ?? ""),
-                phoneNumberId: phoneNumberId || settings?.phoneNumberId || "",
-                defaultLabelId: selectedLabelId ?? settings?.defaultLabelId ?? undefined,
-                defaultLabelName: selectedLabelName || settings?.defaultLabelName || undefined,
-              })}
+              onClick={() => {
+                // Only send apiToken if user typed a new one
+                // Never send the masked version (settings?.apiToken) back to the server
+                if (!apiToken && settings) {
+                  // Update only label/phoneNumberId without touching the stored token
+                  saveMutation.mutate({
+                    apiToken: "__KEEP__",
+                    phoneNumberId: phoneNumberId || settings.phoneNumberId || "",
+                    defaultLabelId: selectedLabelId ?? settings?.defaultLabelId ?? undefined,
+                    defaultLabelName: selectedLabelName || settings?.defaultLabelName || undefined,
+                  });
+                } else {
+                  saveMutation.mutate({
+                    apiToken: apiToken,
+                    phoneNumberId: phoneNumberId || settings?.phoneNumberId || "",
+                    defaultLabelId: selectedLabelId ?? settings?.defaultLabelId ?? undefined,
+                    defaultLabelName: selectedLabelName || settings?.defaultLabelName || undefined,
+                  });
+                }
+              }}
               disabled={saveMutation.isPending || (!apiToken && !settings)}
             >
               {saveMutation.isPending ? <RefreshCw className="w-4 h-4 ml-2 animate-spin" /> : <Save className="w-4 h-4 ml-2" />}
