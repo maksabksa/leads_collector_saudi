@@ -19,21 +19,23 @@ import MissingFieldsPanel from "@/components/leads/MissingFieldsPanel";
 import AuditSummaryCard from "@/components/leads/AuditSummaryCard";
 import SalesBriefCard, { type SalesBriefResult } from "@/components/leads/SalesBriefCard";
 
-function ScoreBar({ label, value, color }: { label: string; value: number | null | undefined; color: string }) {
-  if (!value) return null;
+function ScoreBar({ label, value, color }: { label: string; value: number | string | null | undefined; color: string }) {
+  const numValue = value !== null && value !== undefined ? Number(value) : null;
+  if (numValue === null || isNaN(numValue)) return null;
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs text-muted-foreground w-32 flex-shrink-0">{label}</span>
       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "oklch(0.18 0.02 240)" }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(value / 10) * 100}%`, background: color }} />
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(numValue / 10) * 100}%`, background: color }} />
       </div>
-      <span className="text-xs font-bold w-8 text-right" style={{ color }}>{value.toFixed(1)}</span>
+      <span className="text-xs font-bold w-8 text-right" style={{ color }}>{numValue.toFixed(1)}</span>
     </div>
   );
 }
 
-function ScoreCircle({ value, label }: { value: number | null | undefined; label: string }) {
-  if (!value) return (
+function ScoreCircle({ value, label }: { value: number | string | null | undefined; label: string }) {
+  const numValue = value !== null && value !== undefined ? Number(value) : null;
+  if (numValue === null || isNaN(numValue) || numValue === 0) return (
     <div className="flex flex-col items-center gap-1">
       <div className="w-14 h-14 rounded-full border-2 border-border flex items-center justify-center">
         <span className="text-xs text-muted-foreground">—</span>
@@ -41,11 +43,11 @@ function ScoreCircle({ value, label }: { value: number | null | undefined; label
       <span className="text-xs text-muted-foreground text-center">{label}</span>
     </div>
   );
-  const color = value >= 7 ? "oklch(0.65 0.18 145)" : value >= 5 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)";
+  const color = numValue >= 7 ? "oklch(0.65 0.18 145)" : numValue >= 5 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)";
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="w-14 h-14 rounded-full flex items-center justify-center border-2 font-bold text-lg" style={{ borderColor: color, color }}>
-        {value.toFixed(0)}
+        {numValue.toFixed(0)}
       </div>
       <span className="text-xs text-muted-foreground text-center">{label}</span>
     </div>
