@@ -1893,3 +1893,14 @@
 - [ ] إضافة seedFromRaw procedure في leadIntelligence.ts
 - [ ] كتابة اختبارات PHASE 2 تغطي: wrapper + deduplication + fallback
 - [ ] حفظ checkpoint بعد اكتمال PHASE 2
+
+## PHASE 5 — Opportunity Extraction + Lead Scoring + Priority Labeling
+
+- [x] بناء server/scoring/opportunityEngine.ts (8 قواعد فرص بأدلة تجارية صريحة)
+- [x] بناء server/scoring/leadScorer.ts (6 dimensions، صيغة رياضية ثابتة)
+- [x] بناء server/scoring/priorityLabeler.ts (A/B→high، C→medium، D→low، guard للـ approved)
+- [x] بناء server/scoring/index.ts orchestrator (manual trigger فقط، non-blocking)
+- [x] إضافة scoreLeadById procedure في server/routers/leadIntelligence.ts
+- [x] كتابة 42 اختبار Vitest في server/scoring/phase5.scoring.test.ts (جميعها تمر)
+- [x] التحقق من TypeScript: 0 errors
+- [x] التحقق من جميع الاختبارات: 427 اختبار تمر (385 سابقة + 42 جديدة)

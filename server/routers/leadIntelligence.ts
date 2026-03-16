@@ -427,6 +427,31 @@ const leadIntelligenceRouter = router({
     }),
 
   /**
+   * scoreLeadById — PHASE 5
+   * Manual trigger for the scoring pipeline.
+   * Runs: AuditEngine → MissingFields → Readiness → OpportunityEngine → LeadScorer → PriorityLabeler.
+   * Returns structured result with per-step observability.
+   * NOT auto-wired into enrichment — manual trigger only.
+   */
+  scoreLeadById: protectedProcedure
+    .input(z.object({ leadId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const { runScoringPipeline } = await import("../scoring/index.js");
+      const result = await runScoringPipeline(input.leadId);
+      return {
+        success: result.success,
+        leadId: result.leadId,
+        score: result.score,
+        opportunities: result.opportunities,
+        readinessState: result.readinessState,
+        dbUpdated: result.dbUpdated,
+        dbSkipReason: result.dbSkipReason,
+        completedSteps: result.completedSteps,
+        failedSteps: result.failedSteps,
+      };
+    }),
+
+  /**
    * enrichLeadById — PHASE 4
    * Manual trigger for enrichment pipeline.
    * Runs Gate → Website → Social → Audit → Readiness Recompute.
