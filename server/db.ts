@@ -431,6 +431,19 @@ export async function createLeadWithResolution(data: InsertLead): Promise<number
     }).catch((importErr: unknown) => {
       console.error(`[AUTOFILL] import_failed lead_id=${id}: ${importErr instanceof Error ? importErr.message : String(importErr)}`);
     });
+    // PHASE 4 — enrichment pipeline (gated, non-blocking)
+    import("./enrichment/index.js").then(({ runEnrichmentPipeline }) => {
+      getLeadById(id).then(lead => {
+        if (!lead) return;
+        runEnrichmentPipeline(lead).then(r => {
+          console.log(`[ENRICHMENT] lead_id=${id} gate=${r.gateResult} website=${r.websiteEnriched} social=${r.socialEnriched} errors=${r.errors.length}`);
+        }).catch((e: unknown) => {
+          console.error(`[ENRICHMENT] lead_id=${id} failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
+      });
+    }).catch((importErr: unknown) => {
+      console.error(`[ENRICHMENT] import_failed lead_id=${id}: ${importErr instanceof Error ? importErr.message : String(importErr)}`);
+    });
     return id;
   } catch (err) {
     console.error(`[PHASE2] resolution_failed — fallback to createLead. Error: ${err instanceof Error ? err.message : String(err)}`);

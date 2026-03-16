@@ -425,6 +425,42 @@ const leadIntelligenceRouter = router({
       });
       return { id, source: source || 'unknown' };
     }),
+
+  /**
+   * enrichLeadById — PHASE 4
+   * Manual trigger for enrichment pipeline.
+   * Runs Gate → Website → Social → Audit → Readiness Recompute.
+   * Returns structured result with per-step observability.
+   */
+  enrichLeadById: protectedProcedure
+    .input(z.object({ leadId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const { getLeadById } = await import("../db.js");
+      const { runEnrichmentPipeline } = await import("../enrichment/index.js");
+
+      const lead = await getLeadById(input.leadId);
+      if (!lead) {
+        return {
+          success: false,
+          reason: "lead_not_found",
+          leadId: input.leadId,
+        };
+      }
+
+      const result = await runEnrichmentPipeline(lead);
+      return {
+        success: true,
+        leadId: input.leadId,
+        gateResult: result.gateResult,
+        gateReason: result.gateReason,
+        websiteEnriched: result.websiteEnriched,
+        socialEnriched: result.socialEnriched,
+        platformsEnriched: result.platformsEnriched,
+        auditCompleted: result.auditCompleted,
+        readinessRecomputed: result.readinessRecomputed,
+        errors: result.errors,
+      };
+    }),
 });
 // ────────────────────────────────────────────────────────────────────────────────
 // TODO PHASE 3 — resolveAndSave: multi-source resolution before insertion
