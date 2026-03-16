@@ -11,6 +11,13 @@ import {
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import WhatchimpSendButton from "@/components/WhatchimpSendButton";
+// PHASE 6B — Scoring & Sales Brief components
+import ScoreCard from "@/components/leads/ScoreCard";
+import OpportunityList from "@/components/leads/OpportunityList";
+import ReadinessIndicator from "@/components/leads/ReadinessIndicator";
+import MissingFieldsPanel from "@/components/leads/MissingFieldsPanel";
+import AuditSummaryCard from "@/components/leads/AuditSummaryCard";
+import SalesBriefCard, { type SalesBriefResult } from "@/components/leads/SalesBriefCard";
 
 function ScoreBar({ label, value, color }: { label: string; value: number | null | undefined; color: string }) {
   if (!value) return null;
@@ -95,6 +102,33 @@ export default function LeadDetail() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   // نافذة تأكيد اكتمال البيانات
   const [showDataConfirmModal, setShowDataConfirmModal] = useState(false);
+  // PHASE 6B — Scoring & Sales Brief state (owned by LeadDetail, passed down as props)
+  const [scoreResult, setScoreResult] = useState<any>(null);
+  const [briefResult, setBriefResult] = useState<SalesBriefResult | null>(null);
+  const [isScoring, setIsScoring] = useState(false);
+  const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
+  const scoreLeadMutation = trpc.leadIntelligence.scoreLeadById.useMutation({
+    onSuccess: (result) => {
+      setScoreResult(result);
+      setIsScoring(false);
+    },
+    onError: () => setIsScoring(false),
+  });
+  const generateBriefMutation = trpc.leadIntelligence.generateSalesBrief.useMutation({
+    onSuccess: (result) => {
+      setBriefResult(result as SalesBriefResult);
+      setIsGeneratingBrief(false);
+    },
+    onError: () => setIsGeneratingBrief(false),
+  });
+  const handleRunScore = () => {
+    setIsScoring(true);
+    scoreLeadMutation.mutate({ leadId: id });
+  };
+  const handleGenerateBrief = () => {
+    setIsGeneratingBrief(true);
+    generateBriefMutation.mutate({ leadId: id });
+  };
   const getReportHtml = trpc.report.getHtml.useMutation();
   const generatePDF = trpc.report.generatePDF.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
@@ -1770,6 +1804,57 @@ export default function LeadDetail() {
               </button>
             </div>
           )}
+
+          {/* ===== PHASE 6B: التقييم والمبيعات ===== */}
+          <div className="rounded-2xl border border-border overflow-hidden" style={{ background: "oklch(0.10 0.015 240)" }}>
+            {/* Section header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+              <h3 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+                <span style={{ color: "oklch(0.65 0.18 200)" }}>◈</span>
+                التقييم والمبيعات
+              </h3>
+              <span className="text-xs text-muted-foreground opacity-50">PHASE 6</span>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Row 1: Readiness + Missing Fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <ReadinessIndicator
+                  analysisReadyFlag={lead.analysisReadyFlag}
+                  partialAnalysisFlag={lead.partialAnalysisFlag}
+                  analysisConfidenceScore={lead.analysisConfidenceScore}
+                />
+                <MissingFieldsPanel
+                  missingDataFlags={lead.missingDataFlags as string[] | null | undefined}
+                />
+              </div>
+
+              {/* Row 2: ScoreCard (full width) */}
+              <ScoreCard
+                scoreResult={scoreResult}
+                isScoring={isScoring}
+                onRunScore={handleRunScore}
+              />
+
+              {/* Row 3: OpportunityList (full width, only if score exists) */}
+              {scoreResult?.opportunities && scoreResult.opportunities.length > 0 && (
+                <OpportunityList opportunities={scoreResult.opportunities} />
+              )}
+
+              {/* Row 4: AuditSummaryCard */}
+              <AuditSummaryCard lead={lead} />
+
+              {/* Row 5: SalesBriefCard (full width) */}
+              <SalesBriefCard
+                briefResult={briefResult}
+                isGenerating={isGeneratingBrief}
+                scoreResult={scoreResult}
+                onGenerateBrief={handleGenerateBrief}
+              />
+            </div>
+          </div>
+          {/* ===== END PHASE 6B ===== */}
+
         </div>
       </div>
     </div>
