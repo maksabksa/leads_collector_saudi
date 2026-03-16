@@ -34,10 +34,102 @@ async function whatchimpPost(
   return res.json();
 }
 
+// ─── Lead type with all fields for Whatchimp ────────────────────────────────
+type LeadForWhatchimp = {
+  id: number;
+  companyName: string;
+  verifiedPhone: string | null;
+  businessType?: string | null;
+  city?: string | null;
+  country?: string | null;
+  district?: string | null;
+  website?: string | null;
+  googleMapsUrl?: string | null;
+  instagramUrl?: string | null;
+  twitterUrl?: string | null;
+  snapchatUrl?: string | null;
+  tiktokUrl?: string | null;
+  facebookUrl?: string | null;
+  reviewCount?: number | null;
+  leadPriorityScore?: number | null;
+  biggestMarketingGap?: string | null;
+  suggestedSalesEntryAngle?: string | null;
+  stage?: string | null;
+  priority?: string | null;
+  notes?: string | null;
+  crNumber?: string | null;
+  socialSince?: string | null;
+};
+
+// ─── Build custom fields object for Whatchimp ─────────────────────────────────
+function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
+  const fields: Record<string, string> = {};
+
+  // نوع النشاط التجاري
+  if (lead.businessType) fields["نوع النشاط"] = lead.businessType;
+
+  // الموقع الجغرافي
+  const locationParts = [lead.city, lead.district].filter(Boolean);
+  if (locationParts.length) fields["المدينة والحي"] = locationParts.join(" - ");
+
+  // الدولة
+  if (lead.country) fields["الدولة"] = lead.country === "SA" ? "المملكة العربية السعودية" : lead.country;
+
+  // الموقع الإلكتروني
+  if (lead.website) fields["الموقع الإلكتروني"] = lead.website;
+
+  // روابط السوشيال ميديا
+  if (lead.instagramUrl) fields["إنستجرام"] = lead.instagramUrl;
+  if (lead.twitterUrl) fields["تويتر / X"] = lead.twitterUrl;
+  if (lead.snapchatUrl) fields["سناب شات"] = lead.snapchatUrl;
+  if (lead.tiktokUrl) fields["تيك توك"] = lead.tiktokUrl;
+  if (lead.facebookUrl) fields["فيسبوك"] = lead.facebookUrl;
+
+  // رابط خرائط جوجل
+  if (lead.googleMapsUrl) fields["خرائط جوجل"] = lead.googleMapsUrl;
+
+  // عدد التقييمات
+  if (lead.reviewCount != null && lead.reviewCount > 0) fields["عدد التقييمات"] = String(lead.reviewCount);
+
+  // درجة الأولوية
+  if (lead.leadPriorityScore != null) fields["درجة الأولوية"] = String(lead.leadPriorityScore) + " / 100";
+
+  // أكبر ثغرة تسويقية
+  if (lead.biggestMarketingGap) fields["أكبر ثغرة تسويقية"] = lead.biggestMarketingGap;
+
+  // زاوية الدخول البيعية
+  if (lead.suggestedSalesEntryAngle) fields["زاوية الدخول البيعية"] = lead.suggestedSalesEntryAngle;
+
+  // مرحلة العميل
+  const stageMap: Record<string, string> = {
+    new: "جديد", contacted: "تم التواصل", interested: "مهتم",
+    proposal: "عرض مقدم", won: "تم الإغلاق", lost: "خسرنا",
+  };
+  if (lead.stage) fields["مرحلة العميل"] = stageMap[lead.stage] ?? lead.stage;
+
+  // الأولوية
+  const priorityMap: Record<string, string> = { high: "عالية", medium: "متوسطة", low: "منخفضة" };
+  if (lead.priority) fields["الأولوية"] = priorityMap[lead.priority] ?? lead.priority;
+
+  // رقم السجل التجاري
+  if (lead.crNumber) fields["السجل التجاري"] = lead.crNumber;
+
+  // تاريخ الظهور على السوشيال
+  if (lead.socialSince) fields["تاريخ الظهور على السوشيال"] = lead.socialSince;
+
+  // ملاحظات
+  if (lead.notes) fields["ملاحظات"] = lead.notes;
+
+  // مصدر البيانات
+  fields["مصدر البيانات"] = "نظام مكسب - مجمع البيانات";
+
+  return fields;
+}
+
 // ─── Send one lead to Whatchimp ───────────────────────────────────────────────
 async function sendLeadToWhatchimp(
   settings: typeof whatchimpSettings.$inferSelect,
-  lead: { id: number; companyName: string; verifiedPhone: string | null },
+  lead: LeadForWhatchimp,
   batchId?: string,
   userId?: number
 ): Promise<{ success: boolean; phone: string; waMessageId?: string; error?: string }> {
@@ -71,7 +163,20 @@ async function sendLeadToWhatchimp(
       name: lead.companyName,
     });
 
-    // 2. Assign label if configured (non-fatal)
+    // 2. Assign custom fields with lead data (non-fatal)
+    try {
+      const customFields = buildCustomFields(lead);
+      if (Object.keys(customFields).length > 0) {
+        await whatchimpPost("/whatsapp/subscriber/chat/assign-custom-fields", {
+          apiToken: settings.apiToken,
+          phone_number_id: settings.phoneNumberId,
+          phone_number: phone,
+          custom_fields: JSON.stringify(customFields),
+        });
+      }
+    } catch { /* non-fatal */ }
+
+    // 3. Assign label if configured (non-fatal)
     if (settings.defaultLabelId) {
       try {
         await whatchimpPost("/whatsapp/subscriber/chat/assign-labels", {
@@ -83,7 +188,7 @@ async function sendLeadToWhatchimp(
       } catch { /* non-fatal */ }
     }
 
-    // 3. Add note with lead info (non-fatal)
+    // 4. Add note with lead info (non-fatal)
     try {
       await whatchimpPost("/whatsapp/subscriber/chat/add-notes", {
         apiToken: settings.apiToken,
@@ -241,6 +346,26 @@ export const whatchimpRouter = router({
         id: leads.id,
         companyName: leads.companyName,
         verifiedPhone: leads.verifiedPhone,
+        businessType: leads.businessType,
+        city: leads.city,
+        country: leads.country,
+        district: leads.district,
+        website: leads.website,
+        googleMapsUrl: leads.googleMapsUrl,
+        instagramUrl: leads.instagramUrl,
+        twitterUrl: leads.twitterUrl,
+        snapchatUrl: leads.snapchatUrl,
+        tiktokUrl: leads.tiktokUrl,
+        facebookUrl: leads.facebookUrl,
+        reviewCount: leads.reviewCount,
+        leadPriorityScore: leads.leadPriorityScore,
+        biggestMarketingGap: leads.biggestMarketingGap,
+        suggestedSalesEntryAngle: leads.suggestedSalesEntryAngle,
+        stage: leads.stage,
+        priority: leads.priority,
+        notes: leads.notes,
+        crNumber: leads.crNumber,
+        socialSince: leads.socialSince,
       }).from(leads).where(eq(leads.id, input.leadId)).limit(1);
 
       if (!leadRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
@@ -266,6 +391,26 @@ export const whatchimpRouter = router({
         id: leads.id,
         companyName: leads.companyName,
         verifiedPhone: leads.verifiedPhone,
+        businessType: leads.businessType,
+        city: leads.city,
+        country: leads.country,
+        district: leads.district,
+        website: leads.website,
+        googleMapsUrl: leads.googleMapsUrl,
+        instagramUrl: leads.instagramUrl,
+        twitterUrl: leads.twitterUrl,
+        snapchatUrl: leads.snapchatUrl,
+        tiktokUrl: leads.tiktokUrl,
+        facebookUrl: leads.facebookUrl,
+        reviewCount: leads.reviewCount,
+        leadPriorityScore: leads.leadPriorityScore,
+        biggestMarketingGap: leads.biggestMarketingGap,
+        suggestedSalesEntryAngle: leads.suggestedSalesEntryAngle,
+        stage: leads.stage,
+        priority: leads.priority,
+        notes: leads.notes,
+        crNumber: leads.crNumber,
+        socialSince: leads.socialSince,
       }).from(leads).where(inArray(leads.id, input.leadIds));
 
       let success = 0, failed = 0, skipped = 0;
