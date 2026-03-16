@@ -1918,3 +1918,6 @@
 - [x] server/routers/whatchimp.ts — تعديل sendTemplateMessage لقبول pdfUrl اختياري وإرساله كـ document header
 - [x] client/src/components/WhatchimpSendButton.tsx — إضافة خيار "إرفاق تقرير PDF" في Template Dialog مع توليد PDF أولاً
 - [x] client/src/pages/LeadDetail.tsx — auto-fallback لـ Template Dialog عند خطأ 24 ساعة بدلاً من toast error
+
+## Auto-fallback 24h Window Error Fix
+- [x] WhatchimpSendButton.tsx — اصطياد خطأ "24 hour window" في sendLead وفتح Template Dialog تلقائياً

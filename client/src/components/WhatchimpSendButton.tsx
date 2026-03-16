@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -43,6 +43,17 @@ export default function WhatchimpSendButton({
   const [showTemplateDialog, setShowTemplateDialog] = useState(
     autoOpenTemplate ?? false
   );
+  // تتبع سبب فتح Dialog — لعرض تنبيه 24 ساعة سواء جاء من prop أو من sendMutation error
+  const [openedDue24h, setOpenedDue24h] = useState(autoOpenTemplate ?? false);
+
+  // مزامنة autoOpenTemplate — إذا تغيّر من false إلى true نفتح الـ Dialog
+  useEffect(() => {
+    if (autoOpenTemplate) {
+      setShowTemplateDialog(true);
+      setOpenedDue24h(true);
+    }
+  }, [autoOpenTemplate]);
+
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [attachPdf, setAttachPdf] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -122,7 +133,22 @@ export default function WhatchimpSendButton({
         toast.error(res.error || "فشل الإرسال");
       }
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      // اصطياد خطأ نافذة 24 ساعة — فتح Template Dialog تلقائياً
+      const msg = e.message ?? "";
+      if (
+        msg.includes("24 hour") ||
+        msg.includes("outside 24") ||
+        msg.includes("template message") ||
+        msg.includes("window is not allowed")
+      ) {
+        setOpenedDue24h(true);
+        setShowTemplateDialog(true);
+        // لا نعرض toast error — سيظهر التنبيه داخل Dialog
+      } else {
+        toast.error(e.message);
+      }
+    },
   });
 
   if (!configured?.configured) {
@@ -231,7 +257,10 @@ export default function WhatchimpSendButton({
         open={showTemplateDialog}
         onOpenChange={(open) => {
           setShowTemplateDialog(open);
-          if (!open) onAutoOpenHandled?.();
+          if (!open) {
+            setOpenedDue24h(false);
+            onAutoOpenHandled?.();
+          }
         }}
       >
         <DialogContent className="max-w-md" dir="rtl">
@@ -244,7 +273,7 @@ export default function WhatchimpSendButton({
 
           <div className="space-y-4 py-2">
             {/* تنبيه نافذة 24 ساعة */}
-            {autoOpenTemplate && (
+            {openedDue24h && (
               <div
                 className="flex items-start gap-2 text-xs p-3 rounded-lg"
                 style={{
