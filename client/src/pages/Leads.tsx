@@ -36,7 +36,8 @@ export default function Leads() {
   const [filterWhatsapp, setFilterWhatsapp] = useState<"" | "yes" | "no" | "unknown">("")
   const [filterStage, setFilterStage] = useState("")
   const [filterPriority, setFilterPriority] = useState("");
-  const [filterSentToWhatchimp, setFilterSentToWhatchimp] = useState<"" | "yes" | "no">("");
+  const [filterSentToWhatchimp, setFilterSentToWhatchimp] = useState<"" | "yes" | "no">("")
+  const [filterContactedWhatchimp, setFilterContactedWhatchimp] = useState<"" | "sent" | "not_sent">("");
   const [showSegmentDialog, setShowSegmentDialog] = useState(false);
   const [targetSegmentId, setTargetSegmentId] = useState<string>("");
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
@@ -74,9 +75,16 @@ export default function Leads() {
   })();
 
   // تطبيق فلتر stage الإضافي داخل التبويب
-  const filteredLeads = filterStage
-    ? leads.filter(l => (l as any).stage === filterStage)
-    : leads;
+  const filteredLeads = (() => {
+    let result = filterStage ? leads.filter(l => (l as any).stage === filterStage) : leads;
+    // فلتر Whatchimp في تبويب "تم التواصل"
+    if (activeListTab === "contacted" && filterContactedWhatchimp === "sent") {
+      result = result.filter(l => (l as any).sentToWhatchimp === true);
+    } else if (activeListTab === "contacted" && filterContactedWhatchimp === "not_sent") {
+      result = result.filter(l => !(l as any).sentToWhatchimp);
+    }
+    return result;
+  })();
 
   const { data: zones } = trpc.zones.list.useQuery();
   const { data: segmentsList } = trpc.segments.list.useQuery();
@@ -313,7 +321,7 @@ export default function Leads() {
           </span>
         </button>
         <button
-          onClick={() => { setActiveListTab("contacted"); setSelectedIds(new Set()); setFilterStage(""); }}
+          onClick={() => { setActiveListTab("contacted"); setSelectedIds(new Set()); setFilterStage(""); setFilterContactedWhatchimp(""); }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
           style={activeListTab === "contacted"
             ? { background: "oklch(0.65 0.18 145)", color: "white" }
@@ -433,9 +441,22 @@ export default function Leads() {
                 className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
                 <option value="">الكل</option>
                 <option value="yes">📤 أُرسل إلى Whatchimp</option>
-                <option value="no">📭 لم يُرسَل بعد</option>
+                <option value="no">💭 لم يُرسَل بعد</option>
               </select>
             </div>
+            {/* فلتر Whatchimp الخاص بتبويب "تم التواصل" */}
+            {activeListTab === "contacted" && (
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">رد على Whatchimp</label>
+                <select value={filterContactedWhatchimp} onChange={e => setFilterContactedWhatchimp(e.target.value as "" | "sent" | "not_sent")}
+                  className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none"
+                  style={{ borderColor: filterContactedWhatchimp ? "oklch(0.55 0.2 145 / 0.5)" : undefined }}>
+                  <option value="">الكل</option>
+                  <option value="sent">📤 أُرسل لـ Whatchimp</option>
+                  <option value="not_sent">⏳ لم يُرسَل لـ Whatchimp</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -528,6 +549,17 @@ export default function Leads() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-medium text-foreground truncate">{lead.companyName}</p>
+                        {(lead as any).sentToWhatchimp && (
+                          <span
+                            title="تم الإرسال لـ Whatchimp"
+                            className="flex-shrink-0 cursor-help inline-flex items-center justify-center w-4 h-4 rounded-full"
+                            style={{ background: "oklch(0.45 0.18 145 / 0.2)", color: "oklch(0.65 0.18 145)" }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                              <path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                            </svg>
+                          </span>
+                        )}
                         {(!lead.businessType || !lead.city) && (
                           <span
                             title={[

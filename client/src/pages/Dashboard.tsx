@@ -10,7 +10,7 @@ import {
 import {
   Users, MapPin, TrendingUp, Clock, Plus, ArrowLeft, CheckCircle2,
   MessageSquare, Zap, Activity, Target, Phone, Globe, Star,
-  RefreshCw, ChevronRight
+  RefreshCw, ChevronRight, Send
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const { data: leads, isLoading: leadsLoading } = trpc.leads.list.useQuery({});
   const { data: dmStats } = trpc.digitalMarketing.getOverviewStats.useQuery();
   const { data: dailyMsgs } = trpc.digitalMarketing.getDailyMessageStats.useQuery();
+  const { data: whatchimpStats } = trpc.whatchimp.getWeeklyStats.useQuery();
   const seedZones = trpc.zones.seed.useMutation();
   const utils = trpc.useUtils();
 
@@ -57,7 +58,7 @@ export default function Dashboard() {
       </div>
 
       {/* بطاقات الإحصاء */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           {
             label: "إجمالي العملاء",
@@ -94,6 +95,21 @@ export default function Dashboard() {
             color: "text-purple-400",
             bg: "bg-purple-500/10",
             path: "/zones",
+          },
+          {
+            label: "أُرسل لـ Whatchimp",
+            value: whatchimpStats ? String(whatchimpStats.thisWeek) : "...",
+            sub: whatchimpStats
+              ? whatchimpStats.growth > 0
+                ? `↑ ${whatchimpStats.growth}% عن الأسبوع الماضي`
+                : whatchimpStats.growth < 0
+                ? `↓ ${Math.abs(whatchimpStats.growth)}% عن الأسبوع الماضي`
+                : `إجمالي: ${whatchimpStats.total} عميل`
+              : "هذا الأسبوع",
+            icon: Send,
+            color: "text-emerald-400",
+            bg: "bg-emerald-500/10",
+            path: "/leads",
           },
         ].map((stat, i) => (
           <Card

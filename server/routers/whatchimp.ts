@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { whatchimpSettings, whatchimpSendLog, leads } from "../../drizzle/schema";
-import { eq, inArray, and, desc } from "drizzle-orm";
+import { eq, inArray, and, desc, gte, lt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 const WHATCHIMP_BASE = "https://app.whatchimp.com/api/v1";
@@ -447,11 +447,48 @@ export const whatchimpRouter = router({
         .limit(input.limit);
     }),
 
-  // ── Check if settings exist (for UI) ─────────────────────────────────────
+  // ── Check if settings exist (for UI) ─────────────────────────────────────────────────────
   isConfigured: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const rows = await db.select({ id: whatchimpSettings.id }).from(whatchimpSettings).where(eq(whatchimpSettings.isActive, true)).limit(1);
     return { configured: rows.length > 0 };
+  }),
+
+  // ── Weekly send stats for dashboard ─────────────────────────────────────────────────────
+  getWeeklyStats: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    const now = new Date();
+    const startOfThisWeek = new Date(now);
+    startOfThisWeek.setDate(now.getDate() - now.getDay());
+    startOfThisWeek.setHours(0, 0, 0, 0);
+
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+    const [thisWeekRows, lastWeekRows, totalRows] = await Promise.all([
+      db.select({ count: sql<number>`count(DISTINCT lead_id)` })
+        .from(whatchimpSendLog)
+        .where(and(eq(whatchimpSendLog.status, "success"), gte(whatchimpSendLog.sentAt, startOfThisWeek))),
+      db.select({ count: sql<number>`count(DISTINCT lead_id)` })
+        .from(whatchimpSendLog)
+        .where(and(
+          eq(whatchimpSendLog.status, "success"),
+          gte(whatchimpSendLog.sentAt, startOfLastWeek),
+          lt(whatchimpSendLog.sentAt, startOfThisWeek)
+        )),
+      db.select({ count: sql<number>`count(DISTINCT lead_id)` })
+        .from(whatchimpSendLog)
+        .where(eq(whatchimpSendLog.status, "success")),
+    ]);
+
+    const thisWeek = Number(thisWeekRows[0]?.count ?? 0);
+    const lastWeek = Number(lastWeekRows[0]?.count ?? 0);
+    const total = Number(totalRows[0]?.count ?? 0);
+    const growth = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0);
+
+    return { thisWeek, lastWeek, total, growth };
   }),
 });

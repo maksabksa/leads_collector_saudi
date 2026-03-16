@@ -132,7 +132,7 @@ export async function getAllLeads(filters?: {
   priority?: string;
   ownerUserId?: number;
   sentToWhatchimp?: "yes" | "no";
-}): Promise<Lead[]> {
+}): Promise<(Lead & { sentToWhatchimp: boolean })[]> {
   const db = await getDb();
   if (!db) return [];
   const conditions = [];
@@ -165,10 +165,18 @@ export async function getAllLeads(filters?: {
       conditions.push(sql`${leads.id} NOT IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
     }
   }
-  const query = conditions.length > 0
-    ? db.select().from(leads).where(and(...conditions)).orderBy(desc(leads.createdAt))
-    : db.select().from(leads).orderBy(desc(leads.createdAt));
-  return query;
+  const baseLeads = conditions.length > 0
+    ? await db.select().from(leads).where(and(...conditions)).orderBy(desc(leads.createdAt))
+    : await db.select().from(leads).orderBy(desc(leads.createdAt));
+
+  // جلب معرّفات العملاء المُرسَلين لـ Whatchimp
+  const sentRows = await db
+    .selectDistinct({ leadId: whatchimpSendLog.leadId })
+    .from(whatchimpSendLog)
+    .where(eq(whatchimpSendLog.status, "success"));
+  const sentSet = new Set(sentRows.map(r => r.leadId));
+
+  return baseLeads.map(lead => ({ ...lead, sentToWhatchimp: sentSet.has(lead.id) }));
 }
 
 export async function getLeadById(id: number): Promise<Lead | undefined> {
