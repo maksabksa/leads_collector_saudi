@@ -1870,3 +1870,8 @@
 - [x] فلتر "تم الإرسال لـ Whatchimp" في قائمة العمل- [x] بادج Whatchimp في بطاقة العميل بقائمة العملاءs.tsx
 - [x] فلتر Whatchimp في تبويب "تم التواصل"
 - [x] إحصائية Whatchimp في لوحة التحكم
+- [ ] إضافة procedure getTemplates في whatchimp router
+- [ ] إضافة procedure sendTemplateMessage (فردي) في whatchimp router
+- [ ] إضافة procedure bulkSendTemplate (جماعي) في whatchimp router
+- [ ] إضافة زر إرسال template فردي في صفحة تفاصيل العميل
+- [ ] إضافة زر إرسال template جماعي في شريط الإجراءات الجماعية

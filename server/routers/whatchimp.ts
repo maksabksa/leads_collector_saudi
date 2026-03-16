@@ -1,9 +1,9 @@
-import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { whatchimpSettings, whatchimpSendLog, leads } from "../../drizzle/schema";
 import { eq, inArray, and, desc, gte, lt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 const WHATCHIMP_BASE = "https://app.whatchimp.com/api/v1";
 
@@ -491,4 +491,133 @@ export const whatchimpRouter = router({
 
     return { thisWeek, lastWeek, total, growth };
   }),
+
+  // ── Get Templates List ─────────────────────────────────────────────────────
+  getTemplates: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const settings = await db.select().from(whatchimpSettings).where(eq(whatchimpSettings.isActive, true)).limit(1);
+    if (!settings[0]) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Whatchimp غير مربوط" });
+    const { apiToken, phoneNumberId } = settings[0];
+    const data = await whatchimpPost("/whatsapp/template/list", { apiToken, phone_number_id: phoneNumberId });
+    const templates = Array.isArray(data.message) ? data.message : [];
+    return templates.map((t: Record<string, unknown>) => {
+      let rawName = "";
+      let rawCategory = "";
+      let language = "ar";
+      try {
+        const raw = JSON.parse((t.raw_data as string) || "{}");
+        rawName = raw.mixed_template_name || "";
+        rawCategory = raw.mixed_template_category || "";
+        language = raw.locale || "ar";
+      } catch {}
+      const vars = t.variable_map ? JSON.parse(t.variable_map as string) : {};
+      const bodyVars: string[] = vars.body ? Object.values(vars.body) : [];
+      return {
+        id: t.id as number,
+        name: rawName || String(t.id),
+        category: rawCategory,
+        status: t.status as string,
+        language,
+        buttonType: t.button_type as string,
+        variables: bodyVars,
+      };
+    });
+  }),
+
+  // ── Send Template Message (single lead) ───────────────────────────────────
+  sendTemplateMessage: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      templateName: z.string(),
+      languageCode: z.string().default("ar"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const settings = await db.select().from(whatchimpSettings).where(eq(whatchimpSettings.isActive, true)).limit(1);
+      if (!settings[0]) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Whatchimp غير مربوط" });
+      const { apiToken, phoneNumberId } = settings[0];
+
+      const leadRows = await db.select().from(leads).where(eq(leads.id, input.leadId)).limit(1);
+      if (!leadRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
+      const lead = leadRows[0];
+      if (!lead.verifiedPhone) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يوجد رقم هاتف للعميل" });
+
+      const phone = normalizePhone(lead.verifiedPhone);
+
+      // Send template message
+      const result = await whatchimpPost("/whatsapp/send", {
+        apiToken,
+        phone_number_id: phoneNumberId,
+        phone_number: phone,
+        template_name: input.templateName,
+        language_code: input.languageCode,
+      });
+
+      const success = String(result.status) === "1";
+
+      // Log the send
+      await db.insert(whatchimpSendLog).values({
+        leadId: input.leadId,
+        phone,
+        leadName: lead.companyName,
+        batchId: `tmpl_${Date.now()}`,
+        status: success ? "success" : "failed",
+        errorMessage: success ? null : String(result.message ?? "فشل الإرسال"),
+      });
+
+      if (!success) throw new TRPCError({ code: "BAD_REQUEST", message: String(result.message ?? "فشل إرسال الرسالة") });
+      return { success: true };
+    }),
+
+  // ── Bulk Send Template Messages ────────────────────────────────────────────
+  bulkSendTemplate: protectedProcedure
+    .input(z.object({
+      leadIds: z.array(z.number()).min(1),
+      templateName: z.string(),
+      languageCode: z.string().default("ar"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const settings = await db.select().from(whatchimpSettings).where(eq(whatchimpSettings.isActive, true)).limit(1);
+      if (!settings[0]) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Whatchimp غير مربوط" });
+      const { apiToken, phoneNumberId } = settings[0];
+
+      const leadRows = await db.select().from(leads).where(inArray(leads.id, input.leadIds));
+      const batchId = `bulk_tmpl_${Date.now()}`;
+      let sent = 0;
+      let skipped = 0;
+
+      for (const lead of leadRows) {
+        if (!lead.verifiedPhone) { skipped++; continue; }
+        const phone = normalizePhone(lead.verifiedPhone);
+        try {
+          const result = await whatchimpPost("/whatsapp/send", {
+            apiToken,
+            phone_number_id: phoneNumberId,
+            phone_number: phone,
+            template_name: input.templateName,
+            language_code: input.languageCode,
+          });
+          const success = String(result.status) === "1";
+          await db.insert(whatchimpSendLog).values({
+            leadId: lead.id,
+            phone,
+            leadName: lead.companyName,
+            batchId,
+            status: success ? "success" : "failed",
+            errorMessage: success ? null : String(result.message ?? "فشل"),
+          });
+          if (success) sent++; else skipped++;
+        } catch {
+          skipped++;
+        }
+        // تأخير بسيط بين الرسائل
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      return { sent, skipped, total: leadRows.length };
+    }),
 });

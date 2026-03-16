@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
-  Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send,
+  Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send, MessageSquare,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -13,6 +13,13 @@ import { COUNTRIES_DATA } from "../../../shared/countries";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
 const statusColors: Record<string, { color: string; bg: string; label: string }> = {
@@ -46,6 +53,8 @@ export default function Leads() {
   const [showWhatchimpMigrateDialog, setShowWhatchimpMigrateDialog] = useState(false);
   const [lastWhatchimpSentIds, setLastWhatchimpSentIds] = useState<number[]>([]);
   const [lastWhatchimpResult, setLastWhatchimpResult] = useState<{ success: number; skipped: number; failed: number } | null>(null);
+  const [showBulkTemplateDialog, setShowBulkTemplateDialog] = useState(false);
+  const [bulkSelectedTemplate, setBulkSelectedTemplate] = useState<string>("");
   // التبويب النشط: "all" = قائمة العملاء الجديدة | "contacted" = تم التواصل
   const [activeListTab, setActiveListTab] = useState<"all" | "contacted">("all");
 
@@ -127,6 +136,20 @@ export default function Leads() {
     },
     onError: (e) => toast.error("فشل التحليل: " + e.message),
   });
+  const bulkSendTemplate = trpc.whatchimp.bulkSendTemplate.useMutation({
+    onSuccess: (res) => {
+      toast.success(`✅ تم إرسال Template لـ ${res.sent} عميل بنجاح (${res.skipped} تم تخطيه)`);
+      setSelectedIds(new Set());
+      setShowBulkTemplateDialog(false);
+      setBulkSelectedTemplate("");
+      utils.leads.list.invalidate();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const { data: bulkTemplates, isLoading: bulkTemplatesLoading } = trpc.whatchimp.getTemplates.useQuery(
+    undefined,
+    { enabled: showBulkTemplateDialog }
+  );
   const bulkSendWhatchimp = trpc.whatchimp.sendBulk.useMutation({
     onSuccess: (res) => {
       const sentIds = Array.from(selectedIds);
@@ -255,15 +278,26 @@ export default function Leads() {
                 إضافة {selectedIds.size} للشريحة
               </button>
               {whatchimpConfigured?.configured && (
-                <button
-                  onClick={() => bulkSendWhatchimp.mutate({ leadIds: Array.from(selectedIds) })}
-                  disabled={bulkSendWhatchimp.isPending}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
-                  style={{ background: "oklch(0.55 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.3)" }}
-                >
-                  {bulkSendWhatchimp.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  {bulkSendWhatchimp.isPending ? "جاري الإرسال..." : `إرسال ${selectedIds.size} لـ Whatchimp`}
-                </button>
+                <>
+                  <button
+                    onClick={() => bulkSendWhatchimp.mutate({ leadIds: Array.from(selectedIds) })}
+                    disabled={bulkSendWhatchimp.isPending}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={{ background: "oklch(0.55 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.3)" }}
+                  >
+                    {bulkSendWhatchimp.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {bulkSendWhatchimp.isPending ? "جاري الإرسال..." : `إرسال ${selectedIds.size} Contact`}
+                  </button>
+                  <button
+                    onClick={() => setShowBulkTemplateDialog(true)}
+                    disabled={bulkSendTemplate.isPending}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={{ background: "oklch(0.55 0.2 250 / 0.15)", color: "oklch(0.65 0.2 250)", border: "1px solid oklch(0.55 0.2 250 / 0.3)" }}
+                  >
+                    {bulkSendTemplate.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+                    {bulkSendTemplate.isPending ? "جاري الإرسال..." : `إرسال Template لـ ${selectedIds.size}`}
+                  </button>
+                </>
               )}
               <button
                 onClick={() => setShowBulkDeleteConfirm(true)}
@@ -835,6 +869,82 @@ export default function Leads() {
                 <><Loader2 className="w-4 h-4 animate-spin ml-2" /> جاري...</>
               ) : (
                 <><ArrowRightLeft className="w-4 h-4 ml-2" /> نعم، رحّلهم لـ "تم التواصل"</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== نافذة إرسال Template جماعي ===== */}
+      <Dialog open={showBulkTemplateDialog} onOpenChange={setShowBulkTemplateDialog}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" style={{ color: "oklch(0.65 0.2 250)" }} />
+              إرسال Template لـ {selectedIds.size} عميل
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              اختر الـ Template المعتمد وسيتم إرساله لجميع العملاء المحددين عبر WhatsApp
+            </p>
+            {bulkTemplatesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                جاري تحميل الـ Templates...
+              </div>
+            ) : (
+              <Select value={bulkSelectedTemplate} onValueChange={setBulkSelectedTemplate}>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر Template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {bulkTemplates?.map((t) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="font-medium">{t.name}</span>
+                        {t.category && (
+                          <span className="text-xs text-muted-foreground">{t.category}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {bulkTemplates?.length === 0 && (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      لا توجد templates معتمدة
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
+            {bulkSelectedTemplate && (
+              <div
+                className="text-xs p-3 rounded-lg"
+                style={{ background: "oklch(0.55 0.2 250 / 0.1)", border: "1px solid oklch(0.55 0.2 250 / 0.2)" }}
+              >
+                <p className="text-muted-foreground">
+                  سيتم إرسال <strong className="text-foreground">{bulkSelectedTemplate}</strong> لـ <strong className="text-foreground">{selectedIds.size}</strong> عميل مع ملء بياناتهم تلقائياً.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setShowBulkTemplateDialog(false); setBulkSelectedTemplate(""); }}>
+              إلغاء
+            </Button>
+            <Button
+              disabled={!bulkSelectedTemplate || bulkSendTemplate.isPending}
+              onClick={() => bulkSendTemplate.mutate({
+                leadIds: Array.from(selectedIds),
+                templateName: bulkSelectedTemplate,
+                languageCode: "ar",
+              })}
+              style={{ background: "oklch(0.55 0.2 250)", color: "white" }}
+            >
+              {bulkSendTemplate.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin ml-1" /> جاري الإرسال...</>
+              ) : (
+                <><MessageSquare className="w-4 h-4 ml-1" /> إرسال لـ {selectedIds.size} عميل</>
               )}
             </Button>
           </DialogFooter>
