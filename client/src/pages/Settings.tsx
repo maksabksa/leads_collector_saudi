@@ -34,7 +34,8 @@ type SettingsTab =
   | "notifications"
   | "security"
   | "account"
-  | "report-style";
+  | "report-style"
+  | "whatchimp";
 
 interface TabConfig {
   id: SettingsTab;
@@ -57,6 +58,7 @@ const TABS: TabConfig[] = [
   { id: "security", label: "الأمان", icon: Shield, description: "الصلاحيات والمستخدمين" },
   { id: "account", label: "الحساب", icon: User, description: "معلومات حسابك الشخصي" },
   { id: "report-style", label: "أسلوب التقارير", icon: FileText, description: "تهيئة طريقة كتابة التقارير والفرص", badge: "جديد" },
+  { id: "whatchimp", label: "Whatchimp", icon: MessageSquare, description: "ربط Whatchimp للإرسال عبر واتساب", badge: "جديد" },
 ];
 
 // ===== مكون بطاقة الإعداد =====
@@ -1564,6 +1566,148 @@ function ReportStyleTab() {
   );
 }
 
+// ===== تبويب Whatchimp =====
+function WhatchimpSettingsTab() {
+  const { data: user } = trpc.auth.me.useQuery();
+  const isAdmin = (user as { role?: string } | null)?.role === "admin";
+
+  const { data: settings, isLoading, refetch } = trpc.whatchimp.getSettings.useQuery(undefined, { enabled: isAdmin });
+  const { data: labelsData } = trpc.whatchimp.getLabels.useQuery(undefined, { enabled: isAdmin && !!settings });
+  const { data: configured } = trpc.whatchimp.isConfigured.useQuery();
+
+  const [apiToken, setApiToken] = useState("");
+  const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [selectedLabelId, setSelectedLabelId] = useState<number | undefined>(undefined);
+  const [selectedLabelName, setSelectedLabelName] = useState("");
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const saveMutation = trpc.whatchimp.saveSettings.useMutation({
+    onSuccess: () => { toast.success("تم حفظ إعدادات Whatchimp بنجاح"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const testMutation = trpc.whatchimp.testConnection.useMutation({
+    onSuccess: (res) => setTestResult(res),
+    onError: (e) => setTestResult({ success: false, message: e.message }),
+  });
+
+  if (!isAdmin) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p>هذه الإعدادات متاحة للأدمن فقط</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* حالة الاتصال */}
+      <SettingCard title="حالة الاتصال" description="حالة ربط Whatchimp بالنظام">
+        <div className="flex items-center gap-3">
+          {configured?.configured ? (
+            <><CheckCircle2 className="w-5 h-5 text-green-500" /><span className="text-green-600 font-medium">متصل ومفعّل</span></>
+          ) : (
+            <><AlertCircle className="w-5 h-5 text-yellow-500" /><span className="text-yellow-600 font-medium">غير مربوط بعد</span></>
+          )}
+        </div>
+      </SettingCard>
+
+      {/* إعدادات الاتصال */}
+      <SettingCard title="إعدادات الاتصال" description="أدخل بيانات حساب Whatchimp">
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1 block">API Token</label>
+            <Input
+              type="password"
+              placeholder={settings ? "••••••••••••••••••••" : "أدخل API Token"}
+              value={apiToken}
+              onChange={(e) => setApiToken(e.target.value)}
+              dir="ltr"
+            />
+            {settings && <p className="text-xs text-muted-foreground mt-1">مخزّن: {settings.apiToken}</p>}
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Phone Number ID</label>
+            <Input
+              placeholder={settings?.phoneNumberId ?? "أدخل Phone Number ID"}
+              value={phoneNumberId}
+              onChange={(e) => setPhoneNumberId(e.target.value)}
+              dir="ltr"
+            />
+          </div>
+
+          {/* اختيار Label */}
+          {labelsData && labelsData.length > 0 && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">التصنيف الافتراضي (اختياري)</label>
+              <select
+                className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                value={selectedLabelId ?? ""}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  const label = labelsData.find(l => l.id === id);
+                  setSelectedLabelId(id || undefined);
+                  setSelectedLabelName(label?.label_name ?? "");
+                }}
+              >
+                <option value="">-- بدون تصنيف --</option>
+                {labelsData.map(l => (
+                  <option key={l.id} value={l.id}>{l.label_name}</option>
+                ))}
+              </select>
+              {settings?.defaultLabelName && (
+                <p className="text-xs text-muted-foreground mt-1">الحالي: {settings.defaultLabelName}</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => testMutation.mutate({ apiToken: apiToken || "", phoneNumberId: phoneNumberId || settings?.phoneNumberId || "" })}
+              disabled={testMutation.isPending || (!apiToken && !settings)}
+            >
+              {testMutation.isPending ? <RefreshCw className="w-4 h-4 ml-2 animate-spin" /> : <TestTube2 className="w-4 h-4 ml-2" />}
+              اختبار الاتصال
+            </Button>
+            <Button
+              onClick={() => saveMutation.mutate({
+                apiToken: apiToken || (settings?.apiToken ?? ""),
+                phoneNumberId: phoneNumberId || settings?.phoneNumberId || "",
+                defaultLabelId: selectedLabelId ?? settings?.defaultLabelId ?? undefined,
+                defaultLabelName: selectedLabelName || settings?.defaultLabelName || undefined,
+              })}
+              disabled={saveMutation.isPending || (!apiToken && !settings)}
+            >
+              {saveMutation.isPending ? <RefreshCw className="w-4 h-4 ml-2 animate-spin" /> : <Save className="w-4 h-4 ml-2" />}
+              حفظ الإعدادات
+            </Button>
+          </div>
+
+          {testResult && (
+            <div className={`flex items-center gap-2 text-sm p-3 rounded-lg ${testResult.success ? "bg-green-50 text-green-700 dark:bg-green-950" : "bg-red-50 text-red-700 dark:bg-red-950"}`}>
+              {testResult.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              {testResult.message}
+            </div>
+          )}
+        </div>
+      </SettingCard>
+
+      {/* معلومات */}
+      <SettingCard title="كيفية الاستخدام" description="خطوات ربط Whatchimp">
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="flex gap-2"><span className="font-bold text-foreground">1.</span> ادخل API Token من إعدادات حساب Whatchimp</div>
+          <div className="flex gap-2"><span className="font-bold text-foreground">2.</span> أدخل Phone Number ID من لوحة Whatchimp</div>
+          <div className="flex gap-2"><span className="font-bold text-foreground">3.</span> اختبر الاتصال ثم احفظ</div>
+          <div className="flex gap-2"><span className="font-bold text-foreground">4.</span> في صفحة العميل ستجد زر "إرسال إلى Whatchimp"</div>
+          <div className="flex gap-2"><span className="font-bold text-foreground">5.</span> في قائمة العملاء يمكنك تحديد عدة عملاء وإرسالهم دفعة واحدة</div>
+        </div>
+      </SettingCard>
+    </div>
+  );
+}
+
 // ===== الصفحة الرئيسية =====
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
@@ -1582,6 +1726,7 @@ export default function Settings() {
       case "security": return <SecurityTab />;
       case "account": return <AccountTab />;
       case "report-style": return <ReportStyleTab />;
+      case "whatchimp": return <WhatchimpSettingsTab />;
       default: return <GeneralTab />;
     }
   };

@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
-  Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users,
+  Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -114,6 +114,14 @@ export default function Leads() {
     },
     onError: (e) => toast.error("فشل التحليل: " + e.message),
   });
+  const bulkSendWhatchimp = trpc.whatchimp.sendBulk.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Whatchimp: تم إرسال ${res.success} عميل، تم تخطي ${res.skipped} (لا يوجد هاتف)`);
+      setSelectedIds(new Set());
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const { data: whatchimpConfigured } = trpc.whatchimp.isConfigured.useQuery();
   const addToSegment = trpc.segments.addLeads.useMutation({
     onSuccess: (data) => {
       toast.success(`تمت إضافة ${data.added} عميل للشريحة`);
@@ -225,6 +233,17 @@ export default function Leads() {
                 <Layers className="w-4 h-4" />
                 إضافة {selectedIds.size} للشريحة
               </button>
+              {whatchimpConfigured?.configured && (
+                <button
+                  onClick={() => bulkSendWhatchimp.mutate({ leadIds: Array.from(selectedIds) })}
+                  disabled={bulkSendWhatchimp.isPending}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: "oklch(0.55 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.3)" }}
+                >
+                  {bulkSendWhatchimp.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {bulkSendWhatchimp.isPending ? "جاري الإرسال..." : `إرسال ${selectedIds.size} لـ Whatchimp`}
+                </button>
+              )}
               <button
                 onClick={() => setShowBulkDeleteConfirm(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"

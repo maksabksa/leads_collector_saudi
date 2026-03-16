@@ -1421,3 +1421,33 @@ export const reportStyleSettings = mysqlTable("report_style_settings", {
 });
 export type ReportStyleSettings = typeof reportStyleSettings.$inferSelect;
 export type InsertReportStyleSettings = typeof reportStyleSettings.$inferInsert;
+
+// ===== WHATCHIMP INTEGRATION SETTINGS =====
+export const whatchimpSettings = mysqlTable("whatchimp_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  apiToken: varchar("api_token", { length: 200 }).notNull(),
+  phoneNumberId: varchar("phone_number_id", { length: 50 }).notNull(),
+  defaultLabelId: int("default_label_id"),
+  defaultLabelName: varchar("default_label_name", { length: 100 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type WhatchimpSettings = typeof whatchimpSettings.$inferSelect;
+export type InsertWhatchimpSettings = typeof whatchimpSettings.$inferInsert;
+
+// ===== WHATCHIMP SEND LOG =====
+export const whatchimpSendLog = mysqlTable("whatchimp_send_log", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("lead_id").notNull(),
+  leadName: varchar("lead_name", { length: 200 }),
+  phone: varchar("phone", { length: 30 }).notNull(),
+  status: mysqlEnum("status", ["success", "failed", "skipped"]).notNull(),
+  errorMessage: text("error_message"),
+  waMessageId: varchar("wa_message_id", { length: 200 }),
+  batchId: varchar("batch_id", { length: 100 }),
+  sentByUserId: int("sent_by_user_id"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+export type WhatchimpSendLog = typeof whatchimpSendLog.$inferSelect;
+export type InsertWhatchimpSendLog = typeof whatchimpSendLog.$inferInsert;

@@ -1852,3 +1852,13 @@
 - [x] اختبار تطابق الاسم العالي + نفس المدينة
 - [x] اختبار كيانات مختلفة (لا يجب دمجها)
 - [x] اختبار clusterCandidates
+
+## Whatchimp Integration - تكامل واتشيمب
+
+- [x] جدول whatchimp_settings في قاعدة البيانات (API Key، Phone Number ID، Label ID)
+- [x] جدول whatchimp_send_log لسجل الإرسال (leadId، batchId، status، errorMessage)
+- [x] migration وتطبيق التغييرات
+- [x] whatchimp router: getSettings, saveSettings, getLabels, testConnection, sendLead, sendBulk, getSendHistory, isConfigured
+- [x] صفحة إعدادات Whatchimp للأدمن في Settings.tsx (API Key + Phone Number ID + Label ID + اختبار الاتصال)
+- [x] زر إرسال فردي في LeadDetail.tsx (WhatchimpSendButton component)
+- [x] زر إرسال جماعي في Leads.tsx (يظهر فقط عند تحديد عملاء + Whatchimp مربوط)

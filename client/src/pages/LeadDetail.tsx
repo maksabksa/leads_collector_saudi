@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
+import WhatchimpSendButton from "@/components/WhatchimpSendButton";
 
 function ScoreBar({ label, value, color }: { label: string; value: number | null | undefined; color: string }) {
   if (!value) return null;
@@ -797,6 +798,20 @@ export default function LeadDetail() {
             )}
           </div>}
 
+          {/* Whatchimp Send Button */}
+          {lead.verifiedPhone && (
+            <div className="rounded-2xl p-4 border border-border space-y-2" style={{ background: "oklch(0.12 0.015 240)" }}>
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Send className="w-3.5 h-3.5" style={{ color: "oklch(0.65 0.18 145)" }} />
+                Whatchimp
+              </h3>
+              <WhatchimpSendButton
+                leadId={id}
+                phone={lead.verifiedPhone}
+                name={(lead as any).businessName || lead.companyName || ""}
+              />
+            </div>
+          )}
           {/* Digital presence */}
           <div className="rounded-2xl p-4 border border-border space-y-3" style={{ background: "oklch(0.12 0.015 240)" }}>
             <h3 className="text-sm font-semibold text-foreground">الحضور الرقمي</h3>
