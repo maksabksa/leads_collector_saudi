@@ -7,13 +7,100 @@ import { z } from "zod";
 
 const WHATCHIMP_BASE = "https://app.whatchimp.com/api/v1";
 
-// ─── Normalize Saudi phone to international format ───────────────────────────
-function normalizePhone(phone: string): string {
+// ─── Phone validation & normalization ───────────────────────────────────────
+
+/** أنماط الأرقام المدعومة حسب الدولة */
+const COUNTRY_PATTERNS: Record<string, { prefix: string; length: number; label: string }[]> = {
+  SA: [{ prefix: "966", length: 12, label: "السعودية" }],
+  AE: [{ prefix: "971", length: 12, label: "الإمارات" }],
+  KW: [{ prefix: "965", length: 11, label: "الكويت" }],
+  BH: [{ prefix: "973", length: 11, label: "البحرين" }],
+  QA: [{ prefix: "974", length: 11, label: "قطر" }],
+  OM: [{ prefix: "968", length: 11, label: "عُمان" }],
+  JO: [{ prefix: "962", length: 11, label: "الأردن" }],
+  EG: [{ prefix: "20",  length: 12, label: "مصر" }],
+};
+
+export type PhoneValidation = {
+  raw: string;          // الرقم الأصلي
+  normalized: string;   // الرقم بعد التنسيق (دولي)
+  valid: boolean;       // هل الرقم صالح؟
+  warning?: string;     // تحذير إن وُجد
+  country?: string;     // رمز الدولة المكتشف
+};
+
+export function validateAndNormalizePhone(phone: string): PhoneValidation {
+  if (!phone || !phone.trim()) {
+    return { raw: phone, normalized: "", valid: false, warning: "الرقم فارغ" };
+  }
+
   const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("966")) return digits;
-  if (digits.startsWith("0")) return "966" + digits.slice(1);
-  if (digits.length === 9) return "966" + digits;
-  return digits;
+
+  // رقم قصير جداً
+  if (digits.length < 7) {
+    return { raw: phone, normalized: digits, valid: false, warning: `الرقم قصير جداً (${digits.length} أرقام)` };
+  }
+
+  // رقم طويل جداً
+  if (digits.length > 15) {
+    return { raw: phone, normalized: digits, valid: false, warning: `الرقم طويل جداً (${digits.length} أرقام)` };
+  }
+
+  // تنسيق سعودي: 05xxxxxxxx → 9665xxxxxxxx
+  let normalized = digits;
+  let country: string | undefined;
+
+  if (digits.startsWith("966")) {
+    normalized = digits;
+    country = "SA";
+  } else if (digits.startsWith("0") && digits.length === 10) {
+    // 05xxxxxxxx → 9665xxxxxxxx
+    normalized = "966" + digits.slice(1);
+    country = "SA";
+  } else if (digits.length === 9 && digits.startsWith("5")) {
+    // 5xxxxxxxx → 9665xxxxxxxx
+    normalized = "966" + digits;
+    country = "SA";
+  } else if (digits.startsWith("971")) {
+    normalized = digits; country = "AE";
+  } else if (digits.startsWith("965")) {
+    normalized = digits; country = "KW";
+  } else if (digits.startsWith("973")) {
+    normalized = digits; country = "BH";
+  } else if (digits.startsWith("974")) {
+    normalized = digits; country = "QA";
+  } else if (digits.startsWith("968")) {
+    normalized = digits; country = "OM";
+  } else if (digits.startsWith("962")) {
+    normalized = digits; country = "JO";
+  } else if (digits.startsWith("20")) {
+    normalized = digits; country = "EG";
+  } else {
+    // رقم غير معروف الدولة
+    return {
+      raw: phone,
+      normalized: digits,
+      valid: false,
+      warning: `تنسيق الرقم غير معروف — تأكد من إضافة رمز الدولة (مثال: 9665XXXXXXXX)`,
+    };
+  }
+
+  // التحقق من طول الرقم السعودي
+  if (country === "SA" && normalized.length !== 12) {
+    return {
+      raw: phone,
+      normalized,
+      valid: false,
+      country,
+      warning: `الرقم السعودي يجب أن يكون 12 رقماً (الحالي: ${normalized.length})`,
+    };
+  }
+
+  return { raw: phone, normalized, valid: true, country };
+}
+
+function normalizePhone(phone: string): string {
+  return validateAndNormalizePhone(phone).normalized || phone.replace(/\D/g, "");
 }
 
 // ─── Call Whatchimp API ───────────────────────────────────────────────────────
@@ -619,5 +706,35 @@ export const whatchimpRouter = router({
       }
 
       return { sent, skipped, total: leadRows.length };
+    }),
+
+  // ─── التحقق من صحة أرقام الواتساب لقائمة من العملاء ───────────────────────────────────────
+  validatePhones: protectedProcedure
+    .input(z.object({ leadIds: z.array(z.number()) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "قاعدة البيانات غير متاحة" });
+      const leadRows = await db
+        .select({
+          id: leads.id,
+          companyName: leads.companyName,
+          verifiedPhone: leads.verifiedPhone,
+        })
+        .from(leads)
+        .where(inArray(leads.id, input.leadIds));
+
+      return leadRows.map((lead) => {
+        const phone = lead.verifiedPhone ?? "";
+        const validation = validateAndNormalizePhone(phone);
+        return {
+          leadId: lead.id,
+          companyName: lead.companyName,
+          rawPhone: phone,
+          normalizedPhone: validation.normalized,
+          valid: validation.valid,
+          warning: validation.warning ?? null,
+          country: validation.country ?? null,
+        };
+      });
     }),
 });

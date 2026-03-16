@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
+import PhoneValidationDialog from "@/components/PhoneValidationDialog";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 import {
@@ -55,6 +56,8 @@ export default function Leads() {
   const [lastWhatchimpResult, setLastWhatchimpResult] = useState<{ success: number; skipped: number; failed: number } | null>(null);
   const [showBulkTemplateDialog, setShowBulkTemplateDialog] = useState(false);
   const [bulkSelectedTemplate, setBulkSelectedTemplate] = useState<string>("");
+  const [showPhoneValidation, setShowPhoneValidation] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"contact" | "template" | null>(null);
   // التبويب النشط: "all" = قائمة العملاء الجديدة | "contacted" = تم التواصل
   const [activeListTab, setActiveListTab] = useState<"all" | "contacted">("all");
 
@@ -280,7 +283,7 @@ export default function Leads() {
               {whatchimpConfigured?.configured && (
                 <>
                   <button
-                    onClick={() => bulkSendWhatchimp.mutate({ leadIds: Array.from(selectedIds) })}
+                    onClick={() => { setPendingAction("contact"); setShowPhoneValidation(true); }}
                     disabled={bulkSendWhatchimp.isPending}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
                     style={{ background: "oklch(0.55 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.3)" }}
@@ -289,7 +292,7 @@ export default function Leads() {
                     {bulkSendWhatchimp.isPending ? "جاري الإرسال..." : `إرسال ${selectedIds.size} Contact`}
                   </button>
                   <button
-                    onClick={() => setShowBulkTemplateDialog(true)}
+                    onClick={() => { setPendingAction("template"); setShowPhoneValidation(true); }}
                     disabled={bulkSendTemplate.isPending}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
                     style={{ background: "oklch(0.55 0.2 250 / 0.15)", color: "oklch(0.65 0.2 250)", border: "1px solid oklch(0.55 0.2 250 / 0.3)" }}
@@ -698,6 +701,22 @@ export default function Leads() {
           </div>
         </div>
       )}
+
+      {/* ===== نافذة مراجعة أرقام الواتساب ===== */}
+      <PhoneValidationDialog
+        open={showPhoneValidation}
+        onOpenChange={(v) => { setShowPhoneValidation(v); if (!v) setPendingAction(null); }}
+        leadIds={Array.from(selectedIds)}
+        actionLabel={pendingAction === "template" ? "متابعة إرسال Template" : "متابعة إرسال Contact"}
+        onConfirm={(validIds) => {
+          if (pendingAction === "contact") {
+            bulkSendWhatchimp.mutate({ leadIds: validIds });
+          } else if (pendingAction === "template") {
+            setShowBulkTemplateDialog(true);
+          }
+          setPendingAction(null);
+        }}
+      />
 
       {/* ===== نافذة تأكيد الترحيل ===== */}
       <Dialog open={showMigrateConfirm} onOpenChange={setShowMigrateConfirm}>
