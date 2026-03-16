@@ -618,6 +618,7 @@ export const whatchimpRouter = router({
       leadId: z.number(),
       templateName: z.string(),
       languageCode: z.string().default("ar"),
+      pdfUrl: z.string().url().optional(), // رابط التقرير لإرفاقه كـ document header
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
@@ -633,14 +634,21 @@ export const whatchimpRouter = router({
 
       const phone = normalizePhone(lead.verifiedPhone);
 
-      // Send template message
-      const result = await whatchimpPost("/whatsapp/send", {
+      // Build send params — include document header when pdfUrl is provided
+      const sendParams: Record<string, string | number> = {
         apiToken,
         phone_number_id: phoneNumberId,
         phone_number: phone,
         template_name: input.templateName,
         language_code: input.languageCode,
-      });
+      };
+      if (input.pdfUrl) {
+        sendParams["header_type"] = "document";
+        sendParams["header_document_url"] = input.pdfUrl;
+      }
+
+      // Send template message
+      const result = await whatchimpPost("/whatsapp/send", sendParams);
 
       const success = String(result.status) === "1";
 
@@ -655,7 +663,7 @@ export const whatchimpRouter = router({
       });
 
       if (!success) throw new TRPCError({ code: "BAD_REQUEST", message: String(result.message ?? "فشل إرسال الرسالة") });
-      return { success: true };
+      return { success: true, withPdf: !!input.pdfUrl };
     }),
 
   // ── Bulk Send Template Messages ────────────────────────────────────────────

@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Send, Loader2, CheckCircle2, AlertCircle, Clock, XCircle, History, MessageSquare } from "lucide-react";
+import {
+  Send, Loader2, CheckCircle2, AlertCircle, Clock, XCircle,
+  History, MessageSquare, FileText, Info,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,14 +25,27 @@ interface Props {
   leadId: number;
   phone: string;
   name: string;
+  /** إذا مُرّر، يُفتح الـ Dialog مباشرةً (للـ auto-fallback من LeadDetail) */
+  autoOpenTemplate?: boolean;
+  onAutoOpenHandled?: () => void;
 }
 
-export default function WhatchimpSendButton({ leadId, phone: _phone, name }: Props) {
+export default function WhatchimpSendButton({
+  leadId,
+  phone: _phone,
+  name,
+  autoOpenTemplate,
+  onAutoOpenHandled,
+}: Props) {
   const { data: configured } = trpc.whatchimp.isConfigured.useQuery();
   const utils = trpc.useUtils();
 
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(
+    autoOpenTemplate ?? false
+  );
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [attachPdf, setAttachPdf] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
 
   const { data: history, isLoading: historyLoading } = trpc.whatchimp.getSendHistory.useQuery(
     { leadId, limit: 5 },
@@ -41,15 +57,61 @@ export default function WhatchimpSendButton({ leadId, phone: _phone, name }: Pro
     { enabled: showTemplateDialog && !!configured?.configured }
   );
 
+  // رابط التقرير المحفوظ مسبقاً (إن وُجد)
+  const { data: reportInfo } = trpc.pdfReport.getReportUrl.useQuery(
+    { leadId },
+    { enabled: showTemplateDialog }
+  );
+
+  const generateReportMutation = trpc.pdfReport.generateAndSave.useMutation();
+
   const sendTemplateMutation = trpc.whatchimp.sendTemplateMessage.useMutation({
-    onSuccess: () => {
-      toast.success(`تم إرسال رسالة Template لـ ${name} بنجاح`);
+    onSuccess: (res) => {
+      const pdfNote = res.withPdf ? " مع تقرير PDF" : "";
+      toast.success(`تم إرسال رسالة Template لـ ${name} بنجاح${pdfNote}`);
       utils.whatchimp.getSendHistory.invalidate({ leadId });
       setShowTemplateDialog(false);
       setSelectedTemplate("");
+      setAttachPdf(false);
+      onAutoOpenHandled?.();
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const hasExistingReport =
+    reportInfo?.pdfGenerationStatus === "ready" && !!reportInfo?.pdfFileUrl;
+
+  async function handleSendTemplate() {
+    if (!selectedTemplate) return;
+    let pdfUrl: string | undefined;
+    if (attachPdf) {
+      if (hasExistingReport) {
+        pdfUrl = reportInfo!.pdfFileUrl!;
+      } else {
+        try {
+          setPdfGenerating(true);
+          const result = await generateReportMutation.mutateAsync({
+            leadId,
+            reportType: "client_facing",
+          });
+          pdfUrl = result.reportUrl;
+        } catch {
+          toast.error("فشل توليد تقرير PDF — سيتم الإرسال بدون تقرير");
+          pdfUrl = undefined;
+        } finally {
+          setPdfGenerating(false);
+        }
+      }
+    }
+    sendTemplateMutation.mutate({
+      leadId,
+      templateName: selectedTemplate,
+      languageCode: "ar",
+      pdfUrl,
+    });
+  }
+
+  const isSending = pdfGenerating || sendTemplateMutation.isPending;
 
   const sendMutation = trpc.whatchimp.sendLead.useMutation({
     onSuccess: (res) => {
@@ -165,7 +227,13 @@ export default function WhatchimpSendButton({ leadId, phone: _phone, name }: Pro
         </div>
       )}
       {/* Dialog اختيار الـ Template */}
-      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+      <Dialog
+        open={showTemplateDialog}
+        onOpenChange={(open) => {
+          setShowTemplateDialog(open);
+          if (!open) onAutoOpenHandled?.();
+        }}
+      >
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -175,6 +243,23 @@ export default function WhatchimpSendButton({ leadId, phone: _phone, name }: Pro
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* تنبيه نافذة 24 ساعة */}
+            {autoOpenTemplate && (
+              <div
+                className="flex items-start gap-2 text-xs p-3 rounded-lg"
+                style={{
+                  background: "oklch(0.55 0.18 55 / 0.12)",
+                  border: "1px solid oklch(0.55 0.18 55 / 0.3)",
+                  color: "oklch(0.75 0.15 55)",
+                }}
+              >
+                <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <p>
+                  انتهت نافذة الـ 24 ساعة — يمكنك التواصل مع العميل فقط عبر Template Message معتمد من Meta.
+                </p>
+              </div>
+            )}
+
             <p className="text-sm text-muted-foreground">
               اختر الـ Template المعتمد الذي تريد إرساله للعميل عبر WhatsApp
             </p>
@@ -209,34 +294,86 @@ export default function WhatchimpSendButton({ leadId, phone: _phone, name }: Pro
               </Select>
             )}
 
+            {/* خيار إرفاق تقرير PDF */}
+            <div
+              className="flex items-start gap-3 p-3 rounded-lg cursor-pointer select-none"
+              style={{
+                background: attachPdf
+                  ? "oklch(0.55 0.2 145 / 0.1)"
+                  : "oklch(0.18 0.01 240)",
+                border: `1px solid ${attachPdf ? "oklch(0.55 0.2 145 / 0.35)" : "oklch(0.3 0.01 240)"}`,
+              }}
+              onClick={() => setAttachPdf(v => !v)}
+            >
+              <div
+                className="w-4 h-4 rounded shrink-0 mt-0.5 flex items-center justify-center transition-all"
+                style={{
+                  background: attachPdf ? "oklch(0.55 0.2 145)" : "transparent",
+                  border: `2px solid ${attachPdf ? "oklch(0.55 0.2 145)" : "oklch(0.45 0.02 240)"}`,
+                }}
+              >
+                {attachPdf && (
+                  <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-none stroke-white stroke-2">
+                    <polyline points="1,4 4,7 9,1" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5" style={{ color: "oklch(0.65 0.18 145)" }} />
+                  <span className="text-sm font-medium">إرفاق تقرير PDF</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {hasExistingReport
+                    ? "سيُرفق التقرير المحفوظ مسبقاً كـ document header"
+                    : "سيُولَّد تقرير تحليل العميل ويُرفق تلقائياً"}
+                </p>
+                {hasExistingReport && (
+                  <p className="text-xs mt-1" style={{ color: "oklch(0.65 0.18 145)" }}>
+                    ✓ تقرير جاهز
+                  </p>
+                )}
+              </div>
+            </div>
+
             {selectedTemplate && (
               <div
                 className="text-xs p-3 rounded-lg"
                 style={{ background: "oklch(0.55 0.2 250 / 0.1)", border: "1px solid oklch(0.55 0.2 250 / 0.2)" }}
               >
                 <p className="text-muted-foreground">
-                  سيتم إرسال الـ template <strong className="text-foreground">{selectedTemplate}</strong> إلى رقم العميل مع ملء البيانات تلقائياً من ملفه.
+                  سيتم إرسال الـ template{" "}
+                  <strong className="text-foreground">{selectedTemplate}</strong>{" "}
+                  {attachPdf ? "مع تقرير PDF كمرفق" : "بدون مرفق"}.
                 </p>
               </div>
             )}
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTemplateDialog(false);
+                onAutoOpenHandled?.();
+              }}
+            >
               إلغاء
             </Button>
             <Button
-              disabled={!selectedTemplate || sendTemplateMutation.isPending}
-              onClick={() => sendTemplateMutation.mutate({
-                leadId,
-                templateName: selectedTemplate,
-                languageCode: "ar",
-              })}
+              disabled={!selectedTemplate || isSending}
+              onClick={handleSendTemplate}
             >
-              {sendTemplateMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 animate-spin ml-1" /> جاري الإرسال...</>
+              {isSending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin ml-1" />
+                  {pdfGenerating ? "جاري توليد التقرير..." : "جاري الإرسال..."}
+                </>
               ) : (
-                <><MessageSquare className="w-4 h-4 ml-1" /> إرسال</>
+                <>
+                  <MessageSquare className="w-4 h-4 ml-1" />
+                  {attachPdf ? "إرسال مع PDF" : "إرسال"}
+                </>
               )}
             </Button>
           </DialogFooter>

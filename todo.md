@@ -1912,3 +1912,9 @@
 - [x] server/salesBrief/index.ts — runSalesBriefPipeline orchestrator (stateless, no DB writes)
 - [x] server/routers/leadIntelligence.ts — generateSalesBrief procedure added
 - [x] server/salesBrief/phase6a.brief.test.ts — 28 tests (28/28 pass)
+
+## WhatsApp 24h Window Fix + Template with PDF
+
+- [x] server/routers/whatchimp.ts — تعديل sendTemplateMessage لقبول pdfUrl اختياري وإرساله كـ document header
+- [x] client/src/components/WhatchimpSendButton.tsx — إضافة خيار "إرفاق تقرير PDF" في Template Dialog مع توليد PDF أولاً
+- [x] client/src/pages/LeadDetail.tsx — auto-fallback لـ Template Dialog عند خطأ 24 ساعة بدلاً من toast error

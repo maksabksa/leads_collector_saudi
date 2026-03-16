@@ -104,6 +104,8 @@ export default function LeadDetail() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   // نافذة تأكيد اكتمال البيانات
   const [showDataConfirmModal, setShowDataConfirmModal] = useState(false);
+  // WhatsApp 24h fallback state
+  const [autoOpenTemplate, setAutoOpenTemplate] = useState(false);
   // PHASE 6B — Scoring & Sales Brief state (owned by LeadDetail, passed down as props)
   const [scoreResult, setScoreResult] = useState<any>(null);
   const [briefResult, setBriefResult] = useState<SalesBriefResult | null>(null);
@@ -845,6 +847,8 @@ export default function LeadDetail() {
                 leadId={id}
                 phone={lead.verifiedPhone}
                 name={(lead as any).businessName || lead.companyName || ""}
+                autoOpenTemplate={autoOpenTemplate}
+                onAutoOpenHandled={() => setAutoOpenTemplate(false)}
               />
             </div>
           )}
