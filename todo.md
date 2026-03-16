@@ -1904,3 +1904,11 @@
 - [x] كتابة 42 اختبار Vitest في server/scoring/phase5.scoring.test.ts (جميعها تمر)
 - [x] التحقق من TypeScript: 0 errors
 - [x] التحقق من جميع الاختبارات: 427 اختبار تمر (385 سابقة + 42 جديدة)
+
+## PHASE 6A — Sales Brief Backend (Deterministic, Stateless)
+
+- [x] server/salesBrief/templates.ts — OPPORTUNITY_LABELS, SALES_ANGLE_TEMPLATES, FIRST_MESSAGE_TEMPLATES, PRIORITY_MODIFIER, interpolate, resolveBestContactChannel
+- [x] server/salesBrief/generator.ts — generateSalesBrief (pure, synchronous, no DB)
+- [x] server/salesBrief/index.ts — runSalesBriefPipeline orchestrator (stateless, no DB writes)
+- [x] server/routers/leadIntelligence.ts — generateSalesBrief procedure added
+- [x] server/salesBrief/phase6a.brief.test.ts — 28 tests (28/28 pass)

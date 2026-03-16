@@ -486,6 +486,19 @@ const leadIntelligenceRouter = router({
         errors: result.errors,
       };
     }),
+
+  /**
+   * generateSalesBrief — PHASE 6A
+   * Deterministic, stateless SalesBrief generation.
+   * Runs scoring pipeline then generates brief from templates.
+   * No DB writes. Manual trigger only.
+   */
+  generateSalesBrief: protectedProcedure
+    .input(z.object({ leadId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const { runSalesBriefPipeline } = await import("../salesBrief/index.js");
+      return runSalesBriefPipeline(input.leadId);
+    }),
 });
 // ────────────────────────────────────────────────────────────────────────────────
 // TODO PHASE 3 — resolveAndSave: multi-source resolution before insertion
