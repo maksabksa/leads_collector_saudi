@@ -20,6 +20,7 @@
 
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
+import { createLeadWithResolution } from "../db";
 import {
   resolveLeads,
   computeLinkageScore,
@@ -155,7 +156,7 @@ function rawResultToCandidate(
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-export const leadIntelligenceRouter = router({
+const leadIntelligenceRouter = router({
 
   /**
    * resolve: يأخذ نتائج خام من مصادر متعددة ويدمجها في كيانات موحدة
@@ -388,4 +389,45 @@ export const leadIntelligenceRouter = router({
         },
       };
     }),
+
+  /**
+   * seedFromRaw — PHASE 2
+   * إدخال lead خام من أي مصدر عبر createLeadWithResolution()
+   * يطبّق normalisation + conservative deduplication تلقائياً.
+   * لا يحجب الإدخال أبداً — التكرار يُعلّم فقط ك‘possible_duplicate’.
+   */
+  seedFromRaw: protectedProcedure
+    .input(z.object({
+      companyName: z.string().min(1),
+      businessType: z.string().optional(),
+      city: z.string().optional(),
+      country: z.string().optional(),
+      verifiedPhone: z.string().optional(),
+      website: z.string().optional(),
+      instagramUrl: z.string().optional(),
+      twitterUrl: z.string().optional(),
+      tiktokUrl: z.string().optional(),
+      snapchatUrl: z.string().optional(),
+      facebookUrl: z.string().optional(),
+      googleMapsUrl: z.string().optional(),
+      notes: z.string().optional(),
+      source: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { source, ...leadData } = input;
+      const id = await createLeadWithResolution({
+        ...leadData,
+        city: leadData.city || "غير محدد",
+        businessType: leadData.businessType || "غير محدد",
+        notes: leadData.notes
+          ? `[source: ${source || 'unknown'}] ${leadData.notes}`
+          : source ? `[source: ${source}]` : undefined,
+      });
+      return { id, source: source || 'unknown' };
+    }),
 });
+// ────────────────────────────────────────────────────────────────────────────────
+// TODO PHASE 3 — resolveAndSave: multi-source resolution before insertion
+// TODO PHASE 3 — linkAssetsToLead: persist LeadAsset[] to leadAssets table
+// ────────────────────────────────────────────────────────────────────────────────
+export { leadIntelligenceRouter };

@@ -6,7 +6,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   getAllZones, getZoneById, createZone, updateZone, deleteZone,
-  getAllLeads, getLeadById, createLead, updateLead, deleteLead, getLeadsStats, bulkDeleteLeads,
+  getAllLeads, getLeadById, createLead, createLeadWithResolution, updateLead, deleteLead, getLeadsStats, bulkDeleteLeads,
   getWebsiteAnalysisByLeadId, createWebsiteAnalysis,
   getSocialAnalysesByLeadId, createSocialAnalysis,
   getTopGaps, getDb,
@@ -231,9 +231,8 @@ const leadsRouter = router({
       ownerUserId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
-      const id = await createLead(input);
-
-      // تشغيل التحليل التلقائي في الخلفية بعد الحفظ مباشرة
+      const id = await createLeadWithResolution(input);
+      // تشغيل التحليل التلقائي في الخلفية بعد الحفظ مباشرةة
       setImmediate(async () => {
         try {
           const socialPlatforms: Array<{ field: keyof typeof input; platform: "instagram" | "twitter" | "snapchat" | "tiktok" | "facebook" }> = [
@@ -616,7 +615,7 @@ const leadsRouter = router({
       const errors: string[] = [];
       for (const leadData of input.leads) {
         try {
-          await createLead(leadData);
+          await createLeadWithResolution(leadData);
           created++;
         } catch (e) {
           failed++;
@@ -1904,7 +1903,7 @@ async function runSearchJobInBackground(jobId: number): Promise<void> {
               }
 
               // إضافة Lead جديد
-              await createLead({
+              await createLeadWithResolution({
                 companyName: d.name || place.name,
                 businessType: job.businessType,
                 country: job.country,
@@ -2226,7 +2225,7 @@ const instagramRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { accountId, ...leadData } = input;
-        const leadId = await createLead({
+        const leadId = await createLeadWithResolution({
           companyName: leadData.companyName,
           businessType: leadData.businessType,
           city: leadData.city || "غير محدد",

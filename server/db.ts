@@ -1,4 +1,5 @@
 import { eq, desc, asc, and, or, like, sql, inArray } from "drizzle-orm";
+import { normalizeName, normalizePhone, extractDomain } from "./lib/identityLinkage";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -315,15 +316,120 @@ export async function deleteSearchJob(id: number): Promise<void> {
   await db.delete(searchJobs).where(eq(searchJobs.id, id));
 }
 
-export async function checkLeadDuplicate(phone: string, companyName: string): Promise<boolean> {
+/**
+ * checkLeadDuplicate — PHASE 2 conservative duplicate detection
+ *
+ * Signal priority:
+ *  1. exact normalizedPhone match → sufficient alone
+ *  2. exact normalizedDomain + name overlap ≥ 0.6 → strong signal
+ *  3. normalizedBusinessName alone → insufficient (reserved for manual review)
+ */
+export async function checkLeadDuplicate(
+  phone: string,
+  companyName: string,
+  website?: string
+): Promise<{ isDuplicate: boolean; candidateId: number | null; reason: string }> {
   const db = await getDb();
-  if (!db) return false;
-  const conditions = [];
-  if (phone) conditions.push(eq(leads.verifiedPhone, phone));
-  if (conditions.length === 0) return false;
-  const result = await db.select({ id: leads.id }).from(leads).where(or(...conditions)).limit(1);
-  return result.length > 0;
+  if (!db) return { isDuplicate: false, candidateId: null, reason: "db_unavailable" };
+
+  const normPhone = phone ? normalizePhone(phone) : "";
+  const normName = companyName ? normalizeName(companyName) : "";
+  const normDomain = website ? extractDomain(website) : "";
+
+  // ── Signal 1: exact normalizedPhone match — sufficient alone ──────────────
+  if (normPhone) {
+    const byPhone = await db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(eq(leads.normalizedPhone, normPhone))
+      .limit(1);
+    if (byPhone.length > 0) {
+      return { isDuplicate: true, candidateId: byPhone[0].id, reason: "exact_phone_match" };
+    }
+    // fallback: exact verifiedPhone (pre-PHASE2 records without normalizedPhone)
+    const byVerifiedPhone = await db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(eq(leads.verifiedPhone, phone))
+      .limit(1);
+    if (byVerifiedPhone.length > 0) {
+      return { isDuplicate: true, candidateId: byVerifiedPhone[0].id, reason: "exact_verified_phone_match" };
+    }
+  }
+
+  // ── Signal 2: exact normalizedDomain + name overlap ≥ 0.6 ─────────────────
+  if (normDomain && normName) {
+    const byDomain = await db
+      .select({ id: leads.id, normalizedBusinessName: leads.normalizedBusinessName })
+      .from(leads)
+      .where(eq(leads.normalizedDomain, normDomain))
+      .limit(5);
+    for (const candidate of byDomain) {
+      const candName = candidate.normalizedBusinessName || "";
+      if (candName && nameOverlapScore(normName, candName) >= 0.6) {
+        return { isDuplicate: true, candidateId: candidate.id, reason: "domain_and_name_match" };
+      }
+    }
+  }
+
+  return { isDuplicate: false, candidateId: null, reason: "no_duplicate" };
 }
+
+/** nameOverlapScore — token overlap ratio (0-1) */
+function nameOverlapScore(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const tokensA = new Set(a.split(/\s+/).filter(Boolean));
+  const tokensB = new Set(b.split(/\s+/).filter(Boolean));
+  if (tokensA.size === 0 || tokensB.size === 0) return 0;
+  let shared = 0;
+  tokensA.forEach(t => { if (tokensB.has(t)) shared++; });
+  return shared / Math.max(tokensA.size, tokensB.size);
+}
+
+// ===== PHASE 2: createLeadWithResolution =====
+/**
+ * createLeadWithResolution — safe wrapper around createLead()
+ *
+ * 1. Fills normalizedBusinessName, normalizedPhone, normalizedDomain
+ * 2. Runs conservative duplicate detection
+ * 3. Sets deduplicationStatus + duplicateCandidateIds
+ * 4. Inserts via createLead()
+ * 5. On any error → falls back to createLead() directly
+ *
+ * Never blocks insertion. Always returns the new lead id.
+ */
+export async function createLeadWithResolution(data: InsertLead): Promise<number> {
+  try {
+    const normalizedBusinessName = data.companyName ? normalizeName(data.companyName) : undefined;
+    const normalizedPhone = data.verifiedPhone ? normalizePhone(data.verifiedPhone) : undefined;
+    const normalizedDomain = data.website ? extractDomain(data.website) : undefined;
+
+    const dupResult = await checkLeadDuplicate(
+      data.verifiedPhone || "",
+      data.companyName || "",
+      data.website ?? undefined
+    );
+
+    const enrichedData: InsertLead = {
+      ...data,
+      normalizedBusinessName: normalizedBusinessName ?? data.normalizedBusinessName,
+      normalizedPhone: normalizedPhone ?? data.normalizedPhone,
+      normalizedDomain: normalizedDomain ?? data.normalizedDomain,
+      deduplicationStatus: dupResult.isDuplicate ? "possible_duplicate" : "no_duplicate",
+      duplicateCandidateIds: dupResult.candidateId ? [dupResult.candidateId] : (data.duplicateCandidateIds ?? []),
+    };
+
+    const id = await createLead(enrichedData);
+    console.log(`[PHASE2] resolution_applied lead_id=${id} dedup=${enrichedData.deduplicationStatus} reason=${dupResult.reason}`);
+    return id;
+  } catch (err) {
+    console.error(`[PHASE2] resolution_failed — fallback to createLead. Error: ${err instanceof Error ? err.message : String(err)}`);
+    const id = await createLead(data);
+    console.log(`[PHASE2] fallback_used lead_id=${id}`);
+    return id;
+  }
+}
+// TODO: PHASE 3 — asset persistence: linkAssetsToLead(leadId, assets: LeadAsset[])
 
 // ===== INSTAGRAM HELPERS =====
 import {

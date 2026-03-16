@@ -1884,3 +1884,12 @@
 - [x] ربط نافذة المراجعة بزر "إرسال Template" الجماعي
 - [x] دعم تصحيح الأرقام يدوياً داخل النافذة (مؤقت للعملية الحالية)
 - [x] زر "إرسال الصالحين فقط" عند وجود أرقام مختلطة (بعضها صالح وبعضها لا)
+
+## PHASE 2 — Seed Creation + Normalization + Conservative Deduplication
+
+- [ ] تحديث checkLeadDuplicate() في db.ts: exact normalizedPhone يكفي وحده، normalizedDomain يُسهم بقوة، normalizedBusinessName وحده غير كافٍ
+- [ ] إضافة createLeadWithResolution() في db.ts مع fallback صريح وتسجيل resolution_applied/fallback_used/resolution_failed
+- [ ] استبدال createLead() بـ createLeadWithResolution() في routers.ts (3 مواضع: 619، 1907، 2229)
+- [ ] إضافة seedFromRaw procedure في leadIntelligence.ts
+- [ ] كتابة اختبارات PHASE 2 تغطي: wrapper + deduplication + fallback
+- [ ] حفظ checkpoint بعد اكتمال PHASE 2
