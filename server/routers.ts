@@ -171,6 +171,7 @@ const leadsRouter = router({
       stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).optional(),
       priority: z.enum(["high", "medium", "low"]).optional(),
       ownerUserId: z.number().optional(),
+      sentToWhatchimp: z.enum(["yes", "no"]).optional(),
     }).optional())
     .query(async ({ input }) => {
       return getAllLeads(input ?? {});

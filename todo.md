@@ -1862,3 +1862,9 @@
 - [x] صفحة إعدادات Whatchimp للأدمن في Settings.tsx (API Key + Phone Number ID + Label ID + اختبار الاتصال)
 - [x] زر إرسال فردي في LeadDetail.tsx (WhatchimpSendButton component)
 - [x] زر إرسال جماعي في Leads.tsx (يظهر فقط عند تحديد عملاء + Whatchimp مربوط)
+
+## Whatchimp - تحسينات إضافية
+
+- [ ] صفحة الإعدادات: جلب الـ labels من Whatchimp تلقائياً واختيار الـ Label ID من قائمة منسدلة
+- [ ] سجل الإرسال في صفحة تفاصيل العميل (متى أُرسل، هل نجح، من أرسله)
+- [x] فلتر "تم الإرسال لـ Whatchimp" في قائمة العملاء

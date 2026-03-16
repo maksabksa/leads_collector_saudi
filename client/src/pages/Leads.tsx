@@ -36,6 +36,7 @@ export default function Leads() {
   const [filterWhatsapp, setFilterWhatsapp] = useState<"" | "yes" | "no" | "unknown">("")
   const [filterStage, setFilterStage] = useState("")
   const [filterPriority, setFilterPriority] = useState("");
+  const [filterSentToWhatchimp, setFilterSentToWhatchimp] = useState<"" | "yes" | "no">("");
   const [showSegmentDialog, setShowSegmentDialog] = useState(false);
   const [targetSegmentId, setTargetSegmentId] = useState<string>("");
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
@@ -56,6 +57,7 @@ export default function Leads() {
     zoneId: filterZone,
     hasWhatsapp: filterWhatsapp || undefined,
     priority: (filterPriority || undefined) as "high" | "medium" | "low" | undefined,
+    sentToWhatchimp: (filterSentToWhatchimp || undefined) as "yes" | "no" | undefined,
   });
 
   // تصفية حسب التبويب النشط
@@ -412,6 +414,15 @@ export default function Leads() {
                 <option value="high">عالية</option>
                 <option value="medium">متوسطة</option>
                 <option value="low">منخفضة</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">حالة Whatchimp</label>
+              <select value={filterSentToWhatchimp} onChange={e => setFilterSentToWhatchimp(e.target.value as "" | "yes" | "no")}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground focus:outline-none">
+                <option value="">الكل</option>
+                <option value="yes">📤 أُرسل إلى Whatchimp</option>
+                <option value="no">📭 لم يُرسَل بعد</option>
               </select>
             </div>
           </div>

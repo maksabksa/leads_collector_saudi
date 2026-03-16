@@ -11,6 +11,7 @@ import {
   reminders, InsertReminder, Reminder,
   weeklyReports, InsertWeeklyReport, WeeklyReport,
   reportSchedules, InsertReportSchedule, ReportSchedule,
+  whatchimpSendLog,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -130,6 +131,7 @@ export async function getAllLeads(filters?: {
   stage?: string;
   priority?: string;
   ownerUserId?: number;
+  sentToWhatchimp?: "yes" | "no";
 }): Promise<Lead[]> {
   const db = await getDb();
   if (!db) return [];
@@ -144,6 +146,25 @@ export async function getAllLeads(filters?: {
   if (filters?.stage) conditions.push(eq(leads.stage, filters.stage as any));
   if (filters?.priority) conditions.push(eq(leads.priority, filters.priority as any));
   if (filters?.ownerUserId) conditions.push(eq(leads.ownerUserId, filters.ownerUserId));
+  // فلتر Whatchimp: جلب معرّفات العملاء المُرسَلة بنجاح
+  if (filters?.sentToWhatchimp === "yes") {
+    const sentRows = await db
+      .selectDistinct({ leadId: whatchimpSendLog.leadId })
+      .from(whatchimpSendLog)
+      .where(eq(whatchimpSendLog.status, "success"));
+    const ids = sentRows.map(r => r.leadId);
+    if (ids.length === 0) return [];
+    conditions.push(inArray(leads.id, ids));
+  } else if (filters?.sentToWhatchimp === "no") {
+    const sentRows = await db
+      .selectDistinct({ leadId: whatchimpSendLog.leadId })
+      .from(whatchimpSendLog)
+      .where(eq(whatchimpSendLog.status, "success"));
+    const ids = sentRows.map(r => r.leadId);
+    if (ids.length > 0) {
+      conditions.push(sql`${leads.id} NOT IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+    }
+  }
   const query = conditions.length > 0
     ? db.select().from(leads).where(and(...conditions)).orderBy(desc(leads.createdAt))
     : db.select().from(leads).orderBy(desc(leads.createdAt));
