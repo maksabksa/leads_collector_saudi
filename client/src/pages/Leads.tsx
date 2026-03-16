@@ -42,6 +42,9 @@ export default function Leads() {
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
+  const [showWhatchimpMigrateDialog, setShowWhatchimpMigrateDialog] = useState(false);
+  const [lastWhatchimpSentIds, setLastWhatchimpSentIds] = useState<number[]>([]);
+  const [lastWhatchimpResult, setLastWhatchimpResult] = useState<{ success: number; skipped: number; failed: number } | null>(null);
   // التبويب النشط: "all" = قائمة العملاء الجديدة | "contacted" = تم التواصل
   const [activeListTab, setActiveListTab] = useState<"all" | "contacted">("all");
 
@@ -118,8 +121,16 @@ export default function Leads() {
   });
   const bulkSendWhatchimp = trpc.whatchimp.sendBulk.useMutation({
     onSuccess: (res) => {
-      toast.success(`Whatchimp: تم إرسال ${res.success} عميل، تم تخطي ${res.skipped} (لا يوجد هاتف)`);
+      const sentIds = Array.from(selectedIds);
+      setLastWhatchimpSentIds(sentIds);
+      setLastWhatchimpResult({ success: res.success, skipped: res.skipped, failed: res.failed ?? 0 });
       setSelectedIds(new Set());
+      utils.leads.list.invalidate();
+      if (res.success > 0) {
+        setShowWhatchimpMigrateDialog(true);
+      } else {
+        toast.info(`Whatchimp: تم تخطي ${res.skipped} عميل (لا يوجد هاتف)`);
+      }
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -734,6 +745,64 @@ export default function Leads() {
                 <><Loader2 className="w-4 h-4 animate-spin ml-2" /> جاري الحذف...</>
               ) : (
                 <><Trash2 className="w-4 h-4 ml-2" /> حذف {selectedIds.size} عميل نهائياً</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== نافذة ترحيل بعد إرسال Whatchimp ===== */}
+      <Dialog open={showWhatchimpMigrateDialog} onOpenChange={setShowWhatchimpMigrateDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5" style={{ color: "oklch(0.65 0.2 145)" }} />
+              تم الإرسال لـ Whatchimp ✔
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-center space-y-3">
+            <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
+              style={{ background: "oklch(0.55 0.2 145 / 0.15)", border: "2px solid oklch(0.55 0.2 145 / 0.3)" }}>
+              <Send className="w-8 h-8" style={{ color: "oklch(0.65 0.2 145)" }} />
+            </div>
+            {lastWhatchimpResult && (
+              <div className="space-y-1">
+                <p className="text-base font-semibold">
+                  تم إرسال <span style={{ color: "oklch(0.65 0.2 145)" }}>{lastWhatchimpResult.success}</span> عميل بنجاح
+                </p>
+                {lastWhatchimpResult.skipped > 0 && (
+                  <p className="text-sm text-muted-foreground">تم تخطي {lastWhatchimpResult.skipped} (لا يوجد هاتف)</p>
+                )}
+                {lastWhatchimpResult.failed > 0 && (
+                  <p className="text-sm" style={{ color: "oklch(0.7 0.22 25)" }}>فشل {lastWhatchimpResult.failed}</p>
+                )}
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
+              هل تريد ترحيل هؤلاء العملاء إلى قائمة “تم التواصل” أيضاً؟
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowWhatchimpMigrateDialog(false);
+              toast.success(`✅ Whatchimp: تم إرسال ${lastWhatchimpResult?.success ?? 0} عميل`);
+            }}>
+              لا، شكراً
+            </Button>
+            <Button
+              onClick={() => {
+                if (lastWhatchimpSentIds.length > 0) {
+                  bulkUpdateStage.mutate({ ids: lastWhatchimpSentIds, stage: "contacted" });
+                }
+                setShowWhatchimpMigrateDialog(false);
+              }}
+              disabled={bulkUpdateStage.isPending}
+              style={{ background: "oklch(0.65 0.18 200)", color: "white" }}
+            >
+              {bulkUpdateStage.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin ml-2" /> جاري...</>
+              ) : (
+                <><ArrowRightLeft className="w-4 h-4 ml-2" /> نعم، رحّلهم لـ "تم التواصل"</>
               )}
             </Button>
           </DialogFooter>
