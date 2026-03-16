@@ -57,12 +57,25 @@ export function translateToEnglish(text: string): string {
   return result.trim();
 }
 
-// ─── بناء Google Search URL ───────────────────────────────────────────────────
+// ─── الأنواع ───────────────────────────────────────────────────────────────────────────────────────
 
+/** خيارات بناء Google Search URL */
+export interface GoogleSearchUrlOptions {
+  /** الاستعلام النصي */
+  query: string;
+  /** عدد النتائج (افتراضي: 20) */
+  num?: number;
+  /** اللغة (افتراضي: ar) */
+  hl?: string;
+  /** الدولة (افتراضي: sa) */
+  gl?: string;
+  /** رقم الصفحة — يُحوَّل إلى start (افتراضي: 1) */
+  page?: number;
+}
+
+// ─── بناء Google Search URL ───────────────────────────────────────────────────────────────────────────────────────
 /**
  * بناء Google Search URL مع المعلمات الافتراضية للسوق السعودي
- *
- * @param query - استعلام البحث
  * @param options - خيارات إضافية
  * @returns URL كامل جاهز للإرسال إلى SERP API
  *
@@ -70,23 +83,57 @@ export function translateToEnglish(text: string): string {
  * buildGoogleSearchUrl("مطاعم الرياض")
  * // → "https://www.google.com/search?q=...&num=20&hl=ar&gl=sa"
  */
+/**
+ * بناء Google Search URL موحد للسوق السعودي.
+ *
+ * يقبل شكلين:
+ *   buildGoogleSearchUrl({ query: "..." })           ← موصى به (PHASE 1)
+ *   buildGoogleSearchUrl("...", { num: 10 })          ← متوافق مع الكود القديم
+ *
+ * ملاحظة: لا نضيف cr=countrySA — يُسبب 407 من Bright Data SERP proxy.
+ */
 export function buildGoogleSearchUrl(
-  query: string,
-  options: {
+  queryOrOptions: string | GoogleSearchUrlOptions,
+  legacyOptions: {
     num?: number;
     hl?: string;
     gl?: string;
-    tbm?: string; // "isch" للصور، "nws" للأخبار
+    tbm?: string;
   } = {}
 ): string {
+  // دعم الشكلين: options object أو string
+  let query: string;
+  let num: number;
+  let hl: string;
+  let gl: string;
+  let page: number;
+
+  if (typeof queryOrOptions === "string") {
+    // الشكل القديم: buildGoogleSearchUrl("query", { num: 10 })
+    query = queryOrOptions;
+    num = legacyOptions.num ?? parseInt(DEFAULT_GOOGLE_PARAMS.num);
+    hl = legacyOptions.hl ?? DEFAULT_GOOGLE_PARAMS.hl;
+    gl = legacyOptions.gl ?? DEFAULT_GOOGLE_PARAMS.gl;
+    page = 1;
+  } else {
+    // الشكل الجديد: buildGoogleSearchUrl({ query: "...", num: 10 })
+    query = queryOrOptions.query;
+    num = queryOrOptions.num ?? parseInt(DEFAULT_GOOGLE_PARAMS.num);
+    hl = queryOrOptions.hl ?? DEFAULT_GOOGLE_PARAMS.hl;
+    gl = queryOrOptions.gl ?? DEFAULT_GOOGLE_PARAMS.gl;
+    page = queryOrOptions.page ?? 1;
+  }
+
   const params = new URLSearchParams({
     q: query,
-    num: String(options.num ?? DEFAULT_GOOGLE_PARAMS.num),
-    hl: options.hl ?? DEFAULT_GOOGLE_PARAMS.hl,
-    gl: options.gl ?? DEFAULT_GOOGLE_PARAMS.gl,
+    num: String(num),
+    hl,
+    gl,
   });
 
-  if (options.tbm) params.set("tbm", options.tbm);
+  if (page > 1) {
+    params.set("start", String((page - 1) * num));
+  }
 
   return `${GOOGLE_SEARCH_BASE}?${params.toString()}`;
 }

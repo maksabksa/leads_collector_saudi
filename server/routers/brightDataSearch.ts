@@ -3,7 +3,8 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import puppeteer from "puppeteer-core";
 import { invokeLLM } from "../_core/llm";
-import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP, searchFacebookSERP, serpRequest, parseGoogleResultsPublic } from "./serpSearch";
+import { searchInstagramSERP, searchTikTokSERP, searchSnapchatSERP, searchLinkedInSERP, searchFacebookSERP, serpRequest, parseGoogleResultsGeneric } from "./serpSearch";
+import { buildGoogleSearchUrl } from "../lib/googleUrlBuilder";
 import { searchInstagramByKeyword } from "../lib/brightDataInstagram";
 
 // ─── Bright Data Browser API Helper ───────────────────────────────────────────
@@ -126,23 +127,21 @@ async function scrapeTwitter(query: string, location: string): Promise<any[]> {
 
   for (const q of queries) {
     try {
-      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+      // PHASE 1 FIX: cr=countrySA أُزيل — يُسبب 407 من SERP proxy
+      const googleUrl = buildGoogleSearchUrl({ query: q });
       const html = await serpRequest(googleUrl);
-      const googleResults = parseGoogleResultsPublic(html, "twitter.com");
+      const googleResults = parseGoogleResultsGeneric(html);
 
       for (const item of googleResults) {
         // استخراج username من URL
         const itemUrl = item.url;
-        const usernameMatch = itemUrl.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)(?:\/|$)/);
+          const usernameMatch = itemUrl.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)(?:\/|$)/);
         if (!usernameMatch) continue;
         const username = usernameMatch[1];
         // تجاهل صفحات عامة
         if (["search", "explore", "home", "i", "hashtag", "intent"].includes(username)) continue;
         if (seen.has(username)) continue;
         seen.add(username);
-
-        const phones = ((item.bio || '') + " " + (item.displayName || '')).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
-
         results.push({
           platform: "twitter",
           username,
@@ -153,7 +152,10 @@ async function scrapeTwitter(query: string, location: string): Promise<any[]> {
             .trim(),
           profileUrl: `https://x.com/${username}`,
           bio: item.bio?.substring(0, 200) || "",
-          phone: phones[0] || "",
+          // PHASE 1 FIX: candidatePhones بدل phone: phones[0]
+          // الأرقام مستخرجة من نص الصفحة — ليست verified
+          candidatePhones: item.candidatePhones,
+          verifiedPhones: [],
           dataSource: "serp",
         });
       }
@@ -249,23 +251,28 @@ async function scrapeGoogleSearch(query: string, location: string): Promise<any[
 
   for (const q of queries) {
     try {
-      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+      // PHASE 1 FIX:
+      //   1. cr=countrySA أُزيل — يُسبب 407 من SERP proxy
+      //   2. parseGoogleResultsGeneric() بدل parseGoogleResultsPublic(html, "")
+      //      الدالة القديمة كانت تُرجع [] دائماً عند domainFilter فارغ
+      //   3. candidatePhones بدل phone: phones[0] — الأرقام مستخرجة من النص
+      //      وليست verified — يجب أن تكون candidatePhones لا verifiedPhones
+      const googleUrl = buildGoogleSearchUrl({ query: q });
       const html = await serpRequest(googleUrl);
-      const googleResults = parseGoogleResultsPublic(html, ""); // بدون تصفية domain
-
+      const googleResults = parseGoogleResultsGeneric(html);
       for (const item of googleResults) {
         const itemLink = item.url;
         if (seen.has(itemLink)) continue;
         seen.add(itemLink);
-
-        const phones = ((item.bio || '') + " " + (item.displayName || '')).match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
-
         results.push({
           platform: "google",
           displayName: item.displayName,
           profileUrl: item.url,
           bio: item.bio?.substring(0, 300) || "",
-          phone: phones[0] || "",
+          // PHASE 1 FIX: candidatePhones (ليست verified) — مستخرجة من نص الصفحة
+          // لا تُعامَل كـ verifiedPhones في مرحلة الربط الذكي
+          candidatePhones: item.candidatePhones,
+          verifiedPhones: [],
           website: item.url,
           dataSource: "serp",
         });
@@ -275,7 +282,6 @@ async function scrapeGoogleSearch(query: string, location: string): Promise<any[
     }
     if (results.length >= 30) break;
   }
-
   return results.slice(0, 30);
 }
 
@@ -526,10 +532,11 @@ export const brightDataSearchRouter = router({
         (async () => {
           try {
             const twitterQuery = `${query} ${location} site:twitter.com OR site:x.com`;
-            const url = `https://www.google.com/search?q=${encodeURIComponent(twitterQuery)}&num=10&hl=ar`;
+            // PHASE 1 FIX: buildGoogleSearchUrl + parseGoogleResultsGeneric
+            const url = buildGoogleSearchUrl({ query: twitterQuery, num: 10 });
             const html = await serpRequest(url);
-            const parsed = parseGoogleResultsPublic(html, "twitter.com");
-            results.twitter = parsed.slice(0, 5).map(r => ({
+            const parsed = parseGoogleResultsGeneric(html);
+            results.twitter = parsed.slice(0, 5).map((r: { url: string; displayName: string; bio: string }) => ({
               username: r.url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)/)?.[1] || "",
               displayName: r.displayName,
               url: r.url,

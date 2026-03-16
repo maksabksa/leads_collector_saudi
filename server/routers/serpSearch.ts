@@ -2,8 +2,16 @@
  * Bright Data SERP REST API - البحث في محركات البحث
  * الطريقة الصحيحة: REST API عبر https://api.brightdata.com/request
  * وليس HTTP/HTTPS Proxy
+ *
+ * PHASE 1 CHANGES:
+ *  - Added import for buildGoogleSearchUrl (centralized URL builder)
+ *  - Added parseGoogleResultsGeneric() — domain-free parser (fixes empty-string domainFilter bug)
+ *  - Removed cr=countrySA from searchLinkedInSERP (causes 407 from SERP proxy)
+ *  - Replaced inline URL strings in multiQuerySearch, searchSnapchatSERP,
+ *    searchFacebookSERP, searchTwitterSERP with buildGoogleSearchUrl()
  */
 import https from "https";
+import { buildGoogleSearchUrl } from "../lib/googleUrlBuilder";
 
 // ===== Bright Data SERP REST API =====
 const SERP_API_KEY = process.env.BRIGHT_DATA_API_TOKEN || "";
@@ -470,7 +478,7 @@ async function multiQuerySearch(
 
   const fetchHtml = async (q: string): Promise<string> => {
     // ملاحظة: cr=countrySA يسبب 407 من SERP proxy - تم حذفه
-    const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+    const url = buildGoogleSearchUrl({ query: q });
     if (useResidential && RESI_USERNAME) {
       try {
         return await residentialRequest(url);
@@ -551,7 +559,7 @@ export async function searchSnapchatSERP(query: string, location?: string): Prom
     try {
       if (i > 0) await sleep(800);
       // بدون cr=countrySA لأنه يُسبب 407 من SERP proxy
-      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const url = buildGoogleSearchUrl({ query: q });
       const html = await serpRequest(url);
       // استخدام parseGoogleResultsPublic للاستخراج الصحيح
       const parsed = parseGoogleResultsPublic(html, "snapchat.com");
@@ -587,7 +595,8 @@ export async function searchLinkedInSERP(query: string, location?: string): Prom
 
   const fetchBatch = variants.map(async (q) => {
     try {
-      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa&cr=countrySA`;
+      // PHASE 1 FIX: removed cr=countrySA — causes 407 from Bright Data SERP proxy
+      const url = buildGoogleSearchUrl({ query: q });
       const html = await serpRequest(url);
       return parseGoogleResultsPublic(html, "linkedin.com");
     } catch (err: any) {
@@ -629,7 +638,7 @@ export async function searchFacebookSERP(query: string, location?: string): Prom
     const q = variants[i];
     try {
       if (i > 0) await sleep(800);
-      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const url = buildGoogleSearchUrl({ query: q });
       const html = await serpRequest(url);
       const parsed = parseGoogleResultsPublic(html, "facebook.com");
       for (const r of parsed) {
@@ -670,7 +679,7 @@ export async function searchTwitterSERP(query: string, location?: string): Promi
     const q = variants[i];
     try {
       if (i > 0) await sleep(800);
-      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=20&hl=ar&gl=sa`;
+      const url = buildGoogleSearchUrl({ query: q });
       const html = await serpRequest(url);
       // نحاول كلا النمطين: twitter.com و x.com
       const parsedX = parseGoogleResultsPublic(html, "x.com");
@@ -690,6 +699,118 @@ export async function searchTwitterSERP(query: string, location?: string): Promi
 
 // ===== تحليل نتائج Google HTML =====
 // Google الحديث يُشفّر الروابط في JSON مضمّن أو يضعها في نصوص - نستخدم regex عام
+
+/**
+ * parseGoogleResultsGeneric — PHASE 1 FIX
+ * ==========================================
+ * Parser مستقل لنتائج Google العامة (بدون domain filter).
+ *
+ * المشكلة التي يحلها:
+ *   parseGoogleResultsPublic(html, "") كانت تُرجع [] دائماً لأن
+ *   الـ else branch يُرجع [] عند domainFilter فارغ.
+ *
+ * هذا الـ parser يستخرج:
+ *   - displayName (من h3)
+ *   - bio (من وصف النتيجة)
+ *   - url (الرابط المباشر)
+ *   - candidatePhones[] — أرقام مستخرجة من النص (ليست verified)
+ *
+ * تحذير: الأرقام هنا candidatePhones لأنها مستخرجة من نص الصفحة
+ * وليس من حقل هاتف مباشر — لا تُعامَل كـ verifiedPhones.
+ */
+export function parseGoogleResultsGeneric(html: string): Array<{
+  displayName: string;
+  bio: string;
+  url: string;
+  candidatePhones: string[];
+}> {
+  const results: Array<{ displayName: string; bio: string; url: string; candidatePhones: string[] }> = [];
+  const seen = new Set<string>();
+
+  // نمط استخراج الروابط من Google HTML
+  // يدعم: href="/url?q=https://..." و href="https://..."
+  const linkRegex = /href="(?:\/url\?q=)?(https?:\/\/[^"&\s]{10,200})(?:"|&)/g;
+
+  // نطاقات مستبعدة (مواقع عامة غير تجارية)
+  const EXCLUDED_DOMAINS = [
+    "google.com", "google.sa", "youtube.com", "wikipedia.org", "wikimedia.org",
+    "gstatic.com", "googleapis.com", "googletagmanager.com",
+    "w3.org", "schema.org", "cloudflare.com", "amazonaws.com",
+    "accounts.google", "maps.google", "play.google",
+    "webcache.googleusercontent.com",
+  ];
+
+  // نمط أرقام الهاتف السعودية
+  const PHONE_REGEX = /(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g;
+
+  let match;
+  while ((match = linkRegex.exec(html)) !== null) {
+    const rawUrl = match[1];
+    let url: string;
+    try {
+      url = decodeURIComponent(rawUrl.split("&")[0]);
+    } catch {
+      url = rawUrl.split("&")[0];
+    }
+
+    const lowerUrl = url.toLowerCase();
+    if (EXCLUDED_DOMAINS.some(d => lowerUrl.includes(d))) continue;
+    if (lowerUrl.startsWith("https://www.google.com/") || lowerUrl.startsWith("https://google.com/")) continue;
+    if (url.length < 15 || url.length > 200) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+
+    // استخراج السياق المحيط بالرابط
+    const pos = match.index;
+    const contextStart = Math.max(0, pos - 600);
+    const contextEnd = Math.min(html.length, pos + 600);
+    const context = html.slice(contextStart, contextEnd);
+
+    // استخراج العنوان من h3
+    let displayName = "";
+    const h3Match = context.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
+    if (h3Match) {
+      displayName = h3Match[1].replace(/<[^>]+>/g, "").trim().slice(0, 120);
+    }
+    if (!displayName) continue; // نتجاهل النتائج بدون عنوان
+
+    // استخراج الوصف
+    let bio = "";
+    const descPatterns = [
+      /class="[^"]*VwiC3b[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*s3v9rd[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*lEBKkf[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*yDYNvb[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*IsZvec[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*fzUZNc[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+      /class="[^"]*lyLwlc[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/,
+    ];
+    for (const pattern of descPatterns) {
+      const descMatch = context.match(pattern);
+      if (descMatch) {
+        bio = descMatch[1].replace(/<[^>]+>/g, "").trim().slice(0, 300);
+        if (bio && bio.length > 10) break;
+      }
+    }
+
+    // استخراج أرقام الهاتف كـ candidatePhones (ليست verified)
+    const textForPhones = `${displayName} ${bio}`;
+    const rawPhones = Array.from(new Set(textForPhones.match(PHONE_REGEX) || []));
+    const candidatePhones = rawPhones.map(p => {
+      const digits = p.replace(/\D/g, "");
+      if (digits.startsWith("966")) return digits;
+      if (digits.startsWith("0") && digits.length === 10) return "966" + digits.slice(1);
+      if (digits.startsWith("5") && digits.length === 9) return "966" + digits;
+      return digits;
+    });
+
+    results.push({ displayName, bio, url, candidatePhones });
+    if (results.length >= 30) break;
+  }
+
+  return results;
+}
+
 export function parseGoogleResultsPublic(html: string, domainFilter: string): Array<{
   username: string; displayName: string; bio: string; url: string;
 }> {
