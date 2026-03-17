@@ -5,6 +5,7 @@ import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
   Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send, MessageSquare,
+  Target, FileText, CheckCircle2,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -556,7 +557,7 @@ export default function Leads() {
             <div className="col-span-2">المدينة / المنطقة</div>
             <div className="col-span-2">الاتصال</div>
             <div className="col-span-2">الحضور الرقمي</div>
-            <div className="col-span-1">الأولوية</div>
+            <div className="col-span-1">التشخيص</div>
             <div className="col-span-1 text-center">إجراء</div>
           </div>
           {/* Table rows */}
@@ -669,17 +670,42 @@ export default function Leads() {
                       <span className="text-xs text-muted-foreground">لا يوجد</span>
                     )}
                   </div>
-                  {/* Priority score */}
-                  <div className="col-span-1">
-                    {lead.leadPriorityScore ? (
-                      <span className="text-sm font-bold" style={{
-                        color: lead.leadPriorityScore >= 7 ? "var(--brand-green)" :
-                               lead.leadPriorityScore >= 5 ? "var(--brand-gold)" : "var(--brand-red)"
-                      }}>
-                        {lead.leadPriorityScore.toFixed(1)}
+                  {/* Diagnosis column */}
+                  <div className="col-span-1 flex flex-col gap-1.5">
+                    {/* Readiness badge */}
+                    {(lead as any).analysisReadyFlag ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit" style={{ background: "oklch(0.65 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)" }}>
+                        <CheckCircle2 className="w-2.5 h-2.5" />جاهز
+                      </span>
+                    ) : (lead as any).partialAnalysisFlag ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit" style={{ background: "oklch(0.78 0.16 75 / 0.15)", color: "oklch(0.78 0.16 75)" }}>
+                        <AlertTriangle className="w-2.5 h-2.5" />جزئي
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-full w-fit" style={{ background: "oklch(0.18 0.02 240)", color: "oklch(0.45 0.03 240)" }}>غير جاهز</span>
+                    )}
+                    {/* Score */}
+                    {(lead as any).leadPriorityScore ? (
+                      <div className="flex items-center gap-1">
+                        <Target className="w-2.5 h-2.5 flex-shrink-0" style={{ color: Number((lead as any).leadPriorityScore) >= 70 ? "oklch(0.65 0.2 145)" : Number((lead as any).leadPriorityScore) >= 50 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)" }} />
+                        <span className="text-xs font-bold" style={{ color: Number((lead as any).leadPriorityScore) >= 70 ? "oklch(0.65 0.2 145)" : Number((lead as any).leadPriorityScore) >= 50 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)" }}>
+                          {Number((lead as any).leadPriorityScore).toFixed(0)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs opacity-30 text-muted-foreground">لم يُقيَّم</span>
+                    )}
+                    {/* Primary opportunity */}
+                    {(lead as any).primaryOpportunity && (
+                      <span className="text-xs text-muted-foreground truncate max-w-[90px]" title={(lead as any).primaryOpportunity}>
+                        {String((lead as any).primaryOpportunity).replace(/_/g, " ")}
+                      </span>
+                    )}
+                    {/* Brief indicator */}
+                    {(lead as any).salesBriefGeneratedAt && (
+                      <span className="text-xs inline-flex items-center gap-0.5" style={{ color: "oklch(0.65 0.18 200)" }}>
+                        <FileText className="w-2.5 h-2.5" />brief
+                      </span>
                     )}
                   </div>
                   {/* Actions */}

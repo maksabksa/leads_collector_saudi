@@ -1929,3 +1929,10 @@
 - [ ] تحسين ScoreCard — إظهار الـ breakdown بأرقام صحيحة (0-100 لا 0-1)
 - [ ] تحسين AuditSummaryCard — إضافة SEO/Social/Conversion/Market audit بالتفصيل
 - [ ] تحسين OpportunityList — إظهار Primary/Secondary بشكل مميز بصرياً
+
+## UI Visibility Sprint
+- [ ] Leads List: إضافة readiness badge + priority badge + missing fields count لكل عميل في القائمة
+- [ ] Leads List: إضافة فلتر سريع بالأولوية (A/B/C/D) وحالة الجاهزية
+- [ ] Lead Detail: إعادة تصميم قسم التحليل كـ tab تشغيلي واضح يجمع Score + Opportunities + Audit + Brief
+- [ ] Lead Detail: أزرار "تشغيل التقييم" و"إنشاء ملخص المبيعات" بارزة وواضحة في أعلى الصفحة
+- [ ] Lead Detail: عرض readiness + missing fields في بطاقة ملخص واضحة

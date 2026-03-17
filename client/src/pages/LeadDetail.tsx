@@ -529,7 +529,21 @@ export default function LeadDetail() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* زر تشغيل التقييم */}
+          <button onClick={handleRunScore} disabled={isScoring}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: isScoring ? "oklch(0.65 0.18 145 / 0.08)" : "oklch(0.65 0.18 145 / 0.2)", color: "oklch(0.65 0.18 145)", border: "1px solid oklch(0.65 0.18 145 / 0.4)" }}>
+            {isScoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
+            {isScoring ? "جاري التقييم..." : "تشغيل التقييم"}
+          </button>
+          {/* زر إنشاء ملخص المبيعات */}
+          <button onClick={handleGenerateBrief} disabled={isGeneratingBrief}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: isGeneratingBrief ? "oklch(0.78 0.16 75 / 0.08)" : "oklch(0.78 0.16 75 / 0.2)", color: "oklch(0.78 0.16 75)", border: "1px solid oklch(0.78 0.16 75 / 0.4)" }}>
+            {isGeneratingBrief ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isGeneratingBrief ? "جاري التوليد..." : "ملخص المبيعات"}
+          </button>
           <button onClick={handleAnalyzeBehavior} disabled={analyzeBehavior.isPending}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
@@ -937,6 +951,82 @@ export default function LeadDetail() {
 
         {/* Right column - analysis */}
         <div className="col-span-2 space-y-4">
+
+          {/* ===== PHASE 6B: التشخيص والتقييم والمبيعات (أول شيء يظهر) ===== */}
+          <div className="rounded-2xl border overflow-hidden" style={{ background: "oklch(0.10 0.015 240)", borderColor: "oklch(0.65 0.18 145 / 0.25)" }}>
+            {/* Section header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "oklch(0.65 0.18 145 / 0.2)", background: "oklch(0.65 0.18 145 / 0.06)" }}>
+              <h3 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+                <Target className="w-4 h-4" style={{ color: "oklch(0.65 0.18 145)" }} />
+                التشخيص والتقييم
+              </h3>
+              <div className="flex items-center gap-2">
+                {scoreResult && (
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)" }}>
+                    درجة: {scoreResult.score?.value ?? "—"}
+                  </span>
+                )}
+                <button onClick={handleRunScore} disabled={isScoring}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                  style={{ background: isScoring ? "oklch(0.65 0.18 145 / 0.05)" : "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)", border: "1px solid oklch(0.65 0.18 145 / 0.3)" }}>
+                  {isScoring ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {isScoring ? "جاري..." : "تشغيل التقييم"}
+                </button>
+              </div>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Row 1: Readiness + Missing Fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <ReadinessIndicator
+                  analysisReadyFlag={lead.analysisReadyFlag}
+                  partialAnalysisFlag={lead.partialAnalysisFlag}
+                  analysisConfidenceScore={lead.analysisConfidenceScore}
+                />
+                <MissingFieldsPanel
+                  missingDataFlags={lead.missingDataFlags as string[] | null | undefined}
+                />
+              </div>
+              {/* Row 2: ScoreCard */}
+              <ScoreCard
+                scoreResult={scoreResult}
+                isScoring={isScoring}
+                onRunScore={handleRunScore}
+              />
+              {/* Row 3: OpportunityList */}
+              {scoreResult !== null && (
+                <OpportunityList opportunities={scoreResult.opportunities} />
+              )}
+              {/* Row 4: AuditSummaryCard */}
+              <AuditSummaryCard lead={lead} />
+            </div>
+          </div>
+          {/* ===== END PHASE 6B DIAGNOSIS ===== */}
+
+          {/* ===== PHASE 6B SALES BRIEF ===== */}
+          <div className="rounded-2xl border overflow-hidden" style={{ background: "oklch(0.10 0.015 240)", borderColor: "oklch(0.78 0.16 75 / 0.25)" }}>
+            <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "oklch(0.78 0.16 75 / 0.2)", background: "oklch(0.78 0.16 75 / 0.06)" }}>
+              <h3 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+                <Sparkles className="w-4 h-4" style={{ color: "oklch(0.78 0.16 75)" }} />
+                ملخص المبيعات
+              </h3>
+              <button onClick={handleGenerateBrief} disabled={isGeneratingBrief}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                style={{ background: isGeneratingBrief ? "oklch(0.78 0.16 75 / 0.05)" : "oklch(0.78 0.16 75 / 0.15)", color: "oklch(0.78 0.16 75)", border: "1px solid oklch(0.78 0.16 75 / 0.3)" }}>
+                {isGeneratingBrief ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                {isGeneratingBrief ? "جاري التوليد..." : "إنشاء الملخص"}
+              </button>
+            </div>
+            <div className="p-4">
+              <SalesBriefCard
+                briefResult={briefResult}
+                isGenerating={isGeneratingBrief}
+                scoreResult={scoreResult}
+                onGenerateBrief={handleGenerateBrief}
+              />
+            </div>
+          </div>
+          {/* ===== END PHASE 6B SALES BRIEF ===== */}
+
           {/* Marketing gaps */}
           {(lead.biggestMarketingGap || lead.revenueOpportunity || lead.suggestedSalesEntryAngle) && (
             <div className="rounded-2xl p-5 border border-border space-y-4" style={{ background: "oklch(0.12 0.015 240)" }}>
@@ -1810,56 +1900,6 @@ export default function LeadDetail() {
               </button>
             </div>
           )}
-
-          {/* ===== PHASE 6B: التقييم والمبيعات ===== */}
-          <div className="rounded-2xl border border-border overflow-hidden" style={{ background: "oklch(0.10 0.015 240)" }}>
-            {/* Section header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-              <h3 className="font-semibold text-foreground flex items-center gap-2 text-sm">
-                <span style={{ color: "oklch(0.65 0.18 200)" }}>◈</span>
-                التقييم والمبيعات
-              </h3>
-              <span className="text-xs text-muted-foreground opacity-50">PHASE 6</span>
-            </div>
-
-            <div className="p-4 space-y-4">
-              {/* Row 1: Readiness + Missing Fields */}
-              <div className="grid grid-cols-2 gap-3">
-                <ReadinessIndicator
-                  analysisReadyFlag={lead.analysisReadyFlag}
-                  partialAnalysisFlag={lead.partialAnalysisFlag}
-                  analysisConfidenceScore={lead.analysisConfidenceScore}
-                />
-                <MissingFieldsPanel
-                  missingDataFlags={lead.missingDataFlags as string[] | null | undefined}
-                />
-              </div>
-
-              {/* Row 2: ScoreCard (full width) */}
-              <ScoreCard
-                scoreResult={scoreResult}
-                isScoring={isScoring}
-                onRunScore={handleRunScore}
-              />
-
-              {/* Row 3: OpportunityList (full width, shown after scoring runs) */}
-              {scoreResult !== null && (
-                <OpportunityList opportunities={scoreResult.opportunities} />
-              )}
-
-              {/* Row 4: AuditSummaryCard */}
-              <AuditSummaryCard lead={lead} />
-
-              {/* Row 5: SalesBriefCard (full width) */}
-              <SalesBriefCard
-                briefResult={briefResult}
-                isGenerating={isGeneratingBrief}
-                scoreResult={scoreResult}
-                onGenerateBrief={handleGenerateBrief}
-              />
-            </div>
-          </div>
-          {/* ===== END PHASE 6B ===== */}
 
         </div>
       </div>
