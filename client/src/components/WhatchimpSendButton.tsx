@@ -354,8 +354,8 @@ export default function WhatchimpSendButton({
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {hasExistingReport
-                    ? "سيُرفق التقرير المحفوظ مسبقاً كـ document header"
-                    : "سيُولَّد تقرير تحليل العميل ويُرفق تلقائياً"}
+                    ? "سيُرسَل رابط التقرير في نص الرسالة كـ {{1}} — العميل يضغط عليه لفتح التقرير"
+                    : "سيُولَّد تقرير تحليل العميل ويُرسَل رابطه في نص الرسالة كـ {{1}}"}
                 </p>
                 {hasExistingReport && (
                   <p className="text-xs mt-1" style={{ color: "oklch(0.65 0.18 145)" }}>
@@ -373,7 +373,7 @@ export default function WhatchimpSendButton({
                 <p className="text-muted-foreground">
                   سيتم إرسال الـ template{" "}
                   <strong className="text-foreground">{selectedTemplate}</strong>{" "}
-                  {attachPdf ? "مع تقرير PDF كمرفق" : "بدون مرفق"}.
+                  {attachPdf ? "مع رابط تقرير PDF في نص الرسالة" : "بدون تقرير PDF"}.
                 </p>
               </div>
             )}

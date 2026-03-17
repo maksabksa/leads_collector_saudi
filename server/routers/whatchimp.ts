@@ -618,7 +618,7 @@ export const whatchimpRouter = router({
       leadId: z.number(),
       templateName: z.string(),
       languageCode: z.string().default("ar"),
-      pdfUrl: z.string().url().optional(), // رابط التقرير لإرفاقه كـ document header
+      pdfUrl: z.string().url().optional(), // رابط التقرير — يُمرَّر كـ variable1 في نص الرسالة
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
@@ -634,7 +634,7 @@ export const whatchimpRouter = router({
 
       const phone = normalizePhone(lead.verifiedPhone);
 
-      // Build send params — include document header when pdfUrl is provided
+      // Build send params — pass pdfUrl as variable1 in template body
       const sendParams: Record<string, string | number> = {
         apiToken,
         phone_number_id: phoneNumberId,
@@ -643,8 +643,9 @@ export const whatchimpRouter = router({
         language_code: input.languageCode,
       };
       if (input.pdfUrl) {
-        sendParams["header_type"] = "document";
-        sendParams["header_document_url"] = input.pdfUrl;
+        // Whatchimp API does not support header_document_url dynamically.
+        // Instead, pass the PDF URL as variable1 so the template body can include {{1}}.
+        sendParams["variable1"] = input.pdfUrl;
       }
 
       // Send template message
