@@ -28,10 +28,27 @@ function getBrightDataEndpoint(): string {
 
 async function openBrightDataBrowser() {
   const endpoint = getBrightDataEndpoint();
-  const browser = await puppeteer.connect({
-    browserWSEndpoint: endpoint,
-  });
-  return browser;
+  try {
+    const browser = await Promise.race([
+      puppeteer.connect({ browserWSEndpoint: endpoint }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("انتهت مهلة الاتصال بـ Bright Data (30 ثانية) — تحقق من صحة الـ endpoint")), 30000)
+      ),
+    ]);
+    return browser;
+  } catch (err: any) {
+    const msg: string = err?.message || "";
+    if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND") || msg.includes("Failed to fetch") || msg.includes("fetch") || msg.includes("WebSocket")) {
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: "تعذّر الاتصال بـ Bright Data — تحقق من صحة الـ BRIGHT_DATA_WS_ENDPOINT وأن الحساب نشط",
+      });
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `خطأ في الاتصال بـ Bright Data: ${msg}`,
+    });
+  }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
