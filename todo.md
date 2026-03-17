@@ -1936,3 +1936,5 @@
 - [ ] Lead Detail: إعادة تصميم قسم التحليل كـ tab تشغيلي واضح يجمع Score + Opportunities + Audit + Brief
 - [ ] Lead Detail: أزرار "تشغيل التقييم" و"إنشاء ملخص المبيعات" بارزة وواضحة في أعلى الصفحة
 - [ ] Lead Detail: عرض readiness + missing fields في بطاقة ملخص واضحة
+- [x] CrossPlatformPanel — Platform Coverage Summary + Candidate Groups + Merge Dialog
+- [x] PlatformCoverageCard في صفحة تفاصيل العميل

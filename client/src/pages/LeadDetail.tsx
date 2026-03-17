@@ -18,6 +18,7 @@ import ReadinessIndicator from "@/components/leads/ReadinessIndicator";
 import MissingFieldsPanel from "@/components/leads/MissingFieldsPanel";
 import AuditSummaryCard from "@/components/leads/AuditSummaryCard";
 import SalesBriefCard, { type SalesBriefResult } from "@/components/leads/SalesBriefCard";
+import { PlatformCoverageCard } from "@/components/leads/PlatformCoverageCard";
 
 function ScoreBar({ label, value, color }: { label: string; value: number | string | null | undefined; color: string }) {
   const numValue = value !== null && value !== undefined ? Number(value) : null;
@@ -866,6 +867,12 @@ export default function LeadDetail() {
               />
             </div>
           )}
+          {/* Platform Coverage Card */}
+          <PlatformCoverageCard
+            lead={lead}
+            socialAnalyses={data?.socialAnalyses || []}
+          />
+
           {/* Digital presence */}
           <div className="rounded-2xl p-4 border border-border space-y-3" style={{ background: "oklch(0.12 0.015 240)" }}>
             <h3 className="text-sm font-semibold text-foreground">الحضور الرقمي</h3>

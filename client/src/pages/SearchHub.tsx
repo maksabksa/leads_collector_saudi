@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { MapView } from "@/components/Map";
 import { AddLeadModal } from "@/components/AddLeadModal";
+import { CrossPlatformPanel, type MergedLeadData } from "@/components/CrossPlatformPanel";
 
 // ===== ثوابت =====
 const SAUDI_CITIES = [
@@ -1189,6 +1190,37 @@ export default function SearchHub() {
     }
   };
 
+  // ===== معالجة الدمج من CrossPlatformPanel =====
+  const handleMergedAdd = async (data: MergedLeadData) => {
+    try {
+      await createLead.mutateAsync({
+        companyName: data.companyName,
+        businessType: data.businessType || "غير محدد",
+        city: data.city || city || "غير محدد",
+        verifiedPhone: data.phone || undefined,
+        website: data.website || undefined,
+        instagramUrl: data.instagramUrl || undefined,
+        tiktokUrl: data.tiktokUrl || undefined,
+        snapchatUrl: data.snapchatUrl || undefined,
+        twitterUrl: data.twitterUrl || undefined,
+        linkedinUrl: data.linkedinUrl || undefined,
+        facebookUrl: data.facebookUrl || undefined,
+        googleMapsUrl: data.googleMapsUrl || undefined,
+        notes: data.sources?.length > 1
+          ? `تم الدمج من: ${data.sources.join(", ")}`
+          : undefined,
+      });
+      setAddedNames(prev => { const next = new Set(prev); next.add(data.companyName); return next; });
+      toast.success("تمت الإضافة كعميل محتمل", {
+        description: data.sources?.length > 1
+          ? `${data.companyName} — مدمج من ${data.sources.length} منصات`
+          : data.companyName
+      });
+    } catch (e: any) {
+      toast.error("خطأ في الإضافة", { description: e.message });
+    }
+  };
+
   const clearResults = (platform: PlatformId) => {
     setResultsPlatform(platform, []);
     if (platform === "instagram") setInstagramSearchId(null);
@@ -1546,72 +1578,43 @@ export default function SearchHub() {
 
           {/* ===== محتوى تبويب الكل ===== */}
           <TabsContent value="all" className="flex-1 min-h-0 overflow-y-auto m-0 p-6">
-            <div className="max-w-3xl mx-auto space-y-4">
+            <div className="max-w-3xl mx-auto">
+              {/* شريط تحميل عند البحث */}
               {isAnyLoading && (
-                <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">جاري البحث في جميع المنصات...</p>
-                    <div className="flex gap-2 mt-1">
+                <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-xl mb-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium">جاري البحث في المنصات...</p>
+                    <div className="flex gap-2 mt-1 flex-wrap">
                       {PLATFORMS.map(p => loading[p.id] && (
-                        <span key={p.id} className={`text-xs ${p.color} flex items-center gap-1`}>
-                          <Loader2 className="w-2.5 h-2.5 animate-spin" />{p.label}
+                        <span key={p.id} className={`text-[10px] ${p.color} flex items-center gap-1`}>
+                          <Loader2 className="w-2 h-2 animate-spin" />{p.label}
                         </span>
                       ))}
                     </div>
                   </div>
                 </div>
               )}
-              {totalResults === 0 && !isAnyLoading ? (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
-                    <Layers className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="font-semibold text-foreground mb-2">ابحث في جميع المنصات</h3>
-                  <p className="text-sm text-muted-foreground mb-4 max-w-xs mx-auto">
-                    اضغط بحث للبحث في Google Maps وجميع منصات التواصل دفعة واحدة
-                  </p>
+
+              {/* زر بحث في الكل عند عدم وجود نتائج */}
+              {Object.values(results).every(r => r.length === 0) && !isAnyLoading && (
+                <div className="text-center py-12 mb-4">
                   <Button onClick={handleSearchAll} disabled={!keyword.trim()} className="gap-2">
                     <Layers className="w-4 h-4" />
-                    بحث في الكل
+                    بحث في كل المنصات
                   </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* ملخص النتائج لكل منصة */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {PLATFORMS.map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => setActiveTab(p.id)}
-                        className={`flex items-center gap-2 p-2.5 rounded-lg border transition-all hover:border-primary/40 ${
-                          results[p.id].length > 0 ? `${p.bgColor} ${p.borderColor}` : "bg-muted/20 border-border opacity-50"
-                        }`}
-                      >
-                        <p.icon className={`w-3.5 h-3.5 ${p.color}`} />
-                        <span className="text-xs font-medium">{p.label}</span>
-                        {results[p.id].length > 0 && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${p.badgeColor} font-bold mr-auto`}>
-                            {results[p.id].length}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                  {/* عرض جميع النتائج مدمجة */}
-                  {PLATFORMS.flatMap(p =>
-                    results[p.id].slice(0, Math.ceil(resultLimit / PLATFORMS.length)).map((r: any, i: number) => (
-                      <ResultCard
-                        key={`${p.id}-${i}`}
-                        result={r}
-                        platform={p}
-                        onAdd={(res) => handleOpenAddDialog(res, p.id)}
-                        isDuplicate={isExistingLead(r) || addedNames.has(r.name || r.fullName || r.username || "")}
-                      />
-                    ))
-                  )}
+                  <p className="text-xs text-muted-foreground mt-2">سيبحث في Google Maps + 7 منصات دفعة واحدة</p>
                 </div>
               )}
+
+              {/* CrossPlatformPanel — المقارنة والدمج */}
+              <CrossPlatformPanel
+                results={results}
+                loading={loading}
+                keyword={keyword}
+                city={city}
+                onAddLead={handleMergedAdd}
+              />
             </div>
           </TabsContent>
 
