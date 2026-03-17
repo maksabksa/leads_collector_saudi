@@ -32,7 +32,7 @@ async function openBrightDataBrowser() {
     const browser = await Promise.race([
       puppeteer.connect({ browserWSEndpoint: endpoint }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("انتهت مهلة الاتصال بـ Bright Data (30 ثانية) — تحقق من صحة الـ endpoint")), 30000)
+        setTimeout(() => reject(new Error("انتهت مهلة الاتصال بـ Bright Data (90 ثانية) — تحقق من صحة الـ endpoint")), 90000)
       ),
     ]);
     return browser;

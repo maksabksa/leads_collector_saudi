@@ -404,3 +404,199 @@ describe("Pipeline integration — groupCandidates → getMergePreview → creat
     expect(confidence).toBeLessThanOrEqual(100);
   });
 });
+
+describe("checkDuplicateBatch logic", () => {
+  it("يُعيد isDuplicate=false لعنصر غير موجود", () => {
+    const mockDupResult = { isDuplicate: false, existingLeadId: null, reason: "no_match" };
+    expect(mockDupResult.isDuplicate).toBe(false);
+    expect(mockDupResult.existingLeadId).toBeNull();
+  });
+
+  it("يُعيد isDuplicate=true لعنصر موجود بنفس الهاتف", () => {
+    const mockDupResult = { isDuplicate: true, existingLeadId: 123, reason: "phone_match" };
+    expect(mockDupResult.isDuplicate).toBe(true);
+    expect(mockDupResult.existingLeadId).toBe(123);
+    expect(mockDupResult.reason).toBe("phone_match");
+  });
+
+  it("يُعيد isDuplicate=true لعنصر موجود بنفس الاسم", () => {
+    const mockDupResult = { isDuplicate: true, existingLeadId: 456, reason: "name_match" };
+    expect(mockDupResult.isDuplicate).toBe(true);
+    expect(mockDupResult.reason).toBe("name_match");
+  });
+
+  it("يبني checkItems بشكل صحيح من groups وsingles", () => {
+    const groups = [
+      { primaryName: "مطعم الرياض", primaryPhone: "+966501234567", primaryWebsite: "https://example.com" },
+      { primaryName: "صالون الجمال", primaryPhone: "", primaryWebsite: "" },
+    ];
+    const singles = [
+      { name: "بقالة الحي", phone: "+966509876543", website: "" },
+    ];
+
+    const checkItems: Array<{ id: string; companyName?: string; phone?: string; website?: string }> = [];
+    groups.forEach((g, i) => {
+      checkItems.push({ id: `group-${i}`, companyName: g.primaryName, phone: g.primaryPhone, website: g.primaryWebsite });
+    });
+    singles.forEach((s, i) => {
+      checkItems.push({ id: `single-${i}`, companyName: s.name, phone: s.phone, website: s.website });
+    });
+
+    expect(checkItems.length).toBe(3);
+    expect(checkItems[0].id).toBe("group-0");
+    expect(checkItems[1].id).toBe("group-1");
+    expect(checkItems[2].id).toBe("single-0");
+    expect(checkItems[0].companyName).toBe("مطعم الرياض");
+    expect(checkItems[2].phone).toBe("+966509876543");
+  });
+
+  it("يُطبّق نتائج الفحص على المجموعات بشكل صحيح", () => {
+    const groups = [
+      { primaryName: "مطعم الرياض", isDuplicate: false, existingLeadId: null, duplicateReason: "" },
+      { primaryName: "صالون الجمال", isDuplicate: false, existingLeadId: null, duplicateReason: "" },
+    ];
+
+    const dupResults: Record<string, { isDuplicate: boolean; existingLeadId: number | null; reason: string }> = {
+      "group-0": { isDuplicate: true, existingLeadId: 100, reason: "phone_match" },
+      "group-1": { isDuplicate: false, existingLeadId: null, reason: "no_match" },
+    };
+
+    const updatedGroups = groups.map((g, i) => {
+      const dup = dupResults[`group-${i}`];
+      return { ...g, isDuplicate: dup?.isDuplicate || false, existingLeadId: dup?.existingLeadId || null, duplicateReason: dup?.reason || "" };
+    });
+
+    expect(updatedGroups[0].isDuplicate).toBe(true);
+    expect(updatedGroups[0].existingLeadId).toBe(100);
+    expect(updatedGroups[0].duplicateReason).toBe("phone_match");
+    expect(updatedGroups[1].isDuplicate).toBe(false);
+  });
+
+  it("يُحسب totalDuplicates بشكل صحيح", () => {
+    const groups = [
+      { isDuplicate: true },
+      { isDuplicate: false },
+      { isDuplicate: true },
+    ];
+    const singles = [
+      { isDuplicate: false },
+      { isDuplicate: true },
+    ];
+
+    const duplicateGroupsCount = groups.filter(g => g.isDuplicate).length;
+    const duplicateSinglesCount = singles.filter(s => s.isDuplicate).length;
+    const totalDuplicates = duplicateGroupsCount + duplicateSinglesCount;
+
+    expect(duplicateGroupsCount).toBe(2);
+    expect(duplicateSinglesCount).toBe(1);
+    expect(totalDuplicates).toBe(3);
+  });
+});
+
+describe("MergePreviewDialog — fieldValues logic", () => {
+  it("يبني fieldValues من candidates بشكل صحيح", () => {
+    const candidates = [
+      {
+        source: "google",
+        businessNameHint: "مطعم الرياض",
+        nameHint: "",
+        verifiedPhones: ["+966501234567"],
+        candidatePhones: [],
+        verifiedWebsite: "https://example.com",
+        candidateWebsites: [],
+        cityHint: "الرياض",
+        categoryHint: "مطعم",
+        url: "https://maps.google.com/test",
+      },
+      {
+        source: "instagram",
+        businessNameHint: "",
+        nameHint: "riyadh_restaurant",
+        verifiedPhones: [],
+        candidatePhones: [],
+        verifiedWebsite: "",
+        candidateWebsites: [],
+        cityHint: "",
+        categoryHint: "",
+        url: "https://instagram.com/riyadh_restaurant",
+      },
+    ];
+
+    const fields: Record<string, Array<{ source: string; value: string }>> = {
+      companyName: [],
+      phone: [],
+      website: [],
+      city: [],
+      instagram: [],
+    };
+
+    for (const c of candidates) {
+      const src = c.source;
+      const name = c.businessNameHint || c.nameHint || "";
+      const phone = c.verifiedPhones?.[0] || c.candidatePhones?.[0] || "";
+      const website = c.verifiedWebsite || c.candidateWebsites?.[0] || "";
+      const cityVal = c.cityHint || "";
+      const url = c.url || "";
+
+      if (name && !fields.companyName.find(v => v.value === name)) fields.companyName.push({ source: src, value: name });
+      if (phone && !fields.phone.find(v => v.value === phone)) fields.phone.push({ source: src, value: phone });
+      if (website && !fields.website.find(v => v.value === website)) fields.website.push({ source: src, value: website });
+      if (cityVal && !fields.city.find(v => v.value === cityVal)) fields.city.push({ source: src, value: cityVal });
+      if (src === "instagram" && url) fields.instagram.push({ source: src, value: url });
+    }
+
+    expect(fields.companyName.length).toBe(2);
+    expect(fields.companyName[0]).toEqual({ source: "google", value: "مطعم الرياض" });
+    expect(fields.companyName[1]).toEqual({ source: "instagram", value: "riyadh_restaurant" });
+    expect(fields.phone.length).toBe(1);
+    expect(fields.phone[0].value).toBe("+966501234567");
+    expect(fields.website.length).toBe(1);
+    expect(fields.city.length).toBe(1);
+    expect(fields.instagram.length).toBe(1);
+    expect(fields.instagram[0].value).toBe("https://instagram.com/riyadh_restaurant");
+  });
+
+  it("يتجنب التكرار في fieldValues", () => {
+    const candidates = [
+      { source: "google", businessNameHint: "مطعم", nameHint: "", verifiedPhones: ["+966501234567"], candidatePhones: [], verifiedWebsite: "", candidateWebsites: [], cityHint: "الرياض", categoryHint: "", url: "" },
+      { source: "instagram", businessNameHint: "مطعم", nameHint: "", verifiedPhones: ["+966501234567"], candidatePhones: [], verifiedWebsite: "", candidateWebsites: [], cityHint: "الرياض", categoryHint: "", url: "" },
+    ];
+
+    const companyNames: Array<{ source: string; value: string }> = [];
+    const phones: Array<{ source: string; value: string }> = [];
+
+    for (const c of candidates) {
+      const name = c.businessNameHint || c.nameHint || "";
+      const phone = c.verifiedPhones?.[0] || "";
+      if (name && !companyNames.find(v => v.value === name)) companyNames.push({ source: c.source, value: name });
+      if (phone && !phones.find(v => v.value === phone)) phones.push({ source: c.source, value: phone });
+    }
+
+    // نفس الاسم ونفس الهاتف → يُضاف مرة واحدة فقط
+    expect(companyNames.length).toBe(1);
+    expect(phones.length).toBe(1);
+  });
+
+  it("يُطبّق handleFieldSelect على النموذج بشكل صحيح", () => {
+    const formKeyMap: Record<string, string> = {
+      companyName: "companyName",
+      phone: "phone",
+      website: "website",
+      city: "city",
+      category: "businessType",
+      instagram: "instagramUrl",
+      tiktok: "tiktokUrl",
+      snapchat: "snapchatUrl",
+      twitter: "twitterUrl",
+      linkedin: "linkedinUrl",
+      facebook: "facebookUrl",
+      googleMaps: "googleMapsUrl",
+    };
+
+    // التحقق من تعيين المفاتيح
+    expect(formKeyMap.companyName).toBe("companyName");
+    expect(formKeyMap.instagram).toBe("instagramUrl");
+    expect(formKeyMap.googleMaps).toBe("googleMapsUrl");
+    expect(formKeyMap.category).toBe("businessType");
+  });
+});

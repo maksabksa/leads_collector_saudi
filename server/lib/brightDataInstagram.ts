@@ -71,7 +71,7 @@ async function brightDataRequest(
   method: "GET" | "POST",
   path: string,
   body?: unknown,
-  timeoutMs = 30000
+  timeoutMs = 90000
 ): Promise<unknown> {
   const apiKey = ENV.brightDataApiToken;
   if (!apiKey) {
@@ -361,7 +361,7 @@ export async function searchInstagramByKeyword(
           "Content-Type": "application/json",
         },
         body: JSON.stringify([{ keyword: searchQuery, count: limit }]),
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(90000),
       }
     );
 

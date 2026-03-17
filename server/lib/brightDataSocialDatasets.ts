@@ -125,7 +125,7 @@ async function brightDataRequest(
   method: "GET" | "POST",
   path: string,
   body?: unknown,
-  timeoutMs = 30000
+  timeoutMs = 90000
 ): Promise<unknown> {
   const apiKey = ENV.brightDataApiToken;
   if (!apiKey) throw new Error("BRIGHT_DATA_API_TOKEN not configured");

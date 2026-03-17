@@ -907,6 +907,38 @@ const leadIntelligenceRouter = router({
       }
       return parsed;
     }),
+
+  // ─── checkDuplicateBatch: فحص مجموعة نتائج بحث ضد قاعدة البيانات ────────────
+  checkDuplicateBatch: protectedProcedure
+    .input(z.array(z.object({
+      id: z.string(),                          // معرّف النتيجة (من البحث)
+      companyName: z.string().optional(),
+      phone: z.string().optional(),
+      website: z.string().optional(),
+    })).max(200))
+    .query(async ({ input }) => {
+      const { checkLeadDuplicate } = await import("../db");
+      const results: Record<string, { isDuplicate: boolean; existingLeadId: number | null; reason: string }> = {};
+
+      for (const item of input) {
+        try {
+          const dup = await checkLeadDuplicate(
+            item.phone || "",
+            item.companyName || "",
+            item.website
+          );
+          results[item.id] = {
+            isDuplicate: dup.isDuplicate,
+            existingLeadId: dup.candidateId,
+            reason: dup.reason,
+          };
+        } catch {
+          results[item.id] = { isDuplicate: false, existingLeadId: null, reason: "check_failed" };
+        }
+      }
+
+      return results;
+    }),
 });
 // ────────────────────────────────────────────────────────────────────────────────
 export { leadIntelligenceRouter };

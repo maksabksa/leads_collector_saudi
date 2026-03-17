@@ -350,7 +350,7 @@ async function serpRequestRaw(targetUrl: string): Promise<string> {
       });
     });
 
-    req.setTimeout(30000, () => {
+    req.setTimeout(90000, () => {
       req.destroy();
       reject(new Error("SERP API request timeout"));
     });
