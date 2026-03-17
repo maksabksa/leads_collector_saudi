@@ -179,18 +179,19 @@ export default function ScoreCard({ scoreResult, isScoring, onRunScore }: Props)
       {/* Breakdown bars */}
       <div className="space-y-2">
         {Object.entries(score.breakdown).map(([key, val]) => {
-          const pct = Math.round((val / 25) * 100); // max weight is 25
-          const barColor = val >= 18 ? "oklch(0.65 0.2 145)" : val >= 10 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)";
+          // val is 0..1 (raw ratio), convert to 0..100 percentage for display
+          const pct = Math.round(Math.min(val * 100, 100));
+          const barColor = pct >= 70 ? "oklch(0.65 0.2 145)" : pct >= 40 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)";
           return (
             <div key={key} className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{BREAKDOWN_LABELS[key] ?? key}</span>
               <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "oklch(0.18 0.02 240)" }}>
                 <div
                   className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${Math.min(pct, 100)}%`, background: barColor }}
+                  style={{ width: `${pct}%`, background: barColor }}
                 />
               </div>
-              <span className="text-xs font-mono w-6 text-right" style={{ color: barColor }}>{val}</span>
+              <span className="text-xs font-mono w-8 text-right" style={{ color: barColor }}>{pct}%</span>
             </div>
           );
         })}

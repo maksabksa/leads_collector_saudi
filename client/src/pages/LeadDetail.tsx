@@ -1842,8 +1842,8 @@ export default function LeadDetail() {
                 onRunScore={handleRunScore}
               />
 
-              {/* Row 3: OpportunityList (full width, only if score exists) */}
-              {scoreResult?.opportunities && scoreResult.opportunities.length > 0 && (
+              {/* Row 3: OpportunityList (full width, shown after scoring runs) */}
+              {scoreResult !== null && (
                 <OpportunityList opportunities={scoreResult.opportunities} />
               )}
 

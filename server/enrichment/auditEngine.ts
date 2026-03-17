@@ -150,7 +150,12 @@ export function computeMarketAudit(input: MarketAuditInput): PureAuditSignal {
 
 function buildSeoAudit(wa: Record<string, unknown> | null): AuditSignal {
   if (!wa) {
-    return { present: [], missing: ["website_analysis"], confidence: "low" };
+    // عند عدم وجود موقع — كل مفاتيح SEO مفقودة (rules 1,2,8 تحتاج هذه المفاتيح)
+    return {
+      present: [],
+      missing: ["title_tag", "meta_description", "canonical_url", "sitemap_xml", "og_tags", "structured_data", "robots_meta", "h1_heading", "ssl_certificate"],
+      confidence: "low",
+    };
   }
 
   const raw = wa.rawAnalysis ? JSON.parse(wa.rawAnalysis as string) : {};
@@ -213,21 +218,21 @@ function buildConversionAudit(wa: Record<string, unknown> | null, lead: Record<s
   const present: string[] = [];
   const missing: string[] = [];
 
+  // ── Lead-level signals — keys must match opportunityEngine rule lookups ────────────────
+  (lead.verifiedPhone as string | null) ? present.push("phone") : missing.push("phone");
+  (lead.website as string | null) ? present.push("website") : missing.push("website");
+  (lead.googleMapsUrl as string | null) ? present.push("google_maps") : missing.push("google_maps");
+  (lead.hasWhatsapp as string | null) === "yes" ? present.push("whatsapp") : missing.push("whatsapp");
+
+  // ── Website-level signals (only when website analysis exists) ──────────────────
   if (wa) {
     const raw = wa.rawAnalysis ? JSON.parse(wa.rawAnalysis as string) : {};
     const seo = raw.seo ?? {};
-
-    seo.hasWhatsapp ? present.push("whatsapp_button") : missing.push("whatsapp_button");
     seo.hasBooking ? present.push("online_booking") : missing.push("online_booking");
     seo.hasEcommerce ? present.push("ecommerce_payment") : missing.push("ecommerce_payment");
     seo.hasSSL ? present.push("ssl_secure") : missing.push("ssl_secure");
   } else {
-    missing.push("whatsapp_button", "online_booking", "ecommerce_payment", "ssl_secure");
-  }
-
-  // WhatsApp من جدول leads
-  if (lead.hasWhatsapp === "yes") {
-    if (!present.includes("whatsapp_button")) present.push("whatsapp_button");
+    missing.push("online_booking", "ecommerce_payment", "ssl_secure");
   }
 
   const confidence: AuditSignal["confidence"] = wa ? "high" : "low";

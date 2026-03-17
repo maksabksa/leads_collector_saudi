@@ -1921,3 +1921,11 @@
 
 ## Auto-fallback 24h Window Error Fix
 - [x] WhatchimpSendButton.tsx — اصطياد خطأ "24 hour window" في sendLead وفتح Template Dialog تلقائياً
+
+## الدفعة - إصلاح وتحسين صفحة تفاصيل العميل (Lead Detail)
+- [ ] إصلاح generateSalesBrief — خطأ no_opportunities يمنع توليد الـ brief
+- [ ] حفظ نتيجة التقييم (score.value, reasons, breakdown, opportunities) في DB
+- [ ] جلب النتيجة المحفوظة عند فتح صفحة العميل (لا تختفي عند reload)
+- [ ] تحسين ScoreCard — إظهار الـ breakdown بأرقام صحيحة (0-100 لا 0-1)
+- [ ] تحسين AuditSummaryCard — إضافة SEO/Social/Conversion/Market audit بالتفصيل
+- [ ] تحسين OpportunityList — إظهار Primary/Secondary بشكل مميز بصرياً
