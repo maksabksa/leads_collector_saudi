@@ -1528,7 +1528,14 @@ export default function SearchHub() {
 
       {/* ===== التبويبات ===== */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as ActiveTabType)} className="flex-1 min-h-0 flex flex-col">
+        <Tabs value={activeTab} onValueChange={v => {
+          const newTab = v as ActiveTabType;
+          setActiveTab(newTab);
+          // إذا انتقل المستخدم لتاب الكل وتوجد كلمة بحث وليس هناك نتائج بعد، ابدأ البحث تلقائياً
+          if (newTab === "all" && keyword.trim() && Object.values(results).every(r => r.length === 0) && !isAnyLoading) {
+            setTimeout(() => handleSearchAll(), 100);
+          }
+        }} className="flex-1 min-h-0 flex flex-col">
           {/* شريط التبويبات */}
           <div className="border-b border-border bg-card px-6 shrink-0 overflow-x-auto">
             <TabsList className="h-auto bg-transparent p-0 gap-0 w-max">

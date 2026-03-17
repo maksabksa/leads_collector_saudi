@@ -124,12 +124,44 @@ function buildTopFindings(
  * Produces a fully populated SalesBrief from lead data, score, and opportunities.
  * Throws if opportunities array is empty (caller must guard before calling).
  */
-export function generateSalesBrief(input: SalesBriefGeneratorInput): SalesBrief {
-  const { lead, score, opportunities } = input;
+/**
+ * Builds a fallback opportunity list from score breakdown when no real opportunities exist.
+ * Uses the weakest dimension to suggest the most impactful service.
+ */
+function buildFallbackOpportunities(score: LeadScore): LeadOpportunity[] {
+  const breakdown = score.breakdown;
+  // اختر أضعف بُعد لتحديد الفرصة الافتراضية
+  const dims = Object.entries(breakdown) as [string, number][];
+  dims.sort((a, b) => a[1] - b[1]);
+  const weakest = dims[0]?.[0] ?? "digitalPresence";
 
-  if (opportunities.length === 0) {
-    throw new Error("generateSalesBrief: opportunities array is empty");
-  }
+  const typeMap: Record<string, LeadOpportunity["type"]> = {
+    contactability: "whatsapp_funnel",
+    digitalPresence: "social_optimization",
+    commercialClarity: "local_seo",
+    gapSeverity: "conversion_optimization",
+    opportunityFit: "landing_page",
+    evidenceQuality: "reputation_management",
+  };
+
+  const type: LeadOpportunity["type"] = typeMap[weakest] ?? "social_optimization";
+  return [{
+    id: "fallback-0",
+    leadId: "0",
+    type,
+    severity: "medium",
+    evidence: ["score-based fallback"],
+    businessImpact: "تحسين الأداء العام للنشاط التجاري",
+    suggestedAction: "مراجعة الحضور الرقمي وتحديد أولويات التحسين",
+  }];
+}
+
+export function generateSalesBrief(input: SalesBriefGeneratorInput): SalesBrief {
+  const { lead, score } = input;
+  // إذا كانت opportunities فارغة نستخدم fallback بدلاً من الرفض
+  const opportunities = input.opportunities.length > 0
+    ? input.opportunities
+    : buildFallbackOpportunities(score);
 
   // ── 1. Resolve bestContactChannel ─────────────────────────────────────────
   const channelInput: ContactChannelInput = {

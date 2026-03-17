@@ -1949,3 +1949,20 @@
 - [x] بناء CandidateGroupCard component (groups + signals + زر دمج)
 - [x] بناء UnifiedLeadPreview component (businessLead من getMergePreview)
 - [x] ربط المكوّنات بـ SearchHub تب "الكل" عبر CrossPlatformPanel
+
+## الدفعة الثامنة — تنفيذ الميزات المتبقية (Mar 17, 2026)
+- [x] إصلاح generateSalesBrief — إزالة Guard 3 وإنتاج brief حتى بدون opportunities (fallback mode)
+- [x] إضافة buildFallbackOpportunities في generator.ts لاستخدام أضعف بُعد في الـ score
+- [x] إضافة حقول التقييم في schema (scoringValue, scoringPriority, scoringBreakdown, scoringReasons, scoringAt)
+- [x] تطبيق migration حقول التقييم في DB
+- [x] تحديث priorityLabeler.ts لحفظ نتيجة التقييم الكاملة في DB بعد كل تقييم
+- [x] إضافة procedure getSavedScore في leadIntelligence router لتحميل التقييم المحفوظ
+- [x] تحديث LeadDetail.tsx لتحميل نتيجة التقييم المحفوظة من DB عند فتح الصفحة
+- [x] إضافة Quick Action Bar في صفحة تفاصيل العميل (تشغيل التقييم + ملخص المبيعات + تحليل السلوك + تقرير شامل + معاينة + PDF)
+- [x] تحديث قائمة العملاء لعرض scoringValue + scoringPriority بدلاً من leadPriorityScore القديم
+- [x] إضافة أزرار فلتر سريع A/B/C/D (أ/ب/ج/د) فوق قائمة العملاء
+- [x] إضافة procedure parseBio في leadIntelligence router لتحليل البايو بـ AI
+- [x] إضافة قسم "تحليل البايو بالذكاء الاصطناعي" في AddLead.tsx
+- [x] إضافة procedure seedFromRawBatch في leadIntelligence router لتحويل نتائج البحث الخام إلى leads
+- [x] تحسين تاب الكل في SearchHub.tsx — بحث تلقائي عند الانتقال للتاب إذا لم تكن هناك نتائج
+- [x] إصلاح اختبار phase6a.brief.test.ts ليعكس السلوك الجديد (قبول opportunities فارغة)

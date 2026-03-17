@@ -736,6 +736,177 @@ const leadIntelligenceRouter = router({
         website,
       };
     }),
+
+  // ===== جلب نتيجة التقييم المحفوظة من DB =====
+  getSavedScore: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ input }) => {
+      const { getDb } = await import("../db");
+      const { leads } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) return null;
+      const rows = await db
+        .select({
+          scoringValue: leads.scoringValue,
+          scoringPriority: leads.scoringPriority,
+          scoringReasons: leads.scoringReasons,
+          scoringBreakdown: leads.scoringBreakdown,
+          scoringOpportunities: leads.scoringOpportunities,
+          scoringReadinessState: leads.scoringReadinessState,
+          scoringRunAt: leads.scoringRunAt,
+        })
+        .from(leads)
+        .where(eq(leads.id, input.leadId))
+        .limit(1);
+      const row = rows[0];
+      if (!row || row.scoringValue == null) return null;
+      // إعادة بناء النتيجة بنفس بنية scoreResult
+      return {
+        score: {
+          value: row.scoringValue,
+          priority: row.scoringPriority ?? "C",
+          reasons: (row.scoringReasons as string[]) ?? [],
+          breakdown: (row.scoringBreakdown as Record<string, number>) ?? {},
+        },
+        opportunities: (row.scoringOpportunities as any[]) ?? [],
+        readinessState: row.scoringReadinessState ?? "partial",
+        runAt: row.scoringRunAt,
+      };
+    }),
+  // ─── seedFromRawBatch: تحويل نتائج بحث خام (batch) إلى leads في DB ─────────────────
+  seedFromRawBatch: protectedProcedure
+    .input(z.object({
+      candidates: z.array(z.object({
+        companyName: z.string(),
+        businessType: z.string().optional(),
+        city: z.string().optional(),
+        country: z.string().optional(),
+        verifiedPhone: z.string().optional(),
+        website: z.string().optional(),
+        instagramUrl: z.string().optional(),
+        twitterUrl: z.string().optional(),
+        snapchatUrl: z.string().optional(),
+        tiktokUrl: z.string().optional(),
+        facebookUrl: z.string().optional(),
+        googleMapsUrl: z.string().optional(),
+        reviewCount: z.number().optional(),
+        notes: z.string().optional(),
+        source: z.string().optional(),
+      })),
+      defaultBusinessType: z.string().optional(),
+      defaultCity: z.string().optional(),
+      defaultCountry: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const results = { added: 0, duplicates: 0, failed: 0, ids: [] as number[] };
+      for (const candidate of input.candidates) {
+        try {
+          const leadId = await createLeadWithResolution({
+            companyName: candidate.companyName,
+            businessType: candidate.businessType || input.defaultBusinessType || "غير محدد",
+            city: candidate.city || input.defaultCity || "غير محدد",
+            country: candidate.country || input.defaultCountry || "السعودية",
+            verifiedPhone: candidate.verifiedPhone || null,
+            website: candidate.website || null,
+            instagramUrl: candidate.instagramUrl || null,
+            twitterUrl: candidate.twitterUrl || null,
+            snapchatUrl: candidate.snapchatUrl || null,
+            tiktokUrl: candidate.tiktokUrl || null,
+            facebookUrl: candidate.facebookUrl || null,
+            googleMapsUrl: candidate.googleMapsUrl || null,
+            reviewCount: candidate.reviewCount || 0,
+            notes: candidate.notes || null,
+            analysisStatus: "pending",
+          });
+          if (leadId) {
+            results.added++;
+            results.ids.push(leadId);
+          } else {
+            results.duplicates++;
+          }
+        } catch {
+          results.failed++;
+        }
+      }
+      return results;
+    }),
+
+  // ─── parseBio: تحليل البايو بـ AI واستخراج بيانات النشاط ───────────────────────
+  parseBio: protectedProcedure
+    .input(z.object({
+      bio: z.string().min(5).max(3000),
+    }))
+    .mutation(async ({ input }) => {
+      const { invokeLLM } = await import("../_core/llm");
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `أنت محلل بيانات متخصص في استخراج معلومات الأنشطة التجارية السعودية من النصوص والبيو.
+مهمتك استخراج كل معلومة ممكنة من النص المُدخل وإرجاعها بصيغة JSON دقيقة.
+إذا لم تجد معلومة معينة، أرجع null لذلك الحقل.
+لا تخترع بيانات غير موجودة في النص.`,
+          },
+          {
+            role: "user",
+            content: `حلّل هذا النص واستخرج بيانات النشاط التجاري:\n\n${input.bio}`,
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "bio_extraction",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                companyName: { type: ["string", "null"], description: "اسم النشاط التجاري" },
+                businessType: { type: ["string", "null"], description: "نوع النشاط (مطعم، صالون، ملحمة...)" },
+                city: { type: ["string", "null"], description: "المدينة" },
+                district: { type: ["string", "null"], description: "الحي أو المنطقة" },
+                verifiedPhone: { type: ["string", "null"], description: "رقم الهاتف بصيغة +966..." },
+                website: { type: ["string", "null"], description: "رابط الموقع الإلكتروني" },
+                instagramUrl: { type: ["string", "null"], description: "رابط أو اسم حساب إنستغرام" },
+                twitterUrl: { type: ["string", "null"], description: "رابط أو اسم حساب تويتر" },
+                snapchatUrl: { type: ["string", "null"], description: "رابط أو اسم حساب سناب شات" },
+                tiktokUrl: { type: ["string", "null"], description: "رابط أو اسم حساب تيك توك" },
+                facebookUrl: { type: ["string", "null"], description: "رابط أو اسم حساب فيسبوك" },
+                notes: { type: ["string", "null"], description: "ملاحظات إضافية مستخرجة من النص" },
+                confidence: { type: "number", description: "نسبة الثقة في الاستخراج من 0 إلى 100" },
+                extractedFields: { type: "array", items: { type: "string" }, description: "أسماء الحقول التي تم استخراجها بنجاح" },
+              },
+              required: ["companyName", "businessType", "city", "district", "verifiedPhone", "website", "instagramUrl", "twitterUrl", "snapchatUrl", "tiktokUrl", "facebookUrl", "notes", "confidence", "extractedFields"],
+              additionalProperties: false,
+            },
+          },
+        } as any,
+      });
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("لم يتم استخراج البيانات");
+      const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+      // تنظيف أرقام الهاتف
+      if (parsed.verifiedPhone) {
+        const cleaned = parsed.verifiedPhone.replace(/[\s\-()]/g, "");
+        parsed.verifiedPhone = cleaned.startsWith("05") ? `+966${cleaned.slice(1)}` : cleaned;
+      }
+      // تنظيف روابط السوشيال ميديا
+      const socialFields = ["instagramUrl", "twitterUrl", "snapchatUrl", "tiktokUrl", "facebookUrl"];
+      const socialPrefixes: Record<string, string> = {
+        instagramUrl: "https://instagram.com/",
+        twitterUrl: "https://twitter.com/",
+        snapchatUrl: "https://snapchat.com/add/",
+        tiktokUrl: "https://tiktok.com/@",
+        facebookUrl: "https://facebook.com/",
+      };
+      for (const field of socialFields) {
+        if (parsed[field] && !parsed[field].startsWith("http")) {
+          const username = parsed[field].replace(/^@/, "");
+          parsed[field] = `${socialPrefixes[field]}${username}`;
+        }
+      }
+      return parsed;
+    }),
 });
 // ────────────────────────────────────────────────────────────────────────────────
 export { leadIntelligenceRouter };

@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import PreSaveReviewModal from "@/components/PreSaveReviewModal";
 import { useState, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown, Loader2 } from "lucide-react";
+import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 import { skipToken } from "@tanstack/react-query";
@@ -18,7 +18,11 @@ export default function AddLead() {
   const { data: businessTypesData } = trpc.dataSettings.getByCategory.useQuery({ category: "businessType" });
   const businessTypes = businessTypesData?.length ? businessTypesData.map(b => b.label) : FALLBACK_BUSINESS_TYPES;
   const createLead = trpc.leads.create.useMutation();
+  const parseBioMutation = trpc.leadIntelligence.parseBio.useMutation();
   const utils = trpc.useUtils();
+  const [bioText, setBioText] = useState("");
+  const [showBioPanel, setShowBioPanel] = useState(false);
+  const [bioResult, setBioResult] = useState<any>(null);
 
   const [selectedCountry, setSelectedCountry] = useState("السعودية");
   const availableCities = COUNTRIES_DATA.find(c => c.name === selectedCountry)?.cities ?? [];
@@ -51,6 +55,33 @@ export default function AddLead() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showReviewModal, setShowReviewModal] = useState(false);
+
+  const handleParseBio = async () => {
+    if (!bioText.trim()) return;
+    try {
+      const result = await parseBioMutation.mutateAsync({ bio: bioText });
+      setBioResult(result);
+      // تعبئة الحقول تلقائياً
+      const updates: Record<string, any> = {};
+      if (result.companyName) updates.companyName = result.companyName;
+      if (result.businessType) updates.businessType = result.businessType;
+      if (result.city) updates.city = result.city;
+      if (result.district) updates.district = result.district;
+      if (result.verifiedPhone) updates.verifiedPhone = result.verifiedPhone;
+      if (result.website) updates.website = result.website;
+      if (result.instagramUrl) updates.instagramUrl = result.instagramUrl;
+      if (result.twitterUrl) updates.twitterUrl = result.twitterUrl;
+      if (result.snapchatUrl) updates.snapchatUrl = result.snapchatUrl;
+      if (result.tiktokUrl) updates.tiktokUrl = result.tiktokUrl;
+      if (result.facebookUrl) updates.facebookUrl = result.facebookUrl;
+      if (result.notes) updates.notes = result.notes;
+      setForm(f => ({ ...f, ...updates }));
+      const filled = result.extractedFields?.length || 0;
+      toast.success(`تم استخراج ${filled} حقل تلقائياً`, { description: `نسبة الثقة: ${result.confidence}%` });
+    } catch (err) {
+      toast.error("فشل تحليل البايو");
+    }
+  };
 
   // جلب تفاصيل Google Maps تلقائياً
   const [currentPlaceId, setCurrentPlaceId] = useState<string | null>(null);
@@ -198,6 +229,52 @@ export default function AddLead() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* ===== AI Bio Parser ===== */}
+        <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: "oklch(0.65 0.18 280 / 0.4)", background: "oklch(0.10 0.015 240)" }}>
+          <button
+            type="button"
+            onClick={() => setShowBioPanel(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-3 transition-all"
+            style={{ background: showBioPanel ? "oklch(0.65 0.18 280 / 0.1)" : "oklch(0.65 0.18 280 / 0.06)" }}
+          >
+            <div className="flex items-center gap-2">
+              <Wand2 className="w-4 h-4" style={{ color: "oklch(0.72 0.18 280)" }} />
+              <span className="font-semibold text-sm" style={{ color: "oklch(0.72 0.18 280)" }}>تحليل البايو بالذكاء الاصطناعي</span>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.65 0.18 280 / 0.15)", color: "oklch(0.72 0.18 280)" }}>جديد</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{showBioPanel ? "▲ إخفاء" : "▼ الصق بايو إنستغرام أو وصف النشاط"}</span>
+          </button>
+          {showBioPanel && (
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-muted-foreground">الصق بايو حساب إنستغرام أو أي وصف للنشاط، وسيقوم الذكاء الاصطناعي بملء الحقول تلقائياً.</p>
+              <textarea
+                value={bioText}
+                onChange={e => setBioText(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary resize-none"
+                placeholder="مثال: مطعم الأصيل • الرياض حي النزهة • هاتف: 0501234567 • إنستغرام: @alaseel_rest"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleParseBio}
+                  disabled={parseBioMutation.isPending || !bioText.trim()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: parseBioMutation.isPending ? "oklch(0.65 0.18 280 / 0.1)" : "oklch(0.65 0.18 280 / 0.2)", color: "oklch(0.72 0.18 280)", border: "1px solid oklch(0.65 0.18 280 / 0.4)" }}
+                >
+                  {parseBioMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {parseBioMutation.isPending ? "جاري التحليل..." : "تحليل وملء الحقول"}
+                </button>
+                {bioResult && (
+                  <span className="text-xs" style={{ color: "oklch(0.65 0.18 145)" }}>
+                    ✓ تم استخراج {bioResult.extractedFields?.length || 0} حقل (ثقة: {bioResult.confidence}%)
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        {/* ===== END AI Bio Parser ===== */}
         {/* Basic info */}
         <div className="rounded-2xl p-5 border border-border space-y-4" style={{ background: "oklch(0.12 0.015 240)" }}>
           <h3 className="font-semibold text-foreground flex items-center gap-2">

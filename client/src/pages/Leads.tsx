@@ -45,6 +45,7 @@ export default function Leads() {
   const [filterWhatsapp, setFilterWhatsapp] = useState<"" | "yes" | "no" | "unknown">("")
   const [filterStage, setFilterStage] = useState("")
   const [filterPriority, setFilterPriority] = useState("");
+  const [filterScoringPriority, setFilterScoringPriority] = useState<"" | "A" | "B" | "C" | "D">("");
   const [filterSentToWhatchimp, setFilterSentToWhatchimp] = useState<"" | "yes" | "no">("")
   const [filterContactedWhatchimp, setFilterContactedWhatchimp] = useState<"" | "sent" | "not_sent">("");
   const [showSegmentDialog, setShowSegmentDialog] = useState(false);
@@ -95,6 +96,10 @@ export default function Leads() {
       result = result.filter(l => (l as any).sentToWhatchimp === true);
     } else if (activeListTab === "contacted" && filterContactedWhatchimp === "not_sent") {
       result = result.filter(l => !(l as any).sentToWhatchimp);
+    }
+    // فلتر أولوية التقييم (A/B/C/D)
+    if (filterScoringPriority) {
+      result = result.filter(l => (l as any).scoringPriority === filterScoringPriority);
     }
     return result;
   })();
@@ -374,6 +379,33 @@ export default function Leads() {
             {contactedCount}
           </span>
         </button>
+      </div>
+
+      {/* فلتر سريع بأولوية التقييم A/B/C/D */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">أولوية التقييم:</span>
+        {["", "A", "B", "C", "D"].map(p => {
+          const labels: Record<string, string> = { "": "الكل", A: "أ ممتاز", B: "ب جيد", C: "ج متوسط", D: "د ضعيف" };
+          const colors: Record<string, { active: string; bg: string }> = {
+            "": { active: "oklch(0.65 0.18 200)", bg: "oklch(0.65 0.18 200 / 0.15)" },
+            A: { active: "oklch(0.65 0.2 145)", bg: "oklch(0.65 0.2 145 / 0.15)" },
+            B: { active: "oklch(0.65 0.18 200)", bg: "oklch(0.65 0.18 200 / 0.15)" },
+            C: { active: "oklch(0.78 0.16 75)", bg: "oklch(0.78 0.16 75 / 0.15)" },
+            D: { active: "oklch(0.58 0.22 25)", bg: "oklch(0.58 0.22 25 / 0.15)" },
+          };
+          const isActive = filterScoringPriority === p;
+          const cfg = colors[p];
+          return (
+            <button key={p} onClick={() => setFilterScoringPriority(p as any)}
+              className="text-xs px-2.5 py-1 rounded-full font-medium transition-all"
+              style={isActive
+                ? { background: cfg.bg, color: cfg.active, border: `1px solid ${cfg.active}` }
+                : { background: "oklch(0.12 0.015 240)", color: "oklch(0.5 0.02 240)", border: "1px solid oklch(0.2 0.02 240)" }
+              }>
+              {labels[p]}
+            </button>
+          );
+        })}
       </div>
 
       {/* Search & Filters */}
@@ -672,6 +704,38 @@ export default function Leads() {
                   </div>
                   {/* Diagnosis column */}
                   <div className="col-span-1 flex flex-col gap-1.5">
+                    {/* Scoring Priority Badge (A/B/C/D) */}
+                    {(() => {
+                      const sp = (lead as any).scoringPriority;
+                      const sv = (lead as any).scoringValue;
+                      if (sp) {
+                        const priorityConfig: Record<string, { bg: string; color: string; label: string }> = {
+                          A: { bg: "oklch(0.65 0.2 145 / 0.2)", color: "oklch(0.65 0.2 145)", label: "أ ممتاز" },
+                          B: { bg: "oklch(0.65 0.18 200 / 0.2)", color: "oklch(0.65 0.18 200)", label: "ب جيد" },
+                          C: { bg: "oklch(0.78 0.16 75 / 0.2)", color: "oklch(0.78 0.16 75)", label: "ج متوسط" },
+                          D: { bg: "oklch(0.58 0.22 25 / 0.2)", color: "oklch(0.58 0.22 25)", label: "د ضعيف" },
+                        };
+                        const cfg = priorityConfig[sp] ?? priorityConfig.C;
+                        return (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                            {sv != null && <span className="text-xs font-bold" style={{ color: cfg.color }}>{sv}</span>}
+                          </div>
+                        );
+                      }
+                      // fallback: leadPriorityScore القديم
+                      if ((lead as any).leadPriorityScore) {
+                        const score = Number((lead as any).leadPriorityScore);
+                        const c = score >= 70 ? "oklch(0.65 0.2 145)" : score >= 50 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)";
+                        return (
+                          <div className="flex items-center gap-1">
+                            <Target className="w-2.5 h-2.5 flex-shrink-0" style={{ color: c }} />
+                            <span className="text-xs font-bold" style={{ color: c }}>{score.toFixed(0)}</span>
+                          </div>
+                        );
+                      }
+                      return <span className="text-xs opacity-30 text-muted-foreground">لم يُقيَّم</span>;
+                    })()}
                     {/* Readiness badge */}
                     {(lead as any).analysisReadyFlag ? (
                       <span className="text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit" style={{ background: "oklch(0.65 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)" }}>
@@ -681,26 +745,7 @@ export default function Leads() {
                       <span className="text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit" style={{ background: "oklch(0.78 0.16 75 / 0.15)", color: "oklch(0.78 0.16 75)" }}>
                         <AlertTriangle className="w-2.5 h-2.5" />جزئي
                       </span>
-                    ) : (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full w-fit" style={{ background: "oklch(0.18 0.02 240)", color: "oklch(0.45 0.03 240)" }}>غير جاهز</span>
-                    )}
-                    {/* Score */}
-                    {(lead as any).leadPriorityScore ? (
-                      <div className="flex items-center gap-1">
-                        <Target className="w-2.5 h-2.5 flex-shrink-0" style={{ color: Number((lead as any).leadPriorityScore) >= 70 ? "oklch(0.65 0.2 145)" : Number((lead as any).leadPriorityScore) >= 50 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)" }} />
-                        <span className="text-xs font-bold" style={{ color: Number((lead as any).leadPriorityScore) >= 70 ? "oklch(0.65 0.2 145)" : Number((lead as any).leadPriorityScore) >= 50 ? "oklch(0.78 0.16 75)" : "oklch(0.58 0.22 25)" }}>
-                          {Number((lead as any).leadPriorityScore).toFixed(0)}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs opacity-30 text-muted-foreground">لم يُقيَّم</span>
-                    )}
-                    {/* Primary opportunity */}
-                    {(lead as any).primaryOpportunity && (
-                      <span className="text-xs text-muted-foreground truncate max-w-[90px]" title={(lead as any).primaryOpportunity}>
-                        {String((lead as any).primaryOpportunity).replace(/_/g, " ")}
-                      </span>
-                    )}
+                    ) : null}
                     {/* Brief indicator */}
                     {(lead as any).salesBriefGeneratedAt && (
                       <span className="text-xs inline-flex items-center gap-0.5" style={{ color: "oklch(0.65 0.18 200)" }}>

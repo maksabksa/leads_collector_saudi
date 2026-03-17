@@ -103,21 +103,11 @@ export async function runSalesBriefPipeline(
   }
   completedSteps.push("score_check");
 
-  // ── Guard 3: opportunities must not be empty ──────────────────────────────
+  // ── Guard 3: opportunities check (non-blocking) ─────────────────────────────
+  // لا نوقف الـ pipeline إذا كانت opportunities فارغة —
+  // الـ generator سيستخدم fallback opportunity بناءً على الـ score
   if (opportunities.length === 0) {
-    const error = "no_opportunities: cannot generate brief without at least one opportunity";
-    failedSteps.push({ step: "opportunities_check", error });
-    console.warn(`[SALES_BRIEF] PIPELINE_BLOCKED leadId=${leadId} reason=no_opportunities`);
-    return {
-      leadId,
-      success: false,
-      brief: null,
-      score,
-      opportunities: [],
-      readinessState,
-      completedSteps,
-      failedSteps,
-    };
+    console.warn(`[SALES_BRIEF] NO_OPPORTUNITIES leadId=${leadId} — using score-based fallback`);
   }
   completedSteps.push("opportunities_check");
 

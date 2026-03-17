@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { trpc } from "@/lib/trpc";
 import { useParams, useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
@@ -112,6 +112,13 @@ export default function LeadDetail() {
   const [briefResult, setBriefResult] = useState<SalesBriefResult | null>(null);
   const [isScoring, setIsScoring] = useState(false);
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
+
+  // تحميل نتيجة التقييم المحفوظة من DB عند فتح الصفحة
+  const { data: savedScoreData } = trpc.leadIntelligence.getSavedScore.useQuery(
+    { leadId: id },
+    { enabled: !!id }
+  );
+
   const scoreLeadMutation = trpc.leadIntelligence.scoreLeadById.useMutation({
     onSuccess: (result) => {
       setScoreResult(result);
@@ -126,6 +133,13 @@ export default function LeadDetail() {
     },
     onError: () => setIsGeneratingBrief(false),
   });
+  // تحميل نتيجة التقييم المحفوظة من DB عند فتح الصفحة
+  useEffect(() => {
+    if (savedScoreData && !scoreResult) {
+      setScoreResult(savedScoreData);
+    }
+  }, [savedScoreData]);
+
   const handleRunScore = () => {
     setIsScoring(true);
     scoreLeadMutation.mutate({ leadId: id });
@@ -574,6 +588,58 @@ export default function LeadDetail() {
           </button>
         </div>
       </div>
+
+      {/* ===== Quick Action Bar ===== */}
+      <div className="flex items-center gap-2 p-3 rounded-2xl border overflow-x-auto" style={{ background: "oklch(0.10 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.2)" }}>
+        {/* شارة التقييم */}
+        {scoreResult && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl flex-shrink-0" style={{ background: (() => { const p = scoreResult.score?.priority; return p === 'A' ? 'oklch(0.65 0.2 145 / 0.2)' : p === 'B' ? 'oklch(0.65 0.18 200 / 0.2)' : p === 'C' ? 'oklch(0.78 0.16 75 / 0.2)' : 'oklch(0.58 0.22 25 / 0.2)'; })(), color: (() => { const p = scoreResult.score?.priority; return p === 'A' ? 'oklch(0.65 0.2 145)' : p === 'B' ? 'oklch(0.65 0.18 200)' : p === 'C' ? 'oklch(0.78 0.16 75)' : 'oklch(0.58 0.22 25)'; })() }}>
+            <Target className="w-3.5 h-3.5" />
+            <span className="text-xs font-bold">{scoreResult.score?.priority ?? '—'}</span>
+            <span className="text-xs opacity-70">{scoreResult.score?.value ?? '—'}</span>
+          </div>
+        )}
+        <div className="h-5 w-px bg-border flex-shrink-0" />
+        {/* الإجراءات الرئيسية */}
+        <button onClick={handleRunScore} disabled={isScoring}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex-shrink-0"
+          style={{ background: isScoring ? "oklch(0.65 0.18 145 / 0.08)" : "oklch(0.65 0.18 145 / 0.2)", color: "oklch(0.65 0.18 145)", border: "1px solid oklch(0.65 0.18 145 / 0.4)" }}>
+          {isScoring ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
+          {isScoring ? 'جاري التقييم...' : 'تشغيل التقييم'}
+        </button>
+        <button onClick={handleGenerateBrief} disabled={isGeneratingBrief}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex-shrink-0"
+          style={{ background: isGeneratingBrief ? "oklch(0.78 0.16 75 / 0.08)" : "oklch(0.78 0.16 75 / 0.2)", color: "oklch(0.78 0.16 75)", border: "1px solid oklch(0.78 0.16 75 / 0.4)" }}>
+          {isGeneratingBrief ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          {isGeneratingBrief ? 'جاري التوليد...' : 'ملخص المبيعات'}
+        </button>
+        <button onClick={handleAnalyzeBehavior} disabled={analyzeBehavior.isPending}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex-shrink-0"
+          style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "oklch(0.75 0.18 200)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}>
+          {analyzeBehavior.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+          تحليل السلوك
+        </button>
+        <button onClick={handleGenerateReport} disabled={generateReport.isPending}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex-shrink-0"
+          style={{ background: "oklch(0.62 0.18 285 / 0.15)", color: "var(--brand-purple)", border: "1px solid oklch(0.62 0.18 285 / 0.3)" }}>
+          {generateReport.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+          تقرير شامل
+        </button>
+        <div className="flex-1" />
+        <button onClick={handlePreviewPDF} disabled={pdfGenerating}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex-shrink-0"
+          style={{ background: "oklch(0.62 0.18 285 / 0.15)", color: "oklch(0.72 0.18 285)", border: "1px solid oklch(0.62 0.18 285 / 0.3)" }}>
+          {pdfGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
+          معاينة
+        </button>
+        <button onClick={handleGeneratePDF} disabled={pdfGenerating}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex-shrink-0"
+          style={{ background: "oklch(0.65 0.18 25 / 0.2)", color: "oklch(0.75 0.18 25)", border: "1px solid oklch(0.65 0.18 25 / 0.4)" }}>
+          {pdfGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+          تحميل PDF
+        </button>
+      </div>
+      {/* ===== END Quick Action Bar ===== */}
 
       {/* Edit form */}
       {isEditing && (

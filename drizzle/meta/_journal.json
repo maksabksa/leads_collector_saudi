@@ -288,6 +288,13 @@
       "when": 1773620695987,
       "tag": "0040_shiny_iceman",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1773715376800,
+      "tag": "0041_real_vermin",
+      "breakpoints": true
     }
   ]
 }

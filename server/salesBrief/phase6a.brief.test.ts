@@ -235,14 +235,16 @@ describe("generateSalesBrief", () => {
     expect(brief.topFindings.length).toBeGreaterThan(0);
   });
 
-  it("throws when opportunities array is empty", () => {
-    expect(() =>
-      generateSalesBrief({
-        lead: baseLead,
-        score: baseScore,
-        opportunities: [],
-      })
-    ).toThrow("generateSalesBrief: opportunities array is empty");
+  it("generates brief even when opportunities array is empty (fallback mode)", () => {
+    const brief = generateSalesBrief({
+      lead: baseLead,
+      score: baseScore,
+      opportunities: [],
+    });
+    // بعد الإصلاح: يُنتج brief حتى بدون opportunities بدلاً من رمي خطأ
+    expect(brief).toBeDefined();
+    expect(brief.businessName).toBeTruthy();
+    expect(brief.salesAngle).toBeTruthy();
   });
 
   it("omits city and category when not provided", () => {

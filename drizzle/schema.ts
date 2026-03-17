@@ -183,6 +183,18 @@ export const leads = mysqlTable("leads", {
   missingDataFlags: json("missing_data_flags").$type<string[]>(),
   partialAnalysisFlag: boolean("partial_analysis_flag").default(false),
 
+  // ===== Phase 5: Lead Scoring (حفظ نتيجة التقييم) =====
+  scoringValue: int("scoring_value"),                                          // 0-100
+  scoringPriority: mysqlEnum("scoring_priority", ["A", "B", "C", "D"]),         // A/B/C/D
+  scoringReasons: json("scoring_reasons").$type<string[]>(),                    // أسباب النتيجة
+  scoringBreakdown: json("scoring_breakdown").$type<Record<string, number>>(),  // breakdown بالأبعاد
+  scoringOpportunities: json("scoring_opportunities").$type<Array<{            // الفرص المكتشفة
+    id: string; type: string; severity: string;
+    evidence: string[]; businessImpact: string; suggestedAction: string;
+  }>>(),
+  scoringReadinessState: varchar("scoring_readiness_state", { length: 50 }),   // حالة الجاهزية
+  scoringRunAt: bigint("scoring_run_at", { mode: "number" }),                  // وقت آخر تقييم
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -124,13 +124,28 @@ export async function applyPriorityLabel(
     };
   }
 
-  // Write ONLY the three approved fields
+  // Write priority + scoring fields
   await db
     .update(leads)
     .set({
       priority: dbPriority,
       primaryOpportunity: primaryOpportunity ?? undefined,
       secondaryOpportunity: secondaryOpportunity ?? undefined,
+      // حفظ نتيجة التقييم كاملة لتبقى عند reload
+      leadPriorityScore: score.value,
+      scoringValue: score.value,
+      scoringPriority: score.priority,
+      scoringReasons: score.reasons,
+      scoringBreakdown: score.breakdown as Record<string, number>,
+      scoringOpportunities: opportunities.map(o => ({
+        id: o.id,
+        type: o.type,
+        severity: o.severity,
+        evidence: o.evidence,
+        businessImpact: o.businessImpact,
+        suggestedAction: o.suggestedAction,
+      })),
+      scoringRunAt: Date.now(),
     })
     .where(eq(leads.id, leadId));
 
