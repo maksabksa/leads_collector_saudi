@@ -117,13 +117,14 @@ function MergePreviewDialog({
 }: {
   candidatesJson: string;
   city?: string;
-  onConfirm: (overrides: Partial<MergedLeadData>) => void;
+  onConfirm: (overrides: Partial<MergedLeadData>) => Promise<void>;
   onClose: () => void;
 }) {
   const previewMut = trpc.leadIntelligence.getMergePreview.useMutation();
   const [preview, setPreview] = useState<any>(null);
   const [form, setForm] = useState<Partial<MergedLeadData>>({});
   const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     previewMut.mutateAsync({ candidatesJson }).then(res => {
@@ -315,12 +316,12 @@ function MergePreviewDialog({
             إلغاء
           </Button>
           <Button
-            onClick={() => onConfirm(form)}
-            disabled={!loaded || !form.companyName?.trim()}
+            onClick={() => { if (!saving) { setSaving(true); onConfirm(form).finally(() => setSaving(false)); } }}
+            disabled={!loaded || !form.companyName?.trim() || saving}
             className="flex-1 h-8 text-sm gap-1.5"
           >
-            <Save className="w-3.5 h-3.5" />
-            حفظ كعميل
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {saving ? 'جاري الحفظ...' : 'حفظ كعميل'}
           </Button>
         </DialogFooter>
       </DialogContent>
