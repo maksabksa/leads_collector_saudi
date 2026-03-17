@@ -499,9 +499,243 @@ const leadIntelligenceRouter = router({
       const { runSalesBriefPipeline } = await import("../salesBrief/index.js");
       return runSalesBriefPipeline(input.leadId);
     }),
+
+  // ─── Search → Compare → Merge Pipeline ───────────────────────────────────────
+
+  /**
+   * groupCandidates — Search → Compare
+   * يأخذ نتائج خام من منصات متعددة ويجمّعها في مجموعات باستخدام Identity Linkage.
+   * يُستخدم لعرض المقارنة قبل الدمج.
+   */
+  groupCandidates: protectedProcedure
+    .input(
+      z.object({
+        rawResults: z.record(
+          z.string(),
+          z.array(z.record(z.string(), z.unknown()))
+        ),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const candidates: DiscoveryCandidate[] = [];
+
+      for (const [platform, results] of Object.entries(input.rawResults)) {
+        (results as Record<string, unknown>[]).forEach((result, idx) => {
+          candidates.push(rawResultToCandidate(result, platform, idx));
+        });
+      }
+
+      if (candidates.length === 0) {
+        return {
+          groups: [],
+          singles: [],
+          stats: { totalCandidates: 0, totalGroups: 0, mergedCount: 0 },
+        };
+      }
+
+      const resolvedGroups = clusterCandidates(candidates);
+
+      // فصل المجموعات (أكثر من مرشح) عن المفردات (مرشح واحد)
+      const groups = resolvedGroups.filter(g => g.duplicates.length > 0);
+      const singles = resolvedGroups.filter(g => g.duplicates.length === 0);
+
+      return {
+        groups: groups.map(g => ({
+          primaryName: g.primary.businessNameHint || g.primary.nameHint || "",
+          primarySource: g.primary.source,
+          primaryUrl: g.primary.url,
+          primaryPhone: g.primary.verifiedPhones[0] || g.primary.candidatePhones[0],
+          primaryWebsite: g.primary.verifiedWebsite || g.primary.candidateWebsites[0],
+          primaryCity: g.primary.cityHint,
+          primaryCategory: g.primary.categoryHint,
+          mergeConfidence: Math.round(g.mergeConfidence * 100),
+          sources: g.sources,
+          duplicateCount: g.duplicates.length,
+          duplicates: g.duplicates.map(d => ({
+            name: d.businessNameHint || d.nameHint || "",
+            source: d.source,
+            url: d.url,
+            phone: d.verifiedPhones[0] || d.candidatePhones[0],
+          })),
+          // نمرر المرشحين الكاملين (مشفرين) للاستخدام في getMergePreview
+          _candidatesJson: JSON.stringify([g.primary, ...g.duplicates]),
+        })),
+        singles: singles.map(g => ({
+          name: g.primary.businessNameHint || g.primary.nameHint || "",
+          source: g.primary.source,
+          url: g.primary.url,
+          phone: g.primary.verifiedPhones[0] || g.primary.candidatePhones[0],
+          website: g.primary.verifiedWebsite || g.primary.candidateWebsites[0],
+          city: g.primary.cityHint,
+          category: g.primary.categoryHint,
+          _candidateJson: JSON.stringify(g.primary),
+        })),
+        stats: {
+          totalCandidates: candidates.length,
+          totalGroups: groups.length,
+          mergedCount: candidates.length - resolvedGroups.length,
+        },
+      };
+    }),
+
+  /**
+   * getMergePreview — Compare → Preview
+   * يأخذ مجموعة مرشحين (مُمررة من groupCandidates) ويبني BusinessLead موحد
+   * بدون حفظ في قاعدة البيانات — للمعاينة فقط.
+   */
+  getMergePreview: protectedProcedure
+    .input(
+      z.object({
+        candidatesJson: z.string(), // JSON.stringify(DiscoveryCandidate[])
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { buildBusinessLeadFromGroup } = await import("../lib/identityLinkage.js");
+
+      let candidates: DiscoveryCandidate[];
+      try {
+        candidates = JSON.parse(input.candidatesJson) as DiscoveryCandidate[];
+      } catch {
+        throw new Error("candidatesJson: invalid JSON");
+      }
+
+      if (!candidates.length) {
+        throw new Error("candidatesJson: empty array");
+      }
+
+      // بناء ResolvedGroup من المرشحين
+      const sorted = [...candidates].sort((a, b) => b.confidence - a.confidence);
+      const group = {
+        primary: sorted[0],
+        duplicates: sorted.slice(1),
+        mergeConfidence: sorted.reduce((s, c) => s + c.confidence, 0) / sorted.length,
+        sources: Array.from(new Set(candidates.map(c => c.source))),
+      };
+
+      const lead = buildBusinessLeadFromGroup(group);
+
+      // بناء fieldSources: لكل حقل، من أي مصدر جاء؟
+      const fieldSources: Record<string, string> = {};
+      for (const c of candidates) {
+        const src = c.source;
+        if (!fieldSources.businessName && (c.businessNameHint || c.nameHint)) fieldSources.businessName = src;
+        if (!fieldSources.phone && (c.verifiedPhones[0] || c.candidatePhones[0])) fieldSources.phone = src;
+        if (!fieldSources.website && (c.verifiedWebsite || c.candidateWebsites[0])) fieldSources.website = src;
+        if (!fieldSources.city && c.cityHint) fieldSources.city = src;
+        if (!fieldSources.category && c.categoryHint) fieldSources.category = src;
+      }
+
+      return {
+        lead,
+        fieldSources,
+        sourceCount: candidates.length,
+        sources: group.sources,
+        mergeConfidence: Math.round(group.mergeConfidence * 100),
+      };
+    }),
+
+  /**
+   * createFromMerge — Merge → Save
+   * يأخذ مجموعة مرشحين ويبني BusinessLead موحد ويحفظه في قاعدة البيانات.
+   * يُطبّق createLeadWithResolution للتحقق من التكرار تلقائياً.
+   */
+  createFromMerge: protectedProcedure
+    .input(
+      z.object({
+        candidatesJson: z.string(), // JSON.stringify(DiscoveryCandidate[])
+        // تجاوزات اختيارية من المستخدم
+        overrides: z.object({
+          companyName: z.string().optional(),
+          businessType: z.string().optional(),
+          city: z.string().optional(),
+          phone: z.string().optional(),
+          website: z.string().optional(),
+          instagramUrl: z.string().optional(),
+          tiktokUrl: z.string().optional(),
+          snapchatUrl: z.string().optional(),
+          twitterUrl: z.string().optional(),
+          linkedinUrl: z.string().optional(),
+          facebookUrl: z.string().optional(),
+          googleMapsUrl: z.string().optional(),
+        }).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { buildBusinessLeadFromGroup } = await import("../lib/identityLinkage.js");
+
+      let candidates: DiscoveryCandidate[];
+      try {
+        candidates = JSON.parse(input.candidatesJson) as DiscoveryCandidate[];
+      } catch {
+        throw new Error("candidatesJson: invalid JSON");
+      }
+
+      if (!candidates.length) {
+        throw new Error("candidatesJson: empty array");
+      }
+
+      // بناء ResolvedGroup
+      const sorted = [...candidates].sort((a, b) => b.confidence - a.confidence);
+      const group = {
+        primary: sorted[0],
+        duplicates: sorted.slice(1),
+        mergeConfidence: sorted.reduce((s, c) => s + c.confidence, 0) / sorted.length,
+        sources: Array.from(new Set(candidates.map(c => c.source))),
+      };
+
+      const lead = buildBusinessLeadFromGroup(group);
+      const ov = input.overrides || {};
+
+      // تطبيق التجاوزات
+      const companyName = ov.companyName || lead.businessName;
+      const businessType = ov.businessType || lead.category || "غير محدد";
+      const city = ov.city || lead.city || "غير محدد";
+      const phone = ov.phone || lead.verifiedPhones[0] || lead.candidatePhones[0] || undefined;
+      const website = ov.website || lead.verifiedWebsite || lead.candidateWebsites[0] || undefined;
+
+      // استخراج روابط السوشيال من المرشحين + التجاوزات
+      const getSocialUrl = (platform: string): string | undefined => {
+        const fromCandidates = candidates.find(c => c.source === platform)?.url;
+        return fromCandidates || undefined;
+      };
+
+      const instagramUrl = ov.instagramUrl || getSocialUrl("instagram");
+      const tiktokUrl = ov.tiktokUrl || getSocialUrl("tiktok");
+      const snapchatUrl = ov.snapchatUrl || getSocialUrl("snapchat");
+      const twitterUrl = ov.twitterUrl || getSocialUrl("x");
+      const linkedinUrl = ov.linkedinUrl || getSocialUrl("linkedin");
+      const facebookUrl = ov.facebookUrl || getSocialUrl("facebook");
+      const googleMapsUrl = ov.googleMapsUrl || getSocialUrl("maps");
+
+      // بناء ملاحظة المصادر
+      const sourcesNote = `[merged from: ${group.sources.join(", ")}] [confidence: ${Math.round(group.mergeConfidence * 100)}%]`;
+
+      const id = await createLeadWithResolution({
+        companyName,
+        businessType,
+        city,
+        verifiedPhone: phone,
+        website,
+        instagramUrl,
+        tiktokUrl,
+        snapchatUrl,
+        twitterUrl: twitterUrl,
+        linkedinUrl,
+        facebookUrl,
+        googleMapsUrl,
+        notes: sourcesNote,
+      });
+
+      return {
+        id,
+        companyName,
+        city,
+        sources: group.sources,
+        mergeConfidence: Math.round(group.mergeConfidence * 100),
+        phone,
+        website,
+      };
+    }),
 });
-// ────────────────────────────────────────────────────────────────────────────────
-// TODO PHASE 3 — resolveAndSave: multi-source resolution before insertion
-// TODO PHASE 3 — linkAssetsToLead: persist LeadAsset[] to leadAssets table
 // ────────────────────────────────────────────────────────────────────────────────
 export { leadIntelligenceRouter };

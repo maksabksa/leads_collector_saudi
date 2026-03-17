@@ -1938,3 +1938,14 @@
 - [ ] Lead Detail: عرض readiness + missing fields في بطاقة ملخص واضحة
 - [x] CrossPlatformPanel — Platform Coverage Summary + Candidate Groups + Merge Dialog
 - [x] PlatformCoverageCard في صفحة تفاصيل العميل
+
+## Search → Compare → Merge Pipeline
+
+- [x] إضافة procedure groupCandidates في backend (adapter + clusterCandidates + computeLinkageScore)
+- [x] إضافة procedure getMergePreview في backend (revalidate + buildBusinessLeadFromGroup + fieldSources)
+- [x] إضافة procedure createFromMerge في backend (revalidate + buildBusinessLeadFromGroup + createLeadWithResolution)
+- [x] بناء PipelineHeader component (stats من groupCandidates)
+- [x] بناء RawCandidateRow component (singles من groupCandidates)
+- [x] بناء CandidateGroupCard component (groups + signals + زر دمج)
+- [x] بناء UnifiedLeadPreview component (businessLead من getMergePreview)
+- [x] ربط المكوّنات بـ SearchHub تب "الكل" عبر CrossPlatformPanel
