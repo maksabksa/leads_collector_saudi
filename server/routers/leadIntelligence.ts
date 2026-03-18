@@ -19,6 +19,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { createLeadWithResolution } from "../db";
 import {
@@ -725,6 +726,14 @@ const leadIntelligenceRouter = router({
         googleMapsUrl,
         notes: sourcesNote,
       });
+
+      // إذا كان مكرراً، أرجع رسالة واضحة بدلاً من خطأ غامض
+      if (id === null) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `العميل "${companyName}" موجود مسبقاً في قاعدة البيانات`,
+        });
+      }
 
       return {
         id,

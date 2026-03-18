@@ -392,13 +392,13 @@ function nameOverlapScore(a: string, b: string): number {
  *
  * 1. Fills normalizedBusinessName, normalizedPhone, normalizedDomain
  * 2. Runs conservative duplicate detection
- * 3. Sets deduplicationStatus + duplicateCandidateIds
- * 4. Inserts via createLead()
+ * 3. إذا كان مكرراً → يُرجع null ولا يُنشئ سجلاً جديداً
+ * 4. إذا لم يكن مكرراً → يُدرج عبر createLead()
  * 5. On any error → falls back to createLead() directly
  *
- * Never blocks insertion. Always returns the new lead id.
+ * Returns: new lead id, or null if duplicate detected.
  */
-export async function createLeadWithResolution(data: InsertLead): Promise<number> {
+export async function createLeadWithResolution(data: InsertLead): Promise<number | null> {
   try {
     const normalizedBusinessName = data.companyName ? normalizeName(data.companyName) : undefined;
     const normalizedPhone = data.verifiedPhone ? normalizePhone(data.verifiedPhone) : undefined;
@@ -410,17 +410,23 @@ export async function createLeadWithResolution(data: InsertLead): Promise<number
       data.website ?? undefined
     );
 
+    // ── منع إدراج التكرار ──────────────────────────────────────────────────────
+    if (dupResult.isDuplicate) {
+      console.log(`[PHASE2] duplicate_blocked company="${data.companyName}" reason=${dupResult.reason} existing_id=${dupResult.candidateId}`);
+      return null;
+    }
+
     const enrichedData: InsertLead = {
       ...data,
       normalizedBusinessName: normalizedBusinessName ?? data.normalizedBusinessName,
       normalizedPhone: normalizedPhone ?? data.normalizedPhone,
       normalizedDomain: normalizedDomain ?? data.normalizedDomain,
-      deduplicationStatus: dupResult.isDuplicate ? "possible_duplicate" : "no_duplicate",
-      duplicateCandidateIds: dupResult.candidateId ? [dupResult.candidateId] : (data.duplicateCandidateIds ?? []),
+      deduplicationStatus: "no_duplicate",
+      duplicateCandidateIds: data.duplicateCandidateIds ?? [],
     };
 
     const id = await createLead(enrichedData);
-    console.log(`[PHASE2] resolution_applied lead_id=${id} dedup=${enrichedData.deduplicationStatus} reason=${dupResult.reason}`);
+    console.log(`[PHASE2] lead_created lead_id=${id} company="${data.companyName}"`);
     // PHASE 3 — autofill pipeline (non-blocking, structured observability)
     import("./autofill/index.js").then(({ runAutofill }) => {
       runAutofill(id).then(result => {

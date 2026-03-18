@@ -232,6 +232,10 @@ const leadsRouter = router({
     }))
     .mutation(async ({ input }) => {
       const id = await createLeadWithResolution(input);
+      // إذا كان مكرراً، أرجع خطأ واضح
+      if (id === null) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'العميل موجود مسبقاً في قاعدة البيانات (تكرار محتمل)' });
+      }
       // تشغيل التحليل التلقائي في الخلفية بعد الحفظ مباشرةة
       setImmediate(async () => {
         try {
@@ -615,8 +619,12 @@ const leadsRouter = router({
       const errors: string[] = [];
       for (const leadData of input.leads) {
         try {
-          await createLeadWithResolution(leadData);
-          created++;
+          const newId = await createLeadWithResolution(leadData);
+          if (newId === null) {
+            // مكرر — لا نعدّه فشلاً بل نتجاهله
+          } else {
+            created++;
+          }
         } catch (e) {
           failed++;
           errors.push(`${leadData.companyName}: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`);
@@ -2235,8 +2243,8 @@ const instagramRouter = router({
           notes: leadData.notes || null,
           country: "السعودية",
         });
-      await markInstagramAccountAsLead(accountId, leadId);
-      return { success: true, leadId };
+      await markInstagramAccountAsLead(accountId, leadId ?? 0);
+      return { success: true, leadId: leadId ?? null };
     }),
 
   // ===== جلب بيانات الاتصال بـ Instagram =====
