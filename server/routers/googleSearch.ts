@@ -156,7 +156,14 @@ async function scrapeGoogleSearch(query: string, page = 1): Promise<{
     const start = (page - 1) * 10;
     const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=ar&gl=SA&num=10${start > 0 ? `&start=${start}` : ""}`;
 
-    await tab.goto(googleUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    // محاولة أولى: domcontentloaded (أسرع)
+    try {
+      await tab.goto(googleUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    } catch (gotoErr: any) {
+      // محاولة ثانية: networkidle2 مع timeout أطول
+      console.warn("[Google Bright Data] domcontentloaded timeout, retrying with networkidle2...");
+      await tab.goto(googleUrl, { waitUntil: "networkidle2", timeout: 90000 });
+    }
     await sleep(1500 + Math.random() * 1000);
 
     // استخراج النتائج من صفحة Google
@@ -228,8 +235,26 @@ export async function searchGoogleWeb(
     const scraped = await scrapeGoogleSearch(query, page);
     items = scraped.items;
     rawHtmlText = scraped.rawHtmlText;
-  } catch (err: any) {
-    throw new Error(err.message || "فشل في البحث عبر Bright Data");
+  } catch (puppeteerErr: any) {
+    // ─── Fallback: SERP REST API ─────────────────────────────────────────────
+    console.warn("[Google Search] Puppeteer failed, falling back to SERP REST API:", puppeteerErr.message);
+    try {
+      const { serpRequest } = await import("./serpSearch.js");
+      const { parseGoogleResultsPublic } = await import("./serpSearch.js");
+      const serpHtml = await serpRequest(query.startsWith("http") ? query : `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=ar&gl=SA&num=10`);
+      const serpResults = parseGoogleResultsPublic(serpHtml, "");
+      items = serpResults.map((r: any) => ({
+        title: r.displayName || r.title || "",
+        link: r.profileUrl || r.url || "",
+        snippet: r.bio || r.description || "",
+        displayLink: (() => { try { return new URL(r.profileUrl || r.url || "").hostname.replace("www.", ""); } catch { return ""; } })(),
+      })).filter((r: any) => r.title && r.link);
+      rawHtmlText = serpHtml;
+      console.log(`[Google Search] SERP fallback returned ${items.length} results`);
+    } catch (serpErr: any) {
+      // كلا الطريقتين فشلتا — أرجع الخطأ الأصلي
+      throw new Error(puppeteerErr.message || "فشل في البحث عبر Bright Data");
+    }
   }
 
   if (items.length === 0) {
