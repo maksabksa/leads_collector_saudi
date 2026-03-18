@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { canonicalizeRawResults } from "@/lib/sourceRegistry";
 
 // ===== Types =====
 export interface MergedLeadData {
@@ -348,6 +349,21 @@ function MergePreviewDialog({
                 {candidates.length} مصدر → lead واحد
               </span>
             </div>
+
+            {/* Merge Signals */}
+            {preview?.mergeSignals && preview.mergeSignals.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 shrink-0">
+                {preview.mergeSignals.map((sig: { type: string; description: string; strength: string }, i: number) => (
+                  <span key={`sig-${sig.type}-${i}`} className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${
+                    sig.strength === "strong" ? "bg-green-500/10 text-green-400 border-green-500/30" :
+                    sig.strength === "moderate" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" :
+                    "bg-muted/20 text-muted-foreground border-border/50"
+                  }`}>
+                    {sig.strength === "strong" ? "⚡" : sig.strength === "moderate" ? "≈" : "•"} {sig.description}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0">
@@ -883,6 +899,16 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
     groups: GroupData[];
     singles: SingleData[];
     stats: { totalCandidates: number; totalGroups: number; mergedCount: number };
+    diagnostics?: Array<{
+      platform: string;
+      rawCount: number;
+      parsedCount: number;
+      withPhone: number;
+      withWebsite: number;
+      withUsername: number;
+      withCity: number;
+      dataQuality: "rich" | "moderate" | "sparse" | "empty";
+    }>;
   } | null>(null);
   const [isGrouping, setIsGrouping] = useState(false);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
@@ -995,7 +1021,12 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
     setIsGrouping(true);
     groupCandidatesMut.mutateAsync({ rawResults })
       .then(data => {
-        checkDuplicates(data as any);
+        // تمرير platformDiagnostics إلى checkDuplicates
+        const enrichedData = {
+          ...data,
+          diagnostics: (data as any).platformDiagnostics || [],
+        };
+        checkDuplicates(enrichedData as any);
       })
       .catch(() => {})
       .finally(() => setIsGrouping(false));
@@ -1297,6 +1328,62 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
             </div>
           )}
         </div>
+      )}
+
+      {/* ===== Pipeline Diagnostics ===== */}
+      {groupedData?.diagnostics && groupedData.diagnostics.length > 0 && !isGrouping && (
+        <details className="group">
+          <summary className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors px-1 py-1 select-none">
+            <span className="text-[10px] bg-muted/40 border border-border/50 rounded px-1.5 py-0.5 font-mono">PIPELINE</span>
+            <span>جودة البيانات لكل منصة</span>
+            <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform ml-auto" />
+          </summary>
+          <div className="mt-2 rounded-lg border border-border/40 bg-muted/10 overflow-hidden">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-border/30 text-muted-foreground">
+                  <th className="text-right px-3 py-1.5 font-medium">المنصة</th>
+                  <th className="text-center px-2 py-1.5 font-medium">خام</th>
+                  <th className="text-center px-2 py-1.5 font-medium">هاتف</th>
+                  <th className="text-center px-2 py-1.5 font-medium">موقع</th>
+                  <th className="text-center px-2 py-1.5 font-medium">@user</th>
+                  <th className="text-center px-2 py-1.5 font-medium">مدينة</th>
+                  <th className="text-center px-2 py-1.5 font-medium">جودة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedData.diagnostics.map((d, i) => (
+                  <tr key={`diag-${d.platform}-${i}`} className="border-b border-border/20 last:border-0 hover:bg-muted/20">
+                    <td className="px-3 py-1.5 font-medium text-foreground">{d.platform}</td>
+                    <td className="text-center px-2 py-1.5 text-muted-foreground">{d.rawCount}</td>
+                    <td className="text-center px-2 py-1.5">
+                      <span className={d.withPhone > 0 ? "text-green-400" : "text-muted-foreground/40"}>{d.withPhone}</span>
+                    </td>
+                    <td className="text-center px-2 py-1.5">
+                      <span className={d.withWebsite > 0 ? "text-blue-400" : "text-muted-foreground/40"}>{d.withWebsite}</span>
+                    </td>
+                    <td className="text-center px-2 py-1.5">
+                      <span className={d.withUsername > 0 ? "text-purple-400" : "text-muted-foreground/40"}>{d.withUsername}</span>
+                    </td>
+                    <td className="text-center px-2 py-1.5">
+                      <span className={d.withCity > 0 ? "text-yellow-400" : "text-muted-foreground/40"}>{d.withCity}</span>
+                    </td>
+                    <td className="text-center px-2 py-1.5">
+                      <span className={{
+                        rich: "text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded text-[10px]",
+                        moderate: "text-yellow-400 bg-yellow-500/10 px-1.5 py-0.5 rounded text-[10px]",
+                        sparse: "text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded text-[10px]",
+                        empty: "text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-[10px]",
+                      }[d.dataQuality]}>
+                        {d.dataQuality === "rich" ? "غني" : d.dataQuality === "moderate" ? "متوسط" : d.dataQuality === "sparse" ? "ضعيف" : "فارغ"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       )}
 
       {/* ===== Multi-platform groups ===== */}

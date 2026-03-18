@@ -22,6 +22,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { createLeadWithResolution } from "../db";
+import { canonicalizeSource, getSocialFieldKey } from "../../shared/sourceRegistry";
 import {
   resolveLeads,
   computeLinkageScore,
@@ -38,26 +39,24 @@ import type {
   DiscoverySourceType,
 } from "../../shared/types/lead-intelligence";
 
-// ─── Helper: تحويل مصدر string إلى DiscoverySource ───────────────────────────
+// ─── Helper: تحويل مصدر string إلى DiscoverySource (عبر Source Registry) ──────
 
 function toDiscoverySource(source: string): DiscoverySource {
-  const validSources: DiscoverySource[] = [
-    "google", "maps", "instagram", "tiktok", "snapchat",
-    "x", "facebook", "linkedin", "telegram", "website",
-  ];
-  // تحويل google_maps → maps
-  if (source === "google_maps") return "maps";
-  if (validSources.includes(source as DiscoverySource)) {
-    return source as DiscoverySource;
+  const canonical = canonicalizeSource(source);
+  // telegram مدعوم في DiscoverySource لكن ليس في sourceRegistry بعد
+  if (source === "telegram") return "telegram" as DiscoverySource;
+  // إذا كان unknown → نسجّل تحذيراً ولا نُخفي المشكلة
+  if (canonical === "unknown") {
+    console.warn(`[sourceRegistry] Unknown source: "${source}" — will be tagged as unknown`);
   }
-  // fallback: website لأي مصدر غير معروف
-  return "website";
+  return canonical as DiscoverySource;
 }
 
 function toDiscoverySourceType(source: string): DiscoverySourceType {
-  if (source === "google" || source === "google_maps") return "search_result";
-  if (source === "maps") return "listing";
-  if (["instagram", "tiktok", "snapchat", "x", "facebook", "linkedin", "telegram"].includes(source)) {
+  const canonical = canonicalizeSource(source);
+  if (canonical === "google") return "search_result";
+  if (canonical === "maps") return "listing";
+  if (["instagram", "tiktok", "snapchat", "x", "facebook", "linkedin", "telegram"].includes(canonical)) {
     return "profile";
   }
   return "page";
@@ -70,10 +69,29 @@ function rawResultToCandidate(
   source: string,
   idx: number
 ): DiscoveryCandidate {
+  const canonicalSrc = canonicalizeSource(source);
   const displayName = String(result.displayName || result.name || "");
   const bio = String(result.bio || result.description || result.snippet || "");
-  const url = String(result.profileUrl || result.url || result.website || "");
   const username = String(result.username || result.id || "");
+
+  // Phase C: فصل صارم بين profileUrl و website و externalLinks
+  // profileUrl: رابط صفحة الحساب (دائماً سوشيال)
+  // website: موقع العمل (دائماً غير سوشيال)
+  // externalLinks: روابط خارجية من البيو (قد تكون سوشيال أو غير سوشيال)
+  const isSocialPlatform = ["instagram", "tiktok", "snapchat", "x", "facebook", "linkedin"].includes(canonicalSrc);
+  
+  // profileUrl: الرابط الأساسي للحساب (للسوشيال فقط)
+  const profileUrl = isSocialPlatform
+    ? String(result.profileUrl || result.url || "")
+    : undefined;
+  
+  // للمنصات غير السوشيال (maps/google): url هو رابط النتيجة
+  const resultUrl = !isSocialPlatform
+    ? String(result.url || result.link || "")
+    : undefined;
+  
+  // url الموحد: للسوشيال = profileUrl، للباقي = resultUrl
+  const url = profileUrl || resultUrl || String(result.profileUrl || result.url || "");
 
   // ─── استخراج username من URL إذا لم يكن موجوداً مباشرة ───
   let resolvedUsername = username;
@@ -90,8 +108,7 @@ function rawResultToCandidate(
     { platform: "instagram", regex: /(?:instagram\.com\/|@)([\w.]{3,30})/gi },
     { platform: "tiktok",    regex: /tiktok\.com\/@?([\w.]{3,30})/gi },
     { platform: "snapchat",  regex: /snapchat\.com\/add\/([\w.]{3,30})/gi },
-    { platform: "twitter",   regex: /(?:twitter\.com\/|x\.com\/)([\w.]{3,30})/gi },
-    { platform: "facebook",  regex: /facebook\.com\/([\w.]{3,30})/gi },
+    { platform: "x",         regex: /(?:twitter\.com\/|x\.com\/)([\.\w.]{3,30})/gi },   { platform: "facebook",  regex: /facebook\.com\/([\w.]{3,30})/gi },
   ];
   const crossPlatformHandles: Record<string, string> = {};
   const bioAndUrl = `${bio} ${url}`;
@@ -565,10 +582,42 @@ const leadIntelligenceRouter = router({
     .mutation(async ({ input }) => {
       const candidates: DiscoveryCandidate[] = [];
 
+      // Phase B: Diagnostic trace لكل منصة
+      const platformDiagnostics: Record<string, {
+        source: string;         // canonical source name
+        rawCount: number;       // عدد النتائج الخام
+        parsedCount: number;    // عدد النتائج التي تم تحليلها بنجاح
+        withPhone: number;      // عدد النتائج التي تحتوي على هاتف
+        withWebsite: number;    // عدد النتائج التي تحتوي على موقع
+        withUsername: number;   // عدد النتائج التي تحتوي على username
+        withCity: number;       // عدد النتائج التي تحتوي على مدينة
+        unknownSources: string[]; // أسماء المنصات غير المعروفة
+      }> = {};
+
       for (const [platform, results] of Object.entries(input.rawResults)) {
+        const canonicalPlatform = canonicalizeSource(platform);
+        const diag = {
+          source: canonicalPlatform,
+          rawCount: results.length,
+          parsedCount: 0,
+          withPhone: 0,
+          withWebsite: 0,
+          withUsername: 0,
+          withCity: 0,
+          unknownSources: canonicalPlatform === "unknown" ? [platform] : [],
+        };
+
         (results as Record<string, unknown>[]).forEach((result, idx) => {
-          candidates.push(rawResultToCandidate(result, platform, idx));
+          const candidate = rawResultToCandidate(result, platform, idx);
+          candidates.push(candidate);
+          diag.parsedCount++;
+          if (candidate.verifiedPhones.length > 0 || candidate.candidatePhones.length > 0) diag.withPhone++;
+          if (candidate.verifiedWebsite || candidate.candidateWebsites.length > 0) diag.withWebsite++;
+          if (candidate.usernameHint) diag.withUsername++;
+          if (candidate.cityHint) diag.withCity++;
         });
+
+        platformDiagnostics[canonicalPlatform] = diag;
       }
 
       // ─── Profile Enrichment: جلب صفحة الحساب الكاملة ───────────────────────
@@ -694,6 +743,19 @@ const leadIntelligenceRouter = router({
           totalGroups: groups.length,
           mergedCount: candidates.length - resolvedGroups.length,
         },
+        // Phase B: Diagnostic trace لكل منصة
+        diagnostics: Object.entries(platformDiagnostics).map(([platform, d]) => ({
+          platform,
+          rawCount: d.rawCount,
+          parsedCount: d.parsedCount,
+          withPhone: d.withPhone,
+          withWebsite: d.withWebsite,
+          withUsername: d.withUsername,
+          withCity: d.withCity,
+          dataQuality: d.parsedCount === 0 ? "empty" :
+            (d.withPhone / d.parsedCount) > 0.3 ? "rich" :
+            (d.withUsername / d.parsedCount) > 0.5 ? "moderate" : "sparse",
+        })),
       };
     }),
 
@@ -733,20 +795,82 @@ const leadIntelligenceRouter = router({
 
       const lead = buildBusinessLeadFromGroup(group);
 
-      // بناء fieldSources: لكل حقل، من أي مصدر جاء؟
+      // Phase D: fieldWinners — لكل حقل: القيمة الفائزة + مصدرها + قيم المنافسين
+      type FieldWinner = {
+        value: string | undefined;
+        winnerSource: string;
+        allValues: Array<{ source: string; value: string }>;
+        confidence: "verified" | "candidate" | "inferred";
+      };
+
+      const buildFieldWinner = (
+        field: string,
+        extractor: (c: DiscoveryCandidate) => string | undefined,
+        confidenceLevel: "verified" | "candidate" | "inferred" = "inferred"
+      ): FieldWinner => {
+        const allValues: Array<{ source: string; value: string }> = [];
+        for (const c of candidates) {
+          const v = extractor(c);
+          if (v) allValues.push({ source: c.source, value: v });
+        }
+        const winner = allValues[0];
+        return {
+          value: winner?.value,
+          winnerSource: winner?.source || "unknown",
+          allValues,
+          confidence: confidenceLevel,
+        };
+      };
+
+      const fieldWinners: Record<string, FieldWinner> = {
+        businessName: buildFieldWinner("businessName", c => c.businessNameHint || c.nameHint),
+        phone: buildFieldWinner("phone", c => c.verifiedPhones[0], "verified"),
+        candidatePhone: buildFieldWinner("candidatePhone", c => c.candidatePhones[0], "candidate"),
+        website: buildFieldWinner("website", c => c.verifiedWebsite, "verified"),
+        candidateWebsite: buildFieldWinner("candidateWebsite", c => c.candidateWebsites[0], "candidate"),
+        city: buildFieldWinner("city", c => c.cityHint),
+        category: buildFieldWinner("category", c => c.categoryHint),
+        instagram: buildFieldWinner("instagram", c => c.source === "instagram" ? c.url : undefined, "verified"),
+        tiktok: buildFieldWinner("tiktok", c => c.source === "tiktok" ? c.url : undefined, "verified"),
+        snapchat: buildFieldWinner("snapchat", c => c.source === "snapchat" ? c.url : undefined, "verified"),
+        x: buildFieldWinner("x", c => c.source === "x" ? c.url : undefined, "verified"),
+        facebook: buildFieldWinner("facebook", c => c.source === "facebook" ? c.url : undefined, "verified"),
+        linkedin: buildFieldWinner("linkedin", c => c.source === "linkedin" ? c.url : undefined, "verified"),
+      };
+
+      // Phase D: mergeSignals — إشارات الدمج المستخدمة
+      const mergeSignals: Array<{ type: string; description: string; strength: "strong" | "moderate" | "weak" }> = [];
+      const sourceArr = candidates.map(c => c.source);
+      const sourceSet = Array.from(new Set(sourceArr));
+      if (sourceSet.length > 1) {
+        mergeSignals.push({ type: "multi_platform", description: `تم دمج ${sourceSet.length} منصات: ${sourceSet.join(", ")}`, strength: "strong" });
+      }
+      const phones = candidates.flatMap(c => [...c.verifiedPhones, ...c.candidatePhones]);
+      const uniquePhones = Array.from(new Set(phones));
+      if (uniquePhones.length > 0 && phones.length > uniquePhones.length) {
+        mergeSignals.push({ type: "phone_match", description: `هاتف مشترك: ${uniquePhones[0]}`, strength: "strong" });
+      }
+      const names = candidates.map(c => c.businessNameHint || c.nameHint || "").filter(Boolean);
+      if (names.length > 1) {
+        mergeSignals.push({ type: "name_similarity", description: `تشابه الأسماء: ${names.slice(0, 3).join(" / ")}`, strength: "moderate" });
+      }
+      const usernameArr = candidates.map(c => c.usernameHint).filter((u): u is string => Boolean(u));
+      const uniqueUsernames = Array.from(new Set(usernameArr));
+      if (uniqueUsernames.length === 1 && candidates.length > 1) {
+        mergeSignals.push({ type: "username_match", description: `username مشترك: @${uniqueUsernames[0]}`, strength: "strong" });
+      }
+
+      // fieldSources للتوافق مع الكود القديم
       const fieldSources: Record<string, string> = {};
-      for (const c of candidates) {
-        const src = c.source;
-        if (!fieldSources.businessName && (c.businessNameHint || c.nameHint)) fieldSources.businessName = src;
-        if (!fieldSources.phone && (c.verifiedPhones[0] || c.candidatePhones[0])) fieldSources.phone = src;
-        if (!fieldSources.website && (c.verifiedWebsite || c.candidateWebsites[0])) fieldSources.website = src;
-        if (!fieldSources.city && c.cityHint) fieldSources.city = src;
-        if (!fieldSources.category && c.categoryHint) fieldSources.category = src;
+      for (const [field, winner] of Object.entries(fieldWinners)) {
+        if (winner.value) fieldSources[field] = winner.winnerSource;
       }
 
       return {
         lead,
         fieldSources,
+        fieldWinners,
+        mergeSignals,
         sourceCount: candidates.length,
         sources: group.sources,
         mergeConfidence: Math.round(group.mergeConfidence * 100),
@@ -821,7 +945,8 @@ const leadIntelligenceRouter = router({
       const instagramUrl = ov.instagramUrl || getSocialUrl("instagram");
       const tiktokUrl = ov.tiktokUrl || getSocialUrl("tiktok");
       const snapchatUrl = ov.snapchatUrl || getSocialUrl("snapchat");
-      const twitterUrl = ov.twitterUrl || getSocialUrl("x");
+      // x/twitter: نبحث أولاً بـ "x" (canonical) ثم بـ "twitter" (legacy)
+      const twitterUrl = ov.twitterUrl || getSocialUrl("x") || getSocialUrl("twitter");
       const linkedinUrl = ov.linkedinUrl || getSocialUrl("linkedin");
       const facebookUrl = ov.facebookUrl || getSocialUrl("facebook");
       const googleMapsUrl = ov.googleMapsUrl || getSocialUrl("maps");
@@ -838,7 +963,7 @@ const leadIntelligenceRouter = router({
         instagramUrl,
         tiktokUrl,
         snapchatUrl,
-        twitterUrl: twitterUrl,
+        twitterUrl, // حقل DB يُسمى twitterUrl لكن source الرسمي هو "x"
         linkedinUrl,
         facebookUrl,
         googleMapsUrl,
