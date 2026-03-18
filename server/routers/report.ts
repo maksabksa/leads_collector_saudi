@@ -187,13 +187,13 @@ async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses
 function computeMissedOpportunities(lead: any, websiteAnalysis: any, socialAnalyses: any[]) {
   const gaps: Array<{ icon: string; title: string; description: string; impact: string; solution: string; priority: "high" | "medium" | "low" }> = [];
 
-  // 1. لا يوجد موقع إلكتروني
+  // 1. الموقع الإلكتروني غير مرصود
   if (!lead.website) {
     gaps.push({
       icon: "🌐",
-      title: "غياب الموقع الإلكتروني",
-      description: `${lead.companyName} لا يملك موقعاً إلكترونياً، مما يعني أن العملاء الذين يبحثون عبر Google لا يجدون أي معلومات موثوقة عن النشاط.`,
-      impact: "خسارة تقديرية: 30-50% من العملاء المحتملين الذين يبحثون أونلاين",
+      title: "الموقع الإلكتروني — يحتاج تطوير",
+      description: `لم يظهر موقع إلكتروني لـ ${lead.companyName} في المسح الأولي. قد يكون الموقع موجوداً ولم يُرصد، أو أن هذا الجانب لم يُطوَّر بعد — وفي كلتا الحالتين يمثل فرصة لتعزيز الحضور الرقمي.`,
+      impact: "تقدير أولي: تطوير الموقع يرفع من معدل الوصول عبر محركات البحث بشكل ملموس",
       solution: "بناء موقع احترافي مع تحسين SEO يضع النشاط في أول نتائج البحث",
       priority: "high"
     });
@@ -203,82 +203,82 @@ function computeMissedOpportunities(lead: any, websiteAnalysis: any, socialAnaly
   if (websiteAnalysis && websiteAnalysis.seoScore && Number(websiteAnalysis.seoScore) < 6) {
     gaps.push({
       icon: "🔍",
-      title: "ضعف ظهور محركات البحث (SEO)",
-      description: `درجة SEO للموقع ${Number(websiteAnalysis.seoScore).toFixed(1)}/10 - هذا يعني أن المنافسين يظهرون قبل ${lead.companyName} في نتائج البحث.`,
-      impact: "خسارة تقديرية: 40-60% من الزيارات العضوية المجانية",
+      title: "ظهور محركات البحث (SEO) — يحتاج تحسين",
+      description: `درجة SEO للموقع ${Number(websiteAnalysis.seoScore).toFixed(1)}/10 — هذا يشير إلى وجود فرصة لتحسين الترتيب في نتائج البحث وزيادة الوصول العضوي.`,
+      impact: "تقدير أولي: تحسين SEO يرفع الزيارات العضوية المجانية بشكل ملحوظ",
       solution: "تحسين SEO الفني والمحتوى لرفع الترتيب في Google",
       priority: "high"
     });
   }
 
-  // 3. لا يوجد إنستغرام
+  // 3. إنستغرام غير مرصود
   if (!lead.instagramUrl) {
     gaps.push({
       icon: "📸",
-      title: "غياب الحضور على إنستغرام",
-      description: `${lead.businessType || "النشاط"} في ${lead.city || "المملكة"} يعتمد بشكل كبير على إنستغرام للوصول للعملاء، خاصة الفئة العمرية 18-35.`,
-      impact: "خسارة تقديرية: 25-40% من العملاء المحتملين في الفئة الشبابية",
+      title: "إنستغرام — لم يُرصد في المسح الأولي",
+      description: `لم يظهر حساب إنستغرام لـ ${lead.businessType || "النشاط"} في ${lead.city || "المملكة"} خلال المسح الأولي. قد يكون الحساب موجوداً بمسمى مختلف، أو أن هذه المنصة لم تُفعَّل بعد — وهي فرصة لتعزيز الوصول للفئة العمرية 18-35.`,
+      impact: "تقدير أولي: تفعيل إنستغرام يرفع من الوصول للعملاء المحتملين في هذه الفئة",
       solution: "إنشاء حساب إنستغرام احترافي مع استراتيجية محتوى منتظمة",
       priority: "high"
     });
   }
 
-  // 4. إنستغرام موجود لكن تفاعل ضعيف
+  // 4. إنستغرام موجود لكن تفاعل يحتاج تطوير
   const instaSocial = socialAnalyses.find(s => s.platform?.toLowerCase().includes("instagram"));
   if (instaSocial && instaSocial.followersCount && Number(instaSocial.followersCount) < 1000) {
     gaps.push({
       icon: "📉",
-      title: "ضعف التفاعل على إنستغرام",
-      description: `عدد المتابعين ${Number(instaSocial.followersCount).toLocaleString("ar")} - وهو أقل من المتوسط في ${lead.city || "السوق"} لنشاط مماثل.`,
-      impact: "محدودية الوصول العضوي وضعف الثقة الاجتماعية",
+      title: "إنستغرام — التفاعل يحتاج تطوير",
+      description: `عدد المتابعين الحالي ${Number(instaSocial.followersCount).toLocaleString("ar")} — هناك فرصة لتنمية الجمهور وزيادة التفاعل مقارنةً بالمتوسط في ${lead.city || "السوق"} لنشاط مماثل.`,
+      impact: "تطوير التفاعل يرفع الوصول العضوي ويعزز الثقة الاجتماعية",
       solution: "استراتيجية نمو متكاملة: محتوى + تفاعل + إعلانات مستهدفة",
       priority: "medium"
     });
   }
 
-  // 5. لا يوجد تيك توك
+  // 5. تيك توك غير مرصود
   if (!lead.tiktokUrl) {
     gaps.push({
       icon: "🎵",
-      title: "غياب الحضور على تيك توك",
-      description: `تيك توك أصبح المنصة الأولى للاكتشاف في السعودية، وغياب ${lead.companyName} يمنح المنافسين ميزة تنافسية كبيرة.`,
-      impact: "خسارة فرصة الانتشار الفيروسي المجاني",
+      title: "تيك توك — لم يُرصد في المسح الأولي",
+      description: `لم يظهر حساب تيك توك لـ ${lead.companyName} في المسح الأولي. تيك توك منصة اكتشاف قوية في السعودية، وتفعيلها يمثل فرصة للانتشار الواسع.`,
+      impact: "تفعيل تيك توك يفتح فرصة الانتشار الفيروسي المجاني",
       solution: "إنشاء محتوى تيك توك قصير وجذاب يعكس هوية النشاط",
       priority: "medium"
     });
   }
 
-  // 6. لا يوجد رقم هاتف موثق
+  // 6. رقم هاتف غير موثق في المسح
   if (!lead.verifiedPhone) {
     gaps.push({
       icon: "📞",
-      title: "غياب معلومات التواصل الموثقة",
-      description: `عدم توفر رقم هاتف موثق يجعل العملاء المهتمين يتجهون للمنافسين الأسهل في التواصل.`,
-      impact: "خسارة تقديرية: 20-35% من العملاء الجاهزين للشراء",
+      title: "معلومات التواصل — لم تُوثَّق في المسح الأولي",
+      description: `لم يُرصد رقم هاتف موثق لـ ${lead.companyName} في المسح الأولي. توثيق بيانات التواصل وإبرازها على المنصات الرقمية يسهّل على العملاء المهتمين التواصل المباشر.`,
+      impact: "توثيق التواصل يسهّل وصول العملاء الجاهزين للشراء",
       solution: "توثيق بيانات التواصل وإضافتها لجميع المنصات الرقمية",
       priority: "high"
     });
   }
 
-  // 7. لا يوجد سناب شات
+  // 7. سناب شات غير مرصود
   if (!lead.snapchatUrl) {
     gaps.push({
       icon: "👻",
-      title: "غياب الحضور على سناب شات",
-      description: `سناب شات يملك أعلى معدل استخدام في السعودية (90%+ من الشباب)، وغياب النشاط يعني فقدان شريحة ضخمة.`,
-      impact: "خسارة الوصول للشريحة الأكثر إنفاقاً في السوق السعودي",
+      title: "سناب شات — لم يُرصد في المسح الأولي",
+      description: `لم يظهر حساب سناب شات لـ ${lead.companyName} في المسح الأولي. سناب شات منصة ذات انتشار واسع في السعودية، وتفعيلها يمثل فرصة للوصول لشريحة شبابية واسعة.`,
+      impact: "تفعيل سناب شات يفتح قناة وصول مهمة للشريحة الأكثر إنفاقاً في السوق السعودي",
       solution: "إنشاء حساب سناب شات مع قصص يومية وإعلانات مستهدفة",
       priority: "medium"
     });
   }
 
-  // 8. لا يوجد تقييمات Google
+  // 8. Google Maps غير مرصود
   if (!lead.googleMapsUrl) {
     gaps.push({
       icon: "⭐",
-      title: "غياب التقييمات على Google Maps",
-      description: `${lead.companyName} غير مسجل أو لا يملك تقييمات كافية على Google Maps، مما يضعف الثقة لدى العملاء الجدد.`,
-      impact: "خسارة تقديرية: 45% من العملاء يتخذون قرارهم بناءً على التقييمات",
+      title: "Google Maps — لم يُرصد في المسح الأولي",
+      description: `لم يظهر نشاط ${lead.companyName} على Google Maps في المسح الأولي. التسجيل على Google Business يعزز الثقة لدى العملاء الجدد ويرفع الظهور في نتائج البحث المحلي.`,
+      impact: "تفعيل Google Business يرفع من معدل الثقة والاكتشاف المحلي",
       solution: "تسجيل النشاط على Google Business وبناء استراتيجية تقييمات",
       priority: "high"
     });
@@ -890,9 +890,12 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
     <!-- المقدمة الاحترافية -->
     <div style="max-width:520px;margin:0 auto 36px;">
       <p style="font-size:13.5px;color:rgba(255,255,255,0.75);line-height:2;font-weight:400;">
-        يسعدنا تقديم هذا التقرير التحليلي الشامل المُعدّ خصيصاً لـ <strong style="color:rgba(212,175,55,0.9);">${lead.companyName}</strong>،
-        والذي يتضمن تشخيصاً دقيقاً للحضور الرقمي، وتحليلاً معمّقاً للفرص التسويقية المتاحة،
-        وخارطة طريق استراتيجية قابلة للتنفيذ لتحقيق نمو ملموس وقابل للقياس.
+        يسعدنا تقديم هذا التقرير التحليلي المُعدّ خصيصاً لـ <strong style="color:rgba(212,175,55,0.9);">${lead.companyName}</strong>،
+        والذي يتضمن تشخيصاً أولياً للحضور الرقمي، وتحليلاً للفرص التسويقية المرصودة،
+        وتوصيات استراتيجية لتعزيز النمو الرقمي. هذا التقرير تحليلي أولي وقد لا يعكس الصورة الكاملة للنشاط.
+      </p>
+      <p style="font-size:10.5px;color:rgba(255,255,255,0.4);line-height:1.8;font-weight:400;margin-top:8px;font-style:italic;">
+        تنبيه: الجوانب غير المرصودة قد تكون موجودةً ولم تُكتشف — التقديرات الواردة أولية وتستند إلى معطيات السوق العامة.
       </p>
     </div>
 
@@ -987,7 +990,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
       <div class="score-label">التفاعل الاجتماعي /10</div>
     </div>
     <div class="score-item">
-      <div class="score-value" style="color:${scores.websiteScore ? '#60a5fa' : '#ef4444'};">${scores.websiteScore ? scores.websiteScore + '/10' : 'لا يوجد'}</div>
+      <div class="score-value" style="color:${scores.websiteScore ? '#60a5fa' : '#94a3b8'};">${scores.websiteScore ? scores.websiteScore + '/10' : 'لم يُرصد'}</div>
       <div class="score-label">تقييم الموقع</div>
     </div>
   </div>
@@ -1045,7 +1048,7 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
       <div class="section-title">📊 التحليل الأولي</div>
       <div class="analysis-box">
         <div class="analysis-box-title">📊 ملاحظات أولية</div>
-        <p>${lead.companyName} هو نشاط تجاري في قطاع ${lead.businessType || "الأعمال"} بمدينة ${lead.city || "الرياض"}. يملك النشاط حضوراً رقمياً ${activePlatforms.length > 4 ? 'متوسطاً' : 'محدوداً'} على ${activePlatforms.length} منصة من أصل ${platforms.length} منصة رئيسية. ${lead.verifiedPhone ? 'رقم الهاتف متوفر مما يسهل التواصل المباشر.' : 'لا يوجد رقم هاتف موثق مما يصعّب التواصل.'} ${lead.website ? 'يملك موقعاً إلكترونياً يحتاج لتقييم SEO.' : 'لا يوجد موقع إلكتروني وهو فرصة تسويقية كبيرة.'}</p>
+        <p>${lead.companyName} نشاط تجاري في قطاع ${lead.businessType || "الأعمال"} بمدينة ${lead.city || "الرياض"}. بناءً على المسح الأولي، رُصد حضور رقمي على ${activePlatforms.length} منصة من أصل ${platforms.length} منصة رئيسية — المنصات غير المرصودة قد تكون موجودةً ولم تُكتشف. ${lead.verifiedPhone ? 'رقم الهاتف متوفر مما يسهل التواصل المباشر.' : 'لم يُرصد رقم هاتف موثق — توثيقه يسهّل التواصل مع العملاء.'} ${lead.website ? 'يملك موقعاً إلكترونياً يحتاج لتقييم SEO.' : 'لم يُرصد موقع إلكتروني — قد يكون موجوداً بمسمى مختلف أو يمثل فرصة للتطوير.'}</p>
       </div>
     </div>`}
 
@@ -1172,8 +1175,8 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   <div class="body">
     <div class="section">
       <div class="section-title">⚠️ الفرص الضائعة — تشخيص شامل</div>
-      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:11px;color:#92400e;line-height:1.7;">
-        <strong>ملاحظة تشخيصية:</strong> بناءً على تحليل الحضور الرقمي لـ ${lead.companyName}، تم رصد ${missedOpps.length} فرصة ضائعة تؤثر مباشرة على قدرة النشاط في جذب العملاء. كل فرصة مصحوبة بتقدير للأثر التجاري وحل عملي يمكن تنفيذه مع مكسب.
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:11px;color:#0369a1;line-height:1.7;">
+        <strong>ملاحظة منهجية:</strong> هذا التحليل مبني على مسح أولي للحضور الرقمي لـ ${lead.companyName}. الجوانب غير المرصودة قد تكون موجودةً ولم تُكتشف، أو أنها فرص حقيقية للتطوير — وفي كلتا الحالتين يمثل ذلك فرصة لتعزيز الحضور الرقمي. التقديرات الواردة أولية وتستند إلى معطيات السوق العامة، وليس بيانات دقيقة خاصة بالنشاط.
       </div>
       ${missedOpps.length > 0 ? oppCards : `
         <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:20px;text-align:center;">
@@ -1193,7 +1196,15 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
 </div>
 
 <!-- ===== الصفحة 5: مقارنة المنافسين (تُضاف هنا ديناميكياً) ===== -->
-${(competitors && competitors.length > 0) ? (() => {
+${(() => {
+  // فلترة المنافسين الذين لديهم حضور رقمي حقيقي (منصة واحدة على الأقل)
+  const competitorsWithRealData = (competitors || []).filter((c: any) => {
+    const realPlatforms = [c.website, c.instagramUrl, c.tiktokUrl, c.snapchatUrl, c.googleMapsUrl, c.twitterUrl, c.facebookUrl, c.verifiedPhone];
+    return realPlatforms.filter(Boolean).length >= 1;
+  });
+  // عرض القسم فقط إذا كان هناك منافسان بحضور حقيقي
+  if (!competitorsWithRealData || competitorsWithRealData.length < 2) return '';
+  const filteredComps = competitorsWithRealData;
   // حساب درجة الحضور الرقمي لكل منافس
   function calcPresence(c: any): number {
     let score = 0;
@@ -1208,7 +1219,7 @@ ${(competitors && competitors.length > 0) ? (() => {
     return Math.min(Math.round(score * 10) / 10, 10);
   }
   const leadPresence = calcPresence(lead);
-  const compData = competitors.slice(0, 4).map((c: any, i: number) => ({
+  const compData = filteredComps.slice(0, 4).map((c: any, i: number) => ({
     ...c,
     presence: calcPresence(c),
     color: ['#6366f1','#f59e0b','#10b981','#ef4444'][i % 4],
@@ -1343,7 +1354,7 @@ ${(competitors && competitors.length > 0) ? (() => {
   </div>
 </div>
 `;
-})() : ''}
+})()}
 
 <!-- ===== الصفحة 6: التوصيات + القناة + الموسم + خاتمة ===== -->
 <div class="page">
@@ -1472,6 +1483,18 @@ export const reportRouter = router({
       const lead = await getLeadById(input.leadId);
       if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
 
+      // ===== Identity Gate: منع التوليد عند غياب الحقول الأساسية =====
+      const missingCritical: string[] = [];
+      if (!lead.companyName || lead.companyName.trim() === '' || lead.companyName === 'غير محدد') missingCritical.push('اسم النشاط');
+      if (!lead.city || lead.city.trim() === '' || lead.city === 'غير محدد') missingCritical.push('المدينة');
+      if (!lead.businessType || lead.businessType.trim() === '' || lead.businessType === 'غير محدد') missingCritical.push('نوع النشاط');
+      if (missingCritical.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `لا يمكن توليد التقرير: الحقول التالية مفقودة أو غير محددة: ${missingCritical.join('، ')}. يرجى إكمال بيانات العميل أولاً.`,
+        });
+      }
+
       const websiteAnalysis = await getWebsiteAnalysisByLeadId(input.leadId);
       const socialAnalyses = await getSocialAnalysesByLeadId(input.leadId);
 
@@ -1515,6 +1538,18 @@ export const reportRouter = router({
     .mutation(async ({ input }) => {
       const lead = await getLeadById(input.leadId);
       if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
+
+      // ===== Identity Gate =====
+      const missingCritical: string[] = [];
+      if (!lead.companyName || lead.companyName.trim() === '' || lead.companyName === 'غير محدد') missingCritical.push('اسم النشاط');
+      if (!lead.city || lead.city.trim() === '' || lead.city === 'غير محدد') missingCritical.push('المدينة');
+      if (!lead.businessType || lead.businessType.trim() === '' || lead.businessType === 'غير محدد') missingCritical.push('نوع النشاط');
+      if (missingCritical.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `لا يمكن عرض التقرير: الحقول التالية مفقودة أو غير محددة: ${missingCritical.join('، ')}. يرجى إكمال بيانات العميل أولاً.`,
+        });
+      }
 
       const websiteAnalysis = await getWebsiteAnalysisByLeadId(input.leadId);
       const socialAnalyses = await getSocialAnalysesByLeadId(input.leadId);
