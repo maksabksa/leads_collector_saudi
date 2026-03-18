@@ -727,15 +727,26 @@ const leadIntelligenceRouter = router({
         notes: sourcesNote,
       });
 
-      // إذا كان مكرراً، أرجع رسالة واضحة بدلاً من خطأ غامض
+      // إذا كان مكرراً، أرجع status=duplicate بدلاً من throw حتى تتمكن الواجهة من عرض خيار التحديث
       if (id === null) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: `العميل "${companyName}" موجود مسبقاً في قاعدة البيانات`,
-        });
+        // اجلب معرّف العميل الموجود من قاعدة البيانات
+        const { checkLeadDuplicate } = await import("../db");
+        const dup = await checkLeadDuplicate(phone || "", companyName, website);
+        return {
+          status: "duplicate" as const,
+          existingId: dup.candidateId,
+          companyName,
+          city,
+          sources: group.sources,
+          mergeConfidence: Math.round(group.mergeConfidence * 100),
+          phone,
+          website,
+          duplicateReason: dup.reason,
+        };
       }
 
       return {
+        status: "created" as const,
         id,
         companyName,
         city,
@@ -925,7 +936,7 @@ const leadIntelligenceRouter = router({
       phone: z.string().optional(),
       website: z.string().optional(),
     })).max(200))
-    .query(async ({ input }) => {
+    .mutation(async ({ input }) => {
       const { checkLeadDuplicate } = await import("../db");
       const results: Record<string, { isDuplicate: boolean; existingLeadId: number | null; reason: string }> = {};
 

@@ -134,12 +134,12 @@ function FieldRow({
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
       </div>
       <div className="divide-y divide-border/20">
-        {nonEmpty.map(({ source, value }) => {
+        {nonEmpty.map(({ source, value }, idx) => {
           const meta = PLATFORM_META[source];
           const isSelected = selectedSource === source;
           return (
             <button
-              key={source}
+              key={`${source}-${idx}`}
               onClick={() => onSelect(source, value)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-right transition-colors ${
                 isSelected
@@ -877,7 +877,7 @@ function SingleCandidateCard({
 export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead }: Props) {
   const groupCandidatesMut = trpc.leadIntelligence.groupCandidates.useMutation();
   const createFromMergeMut = trpc.leadIntelligence.createFromMerge.useMutation();
-  const utils = trpc.useUtils();
+  const checkDuplicateBatchMut = trpc.leadIntelligence.checkDuplicateBatch.useMutation();
 
   const [groupedData, setGroupedData] = useState<{
     groups: GroupData[];
@@ -888,6 +888,8 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
   const [mergeTarget, setMergeTarget] = useState<GroupData | null>(null);
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
+  const [isMergingAll, setIsMergingAll] = useState(false);
+  const [mergeAllProgress, setMergeAllProgress] = useState<{ done: number; total: number; created: number; skipped: number } | null>(null);
 
   // حساب Platform Coverage
   const coverage = useMemo(() => {
@@ -937,8 +939,8 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
         return;
       }
 
-      // استدعاء checkDuplicateBatch عبر tRPC utils.fetch
-      const dupResults = await utils.leadIntelligence.checkDuplicateBatch.fetch(checkItems);
+      // استدعاء checkDuplicateBatch عبر mutation
+      const dupResults = await checkDuplicateBatchMut.mutateAsync(checkItems);
 
       // تطبيق نتائج الفحص على المجموعات والمفردات
       const updatedGroups = data.groups.map((g, i) => {
@@ -1011,6 +1013,16 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
       const result = await createFromMergeMut.mutateAsync({
         candidatesJson: `[${candidateJson}]`,
       });
+      if (result.status === "duplicate") {
+        toast.warning("العميل موجود مسبقاً", {
+          description: `"${result.companyName}" مدرج بالفعل في قاعدة البيانات`,
+          action: result.existingId ? {
+            label: "عرض العميل",
+            onClick: () => window.open(`/leads/${result.existingId}`, "_blank"),
+          } : undefined,
+        });
+        return;
+      }
       toast.success("تمت الإضافة كعميل محتمل", {
         description: result.companyName,
       });
@@ -1047,6 +1059,20 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
           googleMapsUrl: overrides.googleMapsUrl,
         },
       });
+
+      if (result.status === "duplicate") {
+        toast.warning("العميل موجود مسبقاً في قاعدة البيانات", {
+          description: `"${result.companyName}" مدرج بالفعل — لا يمكن إضافة تكرار`,
+          action: result.existingId ? {
+            label: "عرض العميل الموجود",
+            onClick: () => window.open(`/leads/${result.existingId}`, "_blank"),
+          } : undefined,
+          duration: 6000,
+        });
+        setMergeTarget(null);
+        return;
+      }
+
       toast.success("تم الدمج والحفظ بنجاح", {
         description: `${result.companyName} — مدمج من ${result.sources.length} منصات (ثقة ${result.mergeConfidence}%)`,
       });
@@ -1061,6 +1087,53 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
     } catch (e: any) {
       toast.error("خطأ في الدمج", { description: e.message });
     }
+  };
+
+  // دمج الكل تلقائياً — يعالج المجموعات والمفردات غير المكررة دفعة واحدة
+  const handleMergeAll = async () => {
+    if (!groupedData) return;
+    const newGroups = groupedData.groups.filter(g => !g.isDuplicate);
+    const newSingles = groupedData.singles.filter(s => !s.isDuplicate);
+    const total = newGroups.length + newSingles.length;
+    if (total === 0) {
+      toast.info("لا توجد نتائج جديدة للدمج", { description: "جميع النتائج موجودة مسبقاً في قاعدة البيانات" });
+      return;
+    }
+    setIsMergingAll(true);
+    setMergeAllProgress({ done: 0, total, created: 0, skipped: 0 });
+    let created = 0;
+    let skipped = 0;
+    // دمج المجموعات أولاً
+    for (const group of newGroups) {
+      try {
+        const result = await createFromMergeMut.mutateAsync({ candidatesJson: group._candidatesJson });
+        if (result.status === "duplicate") {
+          skipped++;
+        } else {
+          created++;
+          onAddLead({ companyName: result.companyName, city: result.city, phone: result.phone, website: result.website, sources: result.sources });
+        }
+      } catch { skipped++; }
+      setMergeAllProgress(p => p ? { ...p, done: p.done + 1, created, skipped } : null);
+    }
+    // ثم المفردات
+    for (const single of newSingles) {
+      try {
+        const result = await createFromMergeMut.mutateAsync({ candidatesJson: `[${single._candidateJson}]` });
+        if (result.status === "duplicate") {
+          skipped++;
+        } else {
+          created++;
+          onAddLead({ companyName: result.companyName, city: result.city, phone: result.phone, website: result.website, sources: result.sources });
+        }
+      } catch { skipped++; }
+      setMergeAllProgress(p => p ? { ...p, done: p.done + 1, created, skipped } : null);
+    }
+    setIsMergingAll(false);
+    toast.success(`تم دمج ${created} عميل بنجاح`, {
+      description: skipped > 0 ? `تم تخطي ${skipped} مكرر` : "جميع النتائج أُضيفت بنجاح",
+    });
+    setTimeout(() => setMergeAllProgress(null), 3000);
   };
 
   if (totalResults === 0 && !isAnyLoading) {
@@ -1159,33 +1232,69 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
 
       {/* ===== Stats Bar ===== */}
       {groupedData && !isGrouping && !isCheckingDuplicates && (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground px-1 flex-wrap">
-          <span className="flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-primary" />
-            <span className="text-foreground font-medium">{groupedData.stats.totalCandidates}</span> مرشح
-          </span>
-          <span className="text-border">→</span>
-          <span className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-400" />
-            <span className="text-green-400 font-medium">{groupedData.groups.length}</span> مجموعة
-          </span>
-          <span className="flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3 text-yellow-400" />
-            <span className="text-yellow-400 font-medium">{groupedData.singles.length}</span> مفرد
-          </span>
-          {totalDuplicates > 0 && (
-            <>
-              <span className="text-border">|</span>
-              <button
-                onClick={() => setShowDuplicatesOnly(v => !v)}
-                className={`flex items-center gap-1 transition-colors ${showDuplicatesOnly ? "text-amber-400" : "text-muted-foreground hover:text-amber-400"}`}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground px-1 flex-wrap">
+            <span className="flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-primary" />
+              <span className="text-foreground font-medium">{groupedData.stats.totalCandidates}</span> مرشح
+            </span>
+            <span className="text-border">→</span>
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-green-400" />
+              <span className="text-green-400 font-medium">{groupedData.groups.length}</span> مجموعة
+            </span>
+            <span className="flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 text-yellow-400" />
+              <span className="text-yellow-400 font-medium">{groupedData.singles.length}</span> مفرد
+            </span>
+            {totalDuplicates > 0 && (
+              <>
+                <span className="text-border">|</span>
+                <button
+                  onClick={() => setShowDuplicatesOnly(v => !v)}
+                  className={`flex items-center gap-1 transition-colors ${showDuplicatesOnly ? "text-amber-400" : "text-muted-foreground hover:text-amber-400"}`}
+                >
+                  <Database className="w-3 h-3" />
+                  <span className={`font-medium ${showDuplicatesOnly ? "text-amber-400" : ""}`}>{totalDuplicates}</span>
+                  <span>موجود مسبقاً</span>
+                  {showDuplicatesOnly && <span className="text-[10px] bg-amber-500/20 px-1 rounded">فلتر نشط</span>}
+                </button>
+              </>
+            )}
+            {/* زر دمج الكل تلقائياً */}
+            <div className="mr-auto">
+              <Button
+                size="sm"
+                onClick={handleMergeAll}
+                disabled={isMergingAll || (groupedData.groups.filter(g => !g.isDuplicate).length + groupedData.singles.filter(s => !s.isDuplicate).length === 0)}
+                className="h-7 text-xs gap-1.5 bg-primary/90 hover:bg-primary"
               >
-                <Database className="w-3 h-3" />
-                <span className={`font-medium ${showDuplicatesOnly ? "text-amber-400" : ""}`}>{totalDuplicates}</span>
-                <span>موجود مسبقاً</span>
-                {showDuplicatesOnly && <span className="text-[10px] bg-amber-500/20 px-1 rounded">فلتر نشط</span>}
-              </button>
-            </>
+                {isMergingAll ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" />دمج الكل...</>
+                ) : (
+                  <><Merge className="w-3 h-3" />دمج الكل تلقائياً ({groupedData.groups.filter(g => !g.isDuplicate).length + groupedData.singles.filter(s => !s.isDuplicate).length})</>
+                )}
+              </Button>
+            </div>
+          </div>
+          {/* شريط تقدم دمج الكل */}
+          {mergeAllProgress && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">جاري الدمج التلقائي...</span>
+                <span className="text-foreground font-medium">{mergeAllProgress.done}/{mergeAllProgress.total}</span>
+              </div>
+              <div className="w-full bg-muted/30 rounded-full h-1.5">
+                <div
+                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${(mergeAllProgress.done / mergeAllProgress.total) * 100}%` }}
+                />
+              </div>
+              <div className="flex gap-3 text-[10px]">
+                <span className="text-green-400">✔ {mergeAllProgress.created} أُضيف</span>
+                {mergeAllProgress.skipped > 0 && <span className="text-amber-400">↷ {mergeAllProgress.skipped} تخطي</span>}
+              </div>
+            </div>
           )}
         </div>
       )}
