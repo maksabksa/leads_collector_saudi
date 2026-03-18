@@ -34,6 +34,7 @@ import {
 } from "../lib/identityLinkage";
 import { enrichCandidatesBatch } from "../lib/profileEnricher";
 import { enrichCandidatesWithAI } from "../lib/aiEnrichmentAgent";
+import { runGateOnBatch } from "../lib/identityIntegrityGate";
 import type {
   DiscoveryCandidate,
   DiscoverySource,
@@ -696,24 +697,55 @@ const leadIntelligenceRouter = router({
         }
       }
 
-      // ─── AI Enrichment: إكمال النواقص بالذكاء الاصطناعي ─────────────────────
+      // ─── Identity Integrity Gate ──────────────────────────────────────────────
+      // يفحص كل مرشح بشكل مستقل ويكتشف التعارضات في الحقول الحرجة
+      // يُوقف AI Enrichment على المرشحين غير المستقرين
+      const batchGateResult = runGateOnBatch(candidates);
+      console.log(`[groupCandidates] Identity Gate: ${batchGateResult.summary}`);
+
+      // فصل المرشحين: مستقرون vs غير مستقرون
+      const stableCandidateIds = new Set(
+        batchGateResult.results
+          .filter(r => r.integrityResult.status !== "identity_unstable")
+          .map(r => r.id)
+      );
+      const unstableCandidateIds = new Set(
+        batchGateResult.results
+          .filter(r => r.integrityResult.status === "identity_unstable")
+          .map(r => r.id)
+      );
+
+      if (unstableCandidateIds.size > 0) {
+        console.warn(
+          `[groupCandidates] ${unstableCandidateIds.size} candidates have identity conflicts — ` +
+          `AI enrichment, scoring, and auto-save BLOCKED for these candidates`
+        );
+      }
+
+      // ─── AI Enrichment: فقط على المرشحين المستقرين ───────────────────────────
       // يُكمل الحقول الناقصة (هاتف/موقع/سوشيال/مدينة/تصنيف) من البايو والنص الخام
-      // يعمل بعد Profile Enrichment وقبل التجميع لتحسين جودة الربط
+      // مُقيَّد بـ Identity Integrity Gate — لا يعمل على المرشحين المتعارضين
       let aiEnrichmentSummary = null;
       if (input.enableAIEnrichment !== false && candidates.length > 0) {
-        try {
-          aiEnrichmentSummary = await enrichCandidatesWithAI(candidates, 5);
-          console.log(
-            `[groupCandidates] AI enrichment done: ${aiEnrichmentSummary.successCount}/${aiEnrichmentSummary.totalProcessed} enriched, ` +
-            `phones: ${aiEnrichmentSummary.fieldsExtracted.phones}, ` +
-            `websites: ${aiEnrichmentSummary.fieldsExtracted.websites}, ` +
-            `social: ${aiEnrichmentSummary.fieldsExtracted.socialHandles}, ` +
-            `cities: ${aiEnrichmentSummary.fieldsExtracted.cities}, ` +
-            `time: ${aiEnrichmentSummary.processingMs}ms`
-          );
-        } catch (aiErr) {
-          // لا نوقف العملية إذا فشل الإثراء
-          console.warn("[groupCandidates] AI enrichment failed (non-fatal):", aiErr);
+        // فلترة المرشحين المستقرين فقط للإثراء
+        const stableCandidates = candidates.filter(c => stableCandidateIds.has(c.id));
+        if (stableCandidates.length > 0) {
+          try {
+            aiEnrichmentSummary = await enrichCandidatesWithAI(stableCandidates, 5);
+            console.log(
+              `[groupCandidates] AI enrichment done (stable only): ${aiEnrichmentSummary.successCount}/${aiEnrichmentSummary.totalProcessed} enriched, ` +
+              `phones: ${aiEnrichmentSummary.fieldsExtracted.phones}, ` +
+              `websites: ${aiEnrichmentSummary.fieldsExtracted.websites}, ` +
+              `social: ${aiEnrichmentSummary.fieldsExtracted.socialHandles}, ` +
+              `cities: ${aiEnrichmentSummary.fieldsExtracted.cities}, ` +
+              `time: ${aiEnrichmentSummary.processingMs}ms`
+            );
+          } catch (aiErr) {
+            // لا نوقف العملية إذا فشل الإثراء
+            console.warn("[groupCandidates] AI enrichment failed (non-fatal):", aiErr);
+          }
+        } else {
+          console.log("[groupCandidates] AI enrichment skipped — no stable candidates");
         }
       }
 
@@ -775,6 +807,32 @@ const leadIntelligenceRouter = router({
           fieldsExtracted: aiEnrichmentSummary.fieldsExtracted,
           processingMs: aiEnrichmentSummary.processingMs,
         } : null,
+        // Identity Integrity Gate Summary
+        identityGate: {
+          passedCount: batchGateResult.passedCount,
+          blockedCount: batchGateResult.blockedCount,
+          reviewCount: batchGateResult.reviewCount,
+          summary: batchGateResult.summary,
+          // تفاصيل المرشحين غير المستقرين للعرض في الواجهة
+          unstableItems: batchGateResult.results
+            .filter(r => r.integrityResult.status === "identity_unstable")
+            .map(r => ({
+              candidateId: r.id,
+              userMessage: r.integrityResult.userMessage,
+              conflictingFields: r.conflictDetails.map(cf => ({
+                fieldName: cf.fieldName,
+                fieldLabel: cf.fieldLabel,
+                severity: cf.severity,
+                values: cf.values.map(v => ({
+                  value: v.value,
+                  source: v.source,
+                  sourceLabel: v.sourceLabel,
+                  confidence: v.confidence,
+                  rawOrigin: v.rawOrigin,
+                })),
+              })),
+            })),
+        },
         // Phase B: Diagnostic trace لكل منصة
         diagnostics: Object.entries(platformDiagnostics).map(([platform, d]) => ({
           platform,
