@@ -268,7 +268,7 @@ export default function MissingFieldsSearchPanel({ leadId, missingDataFlags, onF
   };
 
   const handleApplied = (field: string, _url: string) => {
-    setAppliedFields(prev => new Set([...prev, field]));
+    setAppliedFields(prev => { const next = new Set(Array.from(prev)); next.add(field); return next; });
     onFieldSaved?.();
   };
 
