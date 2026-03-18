@@ -47,6 +47,7 @@ import SmartAnalysis from "./pages/SmartAnalysis";
 import AIAgent from "./pages/AIAgent";
 import SerpQueue from "./pages/SerpQueue";
 import Seasons from "./pages/Seasons";
+import { SearchProvider } from "./contexts/SearchContext";
 function Router() {
   return (
     <Switch>
@@ -109,10 +110,12 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <SearchProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </SearchProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

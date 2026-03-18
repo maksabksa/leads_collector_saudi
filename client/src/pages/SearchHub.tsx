@@ -27,6 +27,9 @@ import {
 } from "lucide-react";
 import { MapView } from "@/components/Map";
 import { CrossPlatformPanel, type MergedLeadData } from "@/components/CrossPlatformPanel";
+import { useSearch } from "@/contexts/SearchContext";
+import { SalesFiltersPanel } from "@/components/SalesFiltersPanel";
+import { SearchSettingsPanel } from "@/components/SearchSettingsPanel";
 
 // ===== ثوابت =====
 const SAUDI_CITIES = [
@@ -127,8 +130,16 @@ function ResultCard({ result, onAdd, isDuplicate, platform }: {
 
 // ===== المكون الرئيسي =====
 export default function SearchHub() {
-  const [keyword, setKeyword] = useState("");
-  const [city, setCity] = useState("الرياض");
+  const {
+    startSearch, updateResults, updateLoading, updateError,
+    getFilteredResults, session, isAnyLoading: ctxAnyLoading,
+    totalResults: ctxTotalResults, totalFiltered,
+    targetCount, autoSave, autoMerge, selectedPlatforms,
+    activeSalesFiltersCount,
+  } = useSearch();
+
+  const [keyword, setKeyword] = useState(session?.keyword || "");
+  const [city, setCity] = useState(session?.city || "الرياض");
   const [activeTab, setActiveTab] = useState<PlatformId>("google");
   const [showFilters, setShowFilters] = useState(false);
   const [onlyWithPhone, setOnlyWithPhone] = useState(false);
@@ -304,124 +315,129 @@ export default function SearchHub() {
     if (!keyword.trim()) return;
     setLoadingPlatform("google", true);
     setResultsPlatform("google", []);
+    updateLoading("google", true);
+    updateResults("google", []);
     try {
       const res = await searchPlaces.mutateAsync({ query: keyword, city, country: "السعودية" });
       const data = res.results || [];
       setResultsPlatform("google", data);
+      updateResults("google", data);
       if (!data.length) toast.info("لا توجد نتائج في Google Maps");
       else toast.success(`${data.length} نتيجة من Google Maps`);
-    } catch (e: any) { toast.error("خطأ في Google Maps", { description: e.message }); }
-    finally { setLoadingPlatform("google", false); }
-  }, [keyword, city]);
+    } catch (e: any) { toast.error("خطأ في Google Maps", { description: e.message }); updateError("google", e.message); }
+    finally { setLoadingPlatform("google", false); updateLoading("google", false); }
+  }, [keyword, city, updateLoading, updateResults, updateError]);
 
   const searchGoogleWeb = useCallback(async () => {
     if (!keyword.trim()) return;
-    setLoadingPlatform("googleWeb", true);
-    setResultsPlatform("googleWeb", []);
+    setLoadingPlatform("googleWeb", true); updateLoading("googleWeb", true);
+    setResultsPlatform("googleWeb", []); updateResults("googleWeb", []);
     try {
       const res = await googleWebSearchMut.mutateAsync({ keyword, city, searchType: googleWebSearchType, page: 1 });
       const data = res.results || [];
-      setResultsPlatform("googleWeb", data);
+      setResultsPlatform("googleWeb", data); updateResults("googleWeb", data);
       if (!data.length) toast.info("لا توجد نتائج في Google Search");
       else toast.success(`${data.length} نتيجة من Google Search`);
-    } catch (e: any) { toast.error("خطأ في Google Search", { description: e.message }); }
-    finally { setLoadingPlatform("googleWeb", false); }
-  }, [keyword, city, googleWebSearchType]);
+    } catch (e: any) { toast.error("خطأ في Google Search", { description: e.message }); updateError("googleWeb", e.message); }
+    finally { setLoadingPlatform("googleWeb", false); updateLoading("googleWeb", false); }
+  }, [keyword, city, googleWebSearchType, updateLoading, updateResults, updateError]);
 
   const searchInstagram = useCallback(async () => {
     if (!keyword.trim()) return;
-    setLoadingPlatform("instagram", true);
-    setResultsPlatform("instagram", []);
+    setLoadingPlatform("instagram", true); updateLoading("instagram", true);
+    setResultsPlatform("instagram", []); updateResults("instagram", []);
     try {
       const res = await searchInstagramMut.mutateAsync({ keyword, city });
       const data = (res as any)?.results || res || [];
-      setResultsPlatform("instagram", data);
+      setResultsPlatform("instagram", data); updateResults("instagram", data);
       if (!data.length) toast.info("لا توجد نتائج في إنستجرام");
       else toast.success(`${data.length} نتيجة من إنستجرام`);
-    } catch (e: any) { handleBrightDataError(e, "إنستجرام"); }
-    finally { setLoadingPlatform("instagram", false); }
-  }, [keyword, city]);
+    } catch (e: any) { handleBrightDataError(e, "إنستجرام"); updateError("instagram", e.message); }
+    finally { setLoadingPlatform("instagram", false); updateLoading("instagram", false); }
+  }, [keyword, city, updateLoading, updateResults, updateError]);
 
   const searchTiktok = useCallback(async () => {
     if (!keyword.trim()) return;
-    setLoadingPlatform("tiktok", true);
-    setResultsPlatform("tiktok", []);
+    setLoadingPlatform("tiktok", true); updateLoading("tiktok", true);
+    setResultsPlatform("tiktok", []); updateResults("tiktok", []);
     try {
       const res = await searchTiktokMut.mutateAsync({ keyword, city });
       const data = (res as any)?.results || res || [];
-      setResultsPlatform("tiktok", data);
+      setResultsPlatform("tiktok", data); updateResults("tiktok", data);
       if (!data.length) toast.info("لا توجد نتائج في تيك توك");
-    } catch (e: any) { handleBrightDataError(e, "تيك توك"); }
-    finally { setLoadingPlatform("tiktok", false); }
-  }, [keyword, city]);
+    } catch (e: any) { handleBrightDataError(e, "تيك توك"); updateError("tiktok", e.message); }
+    finally { setLoadingPlatform("tiktok", false); updateLoading("tiktok", false); }
+  }, [keyword, city, updateLoading, updateResults, updateError]);
 
   const searchSnapchat = useCallback(async () => {
     if (!keyword.trim()) return;
-    setLoadingPlatform("snapchat", true);
-    setResultsPlatform("snapchat", []);
+    setLoadingPlatform("snapchat", true); updateLoading("snapchat", true);
+    setResultsPlatform("snapchat", []); updateResults("snapchat", []);
     try {
       const res = await searchSnapchatMut.mutateAsync({ keyword, city });
       const data = (res as any)?.results || res || [];
-      setResultsPlatform("snapchat", data);
+      setResultsPlatform("snapchat", data); updateResults("snapchat", data);
       if (!data.length) toast.info("لا توجد نتائج في سناب شات");
-    } catch (e: any) { handleBrightDataError(e, "سناب شات"); }
-    finally { setLoadingPlatform("snapchat", false); }
-  }, [keyword, city]);
+    } catch (e: any) { handleBrightDataError(e, "سناب شات"); updateError("snapchat", e.message); }
+    finally { setLoadingPlatform("snapchat", false); updateLoading("snapchat", false); }
+  }, [keyword, city, updateLoading, updateResults, updateError]);
 
   const searchTwitter = useCallback(async () => {
     if (!keyword.trim()) return;
-    setLoadingPlatform("twitter", true);
-    setResultsPlatform("twitter", []);
+    setLoadingPlatform("twitter", true); updateLoading("twitter", true);
+    setResultsPlatform("twitter", []); updateResults("twitter", []);
     try {
       const res = await searchTwitterMut.mutateAsync({ keyword, city });
       const data = res.results || [];
-      setResultsPlatform("twitter", data);
+      setResultsPlatform("twitter", data); updateResults("twitter", data);
       if (!data.length) toast.info("لا توجد نتائج في تويتر");
       else toast.success(`${data.length} نتيجة من تويتر`);
-    } catch (e: any) { toast.error("خطأ في تويتر", { description: e.message }); }
-    finally { setLoadingPlatform("twitter", false); }
-  }, [keyword, city]);
+    } catch (e: any) { toast.error("خطأ في تويتر", { description: e.message }); updateError("twitter", e.message); }
+    finally { setLoadingPlatform("twitter", false); updateLoading("twitter", false); }
+  }, [keyword, city, updateLoading, updateResults, updateError]);
 
   const searchLinkedIn = useCallback(async () => {
     if (!keyword.trim()) return;
-    setLoadingPlatform("linkedin", true);
-    setResultsPlatform("linkedin", []);
+    setLoadingPlatform("linkedin", true); updateLoading("linkedin", true);
+    setResultsPlatform("linkedin", []); updateResults("linkedin", []);
     try {
       const res = await searchLinkedInMut.mutateAsync({ keyword, city });
       const data = res.results || [];
-      setResultsPlatform("linkedin", data);
+      setResultsPlatform("linkedin", data); updateResults("linkedin", data);
       if (!data.length) toast.info("لا توجد نتائج في لينكدإن");
       else toast.success(`${data.length} نتيجة من لينكدإن`);
-    } catch (e: any) { toast.error("خطأ في لينكدإن", { description: e.message }); }
-    finally { setLoadingPlatform("linkedin", false); }
-  }, [keyword, city]);
+    } catch (e: any) { toast.error("خطأ في لينكدإن", { description: e.message }); updateError("linkedin", e.message); }
+    finally { setLoadingPlatform("linkedin", false); updateLoading("linkedin", false); }
+  }, [keyword, city, updateLoading, updateResults, updateError]);
 
   const searchFacebook = useCallback(async () => {
     if (!keyword.trim()) return;
-    setLoadingPlatform("facebook", true);
-    setResultsPlatform("facebook", []);
+    setLoadingPlatform("facebook", true); updateLoading("facebook", true);
+    setResultsPlatform("facebook", []); updateResults("facebook", []);
     try {
       const res = await searchFacebookMut.mutateAsync({ keyword, city });
       const data = res.results || [];
-      setResultsPlatform("facebook", data);
+      setResultsPlatform("facebook", data); updateResults("facebook", data);
       if (!data.length) toast.info("لا توجد نتائج في فيسبوك");
       else toast.success(`${data.length} نتيجة من فيسبوك`);
-    } catch (e: any) { toast.error("خطأ في فيسبوك", { description: e.message }); }
-    finally { setLoadingPlatform("facebook", false); }
-  }, [keyword, city]);
+    } catch (e: any) { toast.error("خطأ في فيسبوك", { description: e.message }); updateError("facebook", e.message); }
+    finally { setLoadingPlatform("facebook", false); updateLoading("facebook", false); }
+  }, [keyword, city, updateLoading, updateResults, updateError]);
 
   const handleSearchAll = useCallback(() => {
     if (!keyword.trim()) { toast.error("أدخل كلمة البحث أولاً"); return; }
-    searchGoogle();
-    searchGoogleWeb();
-    searchInstagram();
-    searchTiktok();
-    searchSnapchat();
-    searchTwitter();
-    searchLinkedIn();
-    searchFacebook();
-    toast.info("بدأ البحث في جميع المنصات الثماني", { description: "سيستغرق بضع ثوانَ..." });
-  }, [keyword, searchGoogle, searchGoogleWeb, searchInstagram, searchTiktok, searchSnapchat, searchTwitter, searchLinkedIn, searchFacebook]);
+    // بدء جلسة بحث جديدة في Context
+    startSearch(keyword, city);
+    // تشغيل المنصات المختارة فقط
+    const platformFns: Record<string, () => void> = {
+      google: searchGoogle, googleWeb: searchGoogleWeb, instagram: searchInstagram,
+      tiktok: searchTiktok, snapchat: searchSnapchat, twitter: searchTwitter,
+      linkedin: searchLinkedIn, facebook: searchFacebook,
+    };
+    const toRun = selectedPlatforms.length > 0 ? selectedPlatforms : Object.keys(platformFns);
+    toRun.forEach(p => platformFns[p]?.());
+    toast.info(`بدأ البحث في ${toRun.length} منصة`, { description: "يعمل في الخلفية — يمكنك التنقل بحرية" });
+  }, [keyword, city, startSearch, selectedPlatforms, searchGoogle, searchGoogleWeb, searchInstagram, searchTiktok, searchSnapchat, searchTwitter, searchLinkedIn, searchFacebook]);
 
   const handleSearch = () => {
     const searchFns: Record<PlatformId, () => void> = {
@@ -485,7 +501,9 @@ export default function SearchHub() {
   const isAnyLoading = Object.values(loading).some(Boolean);
   const currentPlatform = PLATFORMS.find(p => p.id === activeTab)!;
   const currentResults = results[activeTab];
-  const filteredResults = currentResults.filter((r: any) => {
+  // الفلترة: Context filters أولاً ثم onlyWithPhone المحلي
+  const ctxFiltered = getFilteredResults(activeTab);
+  const filteredResults = (ctxFiltered.length > 0 || session ? ctxFiltered : currentResults).filter((r: any) => {
     if (onlyWithPhone) {
       const hasPhone = r.phone || r.formatted_phone_number || r.phones?.length > 0;
       if (!hasPhone) return false;
@@ -509,6 +527,12 @@ export default function SearchHub() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* مؤشر البحث في الخلفية */}
+            {ctxAnyLoading && (
+              <Badge variant="outline" className="text-xs gap-1.5 border-blue-500/40 text-blue-400 bg-blue-500/10 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" />بحث نشط
+              </Badge>
+            )}
             {brightDataConnectionQuery.data?.connected ? (
               <Badge variant="outline" className="text-xs gap-1.5 border-green-500/40 text-green-400 bg-green-500/10">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />Bright Data نشط
@@ -520,9 +544,13 @@ export default function SearchHub() {
             )}
             {totalResults > 0 && (
               <Badge className="text-xs px-2.5 py-1 gap-1.5">
-                <Zap className="w-3 h-3" />{totalResults} نتيجة
+                <Zap className="w-3 h-3" />
+                {activeSalesFiltersCount > 0 ? `${totalFiltered} / ${ctxTotalResults}` : ctxTotalResults || totalResults} نتيجة
               </Badge>
             )}
+            {/* مكونات الإعدادات */}
+            <SalesFiltersPanel />
+            <SearchSettingsPanel />
           </div>
         </div>
 
