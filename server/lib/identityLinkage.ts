@@ -467,15 +467,24 @@ export function computeLinkageScore(
   };
 }
 
+// ─── Browser Verification Agent Constants ────────────────────────────────────
+/** الحد الأدنى لمنطقة الرمادي — أقل من هذا لا يستحق التحقق */
+const GREY_ZONE_MIN = 0.60;
+/** الحد الأقصى لمنطقة الرمادي — فوق هذا يُدمج مباشرة */
+const GREY_ZONE_MAX = 0.84;
+
 // ─── خوارزمية التجميع (Clustering) ───────────────────────────────────────────
 
 /**
  * تجميع المرشحين المتشابهين في مجموعات (كيانات موحدة)
  * باستخدام Union-Find (Disjoint Set Union) للكفاءة
+ *
+ * للحالات الرمادية (score 0.60-0.84): يُستدعى Browser Verification Agent
+ * لاستخراج أدلة إضافية من صفحات الحسابات الفعلية.
  */
-export function clusterCandidates(
+export async function clusterCandidatesAsync(
   candidates: DiscoveryCandidate[]
-): ResolvedGroup[] {
+): Promise<ResolvedGroup[]> {
   const n = candidates.length;
   if (n === 0) return [];
   if (n === 1) {
@@ -486,7 +495,6 @@ export function clusterCandidates(
       sources: [candidates[0].source],
     }];
   }
-
   // Union-Find
   const parent = Array.from({ length: n }, (_, i) => i);
   const rank = new Array(n).fill(0);
@@ -505,16 +513,59 @@ export function clusterCandidates(
     else { parent[py] = px; rank[px]++; }
   }
 
-  // حساب درجات التشابه لكل زوج
+  // حساب درجات التشابه لكل زوج مع Browser Verification للحالات الرمادية
+  const greyZonePairs: Array<{ i: number; j: number; score: number }> = [];
+
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       const linkage = computeLinkageScore(candidates[i], candidates[j]);
       if (linkage.shouldMerge) {
         union(i, j);
+      } else if (linkage.totalScore >= GREY_ZONE_MIN && linkage.totalScore < GREY_ZONE_MAX) {
+        // منطقة رمادية — نحتاج تحقق إضافي
+        greyZonePairs.push({ i, j, score: linkage.totalScore });
       }
     }
   }
 
+  // معالجة الحالات الرمادية عبر Browser Verification Agent
+  if (greyZonePairs.length > 0) {
+    try {
+      const { verifyIdentityPair } = await import("./verificationLayer.js");
+      // نعالج أقصى 5 أزواج لتجنب التأخير الزائد
+      const pairsToVerify = greyZonePairs.slice(0, 5);
+      await Promise.allSettled(
+        pairsToVerify.map(async ({ i, j, score }) => {
+          const a = candidates[i];
+          const b = candidates[j];
+          const urlA = a.verifiedWebsite || (a.candidateWebsites?.[0]) || "";
+          const urlB = b.verifiedWebsite || (b.candidateWebsites?.[0]) || "";
+          if (!urlA || !urlB) return;
+          const caseId = `${a.source}:${a.usernameHint || i}_vs_${b.source}:${b.usernameHint || j}`;
+          const result = await verifyIdentityPair(urlA, a.source, urlB, b.source, score, caseId);
+          if (result.decision === "merge_confirmed" || result.decision === "merge_suggested") {
+            union(i, j);
+            // إثراء الكاندييت بالبيانات الجديدة إذا وُجدت
+            if (result.shouldEnrich) {
+              const enriched = result.enrichedData;
+              if (enriched.phones.length > 0) {
+                candidates[i].candidatePhones = [
+                  ...(candidates[i].candidatePhones || []),
+                  ...enriched.phones,
+                ];
+              }
+              if (enriched.cities.length > 0 && !candidates[i].cityHint) {
+                candidates[i].cityHint = enriched.cities[0];
+              }
+            }
+          }
+        })
+      );
+    } catch (err) {
+      // Browser Verification فشل — نتجاهله ونكمل بالنتائج الحالية
+      console.warn("[IdentityLinkage] Browser Verification failed:", err);
+    }
+  }
   // بناء المجموعات
   const groups: Map<number, number[]> = new Map();
   for (let i = 0; i < n; i++) {
@@ -550,7 +601,70 @@ export function clusterCandidates(
   return result;
 }
 
-// ─── بناء BusinessLead من مجموعة ─────────────────────────────────────────────
+/**
+ * نسخة synchronous من clusterCandidates — لا تُشغّل Browser Verification
+ * مستخدمة للتوافق مع الكود القديم والاختبارات
+ */
+export function clusterCandidates(
+  candidates: DiscoveryCandidate[]
+): ResolvedGroup[] {
+  const n = candidates.length;
+  if (n === 0) return [];
+  if (n === 1) {
+    return [{
+      primary: candidates[0],
+      duplicates: [],
+      mergeConfidence: candidates[0].confidence,
+      sources: [candidates[0].source],
+    }];
+  }
+
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const rank = new Array(n).fill(0);
+
+  function find(x: number): number {
+    if (parent[x] !== x) parent[x] = find(parent[x]);
+    return parent[x];
+  }
+
+  function union(x: number, y: number): void {
+    const px = find(x);
+    const py = find(y);
+    if (px === py) return;
+    if (rank[px] < rank[py]) parent[px] = py;
+    else if (rank[px] > rank[py]) parent[py] = px;
+    else { parent[py] = px; rank[px]++; }
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const linkage = computeLinkageScore(candidates[i], candidates[j]);
+      if (linkage.shouldMerge) union(i, j);
+    }
+  }
+
+  const groups: Map<number, number[]> = new Map();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(i);
+  }
+
+  const result: ResolvedGroup[] = [];
+  for (const [, memberIndices] of Array.from(groups.entries())) {
+    const members = memberIndices.map(i => candidates[i]);
+    const sorted = [...members].sort((a, b) => b.confidence - a.confidence);
+    const primary = sorted[0];
+    const duplicates = sorted.slice(1);
+    const avgConfidence = members.reduce((sum, m) => sum + m.confidence, 0) / members.length;
+    const sources = Array.from(new Set(members.map((m: DiscoveryCandidate) => m.source)));
+    result.push({ primary, duplicates, mergeConfidence: avgConfidence, sources });
+  }
+  result.sort((a, b) => b.sources.length - a.sources.length);
+  return result;
+}
+
+// ─── بناء BusinessLead من مجموعة ─────────────────────────────────────────────────
 
 /**
  * تحويل مجموعة مرشحين مدموجين إلى BusinessLead موحد
