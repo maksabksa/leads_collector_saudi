@@ -1989,3 +1989,24 @@
 - [ ] بناء نافذة المقارنة الجانبية (side-by-side) في نافذة الدمج
 - [ ] فلتر التكرار الذكي — التحقق من DB قبل إضافة أي نتيجة
 - [ ] رفع مهلة Bright Data من 30 إلى 90 ثانية + retry logic
+
+## Phase A — Safety First (نظام الدمج الآمن)
+
+- [ ] Gate قبل buildBusinessLeadFromGroup: منع الدمج عند identity_unstable
+- [ ] إصلاح normalizeName: إضافة disambiguationTokens (مدينة، نوع النشاط، geo terms)
+- [ ] منطق الدمج يرفض التطابق إذا كانت disambiguationTokens متعارضة
+- [ ] اختبارات: Gate قبل buildBusinessLeadFromGroup + normalizeName الجديد
+
+## Phase B — Search Control (التحكم في البحث)
+
+- [ ] فلتر نوع البحث: حسابات مباشرة / بحث عام (في SearchHub)
+- [ ] إدخال يدوي كنقطة انطلاق: اسم / يوزرنيم / رقم / رابط حساب
+- [ ] البحث الموازي (AI Agent) عند ضعف النتائج
+- [ ] دمج كلي بعد البحث (زر منفصل)
+- [ ] Intent Parser بسيط: يحول نية المستخدم إلى استعلامات بحث صحيحة
+
+## Phase C — Lead-Level Merge (الدمج داخل Lead)
+
+- [ ] إضافة حساب أو lead موازٍ من داخل صفحة تعديل Lead
+- [ ] نفس مسار البحث الكامل (Gate + normalizeName + تحقق) عند الإضافة الموازية
+- [ ] URL Validation قبل Profile Enrichment

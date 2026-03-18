@@ -162,7 +162,9 @@ export type LeadStatus =
   | "enriched"
   | "audited"
   | "scored"
-  | "ready_for_sales";
+  | "ready_for_sales"
+  /** هوية غير مستقرة: تعارض في الحقول الحرجة — يتطلب مراجعة يدوية */
+  | "identity_unstable";
 
 /**
  * كيان العمل الموحد بعد دمج المرشحين من مصادر متعددة

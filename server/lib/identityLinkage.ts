@@ -35,6 +35,7 @@ import type {
   BusinessLead,
   SourceRecord,
 } from "../../shared/types/lead-intelligence";
+import { runGateOnGroup, isOperationAllowed } from "./identityIntegrityGate";
 
 // ─── الأوزان (PHASE 1: محدثة لتتوافق مع المتطلبات) ───────────────────────────
 const WEIGHTS = {
@@ -54,13 +55,127 @@ const NAME_ONLY_THRESHOLD = 0.85;
 
 // ─── تطبيع الاسم ──────────────────────────────────────────────────────────────
 
+// ─── قوائم الكلمات المصنّفة ──────────────────────────────────────────────────
+
+/** كلمات نوع النشاط — تُستخدم كـ disambiguators وليس تُحذف */
+const BUSINESS_TYPE_WORDS: Record<string, string> = {
+  // عربي
+  "مطعم": "restaurant", "مطاعم": "restaurant",
+  "مقهى": "cafe", "مقاهي": "cafe", "كافيه": "cafe", "كافيهات": "cafe",
+  "محل": "shop", "محلات": "shop", "متجر": "shop", "متاجر": "shop",
+  "شركة": "company", "مؤسسة": "company", "مجموعة": "group",
+  "مركز": "center", "مراكز": "center",
+  "حلويات": "sweets", "مخبز": "bakery", "مخابز": "bakery",
+  "بوفيه": "buffet", "ملحمة": "butcher", "ملاحم": "butcher",
+  "عيادة": "clinic", "عيادات": "clinic",
+  "مستشفى": "hospital", "مستشفيات": "hospital",
+  "صيدلية": "pharmacy",
+  "خدمات": "services",
+  // إنجليزي
+  "restaurant": "restaurant", "restaurants": "restaurant",
+  "cafe": "cafe", "cafes": "cafe", "coffee": "cafe",
+  "shop": "shop", "store": "shop",
+  "company": "company", "co": "company", "est": "company",
+  "ltd": "company", "llc": "company",
+  "group": "group", "center": "center", "centre": "center",
+  "bakery": "bakery", "kitchen": "kitchen",
+  "food": "food", "foods": "food",
+  "grill": "grill", "grills": "grill",
+  "clinic": "clinic", "hospital": "hospital", "pharmacy": "pharmacy",
+};
+
+/** كلمات المدن السعودية — تُستخدم كـ disambiguators وليس تُحذف */
+const CITY_WORDS: Record<string, string> = {
+  "الرياض": "riyadh", "رياض": "riyadh", "riyadh": "riyadh", "riyad": "riyadh",
+  "جدة": "jeddah", "jeddah": "jeddah", "jidda": "jeddah",
+  "مكة": "mecca", "مكه": "mecca", "مكة المكرمة": "mecca", "mecca": "mecca", "makkah": "mecca",
+  "المدينة": "medina", "المدينة المنورة": "medina", "medina": "medina", "madinah": "medina",
+  "الدمام": "dammam", "dammam": "dammam",
+  "الخبر": "khobar", "khobar": "khobar",
+  "الطائف": "taif", "taif": "taif",
+  "تبوك": "tabuk", "tabuk": "tabuk",
+  "أبها": "abha", "abha": "abha",
+  "القصيم": "qassim", "بريدة": "qassim",
+  "الأحساء": "ahsa", "الهفوف": "ahsa",
+  "حائل": "hail", "hail": "hail",
+  "نجران": "najran", "najran": "najran",
+  "جازان": "jazan", "jazan": "jazan",
+  "ينبع": "yanbu", "yanbu": "yanbu",
+};
+
+/** الكلمات الجغرافية العامة */
+const GEO_WORDS: Record<string, string> = {
+  "السعودية": "saudi", "السعودي": "saudi", "العربية": "saudi",
+  "saudi": "saudi", "ksa": "saudi",
+};
+
+// ─── DisambiguationTokens ─────────────────────────────────────────────────────
+
+export interface DisambiguationTokens {
+  /** نوع النشاط المُعيَّر (restaurant, cafe, shop, ...) */
+  businessType: string | null;
+  /** المدينة المُعيَّرة (riyadh, jeddah, ...) */
+  city: string | null;
+  /** مؤشرات جغرافية أخرى */
+  geoTerms: string[];
+}
+
 /**
- * تطبيع اسم العمل للمقارنة:
+ * استخراج رموز التمييز من اسم النشاط
+ * هذه الرموز لا تُحذف من الاسم بل تُستخدم لمنع الدمج الخاطئ
+ */
+export function extractDisambiguationTokens(name: string): DisambiguationTokens {
+  if (!name) return { businessType: null, city: null, geoTerms: [] };
+
+  const lower = name.toLowerCase()
+    .replace(/[\u064B-\u065F\u0670]/g, "") // إزالة التشكيل
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي");
+
+  let businessType: string | null = null;
+  let city: string | null = null;
+  const geoTerms: string[] = [];
+
+  // فحص نوع النشاط
+  for (const [word, canonical] of Object.entries(BUSINESS_TYPE_WORDS)) {
+    const wLower = word.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+    if (lower.includes(wLower)) {
+      businessType = canonical;
+      break;
+    }
+  }
+
+  // فحص المدينة
+  for (const [word, canonical] of Object.entries(CITY_WORDS)) {
+    const wLower = word.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+    if (lower.includes(wLower)) {
+      city = canonical;
+      break;
+    }
+  }
+
+  // فحص الكلمات الجغرافية العامة
+  for (const [word, canonical] of Object.entries(GEO_WORDS)) {
+    const wLower = word.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+    if (lower.includes(wLower) && !geoTerms.includes(canonical)) {
+      geoTerms.push(canonical);
+    }
+  }
+
+  return { businessType, city, geoTerms };
+}
+
+/**
+ * تطبيع اسم العمل للمقارنة (canonicalName):
  * - إزالة التشكيل والهمزات
- * - توحيد الأحرف المتشابهة (ة → ه، أ/إ/آ → ا)
- * - إزالة الكلمات الشائعة (مطعم، محل، شركة، restaurant, shop, co)
+ * - توحيد الأحرف المتشابهة
+ * - إزالة كلمات نوع النشاط والمدينة (تُحفظ في disambiguationTokens)
  * - تحويل إلى lowercase
  * - إزالة المسافات الزائدة والرموز
+ *
+ * ملاحظة: الكلمات المحذوفة هنا تُستخرج أولاً بـ extractDisambiguationTokens
+ * ثم تُستخدم في منطق الدمج كـ disambiguators وليس تُهمل
  */
 export function normalizeName(name: string): string {
   if (!name) return "";
@@ -77,35 +192,22 @@ export function normalizeName(name: string): string {
   n = n.replace(/ؤ/g, "و");
   n = n.replace(/ئ/g, "ي");
 
-  // إزالة الكلمات الشائعة العربية (noise words)
-  const arabicStopWords = [
-    "مطاعم", "مطعم", "محلات", "محل", "متاجر", "متجر", "شركة", "مؤسسة",
-    "مجموعة", "مركز", "مراكز", "مقاهي", "مقهى", "كافيهات", "كافيه",
-    "حلويات", "مخابز", "مخبز", "بوفيه", "ملاحم", "ملحمة",
-    "خدمات", "تجارية", "للتجارة", "للخدمات", "للأغذية",
-    "عيادة", "عيادات", "مستشفى", "مستشفيات", "صيدلية",
-    "الرياض", "جدة", "مكة", "المدينة", "الدمام",
-    "السعودية", "السعودي", "العربية",
-  ];
-
-  // إزالة الكلمات الشائعة الإنجليزية (noise words)
-  const englishStopWords = [
-    "restaurant", "restaurants", "cafe", "cafes", "coffee", "shop", "store",
-    "company", "co", "est", "ltd", "llc", "group", "center", "centre",
-    "bakery", "kitchen", "food", "foods", "grill", "grills",
-    "clinic", "hospital", "pharmacy",
-    "riyadh", "jeddah", "saudi", "ksa",
-  ];
-
-  // إزالة الكلمات العربية
-  for (const word of arabicStopWords) {
-    n = n.split(word).join(" ");
+  // إزالة كلمات نوع النشاط (بعد حفظها في disambiguationTokens)
+  for (const word of Object.keys(BUSINESS_TYPE_WORDS)) {
+    const wNorm = word.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+    n = n.split(wNorm).join(" ");
   }
 
-  // إزالة الكلمات الإنجليزية بـ \b
-  for (const word of englishStopWords) {
-    const regex = new RegExp(`\\b${word}\\b`, "gi");
-    n = n.replace(regex, " ");
+  // إزالة كلمات المدن (بعد حفظها في disambiguationTokens)
+  for (const word of Object.keys(CITY_WORDS)) {
+    const wNorm = word.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+    n = n.split(wNorm).join(" ");
+  }
+
+  // إزالة الكلمات الجغرافية العامة
+  for (const word of Object.keys(GEO_WORDS)) {
+    const wNorm = word.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+    n = n.split(wNorm).join(" ");
   }
 
   // إزالة الرموز والأرقام والمسافات الزائدة
@@ -405,11 +507,37 @@ export function computeLinkageScore(
   if (crossPlatformScore >= 0.9) matchedSignals.push("crossPlatformHandle");
   if (usernameMatchAcrossPlatforms) matchedSignals.push("usernameAcrossPlatforms");
 
+  // ─── فحص disambiguationTokens: منع الدمج عند تعارض المدينة أو نوع النشاط ───
+  const nameA = a.businessNameHint || a.nameHint || "";
+  const nameB = b.businessNameHint || b.nameHint || "";
+  const disambigA = extractDisambiguationTokens(nameA);
+  const disambigB = extractDisambiguationTokens(nameB);
+
+  // إذا كانت المدينة مذكورة في الاسمين وهي مختلفة → رفض الدمج قطعياً
+  const cityConflict =
+    disambigA.city !== null &&
+    disambigB.city !== null &&
+    disambigA.city !== disambigB.city;
+
+  // إذا كان نوع النشاط مذكوراً في الاسمين وهو مختلف → رفض الدمج
+  const businessTypeConflict =
+    disambigA.businessType !== null &&
+    disambigB.businessType !== null &&
+    disambigA.businessType !== disambigB.businessType;
+
   // ─ منطق الدمج الذكي ─
   let shouldMerge = false;
   let reason = "";
 
-  if (phoneScore === 1) {
+  // الرفض القاطع بسبب تعارض المدينة في الاسم (حتى لو تطابق الهاتف)
+  if (cityConflict && phoneScore < 1 && websiteScore < 1) {
+    shouldMerge = false;
+    reason = `تعارض المدينة في الاسم: ${disambigA.city} ≠ ${disambigB.city} — رفض الدمج`;
+  } else if (businessTypeConflict && nameScore < 0.95 && phoneScore < 1 && websiteScore < 1) {
+    // نوع النشاط مختلف + الاسم غير متطابق تماماً + لا هاتف ولا موقع مشترك
+    shouldMerge = false;
+    reason = `تعارض نوع النشاط: ${disambigA.businessType} ≠ ${disambigB.businessType} — رفض الدمج`;
+  } else if (phoneScore === 1) {
     // تطابق رقم الهاتف وحده كافٍ → دمج مؤكد
     shouldMerge = true;
     reason = "تطابق رقم الهاتف";
@@ -767,11 +895,53 @@ export function buildBusinessLeadFromGroup(
   };
 }
 
-// ─── الدالة الرئيسية: Discovery → Resolution ──────────────────────────────────
+// ─── فحص وجود مُعرّف قوي مشترك بين المرشحين ────────────────────────────────────
+
+/**
+ * يفحص إذا كان هناك مُعرّف قوي مشترك (هاتف أو موقع) بين مرشحين اثنين على الأقل.
+ * إذا كان كذلك، الدمج مسموح حتى لو كان الاسم مختلفاً — لأن الهاتف/الموقع يُثبت الهوية بشكل قاطع.
+ */
+function hasCommonStrongIdentifier(candidates: DiscoveryCandidate[]): boolean {
+  if (candidates.length < 2) return false;
+
+  // جمع أرقام الهاتف المؤكدة لكل مرشح
+  const phoneSets = candidates.map(c => {
+    const phones = [...(c.verifiedPhones || []), ...(c.candidatePhones || [])];
+    return new Set(phones.map(p => normalizePhone(p)).filter(Boolean));
+  });
+
+  // فحص وجود هاتف مشترك بين أي مرشحين اثنين
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      for (const phone of Array.from(phoneSets[i])) {
+        if (phone && phoneSets[j].has(phone)) return true;
+      }
+    }
+  }
+
+  // جمع المواقع لكل مرشح
+  const domainSets = candidates.map(c => {
+    const sites = [
+      ...(c.verifiedWebsite ? [c.verifiedWebsite] : []),
+      ...(c.candidateWebsites || []),
+    ];
+    return new Set(sites.map(s => extractDomain(s)).filter(Boolean));
+  });
+
+  // فحص وجود موقع مشترك
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      for (const domain of Array.from(domainSets[i])) {
+        if (domain && domainSets[j].has(domain)) return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 /**
  * الدالة الرئيسية لمعالجة قائمة المرشحين الخام وتحويلها إلى كيانات موحدة
- *
  * @param candidates - قائمة المرشحين الخام من جميع المصادر
  * @returns قائمة BusinessLead موحدة بدون تكرار
  *
@@ -801,12 +971,48 @@ export function resolveLeads(candidates: DiscoveryCandidate[]): BusinessLead[] {
   // 1. تجميع المرشحين المتشابهين
   const groups = clusterCandidates(candidates);
 
-  // 2. بناء BusinessLead من كل مجموعة
-  const leads = groups.map(group => buildBusinessLeadFromGroup(group));
+  // 2. بناء BusinessLead من كل مجموعة — بعد فحص Identity Integrity Gate
+  const leads: BusinessLead[] = [];
+  let blockedCount = 0;
+
+  for (const group of groups) {
+    const allCandidates = [group.primary, ...group.duplicates];
+
+    // ─── Identity Integrity Gate ───
+    const gateResult = runGateOnGroup(allCandidates);
+
+    // إذا كان هناك مُعرّف قوي مشترك (هاتف أو موقع) بين جميع المرشحين → الدمج مسموح حتى لو كان الاسم مختلفاً
+    const hasSharedStrongIdentifier = hasCommonStrongIdentifier(allCandidates);
+    const mergeAllowed = hasSharedStrongIdentifier
+      ? { allowed: true, reason: "مُعرّف قوي مشترك (هاتف/موقع)" }
+      : isOperationAllowed(gateResult.integrityResult, "merge");
+
+    if (!mergeAllowed.allowed) {
+      // هوية غير مستقرة → لا دمج، كل مرشح يصبح lead مستقل
+      blockedCount++;
+      console.warn(
+        `[IdentityLinkage] Gate منع دمج مجموعة (${allCandidates.length} مرشح): ${mergeAllowed.reason}`
+      );
+      // كل مرشح يصبح lead مستقل بدلاً من دمجهم
+      for (const candidate of allCandidates) {
+        const singleGroup: ResolvedGroup = { primary: candidate, duplicates: [], mergeConfidence: 0, sources: [candidate.source] };
+        const lead = buildBusinessLeadFromGroup(singleGroup);
+        // علّم الليد بأن هويته غير مستقرة
+        lead.status = "identity_unstable";
+        (lead as Record<string, unknown>)["identityGateReason"] = mergeAllowed.reason;
+        leads.push(lead);
+      }
+      continue;
+    }
+
+    // هوية مستقرة → اكمل الدمج
+    const lead = buildBusinessLeadFromGroup(group);
+    leads.push(lead);
+  }
 
   console.log(
     `[IdentityLinkage] ${candidates.length} candidates → ${leads.length} unique leads ` +
-    `(${candidates.length - leads.length} duplicates merged)`
+    `(${candidates.length - leads.length} duplicates merged, ${blockedCount} groups blocked by Gate)`
   );
 
   return leads;
