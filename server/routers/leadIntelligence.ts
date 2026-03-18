@@ -70,19 +70,51 @@ function rawResultToCandidate(
   idx: number
 ): DiscoveryCandidate {
   const displayName = String(result.displayName || result.name || "");
-  const bio = String(result.bio || result.description || "");
+  const bio = String(result.bio || result.description || result.snippet || "");
   const url = String(result.profileUrl || result.url || result.website || "");
   const username = String(result.username || result.id || "");
 
-  // استخراج أرقام الهاتف من النص
-  const text = `${displayName} ${bio} ${username}`;
+  // ─── استخراج username من URL إذا لم يكن موجوداً مباشرة ───
+  let resolvedUsername = username;
+  if (!resolvedUsername && url) {
+    // instagram.com/username أو tiktok.com/@username أو snapchat.com/add/username
+    const usernameFromUrl = url.match(
+      /(?:instagram\.com|tiktok\.com\/@?|snapchat\.com\/add\/|twitter\.com\/|x\.com\/|facebook\.com\/|linkedin\.com\/(?:company|in)\/)\/?([@]?[\w.]+)/i
+    );
+    if (usernameFromUrl) resolvedUsername = usernameFromUrl[1].replace(/^@/, "");
+  }
+
+  // ─── استخراج روابط المنصات من bio (cross-platform signals) ───
+  const SOCIAL_URL_PATTERNS = [
+    { platform: "instagram", regex: /(?:instagram\.com\/|@)([\w.]{3,30})/gi },
+    { platform: "tiktok",    regex: /tiktok\.com\/@?([\w.]{3,30})/gi },
+    { platform: "snapchat",  regex: /snapchat\.com\/add\/([\w.]{3,30})/gi },
+    { platform: "twitter",   regex: /(?:twitter\.com\/|x\.com\/)([\w.]{3,30})/gi },
+    { platform: "facebook",  regex: /facebook\.com\/([\w.]{3,30})/gi },
+  ];
+  const crossPlatformHandles: Record<string, string> = {};
+  const bioAndUrl = `${bio} ${url}`;
+  for (const { platform, regex } of SOCIAL_URL_PATTERNS) {
+    const matches = Array.from(bioAndUrl.matchAll(regex));
+    if (matches.length > 0) {
+      crossPlatformHandles[platform] = matches[0][1].replace(/^@/, "");
+    }
+  }
+
+  // ─── استخراج أرقام الهاتف من النص + availablePhones ───
+  const text = `${displayName} ${bio} ${resolvedUsername}`;
   const phoneMatches =
     text.match(/(?:\+966|00966|0)(?:5[0-9]{8}|[1-9][0-9]{7})/g) || [];
 
   // أرقام الهاتف: مؤكدة (من حقل phone مباشرة) vs مرشحة (من النص)
   const directPhone = String(result.phone || "").trim();
-  const verifiedPhones: string[] = directPhone ? [directPhone] : [];
-  const candidatePhones: string[] = phoneMatches.filter(p => p !== directPhone);
+  // availablePhones: أرقام مستخرجة من صفحة المنصة بـ regex (من socialSearch)
+  const availablePhones = (result.availablePhones as string[] | undefined) || [];
+  const verifiedPhones: string[] = [
+    ...(directPhone ? [directPhone] : []),
+    ...availablePhones,
+  ].filter((p, i, arr) => p && arr.indexOf(p) === i);
+  const candidatePhones: string[] = phoneMatches.filter(p => !verifiedPhones.includes(p));
 
   // البريد الإلكتروني
   const directEmail = String(result.email || "").trim();
@@ -92,16 +124,21 @@ function rawResultToCandidate(
 
   // المواقع الإلكترونية
   const directWebsite = String(result.website || "").trim();
+  const availableWebsites = (result.availableWebsites as string[] | undefined) || [];
   const isSocialUrl = (u: string) =>
     ["instagram.com", "tiktok.com", "twitter.com", "x.com", "snapchat.com", "facebook.com", "linkedin.com", "t.me"].some(
       p => u.includes(p)
     );
 
-  const verifiedWebsite: string | undefined =
-    directWebsite && !isSocialUrl(directWebsite) ? directWebsite : undefined;
+  // الموقع المؤكد: من directWebsite أو availableWebsites (غير سوشيال)
+  const allWebsiteCandidates = [
+    directWebsite,
+    ...availableWebsites,
+  ].filter(w => w && !isSocialUrl(w));
+  const verifiedWebsite: string | undefined = allWebsiteCandidates[0] || undefined;
 
   const candidateWebsites: string[] = [];
-  if (url && url.startsWith("http") && !isSocialUrl(url) && url !== directWebsite) {
+  if (url && url.startsWith("http") && !isSocialUrl(url) && url !== verifiedWebsite) {
     candidateWebsites.push(url);
   }
 
@@ -140,7 +177,7 @@ function rawResultToCandidate(
     sourceType: toDiscoverySourceType(source),
     url: url || undefined,
     nameHint: displayName || undefined,
-    usernameHint: username || undefined,
+    usernameHint: resolvedUsername || username || undefined,
     businessNameHint: displayName || undefined,
     categoryHint: String(result.businessType || result.category || "") || undefined,
     cityHint,
@@ -151,7 +188,12 @@ function rawResultToCandidate(
     verifiedWebsite,
     candidateWebsites,
     confidence: Math.min(confidence, 1),
-    raw: result,
+    raw: {
+      ...result,
+      // إضافة crossPlatformHandles لاستخدامها في computeLinkageScore
+      crossPlatformHandles: Object.keys(crossPlatformHandles).length > 0 ? crossPlatformHandles : undefined,
+      resolvedUsername: resolvedUsername || undefined,
+    },
   };
 }
 

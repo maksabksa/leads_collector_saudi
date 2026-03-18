@@ -343,6 +343,47 @@ export function computeLinkageScore(
   // socialHandle
   const socialHandleScore = compareSocialHandles(a.usernameHint, b.usernameHint);
 
+  // ─── cross-platform username matching ───
+  // إذا كان username أ يظهر في crossPlatformHandles لـ ب أو العكس
+  const crossHandlesA = (a.raw as Record<string, unknown>)?.crossPlatformHandles as Record<string, string> | undefined;
+  const crossHandlesB = (b.raw as Record<string, unknown>)?.crossPlatformHandles as Record<string, string> | undefined;
+  let crossPlatformScore = 0;
+  let crossPlatformReason = "";
+
+  // فحص إذا كان username أ موجوداً في crossHandles ب أو العكس
+  const usernameA = (a.usernameHint || "").replace(/^@/, "").toLowerCase().replace(/[._-]/g, "");
+  const usernameB = (b.usernameHint || "").replace(/^@/, "").toLowerCase().replace(/[._-]/g, "");
+
+  if (crossHandlesB && usernameA) {
+    for (const [platform, handle] of Object.entries(crossHandlesB)) {
+      const normHandle = handle.replace(/^@/, "").toLowerCase().replace(/[._-]/g, "");
+      if (normHandle && (usernameA === normHandle || stringSimilarity.compareTwoStrings(usernameA, normHandle) > 0.85)) {
+        crossPlatformScore = 0.9;
+        crossPlatformReason = `username أ (${usernameA}) موجود في bio ب كـ ${platform}`;
+        break;
+      }
+    }
+  }
+  if (!crossPlatformScore && crossHandlesA && usernameB) {
+    for (const [platform, handle] of Object.entries(crossHandlesA)) {
+      const normHandle = handle.replace(/^@/, "").toLowerCase().replace(/[._-]/g, "");
+      if (normHandle && (usernameB === normHandle || stringSimilarity.compareTwoStrings(usernameB, normHandle) > 0.85)) {
+        crossPlatformScore = 0.9;
+        crossPlatformReason = `username ب (${usernameB}) موجود في bio أ كـ ${platform}`;
+        break;
+      }
+    }
+  }
+
+  // ─── username متطابق عبر منصتين مختلفتين ───
+  // إذا كان username متطابقاً والمصدران مختلفان → إشارة قوية جداً
+  const differentSources = a.source !== b.source;
+  const usernameMatchAcrossPlatforms =
+    differentSources &&
+    socialHandleScore >= 0.85 &&
+    (a.usernameHint?.length || 0) >= 4 &&
+    (b.usernameHint?.length || 0) >= 4;
+
   // ─ الدرجة الإجمالية المرجحة ─
   const totalScore =
     nameScore * WEIGHTS.name +
@@ -361,6 +402,8 @@ export function computeLinkageScore(
   if (cityScore === 1) matchedSignals.push("city");
   if (categoryScore >= 0.8) matchedSignals.push("category");
   if (socialHandleScore >= 0.8) matchedSignals.push("socialHandle");
+  if (crossPlatformScore >= 0.9) matchedSignals.push("crossPlatformHandle");
+  if (usernameMatchAcrossPlatforms) matchedSignals.push("usernameAcrossPlatforms");
 
   // ─ منطق الدمج الذكي ─
   let shouldMerge = false;
@@ -372,17 +415,28 @@ export function computeLinkageScore(
     reason = "تطابق رقم الهاتف";
   } else if (websiteScore === 1) {
     // تطابق الموقع الإلكتروني وحده كافٍ → دمج مؤكد
-    // (نفس الدومين = نفس الكيان بشكل شبه مؤكد، حتى لو الاسم بلغتين مختلفتين)
     shouldMerge = true;
     reason = "تطابق الموقع الإلكتروني";
   } else if (bioLinkScore === 1) {
     // تطابق رابط البيو وحده كافٍ → دمج
     shouldMerge = true;
     reason = "تطابق رابط البيو";
+  } else if (crossPlatformScore >= 0.9) {
+    // username موجود في bio المنصة الأخرى → دمج مؤكد
+    shouldMerge = true;
+    reason = crossPlatformReason;
+  } else if (usernameMatchAcrossPlatforms) {
+    // نفس username عبر منصتين مختلفتين → دمج مرجح
+    shouldMerge = true;
+    reason = `نفس username (${a.usernameHint}) عبر ${a.source} و ${b.source}`;
   } else if (nameScore >= NAME_ONLY_THRESHOLD && cityScore === 1) {
     // تشابه اسم عالي جداً + نفس المدينة → دمج
     shouldMerge = true;
     reason = `تشابه اسم عالي (${(nameScore * 100).toFixed(0)}%) في نفس المدينة`;
+  } else if (nameScore >= 0.75 && differentSources) {
+    // اسم متشابه جداً عبر منصتين مختلفتين → دمج مرجح
+    shouldMerge = true;
+    reason = `اسم متشابه جداً (${(nameScore * 100).toFixed(0)}%) عبر ${a.source} و ${b.source}`;
   } else if (nameScore >= 0.6 && matchedSignals.length >= 3) {
     // اسم متوسط + 3 إشارات داعمة → دمج
     shouldMerge = true;
