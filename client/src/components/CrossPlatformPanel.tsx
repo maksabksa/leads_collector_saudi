@@ -895,10 +895,19 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
   const createFromMergeMut = trpc.leadIntelligence.createFromMerge.useMutation();
   const checkDuplicateBatchMut = trpc.leadIntelligence.checkDuplicateBatch.useMutation();
 
+  const [aiEnrichmentSummary, setAiEnrichmentSummary] = useState<{
+    totalProcessed: number;
+    successCount: number;
+    failureCount: number;
+    fieldsExtracted: { phones: number; websites: number; socialHandles: number; cities: number; categories: number };
+    processingMs: number;
+  } | null>(null);
+
   const [groupedData, setGroupedData] = useState<{
     groups: GroupData[];
     singles: SingleData[];
     stats: { totalCandidates: number; totalGroups: number; mergedCount: number };
+    aiEnrichment?: { totalProcessed: number; successCount: number; failureCount: number; fieldsExtracted: { phones: number; websites: number; socialHandles: number; cities: number }; processingMs: number } | null;
     diagnostics?: Array<{
       platform: string;
       rawCount: number;
@@ -1019,8 +1028,13 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
     if (Object.keys(rawResults).length === 0) return;
 
     setIsGrouping(true);
+    setAiEnrichmentSummary(null);
     groupCandidatesMut.mutateAsync({ rawResults })
       .then(data => {
+        // حفظ ملخص AI Enrichment
+        if ((data as any).aiEnrichment) {
+          setAiEnrichmentSummary((data as any).aiEnrichment);
+        }
         // تمرير platformDiagnostics إلى checkDuplicates
         const enrichedData = {
           ...data,
@@ -1256,7 +1270,47 @@ export function CrossPlatformPanel({ results, loading, keyword, city, onAddLead 
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs">
           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
           <span className="text-muted-foreground">
-            {isGrouping ? "جاري تحليل التشابه بين المنصات..." : "جاري فحص التكرار في قاعدة البيانات..."}
+            {isGrouping ? "جاري تحليل البيانات وإثراءها بالذكاء الاصطناعي..." : "جاري فحص التكرار في قاعدة البيانات..."}
+          </span>
+        </div>
+      )}
+
+      {/* ===== AI Enrichment Summary ===== */}
+      {aiEnrichmentSummary && !isGrouping && !isCheckingDuplicates && (
+        aiEnrichmentSummary.successCount > 0 || (
+          aiEnrichmentSummary.fieldsExtracted.phones +
+          aiEnrichmentSummary.fieldsExtracted.websites +
+          aiEnrichmentSummary.fieldsExtracted.socialHandles +
+          aiEnrichmentSummary.fieldsExtracted.cities
+        ) > 0
+      ) && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-500/5 border border-violet-500/20 text-xs">
+          <Sparkles className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+          <span className="text-violet-300 font-medium">إثراء AI:</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {aiEnrichmentSummary.fieldsExtracted.phones > 0 && (
+              <span className="flex items-center gap-1 text-green-400">
+                <Phone className="w-3 h-3" />{aiEnrichmentSummary.fieldsExtracted.phones} هاتف
+              </span>
+            )}
+            {aiEnrichmentSummary.fieldsExtracted.websites > 0 && (
+              <span className="flex items-center gap-1 text-blue-400">
+                <Globe className="w-3 h-3" />{aiEnrichmentSummary.fieldsExtracted.websites} موقع
+              </span>
+            )}
+            {aiEnrichmentSummary.fieldsExtracted.socialHandles > 0 && (
+              <span className="flex items-center gap-1 text-pink-400">
+                <Link2 className="w-3 h-3" />{aiEnrichmentSummary.fieldsExtracted.socialHandles} سوشيال
+              </span>
+            )}
+            {aiEnrichmentSummary.fieldsExtracted.cities > 0 && (
+              <span className="flex items-center gap-1 text-yellow-400">
+                <MapPin className="w-3 h-3" />{aiEnrichmentSummary.fieldsExtracted.cities} مدينة
+              </span>
+            )}
+          </div>
+          <span className="mr-auto text-muted-foreground/60 text-[10px]">
+            {aiEnrichmentSummary.successCount}/{aiEnrichmentSummary.totalProcessed} عملية · {(aiEnrichmentSummary.processingMs / 1000).toFixed(1)}ث
           </span>
         </div>
       )}

@@ -47,10 +47,10 @@ const WEIGHTS = {
 } as const;
 
 /** عتبة الدمج: إذا كانت الدرجة الإجمالية >= هذه القيمة → دمج */
-const MERGE_THRESHOLD = 0.55;
+const MERGE_THRESHOLD = 0.70;
 
 /** عتبة تطابق الاسم العالية (لا يكفي وحده للدمج إلا مع إشارات داعمة) */
-const NAME_ONLY_THRESHOLD = 0.80;
+const NAME_ONLY_THRESHOLD = 0.85;
 
 // ─── تطبيع الاسم ──────────────────────────────────────────────────────────────
 
@@ -429,18 +429,14 @@ export function computeLinkageScore(
     // نفس username عبر منصتين مختلفتين → دمج مرجح
     shouldMerge = true;
     reason = `نفس username (${a.usernameHint}) عبر ${a.source} و ${b.source}`;
-  } else if (nameScore >= NAME_ONLY_THRESHOLD && cityScore === 1) {
-    // تشابه اسم عالي جداً + نفس المدينة → دمج
+  } else if (nameScore >= NAME_ONLY_THRESHOLD && cityScore === 1 && differentSources) {
+    // اسم متطابق جداً (85%+) + نفس المدينة + منصتان مختلفتان → دمج مرجح
     shouldMerge = true;
-    reason = `تشابه اسم عالي (${(nameScore * 100).toFixed(0)}%) في نفس المدينة`;
-  } else if (nameScore >= 0.75 && differentSources) {
-    // اسم متشابه جداً عبر منصتين مختلفتين → دمج مرجح
+    reason = `اسم متطابق جداً (${(nameScore * 100).toFixed(0)}%) في نفس المدينة عبر ${a.source} و ${b.source}`;
+  } else if (nameScore >= 0.85 && phoneScore === 1) {
+    // اسم متطابق جداً + هاتف مطابق → دمج مؤكد
     shouldMerge = true;
-    reason = `اسم متشابه جداً (${(nameScore * 100).toFixed(0)}%) عبر ${a.source} و ${b.source}`;
-  } else if (nameScore >= 0.6 && matchedSignals.length >= 3) {
-    // اسم متوسط + 3 إشارات داعمة → دمج
-    shouldMerge = true;
-    reason = `اسم متشابه (${(nameScore * 100).toFixed(0)}%) مع ${matchedSignals.length} إشارات داعمة`;
+    reason = `اسم متطابق (${(nameScore * 100).toFixed(0)}%) مع هاتف مطابق`;
   } else if (totalScore >= MERGE_THRESHOLD) {
     // الدرجة الإجمالية كافية للدمج
     shouldMerge = true;

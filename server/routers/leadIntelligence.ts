@@ -33,6 +33,7 @@ import {
   clusterCandidates,
 } from "../lib/identityLinkage";
 import { enrichCandidatesBatch } from "../lib/profileEnricher";
+import { enrichCandidatesWithAI } from "../lib/aiEnrichmentAgent";
 import type {
   DiscoveryCandidate,
   DiscoverySource,
@@ -577,6 +578,8 @@ const leadIntelligenceRouter = router({
         ),
         // خيار لتفعيل/تعطيل إثراء الصفحة الكاملة (افتراضي: مفعّل)
         enableProfileEnrichment: z.boolean().optional().default(true),
+        // خيار لتفعيل/تعطيل إثراء AI (افتراضي: مفعّل)
+        enableAIEnrichment: z.boolean().optional().default(true),
       })
     )
     .mutation(async ({ input }) => {
@@ -693,6 +696,27 @@ const leadIntelligenceRouter = router({
         }
       }
 
+      // ─── AI Enrichment: إكمال النواقص بالذكاء الاصطناعي ─────────────────────
+      // يُكمل الحقول الناقصة (هاتف/موقع/سوشيال/مدينة/تصنيف) من البايو والنص الخام
+      // يعمل بعد Profile Enrichment وقبل التجميع لتحسين جودة الربط
+      let aiEnrichmentSummary = null;
+      if (input.enableAIEnrichment !== false && candidates.length > 0) {
+        try {
+          aiEnrichmentSummary = await enrichCandidatesWithAI(candidates, 5);
+          console.log(
+            `[groupCandidates] AI enrichment done: ${aiEnrichmentSummary.successCount}/${aiEnrichmentSummary.totalProcessed} enriched, ` +
+            `phones: ${aiEnrichmentSummary.fieldsExtracted.phones}, ` +
+            `websites: ${aiEnrichmentSummary.fieldsExtracted.websites}, ` +
+            `social: ${aiEnrichmentSummary.fieldsExtracted.socialHandles}, ` +
+            `cities: ${aiEnrichmentSummary.fieldsExtracted.cities}, ` +
+            `time: ${aiEnrichmentSummary.processingMs}ms`
+          );
+        } catch (aiErr) {
+          // لا نوقف العملية إذا فشل الإثراء
+          console.warn("[groupCandidates] AI enrichment failed (non-fatal):", aiErr);
+        }
+      }
+
       if (candidates.length === 0) {
         return {
           groups: [],
@@ -743,6 +767,14 @@ const leadIntelligenceRouter = router({
           totalGroups: groups.length,
           mergedCount: candidates.length - resolvedGroups.length,
         },
+        // AI Enrichment Summary
+        aiEnrichment: aiEnrichmentSummary ? {
+          totalProcessed: aiEnrichmentSummary.totalProcessed,
+          successCount: aiEnrichmentSummary.successCount,
+          failureCount: aiEnrichmentSummary.failureCount,
+          fieldsExtracted: aiEnrichmentSummary.fieldsExtracted,
+          processingMs: aiEnrichmentSummary.processingMs,
+        } : null,
         // Phase B: Diagnostic trace لكل منصة
         diagnostics: Object.entries(platformDiagnostics).map(([platform, d]) => ({
           platform,

@@ -412,12 +412,23 @@ describe("PHASE 1 Weights Validation", () => {
     expect(result.breakdown.websiteScore).toBe(1);
   });
 
-  it("الاسم المتطابق (35%) + المدينة (5%) يكفي للدمج", () => {
-    const a = makeCandidate({ nameHint: "البركة", cityHint: "الرياض" });
-    const b = makeCandidate({ nameHint: "البركة", cityHint: "الرياض" });
+  it("الاسم المتطابق (85%+) + المدينة + منصتان مختلفتان يكفي للدمج", () => {
+    // المنطق الجديد: يتطلب منصتين مختلفتين لتفعيل شرط الاسم+المدينة
+    const a = makeCandidate({ nameHint: "البركة", cityHint: "الرياض", source: "instagram" });
+    const b = makeCandidate({ nameHint: "البركة", cityHint: "الرياض", source: "maps" });
 
     const result = computeLinkageScore(a, b);
     expect(result.shouldMerge).toBe(true);
+    expect(result.breakdown.nameScore).toBeGreaterThan(0.9);
+  });
+
+  it("الاسم المتطابق + المدينة من نفس المنصة لا يكفي للدمج بدون هاتف/موقع", () => {
+    // نفس المنصة → لا يُطبَّق شرط الاسم+المدينة
+    const a = makeCandidate({ nameHint: "البركة", cityHint: "الرياض", source: "instagram" });
+    const b = makeCandidate({ nameHint: "البركة", cityHint: "الرياض", source: "instagram" });
+
+    const result = computeLinkageScore(a, b);
+    // بدون هاتف أو موقع أو username → لا دمج تلقائي
     expect(result.breakdown.nameScore).toBeGreaterThan(0.9);
   });
 
