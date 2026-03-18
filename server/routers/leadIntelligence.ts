@@ -31,6 +31,7 @@ import {
   explainLinkage,
   clusterCandidates,
 } from "../lib/identityLinkage";
+import { enrichCandidatesBatch } from "../lib/profileEnricher";
 import type {
   DiscoveryCandidate,
   DiscoverySource,
@@ -557,6 +558,8 @@ const leadIntelligenceRouter = router({
           z.string(),
           z.array(z.record(z.string(), z.unknown()))
         ),
+        // خيار لتفعيل/تعطيل إثراء الصفحة الكاملة (افتراضي: مفعّل)
+        enableProfileEnrichment: z.boolean().optional().default(true),
       })
     )
     .mutation(async ({ input }) => {
@@ -566,6 +569,79 @@ const leadIntelligenceRouter = router({
         (results as Record<string, unknown>[]).forEach((result, idx) => {
           candidates.push(rawResultToCandidate(result, platform, idx));
         });
+      }
+
+      // ─── Profile Enrichment: جلب صفحة الحساب الكاملة ───────────────────────
+      // يجلب صفحة كل حساب سوشيال عبر Bright Data Residential Proxy
+      // ويستخرج: الهاتف، الموقع، روابط المنصات المتقاطعة، الـ bio الكامل
+      if (input.enableProfileEnrichment !== false) {
+        try {
+          const enrichedMap = await enrichCandidatesBatch(
+            candidates.map(c => ({ url: c.url, source: c.source, usernameHint: c.usernameHint })),
+            3 // max concurrent
+          );
+
+          // دمج البيانات المُثراة مع الـ candidates
+          for (const candidate of candidates) {
+            if (!candidate.url) continue;
+            const enriched = enrichedMap.get(candidate.url);
+            if (!enriched || !enriched.success) continue;
+
+            // إضافة الأرقام المستخرجة
+            if (enriched.phones.length > 0) {
+              candidate.candidatePhones = Array.from(new Set([
+                ...candidate.candidatePhones,
+                ...enriched.phones,
+              ]));
+            }
+
+            // إضافة المواقع المستخرجة
+            if (enriched.websites.length > 0) {
+              candidate.candidateWebsites = Array.from(new Set([
+                ...candidate.candidateWebsites,
+                ...enriched.websites,
+              ]));
+              // أول موقع → verifiedWebsite إذا لم يكن موجوداً
+              if (!candidate.verifiedWebsite && enriched.websites[0]) {
+                candidate.verifiedWebsite = enriched.websites[0];
+              }
+            }
+
+            // تحديث الـ bio إذا كان الجديد أطول
+            if (enriched.bio && enriched.bio.length > (candidate.nameHint?.length || 0)) {
+              // نحتفظ بالـ bio في raw
+            }
+
+            // تحديث المدينة إذا لم تكن موجودة
+            if (!candidate.cityHint && enriched.city) {
+              candidate.cityHint = enriched.city;
+            }
+
+            // إضافة crossPlatformHandles إلى raw
+            if (Object.keys(enriched.crossPlatformHandles).length > 0) {
+              candidate.raw = {
+                ...(candidate.raw as Record<string, unknown> || {}),
+                crossPlatformHandles: {
+                  ...((candidate.raw as Record<string, unknown>)?.crossPlatformHandles as Record<string, string> || {}),
+                  ...enriched.crossPlatformHandles,
+                },
+              };
+            }
+
+            // تحديث عدد المتابعين
+            if (enriched.followers) {
+              candidate.raw = {
+                ...(candidate.raw as Record<string, unknown> || {}),
+                followers: enriched.followers,
+              };
+            }
+          }
+
+          console.log(`[groupCandidates] Profile enrichment done: ${enrichedMap.size} profiles enriched`);
+        } catch (enrichErr) {
+          // لا نوقف العملية إذا فشل الإثراء
+          console.warn("[groupCandidates] Profile enrichment failed (non-fatal):", enrichErr);
+        }
       }
 
       if (candidates.length === 0) {
