@@ -61,6 +61,7 @@ import { seasonsRouter } from "./routers/seasons";
 import { reportStyleRouter } from "./routers/reportStyle";
 import { leadIntelligenceRouter } from "./routers/leadIntelligence";
 import { whatchimpRouter } from "./routers/whatchimp";
+import { missingFieldsSearchRouter } from "./routers/missingFieldsSearch";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -2508,5 +2509,6 @@ export const appRouter = router({
   reportStyle: reportStyleRouter,
   leadIntelligence: leadIntelligenceRouter,
   whatchimp: whatchimpRouter,
+  missingFieldsSearch: missingFieldsSearchRouter,
 });
 export type AppRouter = typeof appRouter;

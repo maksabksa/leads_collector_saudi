@@ -16,6 +16,7 @@ import ScoreCard from "@/components/leads/ScoreCard";
 import OpportunityList from "@/components/leads/OpportunityList";
 import ReadinessIndicator from "@/components/leads/ReadinessIndicator";
 import MissingFieldsPanel from "@/components/leads/MissingFieldsPanel";
+import MissingFieldsSearchPanel from "@/components/leads/MissingFieldsSearchPanel";
 import AuditSummaryCard from "@/components/leads/AuditSummaryCard";
 import SalesBriefCard, { type SalesBriefResult } from "@/components/leads/SalesBriefCard";
 import { PlatformCoverageCard } from "@/components/leads/PlatformCoverageCard";
@@ -1059,6 +1060,12 @@ export default function LeadDetail() {
                   missingDataFlags={lead.missingDataFlags as string[] | null | undefined}
                 />
               </div>
+              {/* Row 1.5: Missing Fields Search Panel */}
+              <MissingFieldsSearchPanel
+                leadId={lead.id}
+                missingDataFlags={lead.missingDataFlags as string[] | null | undefined}
+                onFieldSaved={() => refetch()}
+              />
               {/* Row 2: ScoreCard */}
               <ScoreCard
                 scoreResult={scoreResult}
