@@ -119,6 +119,15 @@ function calcRevenueOpportunity(analysis: PDFReportData["analysis"], lead: PDFRe
   return calcLostRevenue(analysis, lead) * 4;
 }
 
+// تصنيف الحالة العامة بدلاً من الأرقام المجردة
+function getDigitalReadinessLabel(score: number): { status: string; readiness: string; priority: string; statusColor: string; priorityColor: string } {
+  if (score >= 7) return { status: "جيد", readiness: "متقدمة", priority: "لاحقة", statusColor: "#22c55e", priorityColor: "#22c55e" };
+  if (score >= 4) return { status: "متوسط", readiness: "متوسطة", priority: "مهمة", statusColor: "#f59e0b", priorityColor: "#f59e0b" };
+  return { status: "منخفض", readiness: "أولية", priority: "عاجلة", statusColor: "#ef4444", priorityColor: "#ef4444" };
+}
+
+const FINANCIAL_DISCLAIMER = `<div style="margin-top:6px;padding:5px 10px;background:rgba(255,255,255,0.03);border-right:2px solid rgba(148,163,184,0.3);border-radius:0 6px 6px 0;"><span style="font-size:8px;color:#475569;font-style:italic;">تقدير أولي استرشادي مبني على فجوات الحضور الرقمي وسلوك الطلب المحلي وحجم الأثر المتوقع عند معالجة الثغرة. يحتاج التأكيد في التحليل المتقدم.</span></div>`;
+
 function getCurrentSeason(): { name: string; emoji: string; color: string; urgency: string; tip: string } {
   const month = new Date().getMonth() + 1;
   if (month === 3 || month === 4) return {
@@ -398,29 +407,27 @@ export function generateReportHTML(data: PDFReportData): string {
     <div style="padding:16px 36px;position:relative;z-index:1;">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
         <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:14px;padding:14px;text-align:center;">
-          <div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:6px;letter-spacing:1px;">مستوى الأداء</div>
-          <div style="font-size:32px;font-weight:900;color:#0ea5e9;line-height:1;margin-bottom:5px;">${priorityScore > 0 ? priorityScore : "—"}</div>
-          <div style="font-size:9px;color:#475569;">من أصل 10 نقاط</div>
+          <div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:6px;letter-spacing:1px;">الحالة العامة</div>
+          <div style="font-size:22px;font-weight:900;color:#0ea5e9;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).status}</div>
+          <div style="font-size:9px;color:#475569;">${priorityScore > 0 ? priorityScore + "/10" : "—"}</div>
           <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;"><div style="height:100%;width:${priorityScore * 10}%;background:#0ea5e9;border-radius:2px;"></div></div>
         </div>
         <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:14px;padding:14px;text-align:center;">
-          <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;letter-spacing:1px;">حجم الفجوة</div>
-          <div style="font-size:32px;font-weight:900;color:#ef4444;line-height:1;margin-bottom:5px;">${10 - (priorityScore || 5)}</div>
-          <div style="font-size:9px;color:#475569;">نقاط تحتاج تحسين</div>
+          <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;letter-spacing:1px;">جاهزية رقمية</div>
+          <div style="font-size:22px;font-weight:900;color:#ef4444;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).readiness}</div>
+          <div style="font-size:9px;color:#475569;">فجوة: ${10 - (priorityScore || 5)} نقطة</div>
           <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;"><div style="height:100%;width:${(10 - (priorityScore || 5)) * 10}%;background:#ef4444;border-radius:2px;"></div></div>
         </div>
         <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:14px;text-align:center;">
-          <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;letter-spacing:1px;">الفرصة المتاحة</div>
-          <div style="font-size:26px;font-weight:900;color:#22c55e;line-height:1;margin-bottom:5px;">${(revenueOpp / 1000).toFixed(0)}K+</div>
-          <div style="font-size:9px;color:#475569;">ريال/شهر إمكانية نمو</div>
+          <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;letter-spacing:1px;">أولوية التحسين</div>
+          <div style="font-size:22px;font-weight:900;color:#22c55e;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).priority}</div>
+          <div style="font-size:9px;color:#475569;">فرصة: ${(revenueOpp / 1000).toFixed(0)}K+ ريال</div>
           <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;"><div style="height:100%;width:85%;background:#22c55e;border-radius:2px;"></div></div>
         </div>
       </div>
       <div style="margin-bottom:16px;padding:18px 22px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.2);border-radius:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
-          <div>
-            <div style="font-size:10px;color:#86efac;font-weight:800;margin-bottom:5px;letter-spacing:1px;">💰 إجمالي الفرصة المالية المقدّرة</div>
-            <div style="font-size:38px;font-weight:900;color:#22c55e;line-height:1;text-shadow:0 0 30px rgba(34,197,94,0.3);">${revenueOpp.toLocaleString("ar-SA")}</div>
+                   <div style="font-size:10px;color:#86efac;font-weight:800;margin-bottom:5px;letter-spacing:1px;">💰 الفرصة المالية المقدّرة (استرشادي)</div>           <div style="font-size:38px;font-weight:900;color:#22c55e;line-height:1;text-shadow:0 0 30px rgba(34,197,94,0.3);">${revenueOpp.toLocaleString("ar-SA")}</div>
             <div style="font-size:10px;color:#475569;margin-top:3px;">ريال سعودي / شهرياً — بعد تطبيق التوصيات</div>
           </div>
           <div style="text-align:center;padding:14px 18px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:12px;flex-shrink:0;">
@@ -434,7 +441,7 @@ export function generateReportHTML(data: PDFReportData): string {
         </div>
       </div>
       ${analysis?.marketingGapSummary ? `<div style="margin-bottom:12px;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#7dd3fc;margin-bottom:7px;">🔍 ملخص الفجوة التسويقية</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.marketingGapSummary}</div></div>` : ""}
-      ${analysis?.primaryOpportunity ? `<div style="margin-bottom:12px;padding:14px 18px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:7px;">🎯 الفرصة الرئيسية</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.primaryOpportunity}</div></div>` : ""}
+      ${analysis?.primaryOpportunity ? `<div style="margin-bottom:12px;padding:14px 18px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:7px;">🎯 نقطة التأثير الأعلى</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.primaryOpportunity}</div>${FINANCIAL_DISCLAIMER}</div>` : ""}
       ${analysis?.competitivePosition ? `<div style="padding:14px 18px;background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#c4b5fd;margin-bottom:7px;">🏆 الموقع التنافسي</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.competitivePosition}</div></div>` : ""}
     </div>
     ${FOOTER_HTML(2, reportSerial)}
