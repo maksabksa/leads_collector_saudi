@@ -17,6 +17,8 @@ import OpportunityList from "@/components/leads/OpportunityList";
 import ReadinessIndicator from "@/components/leads/ReadinessIndicator";
 import MissingFieldsPanel from "@/components/leads/MissingFieldsPanel";
 import MissingFieldsSearchPanel from "@/components/leads/MissingFieldsSearchPanel";
+import LeadEditPanel from "@/components/leads/LeadEditPanel";
+import AutoSearchPanel from "@/components/leads/AutoSearchPanel";
 import AuditSummaryCard from "@/components/leads/AuditSummaryCard";
 import SalesBriefCard, { type SalesBriefResult } from "@/components/leads/SalesBriefCard";
 import { PlatformCoverageCard } from "@/components/leads/PlatformCoverageCard";
@@ -642,8 +644,16 @@ export default function LeadDetail() {
       </div>
       {/* ===== END Quick Action Bar ===== */}
 
-      {/* Edit form */}
-      {isEditing && (
+      {/* Edit form — LeadEditPanel */}
+      {isEditing && lead && (
+        <LeadEditPanel
+          lead={lead}
+          onClose={() => setIsEditing(false)}
+          onSaved={() => { setIsEditing(false); refetch(); }}
+        />
+      )}
+      {/* HIDDEN OLD EDIT FORM START */}
+      {false && (
         <div className="rounded-2xl p-5 border space-y-4" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.65 0.18 200 / 0.3)" }}>
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-foreground">تعديل البيانات</h3>
@@ -1060,11 +1070,17 @@ export default function LeadDetail() {
                   missingDataFlags={lead.missingDataFlags as string[] | null | undefined}
                 />
               </div>
-              {/* Row 1.5: Missing Fields Search Panel */}
+              {/* Row 1.5: Missing Fields Search Panel (Quick) */}
               <MissingFieldsSearchPanel
                 leadId={lead.id}
                 missingDataFlags={lead.missingDataFlags as string[] | null | undefined}
                 onFieldSaved={() => refetch()}
+              />
+              {/* Row 1.6: Auto Search Panel (Smart Multi-Layer) */}
+              <AutoSearchPanel
+                leadId={lead.id}
+                leadName={lead.companyName}
+                onFieldApplied={() => refetch()}
               />
               {/* Row 2: ScoreCard */}
               <ScoreCard
