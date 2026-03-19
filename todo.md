@@ -2060,3 +2060,12 @@
 ## مارس 2026 - إصلاحات
 - [x] إصلاح معالجة العملاء المكررين: عرض dialog مع زر الانتقال للعميل الموجود بدلاً من رسالة خطأ
 - [x] تحسين تحليل المنافسين: تصفية المقالات والمدونات والمنصات الاجتماعية لعرض نشاطات تجارية حقيقية فقط
+
+## مارس 2026 - تطوير التحليل الشامل (SEO + سوشيال)
+- [x] دمج websiteIntelligence في seoAdvancedAnalysis: جلب PageSpeed + محتوى الموقع الحقيقي
+- [x] تحسين serpContext ليستخدم بيانات PageSpeed الحقيقية من websiteIntelligence
+- [x] إضافة متغيرات مسبقة لتجنب template literal المتداخل في prompt
+- [x] تحسين prompt AI في seoAdvancedAnalysis: تحليل منطقي من البيانات الحقيقية
+- [x] تحسين socialEnrichment: إضافة تحليل AI عميق يملأ summary وrecommendations وscores
+- [x] تحديث التقرير: تمييز Backlinks التقديرية بـ "تقدير" باللون الأصفر
+- [x] إضافة رسالة استشارة مجانية في قسم Backlinks بالتقرير

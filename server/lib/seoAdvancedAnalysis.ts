@@ -9,6 +9,7 @@
 import { ENV } from "../_core/env";
 import { fetchViaProxy, fetchWithScrapingBrowser } from "./brightDataScraper";
 import { invokeLLM } from "../_core/llm";
+import { gatherWebsiteIntelligence, buildWebsiteIntelligenceContext } from "./websiteIntelligence";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface KeywordData {
@@ -269,21 +270,27 @@ export async function runSeoAdvancedAnalysis(params: {
     mobilePerformanceScore: number | null;
   };
 }): Promise<SeoAdvancedReport> {
-  const { url, companyName, businessType, city, websiteContent, pagespeedData } = params;
+    const { url, companyName, businessType, city, websiteContent, pagespeedData } = params;
   const domain = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "").split("/")[0];
-
-  // ─── جمع البيانات بالتوازي ────────────────────────────────────────────────
+  // ─── جمع البيانات بالتوازي (PageSpeed + SEO الحقيقي + SERP + Competitors + Backlinks) ─
   const [
+    websiteIntelResult,
     brandRankingHtml,
     businessRankingHtml,
     competitorsList,
     backlinkData,
   ] = await Promise.allSettled([
+    gatherWebsiteIntelligence(url),
     fetchSerpResults(`${companyName} ${city}`),
-    fetchSerpResults(`${businessType} ${city}`),
+    fetchSerpResults(`أفضل ${businessType} في ${city}`),
     findCompetitors(businessType, city, url),
     estimateBacklinks(url),
   ]);
+  // استخراج بيانات الموقع الحقيقية
+  const websiteIntel = websiteIntelResult.status === "fulfilled" ? websiteIntelResult.value : null;
+  const realPagespeed = websiteIntel?.pagespeed;
+  const realSeo = websiteIntel?.seo;
+  const websiteIntelContext = websiteIntel ? buildWebsiteIntelligenceContext(websiteIntel) : "";
 
   const brandHtml = brandRankingHtml.status === "fulfilled" ? brandRankingHtml.value : "";
   const businessHtml = businessRankingHtml.status === "fulfilled" ? businessRankingHtml.value : "";
@@ -304,57 +311,98 @@ export async function runSeoAdvancedAnalysis(params: {
     : 0;
 
   // ─── تحليل بالـ AI ────────────────────────────────────────────────────────
+  // متغيرات مسبقة لتجنب template literal المتداخل
+  const brandPositionStr = brandPosition ? String(brandPosition) : "null";
+  const businessPositionStr = businessPosition ? String(businessPosition) : "null";
+  const backlinkCountStr = String(backlinks.count);
+  const brandMentionsStr = String(brandMentions);
+  const backlinksDomainsJson = JSON.stringify(backlinks.domains);
+  // تحديد درجات PageSpeed الحقيقية (PageSpeed API أولاً، ثم الممرر من params كبديل)
+  const effectiveSeoScore = realPagespeed?.fetchedSuccessfully ? realPagespeed.seoScore : pagespeedData?.seoScore;
+  const effectivePerfScore = realPagespeed?.fetchedSuccessfully ? realPagespeed.performanceScore : pagespeedData?.performanceScore;
+  const effectiveMobileScore = realPagespeed?.fetchedSuccessfully ? realPagespeed.mobilePerformanceScore : pagespeedData?.mobilePerformanceScore;
+  const effectiveBodyText = realSeo?.fetchedSuccessfully ? realSeo.bodyText : websiteContent;
+
   const serpContext = `
+=== بيانات الموقع الحقيقية ===
+${websiteIntelContext || [
+  `درجة SEO: ${effectiveSeoScore ?? "غير متوفرة"}/100`,
+  `درجة الأداء: ${effectivePerfScore ?? "غير متوفرة"}/100`,
+  `درجة الجوال: ${effectiveMobileScore ?? "غير متوفرة"}/100`,
+].join("\n")}
+
+=== بيانات SERP ===
 نتائج البحث عن اسم النشاط "${companyName} ${city}": ${brandHtml ? "متوفرة" : "غير متوفرة"}
-ترتيب الموقع عند البحث باسم النشاط: ${brandPosition ? `المركز ${brandPosition}` : "غير مرتب في أول 5 نتائج"}
-ترتيب الموقع عند البحث بنوع النشاط: ${businessPosition ? `المركز ${businessPosition}` : "غير مرتب في أول 5 نتائج"}
-المنافسون المكتشفون: ${competitors.map((c) => c.name || c.url).join(", ") || "لم يُكتشف منافسون"}
+ترتيب الموقع عند البحث باسم النشاط: ${brandPosition ? `المركز ${brandPosition}` : "غير مرتب في أول 10 نتائج"}
+ترتيب الموقع عند البحث بنوع النشاط (أفضل ${businessType} في ${city}): ${businessPosition ? `المركز ${businessPosition}` : "غير مرتب في أول 10 نتائج"}
+المنافسون المكتشفون من SERP: ${competitors.map((c) => `${c.name || ""} (${c.url})`).join(", ") || "لم يُكتشف منافسون"}
+
+=== بيانات Backlinks ===
 تقدير عدد الـ Backlinks: ${backlinks.count}
 نطاقات مرجعية: ${backlinks.domains.join(", ") || "لا توجد"}
-درجة SEO من PageSpeed: ${pagespeedData?.seoScore ?? "غير متوفرة"}/100
-درجة الأداء: ${pagespeedData?.performanceScore ?? "غير متوفرة"}/100
-درجة الجوال: ${pagespeedData?.mobilePerformanceScore ?? "غير متوفرة"}/100
-${websiteContent ? `محتوى الموقع (مقتطف): ${websiteContent.slice(0, 800)}` : ""}
+ملاحظة: هذا تقدير مبني على SERP. للحصول على بيانات دقيقة ينصح باستخدام Ahrefs أو SEMrush.
+${effectiveBodyText ? `
+=== محتوى الموقع ===
+${effectiveBodyText.slice(0, 1000)}` : ""}
 `;
 
-  const prompt = `أنت خبير SEO متخصص في السوق السعودي.
-بناءً على البيانات التالية لموقع "${companyName}" (${businessType} في ${city}):
+    const prompt = `أنت خبير SEO متخصص في السوق السعودي. مهمتك تحليل بيانات حقيقية وتقديم رؤى منطقية مبنية على الأدلة.
+
+بيانات الموقع الحقيقية لـ "${companyName}" (${businessType} في ${city}):
 ${serpContext}
 
-قدم تحليل SEO متقدم بصيغة JSON فقط:
+تعليمات التحليل المنطقي:
+
+1. **الكلمات المفتاحية**: بناءً على نوع النشاط (${businessType}) والمدينة (${city}) ومحتوى الموقع الفعلي، اقترح كلمات مفتاحية واقعية يبحث عنها العملاء في السعودية. إذا كان عنوان الصفحة أو H1 متوفراً، استخدمه لاستنتاج الكلمات المستهدفة حالياً.
+
+2. **المنافسون (حرج جداً)**: 
+   - استخدم فقط المنافسين المكتشفين من SERP إذا كانوا نشاطات تجارية حقيقية
+   - المنافس يجب أن يكون: متجر، شركة، مطعم، محل، مستشفى، أو أي نشاط تجاري في نفس مجال ${businessType}
+   - ممنوع منعاً باتاً: مقالات، مدونات، منصات اجتماعية، مواقع إخبارية، مواقع تجميعية
+   - إذا لم تجد منافسين حقيقيين من SERP، اقترح 3-4 منافسين تجاريين واقعيين معروفين في ${city} لهذا النشاط
+
+3. **تقييم الـ Backlinks**: 
+   - العدد ${backlinks.count} هو تقدير من SERP وليس دقيقاً
+   - قيّم الجودة بناءً على: العدد + نوع النطاقات المرجعية + حجم النشاط
+   - كن صريحاً: إذا كان العدد منخفضاً جداً أو البيانات غير موثوقة، قل ذلك في الملخص
+
+4. **درجة SEO المحلية**: احسبها بناءً على:
+   - هل الموقع مُحسَّن للعربية؟ (${realSeo?.isArabicContent ? "نعم" : "لا"})
+   - هل يوجد Schema Markup؟ (${realSeo?.hasSchemaMarkup ? "نعم" : "لا"})
+   - هل يوجد SSL؟ (${realSeo?.hasSSL ? "نعم" : "لا"})
+   - درجة SEO من PageSpeed: ${effectiveSeoScore ?? "غير متوفرة"}
+   - ترتيب الموقع في البحث المحلي: ${businessPosition ? `المركز ${businessPosition}` : "غير مرتب"}
+
+5. **الملخص**: كن صريحاً وعملياً. اذكر أقوى نقطة وأضعف نقطة بوضوح. لا تبالغ في التفاؤل.
+
+6. **الأولويات**: رتّب حسب التأثير التجاري الفوري. الأولوية الأولى يجب أن تكون الأكثر تأثيراً على الإيرادات.
+
+أجب بـ JSON فقط:
 {
   "topKeywords": [
-    {"keyword": "كلمة مفتاحية رئيسية", "volume": "عالي/متوسط/منخفض", "position": null, "difficulty": "سهل/متوسط/صعب"}
+    {"keyword": "كلمة مفتاحية واقعية", "volume": "عالي/متوسط/منخفض", "position": null, "difficulty": "سهل/متوسط/صعب"}
   ],
-  "missingKeywords": ["كلمة مفتاحية يجب استهدافها 1", "كلمة 2"],
-  "keywordOpportunities": ["فرصة كلمة مفتاحية 1 مع سبب تجاري"],
-  "estimatedBacklinks": ${backlinks.count},
+  "missingKeywords": ["كلمة مفتاحية مهمة غائبة عن المحتوى"],
+  "keywordOpportunities": ["فرصة محددة مع تأثيرها التجاري"],
+  "estimatedBacklinks": ${backlinkCountStr},
   "backlinkQuality": "weak|average|good|strong",
-  "topReferringDomains": ${JSON.stringify(backlinks.domains)},
-  "backlinkGaps": ["نطاق مهم يجب الحصول على رابط منه"],
+  "topReferringDomains": ${backlinksDomainsJson},
+  "backlinkGaps": ["نطاق تجاري مهم يجب الحصول على رابط منه"],
   "competitors": [
-    {"name": "اسم المنافس", "url": "رابطه", "seoScore": 7, "strengths": ["ميزة 1"]}
+    {"name": "اسم نشاط تجاري حقيقي", "url": "رابطه الفعلي", "seoScore": 7, "strengths": ["ميزة تنافسية حقيقية"]}
   ],
-  "competitorGaps": ["ثغرة مقارنة بالمنافسين"],
-  "competitiveAdvantages": ["ميزة تنافسية يمكن استغلالها"],
+  "competitorGaps": ["ثغرة محددة مقارنة بالمنافسين"],
+  "competitiveAdvantages": ["ميزة تنافسية يمكن استغلالها فوراً"],
   "searchRankings": [
-    {"keyword": "${companyName}", "position": ${brandPosition ?? null}, "url": "${url}", "snippet": "وصف مختصر"},
-    {"keyword": "${businessType} ${city}", "position": ${businessPosition ?? null}, "url": "${url}", "snippet": "وصف مختصر"}
+    {"keyword": "${companyName}", "position": ${brandPositionStr}, "url": "${url}", "snippet": "وصف مختصر"},
+    {"keyword": "${businessType} ${city}", "position": ${businessPositionStr}, "url": "${url}", "snippet": "وصف مختصر"}
   ],
-  "brandMentions": ${brandMentions},
+  "brandMentions": ${brandMentionsStr},
   "localSeoScore": 5,
   "overallSeoHealth": "critical|weak|average|good|excellent",
-  "seoSummary": "ملخص تحليلي دقيق في 2-3 جمل يصف الوضع الحالي والأولوية",
-  "priorityActions": ["إجراء أولوية 1 مع تأثيره التجاري", "إجراء 2", "إجراء 3"]
-}
-
-ملاحظات مهمة:
-- اقترح كلمات مفتاحية واقعية لهذا النوع من النشاط في السعودية
-- المنافسون (مهم جداً): يجب أن يكونوا نشاطات تجارية حقيقية فقط (متاجر أو شركات أو مطاعم أو محلات) في نفس مجال ${businessType}
-  لا تذكر أبداً: مقالات أو مدونات أو منصات اجتماعية أو مواقع إخبارية كمنافسين
-  استخدم البيانات المتوفرة من نتائج SERP أو اقترح منافسين تجاريين واقعيين لهذا النشاط في هذه المدينة
-- الـ Backlinks: قيّم الجودة بناءً على العدد ونوع النطاقات
-- الأولويات: رتّب حسب التأثير التجاري الفوري`;
+  "seoSummary": "ملخص تحليلي دقيق في 2-3 جمل يذكر أقوى نقطة وأضعف نقطة والأولوية الفورية",
+  "priorityActions": ["إجراء أولوية 1 مع تأثيره التجاري المباشر", "إجراء 2", "إجراء 3"]
+}`;
   const response = await invokeLLM({
     messages: [
       { role: "system", content: "أنت خبير SEO. أجب دائماً بـ JSON صحيح فقط." },

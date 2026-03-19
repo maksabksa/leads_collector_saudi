@@ -365,7 +365,7 @@ export function generateReportHTML(data: PDFReportData): string {
           <div style="font-size:22px;font-weight:900;color:${seoColor};">${seoLabel}</div>
         </div>
         ${seo?.localSeoScore != null ? `<div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;"><div style="font-size:9px;color:#64748b;margin-bottom:4px;">درجة SEO المحلي</div><div style="font-size:22px;font-weight:900;color:#22c55e;">${seo!.localSeoScore}/100</div></div>` : ""}
-        ${seo?.estimatedBacklinks != null ? `<div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;"><div style="font-size:9px;color:#64748b;margin-bottom:4px;">الروابط الخارجية</div><div style="font-size:22px;font-weight:900;color:#a78bfa;">${seo!.estimatedBacklinks}</div><div style="font-size:8px;color:#475569;">${backlinkQualityLabel[seo!.backlinkQuality || "weak"] || ""}</div></div>` : ""}
+        ${seo?.estimatedBacklinks != null ? `<div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;"><div style="font-size:9px;color:#64748b;margin-bottom:4px;">الروابط الخارجية</div><div style="font-size:22px;font-weight:900;color:#a78bfa;">${seo!.estimatedBacklinks}</div><div style="font-size:8px;color:#f59e0b;font-weight:700;">تقدير · ${backlinkQualityLabel[seo!.backlinkQuality || "weak"] || ""}</div></div>` : ""}
       </div>
       ${seo?.seoSummary ? `<div style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:10px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:9px;color:#06b6d4;font-weight:700;margin-bottom:4px;">📋 ملخص تحليل SEO</div><div style="font-size:10px;color:#cbd5e1;line-height:1.7;">${seo!.seoSummary}</div></div>` : ""}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -387,6 +387,14 @@ export function generateReportHTML(data: PDFReportData): string {
         </div>
       </div>
       ${(seo?.priorityActions?.length || 0) > 0 ? `<div style="margin-top:12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.15);border-radius:10px;padding:10px 14px;"><div style="font-size:10px;font-weight:800;color:#ef4444;margin-bottom:6px;">🚨 إجراءات SEO ذات أولوية</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${(seo!.priorityActions!).slice(0,6).map((a: string, i: number) => `<div style="font-size:9px;color:#e2e8f0;padding:3px 0;"><span style="color:#ef4444;font-weight:700;">${i+1}.</span> ${a}</div>`).join("")}</div></div>` : ""}
+      <div style="margin-top:12px;padding:10px 14px;background:linear-gradient(135deg,rgba(167,139,250,0.06),rgba(6,182,212,0.04));border:1px solid rgba(167,139,250,0.25);border-radius:10px;">
+        <div style="font-size:9px;font-weight:800;color:#a78bfa;margin-bottom:5px;">📊 ملاحظة حول بيانات الروابط الخارجية</div>
+        <div style="font-size:8.5px;color:#94a3b8;line-height:1.7;">بيانات الـ Backlinks المعروضة هي <span style="color:#f59e0b;font-weight:700;">تقديرات مبنية على SERP</span> وليست بيانات دقيقة. للحصول على تحليل دقيق يشمل عدد الروابط الحقيقي، جودتها، والنطاقات المرجعية بالتفصيل، نوصي بـ:</div>
+        <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="padding:4px 10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;font-size:8px;color:#22c55e;font-weight:700;">🗓️ حجز استشارة مجانية 30 دقيقة</div>
+          <div style="padding:4px 10px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:6px;font-size:8px;color:#06b6d4;font-weight:700;">📊 طلب تحليل Backlinks متقدم</div>
+        </div>
+      </div>
     </div>
     ${FOOTER_HTML(6, reportSerial)}
   </div>` : "";
