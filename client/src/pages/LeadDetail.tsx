@@ -206,14 +206,23 @@ export default function LeadDetail() {
       // استخدام السيرفر مباشرة لتوليد PDF وتحميله
       const result = await generatePDF.mutateAsync({ leadId: id });
       if (result.url) {
-        const a = document.createElement("a");
-        a.href = result.url;
-        a.download = result.filename || `تقرير-${data?.lead?.companyName || id}.pdf`;
-        a.target = "_blank";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
         setPdfUrl(result.url);
+        // تحميل الملف عبر fetch لتجنب حجب المتصفح للـ popup
+        try {
+          const response = await fetch(result.url);
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = result.filename || `تقرير-${data?.lead?.companyName || id}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        } catch {
+          // fallback: فتح في نافذة جديدة
+          window.open(result.url, "_blank");
+        }
         toast.success("تم توليد التقرير وبدأ التحميل تلقائياً");
       }
     } catch (e: any) {
