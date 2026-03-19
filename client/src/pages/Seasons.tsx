@@ -45,6 +45,8 @@ const emptyForm = {
   icon: "🌙",
   isActive: true,
   priority: 5,
+  urgencyText: "",
+  tipText: "",
 };
 
 type FormState = typeof emptyForm;
@@ -388,6 +390,27 @@ function SeasonForm({
             className="w-full px-3 py-2 rounded-xl text-sm border border-border bg-background text-foreground resize-none focus:outline-none focus:border-primary"
           />
         </div>
+        {/* نص الإلحاح في التقرير */}
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">🚨 نص الإلحاح في التقرير (اختياري)</label>
+          <input
+            value={form.urgencyText}
+            onChange={e => setForm(f => ({ ...f, urgencyText: e.target.value }))}
+            placeholder="مثال: الموسم الأعلى إنفاقاً — الوقت المثالي لإطلاق عروض الإفطار..."
+            className="w-full px-3 py-2 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary"
+          />
+        </div>
+        {/* نصيحة التقرير */}
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">💡 نصيحة التقرير (اختياري)</label>
+          <textarea
+            value={form.tipText}
+            onChange={e => setForm(f => ({ ...f, tipText: e.target.value }))}
+            placeholder="نصيحة تفصيلية تظهر في التقرير للعميل..."
+            rows={3}
+            className="w-full px-3 py-2 rounded-xl text-sm border border-border bg-background text-foreground resize-none focus:outline-none focus:border-primary"
+          />
+        </div>
       </div>
 
       {/* الفرص التسويقية */}
@@ -511,6 +534,8 @@ export default function Seasons() {
       relatedBusinessTypes: data.relatedBusinessTypes.length > 0 ? data.relatedBusinessTypes : null,
       description: data.description || null,
       year: data.year || null,
+      urgencyText: data.urgencyText || null,
+      tipText: data.tipText || null,
     };
     if (editingSeason) {
       updateMutation.mutate({ id: editingSeason.id, ...payload });
@@ -623,6 +648,8 @@ export default function Seasons() {
             icon: editingSeason.icon || "🌙",
             isActive: editingSeason.isActive ?? true,
             priority: editingSeason.priority ?? 5,
+            urgencyText: editingSeason.urgency_text || "",
+            tipText: editingSeason.tip_text || "",
           }}
           onSave={handleSave}
           onCancel={() => setEditingSeason(null)}

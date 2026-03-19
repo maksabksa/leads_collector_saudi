@@ -9,6 +9,7 @@ import { leads } from "../../drizzle/schema";
 import { eq, isNotNull, ne, or } from "drizzle-orm";
 import { generateReportHTML, type PDFReportData } from "../lib/pdfReportEngine";
 import { storagePut } from "../storage";
+import { getActiveSeasonForBusiness } from "./seasons";
 
 function buildReportData(lead: typeof leads.$inferSelect, reportType: "internal" | "client_facing", generatedBy?: string): PDFReportData {
   return {
@@ -105,7 +106,17 @@ export const pdfReportRouter = router({
       const [lead] = await db.select().from(leads).where(eq(leads.id, input.leadId));
       if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
 
+      const activeSeason = await getActiveSeasonForBusiness(lead.businessType || "");
       const reportData = buildReportData(lead, input.reportType, ctx.user?.name || undefined);
+      if (activeSeason) {
+        reportData.seasonOverride = {
+          name: activeSeason.name,
+          emoji: activeSeason.icon || "📅",
+          color: activeSeason.color || "#64748b",
+          urgency: (activeSeason as any).urgency_text || activeSeason.description || "",
+          tip: (activeSeason as any).tip_text || (Array.isArray(activeSeason.opportunities) ? activeSeason.opportunities[0] : "") || "",
+        };
+      }
       const html = generateReportHTML(reportData);
 
       return { html, leadName: lead.companyName };
@@ -129,7 +140,17 @@ export const pdfReportRouter = router({
         .where(eq(leads.id, input.leadId));
 
       try {
+        const activeSeason = await getActiveSeasonForBusiness(lead.businessType || "");
         const reportData = buildReportData(lead, input.reportType, ctx.user?.name || undefined);
+        if (activeSeason) {
+          reportData.seasonOverride = {
+            name: activeSeason.name,
+            emoji: activeSeason.icon || "📅",
+            color: activeSeason.color || "#64748b",
+            urgency: (activeSeason as any).urgency_text || activeSeason.description || "",
+            tip: (activeSeason as any).tip_text || (Array.isArray(activeSeason.opportunities) ? activeSeason.opportunities[0] : "") || "",
+          };
+        }
         const html = generateReportHTML(reportData);
 
         const fileKey = `reports/lead-${lead.id}-${input.reportType}-${Date.now()}.html`;

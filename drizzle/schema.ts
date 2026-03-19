@@ -9,6 +9,7 @@ import {
   float,
   boolean,
   json,
+  tinyint,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -1463,3 +1464,4 @@ export const whatchimpSendLog = mysqlTable("whatchimp_send_log", {
 });
 export type WhatchimpSendLog = typeof whatchimpSendLog.$inferSelect;
 export type InsertWhatchimpSendLog = typeof whatchimpSendLog.$inferInsert;
+

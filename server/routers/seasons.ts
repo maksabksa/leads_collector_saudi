@@ -155,6 +155,8 @@ export const seasonsRouter = router({
       icon: z.string().optional(),
       isActive: z.boolean().optional(),
       priority: z.number().min(1).max(10).optional(),
+      urgencyText: z.string().optional().nullable(),
+      tipText: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -172,6 +174,8 @@ export const seasonsRouter = router({
       if (data.icon !== undefined) updateData.icon = data.icon;
       if (data.isActive !== undefined) updateData.isActive = data.isActive;
       if (data.priority !== undefined) updateData.priority = data.priority;
+      if (data.urgencyText !== undefined) updateData.urgency_text = data.urgencyText;
+      if (data.tipText !== undefined) updateData.tip_text = data.tipText;
       await db.update(marketingSeasons).set(updateData).where(eq(marketingSeasons.id, id));
       return { success: true };
     }),

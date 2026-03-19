@@ -46,6 +46,13 @@ export interface PDFReportData {
   reportType: "internal" | "client_facing";
   generatedAt: Date;
   generatedBy?: string;
+  seasonOverride?: {
+    name: string;
+    emoji: string;
+    color: string;
+    urgency: string;
+    tip: string;
+  } | null;
 }
 
 // ===== Helpers =====
@@ -278,7 +285,7 @@ export function generateReportHTML(data: PDFReportData): string {
   const priorityScore = analysis?.leadPriorityScore || 0;
   const lostRevenue = calcLostRevenue(analysis, lead);
   const revenueOpp = calcRevenueOpportunity(analysis, lead);
-  const season = getCurrentSeason();
+  const season = data.seasonOverride || getCurrentSeason();
   const reportSerial = `RPT-${lead.id.toString().padStart(4, "0")}-${generatedAt.getFullYear()}`;
   const radarChart = buildRadarChart(analysis, lead);
   const platformBlocks = buildPlatformBlocks(lead, analysis);
@@ -493,13 +500,15 @@ export function generateReportHTML(data: PDFReportData): string {
     ${WATERMARK_HTML}
     ${HEADER_HTML(4, 5, "التوصيات والخطة", "الأولويات المرتبة وتوقيت التنفيذ المثالي", "#f97316")}
     <div style="padding:14px 36px;position:relative;z-index:1;">
-      <div style="margin-bottom:14px;padding:12px 16px;background:linear-gradient(135deg,rgba(167,139,250,0.08),rgba(14,165,233,0.05));border:1px solid rgba(167,139,250,0.25);border-radius:14px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:28px;">${season.emoji}</div>
+      <div style="margin-bottom:16px;padding:16px 18px;background:linear-gradient(135deg,${season.color}18,${season.color}08);border:1.5px solid ${season.color}50;border-radius:16px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-20px;left:-20px;font-size:80px;opacity:0.07;">${season.emoji}</div>
+        <div style="display:flex;align-items:flex-start;gap:12px;position:relative;z-index:1;">
+          <div style="font-size:36px;flex-shrink:0;">${season.emoji}</div>
           <div style="flex:1;">
-            <div style="font-size:11px;font-weight:900;color:#c4b5fd;margin-bottom:3px;">${season.name} — التوقيت الحالي</div>
-            <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;">${season.urgency}</div>
-            <div style="font-size:9px;color:#64748b;padding:5px 9px;background:rgba(255,255,255,0.03);border-radius:6px;border-right:3px solid ${season.color};">${season.tip}</div>
+            <div style="font-size:9px;font-weight:700;color:${season.color};letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">🗓️ الموسم التسويقي الحالي</div>
+            <div style="font-size:13px;font-weight:900;color:#e2e8f0;margin-bottom:5px;">${season.name}</div>
+            ${season.urgency ? `<div style="font-size:10px;color:${season.color};font-weight:700;margin-bottom:6px;">${season.urgency}</div>` : ""}
+            ${season.tip ? `<div style="font-size:9.5px;color:#94a3b8;line-height:1.8;padding:8px 12px;background:rgba(0,0,0,0.25);border-radius:8px;border-right:3px solid ${season.color};">${season.tip}</div>` : ""}
           </div>
         </div>
       </div>

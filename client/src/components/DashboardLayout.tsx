@@ -28,7 +28,7 @@ import {
   MapPin, Upload, Key, ChevronDown, ChevronRight, TrendingUp,
   Activity, Shield, UserCheck, FileText, Zap, Target, PieChart,
   Settings, Heart, Phone, Star, BarChart, LineChart, Megaphone,
-  Package, RefreshCw, AlertTriangle
+  Package, RefreshCw, AlertTriangle, Calendar
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -101,6 +101,7 @@ const menuGroups = [
     icon: Settings,
     items: [
       { icon: Settings, label: "الإعدادات الموحدة", path: "/settings", badge: null },
+      { icon: Calendar, label: "المواسم التسويقية", path: "/seasons", badge: null },
       { icon: Shield, label: "إدارة المستخدمين", path: "/users", badge: null },
       { icon: FileText, label: "سجل التدقيق", path: "/audit-log", badge: null },
     ]
