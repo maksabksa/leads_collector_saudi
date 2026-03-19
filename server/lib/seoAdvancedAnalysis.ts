@@ -135,23 +135,96 @@ async function checkKeywordRanking(domain: string, keyword: string): Promise<num
   return null;
 }
 
-// ─── Find competitors via SERP ────────────────────────────────────────────────
+// ─── Domain classification helpers ────────────────────────────────────────────
+// نطاقات المحتوى غير التجاري (مقالات ومدونات ومحتوى)
+const NON_BUSINESS_DOMAINS = [
+  "youtube.com", "facebook.com", "instagram.com", "twitter.com", "tiktok.com",
+  "snapchat.com", "linkedin.com", "pinterest.com",
+  "wikipedia.org", "wikihow.com",
+  "blogger.com", "blogspot.com", "wordpress.com", "medium.com",
+  "reddit.com", "quora.com",
+  "almaany.com", "mawdoo3.com", "almrsal.com", "sotor.com", "3rbseyes.com",
+  "dorar.net", "islamweb.net", "islamqa.info",
+  "zad.com.sa", "saudigazette.com.sa", "arabnews.com", "alriyadh.com",
+  "sabq.org", "okaz.com.sa", "alyaum.com", "saudipost.net",
+  "tripadvisor.com", "foursquare.com", "yelp.com",
+  "maps.google.com", "goo.gl",
+  "amazon.com", "amazon.sa",
+  "noon.com", "jarir.com",
+  "gov.sa", "moci.gov.sa", "zatca.gov.sa",
+];
+
+// كلمات تدل على محتوى غير تجاري في عنوان الصفحة
+const NON_BUSINESS_TITLE_KEYWORDS = [
+  "طريقة", "كيفية", "ما هو", "تعريف", "فوائد", "أسباب", "نصائح",
+  "مقال", "دليل", "شرح", "تجربتي", "مراجعة",
+  "how to", "what is", "guide", "tips", "review", "best",
+  "أفضل 10", "أفضل 5", "أفضل مطاعم", "قائمة",
+];
+
+function isLikelyBusinessUrl(url: string, title: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    // استبعاد النطاقات غير التجارية
+    if (NON_BUSINESS_DOMAINS.some(d => hostname === d || hostname.endsWith(`.${d}`))) {
+      return false;
+    }
+    // استبعاد العناوين التي تدل على محتوى
+    const lowerTitle = title.toLowerCase();
+    if (NON_BUSINESS_TITLE_KEYWORDS.some(kw => lowerTitle.includes(kw))) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Find competitors via SERP ────────────────────────────────────────────
 async function findCompetitors(
   businessType: string,
   city: string,
   domain: string
 ): Promise<{ name: string; url: string }[]> {
-  const query = `${businessType} ${city} موقع`;
-  const html = await fetchSerpResults(query);
-  if (!html) return [];
-
   const domainClean = domain.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-  const results = extractSerpSnippets(html);
 
-  return results
-    .filter((r) => r.url && !r.url.includes(domainClean))
-    .slice(0, 4)
-    .map((r) => ({ name: r.title || new URL(r.url).hostname, url: r.url }));
+  // استعلامات متعددة للبحث عن نشاطات تجارية حقيقية
+  const queries = [
+    `أفضل ${businessType} في ${city} site:com.sa OR site:sa`,
+    `${businessType} ${city} متجر موقع رسمي`,
+    `${businessType} ${city}`,
+  ];
+
+  const allResults: { name: string; url: string }[] = [];
+
+  for (const query of queries) {
+    if (allResults.length >= 4) break;
+    const html = await fetchSerpResults(query);
+    if (!html) continue;
+
+    const results = extractSerpSnippets(html);
+    for (const r of results) {
+      if (!r.url || r.url.includes(domainClean)) continue;
+      if (!isLikelyBusinessUrl(r.url, r.title)) continue;
+
+      // تجنب التكرار
+      const alreadyAdded = allResults.some(existing => {
+        try {
+          return new URL(existing.url).hostname === new URL(r.url).hostname;
+        } catch { return false; }
+      });
+      if (alreadyAdded) continue;
+
+      allResults.push({
+        name: r.title || new URL(r.url).hostname,
+        url: r.url,
+      });
+
+      if (allResults.length >= 4) break;
+    }
+  }
+
+  return allResults;
 }
 
 // ─── Estimate backlinks via scraping ─────────────────────────────────────────
@@ -275,12 +348,13 @@ ${serpContext}
   "priorityActions": ["إجراء أولوية 1 مع تأثيره التجاري", "إجراء 2", "إجراء 3"]
 }
 
-ملاحظات:
+ملاحظات مهمة:
 - اقترح كلمات مفتاحية واقعية لهذا النوع من النشاط في السعودية
-- المنافسون: استخدم البيانات المتوفرة أو اقترح منافسين واقعيين
+- المنافسون (مهم جداً): يجب أن يكونوا نشاطات تجارية حقيقية فقط (متاجر أو شركات أو مطاعم أو محلات) في نفس مجال ${businessType}
+  لا تذكر أبداً: مقالات أو مدونات أو منصات اجتماعية أو مواقع إخبارية كمنافسين
+  استخدم البيانات المتوفرة من نتائج SERP أو اقترح منافسين تجاريين واقعيين لهذا النشاط في هذه المدينة
 - الـ Backlinks: قيّم الجودة بناءً على العدد ونوع النطاقات
-- الأولويات: رتب حسب التأثير التجاري الفوري`;
-
+- الأولويات: رتّب حسب التأثير التجاري الفوري`;
   const response = await invokeLLM({
     messages: [
       { role: "system", content: "أنت خبير SEO. أجب دائماً بـ JSON صحيح فقط." },

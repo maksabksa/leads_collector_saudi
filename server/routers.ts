@@ -234,7 +234,28 @@ const leadsRouter = router({
       ownerUserId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
-      // الإضافة اليدوية: حفظ مباشر بدون فحص تكرار
+      // فحص التكرار: إذا وُجد عميل مطابق نُعيد بياناته بدلاً من رمي خطأ
+      const dupCheck = await checkLeadDuplicate(
+        input.verifiedPhone || "",
+        input.companyName,
+        input.website
+      );
+      if (dupCheck.isDuplicate && dupCheck.candidateId) {
+        const existingLead = await getLeadById(dupCheck.candidateId);
+        return {
+          id: dupCheck.candidateId,
+          isDuplicate: true as const,
+          duplicateReason: dupCheck.reason,
+          existingLead: existingLead ? {
+            id: existingLead.id,
+            companyName: existingLead.companyName,
+            businessType: existingLead.businessType,
+            city: existingLead.city,
+            verifiedPhone: existingLead.verifiedPhone,
+            stage: existingLead.stage,
+          } : null,
+        };
+      }
       const id = await createLead({
         ...input,
         deduplicationStatus: "no_duplicate",

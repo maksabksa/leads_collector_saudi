@@ -1,10 +1,19 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown, Loader2, Sparkles, Wand2, AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRIES_DATA } from "../../../shared/countries";
 import { skipToken } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const FALLBACK_BUSINESS_TYPES = [
   "ملحمة", "أغنام", "ماعز", "لحوم", "ذبح وتجهيز", "توصيل لحوم",
@@ -185,6 +194,13 @@ export default function AddLead() {
     await handleConfirmSave();
   };
 
+  // حالة dialog التكرار
+  const [duplicateDialog, setDuplicateDialog] = useState<{
+    open: boolean;
+    existingLead: { id: number; companyName: string; businessType: string; city: string; verifiedPhone?: string | null; stage?: string | null } | null;
+    reason: string;
+  }>({ open: false, existingLead: null, reason: "" });
+
   const handleConfirmSave = async () => {
     const selectedZone = zones?.find(z => z.id === form.zoneId);
     try {
@@ -192,6 +208,15 @@ export default function AddLead() {
         ...form,
         zoneName: selectedZone?.name || form.zoneName || undefined,
       });
+      // فحص إذا كان العميل مكرراً
+      if ((result as any).isDuplicate) {
+        setDuplicateDialog({
+          open: true,
+          existingLead: (result as any).existingLead,
+          reason: (result as any).duplicateReason || "",
+        });
+        return;
+      }
       toast.success("تم إضافة العميل — جاري التحليل التلقائي في الخلفية...");
       utils.leads.list.invalidate();
       utils.leads.stats.invalidate();
@@ -560,7 +585,71 @@ export default function AddLead() {
         </div>
       </form>
 
-
+      {/* ديالوج العميل المكرر */}
+      <Dialog open={duplicateDialog.open} onOpenChange={(open) => setDuplicateDialog(d => ({ ...d, open }))}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-400">
+              <AlertTriangle className="w-5 h-5" />
+              عميل موجود مسبقاً
+            </DialogTitle>
+            <DialogDescription className="text-right">
+              تم اكتشاف عميل مطابق للبيانات التي أدخلتها
+            </DialogDescription>
+          </DialogHeader>
+          {duplicateDialog.existingLead && (
+            <div className="rounded-xl p-4 border border-amber-500/30 bg-amber-500/5 space-y-2">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-amber-400" />
+                <span className="font-bold text-foreground">{duplicateDialog.existingLead.companyName}</span>
+              </div>
+              {duplicateDialog.existingLead.businessType && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>{duplicateDialog.existingLead.businessType}</span>
+                </div>
+              )}
+              {duplicateDialog.existingLead.city && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>{duplicateDialog.existingLead.city}</span>
+                </div>
+              )}
+              {duplicateDialog.existingLead.verifiedPhone && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Phone className="w-3.5 h-3.5" />
+                  <span dir="ltr">{duplicateDialog.existingLead.verifiedPhone}</span>
+                </div>
+              )}
+              {duplicateDialog.existingLead.stage && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  الحالة: <span className="text-amber-400 font-medium">{duplicateDialog.existingLead.stage === 'new' ? 'جديد' : duplicateDialog.existingLead.stage === 'contacted' ? 'تم التواصل' : duplicateDialog.existingLead.stage === 'interested' ? 'مهتم' : duplicateDialog.existingLead.stage === 'won' ? 'عميل فعلي' : duplicateDialog.existingLead.stage}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="flex gap-2 flex-row-reverse">
+            <Button
+              onClick={() => {
+                if (duplicateDialog.existingLead) {
+                  navigate(`/leads/${duplicateDialog.existingLead.id}`);
+                }
+              }}
+              className="flex items-center gap-2"
+              style={{ background: "linear-gradient(135deg, oklch(0.65 0.18 200), oklch(0.55 0.15 200))" }}
+            >
+              <ExternalLink className="w-4 h-4" />
+              الانتقال للعميل الموجود
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setDuplicateDialog(d => ({ ...d, open: false }))}
+            >
+              إلغاء
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
