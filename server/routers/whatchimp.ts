@@ -717,6 +717,143 @@ export const whatchimpRouter = router({
       return { sent, skipped, total: leadRows.length };
     }),
 
+  // ─── إرسال جهة الاتصال مع البريف إلى Whatchimp ───────────────────────────────────────────
+  /**
+   * sendBriefAsContact
+   * يُنشئ جهة الاتصال (subscriber) في Whatchimp ويُضيف نص البريف كـ note + custom fields.
+   */
+  sendBriefAsContact: protectedProcedure
+    .input(z.object({
+      leadId: z.number().int().positive(),
+      brief: z.object({
+        topOpportunity: z.string(),
+        salesAngle: z.string(),
+        firstMessageHint: z.string(),
+        priority: z.enum(["A", "B", "C", "D"]),
+        leadScore: z.number(),
+        bestContactChannel: z.string(),
+      }),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // جلب إعدادات Whatchimp
+      const settingsRows = await db
+        .select()
+        .from(whatchimpSettings)
+        .where(eq(whatchimpSettings.isActive, true))
+        .limit(1);
+      if (!settingsRows[0]) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Whatchimp غير مربوط — يرجى ربط الحساب من صفحة واتساب",
+        });
+      }
+      const { apiToken, phoneNumberId } = settingsRows[0];
+
+      // جلب بيانات العميل
+      const leadRows = await db
+        .select({
+          id: leads.id,
+          companyName: leads.companyName,
+          verifiedPhone: leads.verifiedPhone,
+          businessType: leads.businessType,
+          city: leads.city,
+          website: leads.website,
+          instagramUrl: leads.instagramUrl,
+          twitterUrl: leads.twitterUrl,
+          snapchatUrl: leads.snapchatUrl,
+          tiktokUrl: leads.tiktokUrl,
+          facebookUrl: leads.facebookUrl,
+          googleMapsUrl: leads.googleMapsUrl,
+        })
+        .from(leads)
+        .where(eq(leads.id, input.leadId))
+        .limit(1);
+
+      if (!leadRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
+      const lead = leadRows[0];
+
+      if (!lead.verifiedPhone) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "لا يوجد رقم هاتف لهذا العميل" });
+      }
+
+      const phone = normalizePhone(lead.verifiedPhone);
+
+      // 1. إنشاء جهة الاتصال (subscriber) في Whatchimp
+      const subRes = await whatchimpPost("/whatsapp/subscriber/create", {
+        apiToken,
+        phoneNumberID: phoneNumberId,
+        phoneNumber: phone,
+        name: lead.companyName,
+      });
+
+      // 2. إضافة البيانات + ملخص البريف كـ custom fields (non-fatal)
+      try {
+        const customFields: Record<string, string> = {};
+        if (lead.businessType) customFields["نوع النشاط"] = lead.businessType;
+        if (lead.city) customFields["المدينة"] = lead.city;
+        if (lead.website) customFields["الموقع الإلكتروني"] = lead.website;
+        if (lead.instagramUrl) customFields["إنستغرام"] = lead.instagramUrl;
+        if (lead.twitterUrl) customFields["تويتر/X"] = lead.twitterUrl;
+        if (lead.snapchatUrl) customFields["سناب شات"] = lead.snapchatUrl;
+        if (lead.tiktokUrl) customFields["تيك توك"] = lead.tiktokUrl;
+        if (lead.facebookUrl) customFields["فيسبوك"] = lead.facebookUrl;
+        if (lead.googleMapsUrl) customFields["خرائط Google"] = lead.googleMapsUrl;
+        customFields["درجة التحليل"] = `${input.brief.leadScore}/100 (أولوية ${input.brief.priority})`;
+        customFields["أفضل قناة تواصل"] = input.brief.bestContactChannel;
+        customFields["أبرز فرصة"] = input.brief.topOpportunity;
+
+        if (Object.keys(customFields).length > 0) {
+          await whatchimpPost("/whatsapp/subscriber/chat/assign-custom-fields", {
+            apiToken,
+            phone_number_id: phoneNumberId,
+            phone_number: phone,
+            custom_fields: JSON.stringify(customFields),
+          });
+        }
+      } catch { /* non-fatal */ }
+
+      // 3. إضافة البريف كاملاً كـ note
+      const briefNote = [
+        `\uD83D\uDCCA ملخص التحليل التسويقي — ${lead.companyName}`,
+        ``,
+        `\uD83C\uDFAF أبرز فرصة: ${input.brief.topOpportunity}`,
+        `\uD83D\uDCA1 زاوية الدخول: ${input.brief.salesAngle}`,
+        ``,
+        `\uD83D\uDCDD مقترح الرسالة الأولى:`,
+        input.brief.firstMessageHint,
+        ``,
+        `\u2B50 الدرجة: ${input.brief.leadScore}/100 | الأولوية: ${input.brief.priority} | القناة المثلى: ${input.brief.bestContactChannel}`,
+        ``,
+        `— نظام مكسب للعملاء`,
+      ].join("\n");
+
+      try {
+        await whatchimpPost("/whatsapp/subscriber/chat/add-notes", {
+          apiToken,
+          phone_number_id: phoneNumberId,
+          phone_number: phone,
+          note_text: briefNote,
+        });
+      } catch { /* non-fatal */ }
+
+      // 4. تسجيل العملية
+      const waMessageId = typeof subRes.message === "string" ? subRes.message : undefined;
+      await db.insert(whatchimpSendLog).values({
+        leadId: input.leadId,
+        leadName: lead.companyName,
+        phone,
+        status: "success",
+        waMessageId,
+        batchId: `brief_${Date.now()}`,
+        sentByUserId: ctx.user.id,
+      });
+
+      return { success: true, phone, waMessageId };
+    }),
+
   // ─── التحقق من صحة أرقام الواتساب لقائمة من العملاء ───────────────────────────────────────
   validatePhones: protectedProcedure
     .input(z.object({ leadIds: z.array(z.number()) }))

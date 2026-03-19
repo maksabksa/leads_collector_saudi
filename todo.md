@@ -2036,3 +2036,11 @@
 - [x] بناء مكوّن MissingFieldsSearchPanel مع زر البحث وعرض النتائج للمراجعة والحفظ
 - [x] دمج المكوّن في صفحة LeadDetail بعد MissingFieldsPanel
 - [x] 558 اختبار ناجح
+
+## ميزة إرسال البريف عبر واتساب (مارس 2026)
+- [ ] procedure whatchimp.sendBrief - إرسال نص البريف (firstMessageHint + topOpportunity) كرسالة واتساب
+- [x] زر "إرسال عبر واتساب" في SalesBriefCard
+
+## ميزة إرسال البريف مع جهة الاتصال (مارس 2026)
+- [x] procedure whatchimp.sendBriefAsContact: إرسال جهة الاتصال (subscriber) مع البريف كـ note إلى Whatchimp
+- [x] زر "إرسال عبر واتساب" في SalesBriefCard

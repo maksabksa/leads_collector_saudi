@@ -1,17 +1,19 @@
 /**
- * SalesBriefCard — PHASE 6B
+ * SalesBriefCard — PHASE 6C
  *
  * Responsibilities:
  * - Display generated SalesBrief (deterministic, no LLM)
  * - Trigger brief generation via onGenerateBrief callback (owned by LeadDetail)
  * - Show loading/empty/error states
  * - Copy-to-clipboard for firstMessageHint
+ * - Send contact + brief as subscriber note to Whatchimp
  *
  * Owns: nothing — all state comes from props
  */
-import { FileText, Loader2, RefreshCw, Copy, CheckCircle, AlertTriangle, Phone, Instagram, MessageCircle, Mail, Linkedin } from "lucide-react";
+import { FileText, Loader2, RefreshCw, Copy, CheckCircle, AlertTriangle, Phone, Instagram, MessageCircle, Mail, Linkedin, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 export type SalesBriefResult = {
   leadId: number;
@@ -56,12 +58,40 @@ const PRIORITY_COLORS: Record<"A" | "B" | "C" | "D", string> = {
 
 export default function SalesBriefCard({ briefResult, isGenerating, scoreResult, onGenerateBrief }: Props) {
   const [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const sendBriefMutation = trpc.whatchimp.sendBriefAsContact.useMutation({
+    onSuccess: () => {
+      setSent(true);
+      toast.success("تم إرسال جهة الاتصال والبريف إلى Whatchimp بنجاح");
+      setTimeout(() => setSent(false), 4000);
+    },
+    onError: (err) => {
+      toast.error(err.message ?? "فشل الإرسال إلى Whatchimp");
+    },
+  });
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       toast.success("تم النسخ");
       setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleSendToWhatchimp = () => {
+    if (!briefResult?.brief || !briefResult.leadId) return;
+    const { brief } = briefResult;
+    sendBriefMutation.mutate({
+      leadId: briefResult.leadId,
+      brief: {
+        topOpportunity: brief.topOpportunity,
+        salesAngle: brief.salesAngle,
+        firstMessageHint: brief.firstMessageHint,
+        priority: brief.priority,
+        leadScore: brief.leadScore,
+        bestContactChannel: brief.bestContactChannel,
+      },
     });
   };
 
@@ -154,6 +184,7 @@ export default function SalesBriefCard({ briefResult, isGenerating, scoreResult,
   const { brief } = briefResult;
   const channelCfg = CHANNEL_CONFIG[brief.bestContactChannel] ?? CHANNEL_CONFIG.phone;
   const priorityColor = PRIORITY_COLORS[brief.priority];
+  const isSending = sendBriefMutation.isPending;
 
   return (
     <div className="rounded-2xl border border-border overflow-hidden" style={{ background: "oklch(0.12 0.015 240)" }}>
@@ -163,13 +194,37 @@ export default function SalesBriefCard({ briefResult, isGenerating, scoreResult,
           <FileText className="w-4 h-4" style={{ color: "oklch(0.65 0.18 200)" }} />
           ملخص المبيعات
         </h4>
-        <button
-          onClick={onGenerateBrief}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all"
-          title="إعادة الإنشاء"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* زر الإرسال إلى Whatchimp */}
+          <button
+            onClick={handleSendToWhatchimp}
+            disabled={isSending || sent}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-60"
+            style={
+              sent
+                ? { background: "oklch(0.65 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.65 0.2 145 / 0.3)" }
+                : { background: "oklch(0.65 0.2 145 / 0.12)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.65 0.2 145 / 0.25)" }
+            }
+            title="إرسال جهة الاتصال والبريف إلى Whatchimp"
+          >
+            {isSending ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : sent ? (
+              <CheckCircle className="w-3 h-3" />
+            ) : (
+              <Send className="w-3 h-3" />
+            )}
+            {isSending ? "جاري الإرسال..." : sent ? "تم الإرسال" : "إرسال لواتشمب"}
+          </button>
+
+          <button
+            onClick={onGenerateBrief}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all"
+            title="إعادة الإنشاء"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="p-4 space-y-4">
@@ -238,6 +293,11 @@ export default function SalesBriefCard({ briefResult, isGenerating, scoreResult,
           </div>
           <p className="text-xs text-foreground leading-relaxed">{brief.firstMessageHint}</p>
         </div>
+
+        {/* Whatchimp send hint */}
+        <p className="text-xs text-muted-foreground text-center opacity-60">
+          زر "إرسال لواتشمب" يحفظ جهة الاتصال + البريف كـ note في Whatchimp
+        </p>
       </div>
     </div>
   );
