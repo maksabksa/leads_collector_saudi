@@ -63,6 +63,7 @@ import { leadIntelligenceRouter } from "./routers/leadIntelligence";
 import { whatchimpRouter } from "./routers/whatchimp";
 import { missingFieldsSearchRouter } from "./routers/missingFieldsSearch";
 import { autoSearchRouter } from "./routers/autoSearch";
+import { seoAdvancedRouter } from "./routers/seoAdvanced";
 
 // ===== ZONES ROUTER =====
 const zonesRouter = router({
@@ -829,14 +830,39 @@ const analysisRouter = router({
     .mutation(async ({ input }) => {
       await updateLead(input.leadId, { analysisStatus: "analyzing" });
       try {
+        // الخطوة 1: جمع بيانات حقيقية عبر Bright Data + PageSpeed أولاً
+        let realWebsiteContext = "";
+        let scrapedFlags = { hasWhatsapp: false, hasBooking: false, hasEcommerce: false, hasSSL: false };
+        let pagespeedScores = { performance: null as number | null, mobile: null as number | null, seo: null as number | null };
+        let scrapedPhone: string | null = null;
+        try {
+          const { gatherWebsiteIntelligence, buildWebsiteIntelligenceContext } = await import("./lib/websiteIntelligence");
+          const intelligence = await gatherWebsiteIntelligence(input.url);
+          if (intelligence.seo.fetchedSuccessfully) {
+            scrapedFlags = { hasWhatsapp: intelligence.seo.hasWhatsapp, hasBooking: intelligence.seo.hasBooking, hasEcommerce: intelligence.seo.hasEcommerce, hasSSL: intelligence.seo.hasSSL };
+            if (intelligence.seo.phones?.length > 0) scrapedPhone = intelligence.seo.phones[0];
+          }
+          if (intelligence.pagespeed.fetchedSuccessfully) {
+            pagespeedScores = { performance: intelligence.pagespeed.performanceScore, mobile: intelligence.pagespeed.mobilePerformanceScore, seo: intelligence.pagespeed.seoScore };
+          }
+          realWebsiteContext = buildWebsiteIntelligenceContext(intelligence);
+        } catch (scrapeErr) {
+          console.warn("[analyzeWebsite] Bright Data failed, using AI estimation:", scrapeErr);
+        }
+        if (scrapedPhone) await updateLead(input.leadId, { verifiedPhone: scrapedPhone });
+        const hasRealPagespeed = pagespeedScores.performance !== null;
+        // الخطوة 2: تحليل بالـ AI مع البيانات الحقيقية
         const prompt = `أنت خبير تحليل تسويق رقمي متخصص في السوق السعودي.
-
 قم بتحليل الموقع الإلكتروني التالي لنشاط تجاري سعودي:
 - اسم النشاط: ${input.companyName}
 - نوع النشاط: ${input.businessType}
 - رابط الموقع: ${input.url}
-
-قدم تحليلاً شاملاً بصيغة JSON فقط (بدون أي نص خارج JSON) وفق الهيكل التالي:
+${realWebsiteContext}
+${hasRealPagespeed ? `تعليمات خاصة بالدرجات:
+- درجة سرعة الموقع (Desktop) من Google PageSpeed: ${pagespeedScores.performance}/100 → حولها إلى مقياس 1-10
+- درجة سرعة الجوال: ${pagespeedScores.mobile}/100 → حولها إلى مقياس 1-10
+- درجة SEO من PageSpeed: ${pagespeedScores.seo}/100 → حولها إلى مقياس 1-10` : 'لا تتوفر بيانات PageSpeed حقيقية — قدّر الدرجات بناءً على محتوى الموقع.'}
+قدم تحليلاً شاملاً بصيغة JSON فقط وفق الهيكل التالي:
 {
   "hasWebsite": true,
   "loadSpeedScore": 7,
@@ -849,8 +875,8 @@ const analysisRouter = router({
   "hasOnlineBooking": false,
   "hasPaymentOptions": false,
   "hasDeliveryInfo": false,
-  "technicalGaps": ["لا يوجد SSL", "سرعة تحميل بطيئة"],
-  "contentGaps": ["لا يوجد قسم للأسعار", "لا يوجد محتوى موسمي"],
+  "technicalGaps": ["ثغرة تقنية حقيقية"],
+  "contentGaps": ["ثغرة محتوى حقيقية"],
   "overallScore": 6,
   "summary": "ملخص تحليلي واضح في سطرين",
   "recommendations": ["توصية 1", "توصية 2", "توصية 3"],
@@ -858,8 +884,7 @@ const analysisRouter = router({
   "revenueOpportunity": "كيف يمكن زيادة الإيراد فعلياً في سطرين على الأقل",
   "suggestedSalesEntryAngle": "زاوية الدخول البيعية المخصصة لهذا النشاط تحديداً"
 }
-
-ملاحظة: قيّم الموقع بناءً على المعرفة العامة بمواقع هذا النوع من الأنشطة في السعودية إذا لم تتمكن من الوصول المباشر.`;
+${realWebsiteContext ? 'ملاحظة: لديك بيانات حقيقية شاملة — استخدمها لتقديم تحليل دقيق.' : 'ملاحظة: قيّم الموقع بناءً على المعرفة العامة بمواقع هذا النوع في السعودية.'}`;
 
         const response = await invokeLLM({
           messages: [
@@ -873,6 +898,9 @@ const analysisRouter = router({
         const content = typeof rawContent === 'string' ? rawContent : "{}";
         let analysis: any = {};
         try { analysis = JSON.parse(content); } catch { analysis = {}; }
+        // دمج البيانات الحقيقية
+        analysis.hasOnlineBooking = analysis.hasOnlineBooking || scrapedFlags.hasBooking;
+        analysis.hasPaymentOptions = analysis.hasPaymentOptions || scrapedFlags.hasEcommerce;
 
         const analysisId = await createWebsiteAnalysis({
           leadId: input.leadId,
@@ -2512,5 +2540,6 @@ export const appRouter = router({
   whatchimp: whatchimpRouter,
   missingFieldsSearch: missingFieldsSearchRouter,
   autoSearch: autoSearchRouter,
+  seoAdvanced: seoAdvancedRouter,
 });
 export type AppRouter = typeof appRouter;

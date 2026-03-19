@@ -1465,3 +1465,40 @@ export const whatchimpSendLog = mysqlTable("whatchimp_send_log", {
 export type WhatchimpSendLog = typeof whatchimpSendLog.$inferSelect;
 export type InsertWhatchimpSendLog = typeof whatchimpSendLog.$inferInsert;
 
+
+// ===== SEO ADVANCED ANALYSIS =====
+export const seoAdvancedAnalysis = mysqlTable("seo_advanced_analysis", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("lead_id").notNull(),
+  url: varchar("url", { length: 500 }).notNull(),
+
+  // الكلمات المفتاحية
+  topKeywords: json("top_keywords").$type<{keyword: string, volume: string, position: number | null, difficulty: string}[]>().default([]),
+  missingKeywords: json("missing_keywords").$type<string[]>().default([]),
+  keywordOpportunities: json("keyword_opportunities").$type<string[]>().default([]),
+
+  // الـ Backlinks
+  estimatedBacklinks: int("estimated_backlinks"),
+  backlinkQuality: mysqlEnum("backlink_quality", ["weak", "average", "good", "strong"]).default("weak"),
+  topReferringDomains: json("top_referring_domains").$type<string[]>().default([]),
+  backlinkGaps: json("backlink_gaps").$type<string[]>().default([]),
+
+  // مقارنة المنافسين
+  competitors: json("competitors").$type<{name: string, url: string, seoScore: number, strengths: string[]}[]>().default([]),
+  competitorGaps: json("competitor_gaps").$type<string[]>().default([]),
+  competitiveAdvantages: json("competitive_advantages").$type<string[]>().default([]),
+
+  // ترتيب البحث
+  searchRankings: json("search_rankings").$type<{keyword: string, position: number | null, url: string, snippet: string}[]>().default([]),
+  brandMentions: int("brand_mentions").default(0),
+  localSeoScore: int("local_seo_score"),
+
+  // ملخص
+  overallSeoHealth: mysqlEnum("overall_seo_health", ["critical", "weak", "average", "good", "excellent"]).default("average"),
+  seoSummary: text("seo_summary"),
+  priorityActions: json("priority_actions").$type<string[]>().default([]),
+
+  analyzedAt: timestamp("analyzed_at").defaultNow().notNull(),
+});
+export type SeoAdvancedAnalysis = typeof seoAdvancedAnalysis.$inferSelect;
+export type InsertSeoAdvancedAnalysis = typeof seoAdvancedAnalysis.$inferInsert;

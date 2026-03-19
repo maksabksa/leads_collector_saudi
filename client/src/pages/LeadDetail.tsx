@@ -22,6 +22,7 @@ import AutoSearchPanel from "@/components/leads/AutoSearchPanel";
 import AuditSummaryCard from "@/components/leads/AuditSummaryCard";
 import SalesBriefCard, { type SalesBriefResult } from "@/components/leads/SalesBriefCard";
 import { PlatformCoverageCard } from "@/components/leads/PlatformCoverageCard";
+import SeoAdvancedCard from "@/components/leads/SeoAdvancedCard";
 
 function ScoreBar({ label, value, color }: { label: string; value: number | string | null | undefined; color: string }) {
   const numValue = value !== null && value !== undefined ? Number(value) : null;
@@ -115,6 +116,26 @@ export default function LeadDetail() {
   const [briefResult, setBriefResult] = useState<SalesBriefResult | null>(null);
   const [isScoring, setIsScoring] = useState(false);
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
+  const [seoAdvancedResult, setSeoAdvancedResult] = useState<any>(null);
+  const [isRunningAdvancedSeo, setIsRunningAdvancedSeo] = useState(false);
+  const runSeoAdvanced = trpc.seoAdvanced.analyze.useMutation();
+  const { data: savedSeoAdvanced } = trpc.seoAdvanced.getLatest.useQuery({ leadId: id }, { enabled: !!id });
+  const handleRunAdvancedSeo = async () => {
+    if (!data?.lead?.website) { toast.error("لا يوجد موقع إلكتروني لهذا النشاط"); return; }
+    setIsRunningAdvancedSeo(true);
+    try {
+      const result = await runSeoAdvanced.mutateAsync({
+        leadId: id,
+        url: data.lead.website,
+        companyName: data.lead.companyName,
+        businessType: data.lead.businessType,
+        city: data.lead.city,
+      });
+      setSeoAdvancedResult(result.report);
+      toast.success("تم تحليل SEO المتقدم بنجاح");
+    } catch { toast.error("فشل تحليل SEO المتقدم"); }
+    finally { setIsRunningAdvancedSeo(false); }
+  };
 
   // تحميل نتيجة التقييم المحفوظة من DB عند فتح الصفحة
   const { data: savedScoreData } = trpc.leadIntelligence.getSavedScore.useQuery(
@@ -1122,6 +1143,15 @@ export default function LeadDetail() {
             </div>
           </div>
           {/* ===== END PHASE 6B SALES BRIEF ===== */}
+          {/* ===== SEO ADVANCED ANALYSIS ===== */}
+          {(data?.lead?.website) && (
+            <SeoAdvancedCard
+              report={seoAdvancedResult ?? savedSeoAdvanced}
+              isLoading={isRunningAdvancedSeo}
+              onRunAnalysis={handleRunAdvancedSeo}
+            />
+          )}
+          {/* ===== END SEO ADVANCED ===== */}
 
           {/* Marketing gaps */}
           {(lead.biggestMarketingGap || lead.revenueOpportunity || lead.suggestedSalesEntryAngle) && (
