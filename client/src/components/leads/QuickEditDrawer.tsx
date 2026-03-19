@@ -134,7 +134,7 @@ export default function QuickEditDrawer({ open, onOpenChange, lead, onSaved }: Q
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-full sm:max-w-md p-0 flex flex-col" style={{ background: "oklch(0.12 0.01 240)", borderRight: "1px solid oklch(0.22 0.02 240)" }}>
+      <SheetContent side="left" className="w-full sm:max-w-md p-0 flex flex-col h-full overflow-hidden" style={{ background: "oklch(0.12 0.01 240)", borderRight: "1px solid oklch(0.22 0.02 240)" }}>
         <SheetHeader className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "oklch(0.22 0.02 240)" }}>
           <SheetTitle className="text-right text-base font-bold" style={{ color: "oklch(0.9 0.01 240)" }}>
             ✏️ تعديل سريع
@@ -146,7 +146,7 @@ export default function QuickEditDrawer({ open, onOpenChange, lead, onSaved }: Q
           )}
         </SheetHeader>
 
-        <ScrollArea className="flex-1 px-5 py-4">
+        <ScrollArea className="flex-1 min-h-0 px-5 py-4">
           <div className="flex flex-col gap-4">
 
             {/* اسم النشاط */}

@@ -110,7 +110,7 @@ export default function ScoreCard({ scoreResult, isScoring, onRunScore }: Props)
 
   // ── Error state ────────────────────────────────────────────────────────────
   if (!scoreResult.success || !scoreResult.score) {
-    const firstError = scoreResult.failedSteps[0];
+    const firstError = scoreResult.failedSteps?.[0];
     return (
       <div className="rounded-2xl p-5 border space-y-3" style={{ background: "oklch(0.12 0.015 240)", borderColor: "oklch(0.58 0.22 25 / 0.3)" }}>
         <div className="flex items-center gap-2">
