@@ -53,6 +53,26 @@ export interface PDFReportData {
     urgency: string;
     tip: string;
   } | null;
+  seoData?: {
+    url: string;
+    topKeywords?: {keyword: string; volume: string; position: number | null; difficulty: string}[];
+    missingKeywords?: string[];
+    keywordOpportunities?: string[];
+    estimatedBacklinks?: number | null;
+    backlinkQuality?: string | null;
+    topReferringDomains?: string[];
+    backlinkGaps?: string[];
+    competitors?: {name: string; url: string; seoScore: number; strengths: string[]}[];
+    competitorGaps?: string[];
+    competitiveAdvantages?: string[];
+    searchRankings?: {keyword: string; position: number | null; url: string; snippet: string}[];
+    brandMentions?: number | null;
+    localSeoScore?: number | null;
+    overallSeoHealth?: string | null;
+    seoSummary?: string | null;
+    priorityActions?: string[];
+    analyzedAt?: Date;
+  } | null;
 }
 
 // ===== Helpers =====
@@ -296,6 +316,9 @@ export function generateReportHTML(data: PDFReportData): string {
   const confidenceScore = analysis?.aiConfidenceScore || Math.round(priorityScore * 8 + 20);
   const websiteScore = lead.website ? Math.min(priorityScore + 1, 10) : 2;
   const digitalScore = !!(lead.instagramUrl || lead.tiktokUrl || lead.snapchatUrl) ? Math.min(priorityScore + 2, 10) : 3;
+  const seo = data.seoData || null;
+  const hasSeo = !!seo;
+
 
   const PAGE_STYLE = `width:210mm;min-height:297mm;padding:0;margin:0 auto;background:linear-gradient(160deg,#020810 0%,#060d1a 60%,#020810 100%);position:relative;overflow:hidden;font-family:'Tajawal','Cairo','Arial',sans-serif;direction:rtl;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;page-break-after:always;break-after:page;`;
 
@@ -324,6 +347,49 @@ export function generateReportHTML(data: PDFReportData): string {
   </div>`;
 
   const WATERMARK_HTML = `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:55px;font-weight:900;color:rgba(34,197,94,0.022);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:6px;">حصري من مكسب لخدمات الاعمال</div>`;
+
+  // ===== صفحة SEO المتقدم =====
+  const seoHealthColor: Record<string, string> = { critical: "#ef4444", weak: "#f97316", average: "#f59e0b", good: "#22c55e", excellent: "#06b6d4" };
+  const seoHealthLabel: Record<string, string> = { critical: "حرج", weak: "ضعيف", average: "متوسط", good: "جيد", excellent: "ممتاز" };
+  const seoColor = seoHealthColor[seo?.overallSeoHealth || "average"] || "#f59e0b";
+  const seoLabel = seoHealthLabel[seo?.overallSeoHealth || "average"] || "متوسط";
+  const backlinkQualityLabel: Record<string, string> = { weak: "ضعيف", average: "متوسط", good: "جيد", strong: "قوي" };
+
+  const pageSEO = hasSeo ? `
+  <div style="${PAGE_STYLE}">
+    ${HEADER_HTML(6, 6, "تحليل SEO المتقدم", "الكلمات المفتاحية · الروابط الخارجية · المنافسون · ترتيب البحث", "#06b6d4")}
+    <div style="padding:16px 28px;">
+      <div style="display:flex;gap:12px;margin-bottom:14px;">
+        <div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;">
+          <div style="font-size:9px;color:#64748b;margin-bottom:4px;">الصحة العامة</div>
+          <div style="font-size:22px;font-weight:900;color:${seoColor};">${seoLabel}</div>
+        </div>
+        ${seo?.localSeoScore != null ? `<div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;"><div style="font-size:9px;color:#64748b;margin-bottom:4px;">درجة SEO المحلي</div><div style="font-size:22px;font-weight:900;color:#22c55e;">${seo!.localSeoScore}/100</div></div>` : ""}
+        ${seo?.estimatedBacklinks != null ? `<div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;"><div style="font-size:9px;color:#64748b;margin-bottom:4px;">الروابط الخارجية</div><div style="font-size:22px;font-weight:900;color:#a78bfa;">${seo!.estimatedBacklinks}</div><div style="font-size:8px;color:#475569;">${backlinkQualityLabel[seo!.backlinkQuality || "weak"] || ""}</div></div>` : ""}
+      </div>
+      ${seo?.seoSummary ? `<div style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:10px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:9px;color:#06b6d4;font-weight:700;margin-bottom:4px;">📋 ملخص تحليل SEO</div><div style="font-size:10px;color:#cbd5e1;line-height:1.7;">${seo!.seoSummary}</div></div>` : ""}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;color:#f1f5f9;margin-bottom:8px;">🔑 الكلمات المفتاحية</div>
+          ${(seo?.topKeywords?.length || 0) > 0 ? (seo!.topKeywords!).slice(0,5).map((k: {keyword:string;volume:string;position:number|null;difficulty:string}) => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="font-size:9px;color:#e2e8f0;">${k.keyword}</span><span style="font-size:8px;color:#64748b;">${k.volume}</span></div>`).join("") : `<div style="font-size:9px;color:#475569;text-align:center;padding:8px;">لا توجد بيانات</div>`}
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;color:#f1f5f9;margin-bottom:8px;">💡 فرص كلمات مفتاحية</div>
+          ${(seo?.keywordOpportunities?.length || 0) > 0 ? (seo!.keywordOpportunities!).slice(0,5).map((k: string) => `<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="font-size:9px;color:#a78bfa;">◆ </span><span style="font-size:9px;color:#e2e8f0;">${k}</span></div>`).join("") : `<div style="font-size:9px;color:#475569;text-align:center;padding:8px;">لا توجد بيانات</div>`}
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;color:#f1f5f9;margin-bottom:8px;">📊 ترتيب في نتائج البحث</div>
+          ${(seo?.searchRankings?.length || 0) > 0 ? (seo!.searchRankings!).slice(0,4).map((r: {keyword:string;position:number|null;url:string;snippet:string}) => `<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><div style="display:flex;justify-content:space-between;"><span style="font-size:9px;color:#e2e8f0;">${r.keyword}</span>${r.position != null ? `<span style="font-size:8px;font-weight:800;color:${r.position<=10?"#22c55e":r.position<=30?"#f59e0b":"#ef4444"};">\u0645\u0631\u0643\u0632 ${r.position}</span>` : `<span style="font-size:8px;color:#475569;">\u063a\u064a\u0631 \u0645\u0631\u062a\u0628</span>`}</div></div>`).join("") : `<div style="font-size:9px;color:#475569;text-align:center;padding:8px;">لا توجد بيانات</div>`}
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;color:#f1f5f9;margin-bottom:8px;">🏆 مقارنة المنافسين</div>
+          ${(seo?.competitors?.length || 0) > 0 ? (seo!.competitors!).slice(0,3).map((c: {name:string;url:string;seoScore:number;strengths:string[]}) => `<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><div style="display:flex;justify-content:space-between;"><span style="font-size:9px;color:#e2e8f0;font-weight:700;">${c.name}</span><span style="font-size:8px;background:rgba(6,182,212,0.1);color:#06b6d4;border-radius:4px;padding:1px 5px;">${c.seoScore}/100</span></div>${c.strengths?.length>0?`<div style="font-size:8px;color:#64748b;">${c.strengths.slice(0,2).join(" · ")}</div>`:""}</div>`).join("") : `<div style="font-size:9px;color:#475569;text-align:center;padding:8px;">لا توجد بيانات</div>`}
+        </div>
+      </div>
+      ${(seo?.priorityActions?.length || 0) > 0 ? `<div style="margin-top:12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.15);border-radius:10px;padding:10px 14px;"><div style="font-size:10px;font-weight:800;color:#ef4444;margin-bottom:6px;">🚨 إجراءات SEO ذات أولوية</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${(seo!.priorityActions!).slice(0,6).map((a: string, i: number) => `<div style="font-size:9px;color:#e2e8f0;padding:3px 0;"><span style="color:#ef4444;font-weight:700;">${i+1}.</span> ${a}</div>`).join("")}</div></div>` : ""}
+    </div>
+    ${FOOTER_HTML(6, reportSerial)}
+  </div>` : "";
 
   // ===== PAGE 1: الغلاف =====
   const page1 = `<div style="${PAGE_STYLE}">
@@ -626,6 +692,7 @@ export function generateReportHTML(data: PDFReportData): string {
   <div class="page-wrapper">${page3}</div>
   <div class="page-wrapper">${page4}</div>
   <div class="page-wrapper">${page5}</div>
+  ${hasSeo ? `<div class="page-wrapper">${pageSEO}</div>` : ""}
 </div>
 </body>
 </html>`;

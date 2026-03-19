@@ -5,7 +5,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { leads } from "../../drizzle/schema";
+import { leads, seoAdvancedAnalysis } from "../../drizzle/schema";
 import { eq, isNotNull, ne, or } from "drizzle-orm";
 import { generateReportHTML, type PDFReportData } from "../lib/pdfReportEngine";
 import { storagePut } from "../storage";
@@ -117,6 +117,31 @@ export const pdfReportRouter = router({
           tip: (activeSeason as any).tip_text || (Array.isArray(activeSeason.opportunities) ? activeSeason.opportunities[0] : "") || "",
         };
       }
+      // جلب بيانات SEO المتقدم إن وجدت
+      const [seoRow] = await db.select().from(seoAdvancedAnalysis)
+        .where(eq(seoAdvancedAnalysis.leadId, input.leadId))
+        .orderBy(seoAdvancedAnalysis.analyzedAt)
+        .limit(1);
+      if (seoRow) {
+        reportData.seoData = {
+          url: seoRow.url,
+          overallSeoHealth: seoRow.overallSeoHealth || undefined,
+          localSeoScore: seoRow.localSeoScore || undefined,
+          estimatedBacklinks: seoRow.estimatedBacklinks || undefined,
+          backlinkQuality: seoRow.backlinkQuality || undefined,
+          brandMentions: seoRow.brandMentions || undefined,
+          seoSummary: seoRow.seoSummary || undefined,
+          topKeywords: (seoRow.topKeywords as any[])?.length ? seoRow.topKeywords as any : undefined,
+          keywordOpportunities: (seoRow.keywordOpportunities as any[])?.length ? seoRow.keywordOpportunities as any : undefined,
+          missingKeywords: (seoRow.missingKeywords as any[])?.length ? seoRow.missingKeywords as any : undefined,
+          searchRankings: (seoRow.searchRankings as any[])?.length ? seoRow.searchRankings as any : undefined,
+          competitors: (seoRow.competitors as any[])?.length ? seoRow.competitors as any : undefined,
+          competitorGaps: (seoRow.competitorGaps as any[])?.length ? seoRow.competitorGaps as any : undefined,
+          priorityActions: (seoRow.priorityActions as any[])?.length ? seoRow.priorityActions as any : undefined,
+          topReferringDomains: (seoRow.topReferringDomains as any[])?.length ? seoRow.topReferringDomains as any : undefined,
+          backlinkGaps: (seoRow.backlinkGaps as any[])?.length ? seoRow.backlinkGaps as any : undefined,
+        };
+      }
       const html = generateReportHTML(reportData);
 
       return { html, leadName: lead.companyName };
@@ -149,6 +174,31 @@ export const pdfReportRouter = router({
             color: activeSeason.color || "#64748b",
             urgency: (activeSeason as any).urgency_text || activeSeason.description || "",
             tip: (activeSeason as any).tip_text || (Array.isArray(activeSeason.opportunities) ? activeSeason.opportunities[0] : "") || "",
+          };
+        }
+        // جلب بيانات SEO المتقدم إن وجدت
+        const [seoRow2] = await db.select().from(seoAdvancedAnalysis)
+          .where(eq(seoAdvancedAnalysis.leadId, input.leadId))
+          .orderBy(seoAdvancedAnalysis.analyzedAt)
+          .limit(1);
+        if (seoRow2) {
+          reportData.seoData = {
+            url: seoRow2.url,
+            overallSeoHealth: seoRow2.overallSeoHealth || undefined,
+            localSeoScore: seoRow2.localSeoScore || undefined,
+            estimatedBacklinks: seoRow2.estimatedBacklinks || undefined,
+            backlinkQuality: seoRow2.backlinkQuality || undefined,
+            brandMentions: seoRow2.brandMentions || undefined,
+            seoSummary: seoRow2.seoSummary || undefined,
+            topKeywords: (seoRow2.topKeywords as any[])?.length ? seoRow2.topKeywords as any : undefined,
+            keywordOpportunities: (seoRow2.keywordOpportunities as any[])?.length ? seoRow2.keywordOpportunities as any : undefined,
+            missingKeywords: (seoRow2.missingKeywords as any[])?.length ? seoRow2.missingKeywords as any : undefined,
+            searchRankings: (seoRow2.searchRankings as any[])?.length ? seoRow2.searchRankings as any : undefined,
+            competitors: (seoRow2.competitors as any[])?.length ? seoRow2.competitors as any : undefined,
+            competitorGaps: (seoRow2.competitorGaps as any[])?.length ? seoRow2.competitorGaps as any : undefined,
+            priorityActions: (seoRow2.priorityActions as any[])?.length ? seoRow2.priorityActions as any : undefined,
+            topReferringDomains: (seoRow2.topReferringDomains as any[])?.length ? seoRow2.topReferringDomains as any : undefined,
+            backlinkGaps: (seoRow2.backlinkGaps as any[])?.length ? seoRow2.backlinkGaps as any : undefined,
           };
         }
         const html = generateReportHTML(reportData);
