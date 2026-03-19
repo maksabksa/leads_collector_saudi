@@ -562,14 +562,14 @@ const leadsRouter = router({
     }),
 
   bulkDelete: protectedProcedure
-    .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
+    .input(z.object({ ids: z.array(z.number()).min(1).max(5000) }))
     .mutation(async ({ input }) => {
       const result = await bulkDeleteLeads(input.ids);
       return { success: true, deleted: result.deleted };
     }),
   bulkUpdateStage: protectedProcedure
     .input(z.object({
-      ids: z.array(z.number()).min(1).max(500),
+      ids: z.array(z.number()).min(1).max(5000),
       stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]),
     }))
     .mutation(async ({ input }) => {

@@ -463,7 +463,7 @@ export const whatchimpRouter = router({
   // ── Bulk send ──────────────────────────────────────────────────────────────
   sendBulk: protectedProcedure
     .input(z.object({
-      leadIds: z.array(z.number()).min(1).max(500),
+      leadIds: z.array(z.number()).min(1).max(5000),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

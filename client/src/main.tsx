@@ -18,6 +18,11 @@ const queryClient = new QueryClient({
           if (error.message === UNAUTHED_ERR_MSG) return false;
           if ((error as any).data?.code === 'UNAUTHORIZED') return false;
         }
+          // إعادة المحاولة عند خطأ HTML response (server restart أثناء التطوير)
+        if (error instanceof TRPCClientError) {
+          const isHtmlResponse = error.message?.includes('<!doctype') || error.message?.includes('<html') || error.message?.includes('not valid JSON');
+          if (isHtmlResponse) return failureCount < 3; // إعادة المحاولة 3 مرات
+        }
         // إعادة المحاولة مرتين فقط لأخطاء الشبكة
         return failureCount < 2;
       },
@@ -49,6 +54,14 @@ queryClient.getQueryCache().subscribe(event => {
     if (error instanceof TRPCClientError && error.message === 'Failed to fetch') {
       console.warn('[API] خطأ شبكة مؤقت - جاري إعادة المحاولة...');
       return;
+    }
+    // تجاهل خطأ HTML response (يحدث عند server restart أثناء التطوير)
+    if (error instanceof TRPCClientError) {
+      const isHtmlResponse = error.message?.includes('<!doctype') || error.message?.includes('<html') || error.message?.includes('not valid JSON');
+      if (isHtmlResponse) {
+        console.warn('[API] السيرفر يُعيد التشغيل - جاري إعادة المحاولة...');
+        return;
+      }
     }
     console.error("[API Query Error]", error);
   }
