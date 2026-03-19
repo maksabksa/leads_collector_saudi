@@ -162,6 +162,7 @@ export const leads = mysqlTable("leads", {
 
   // ===== Custom Recommendations =====
   customRecommendations: text("custom_recommendations"),  // توصيات مخصصة يُدخلها المستخدم يدوياً
+  additionalNotes: text("additional_notes"),  // توضيحات إضافية يقرأها AI في التحليل والتقرير
 
   // ===== Phase 1: PDF Report =====
   pdfGenerationStatus: mysqlEnum("pdf_generation_status", ["not_generated", "generating", "ready", "failed"]).default("not_generated"),

@@ -448,10 +448,28 @@ const leadsRouter = router({
       nextFollowup: z.number().optional(),
       ownerUserId: z.number().optional(),
       customRecommendations: z.string().optional().nullable(),
+      additionalNotes: z.string().optional().nullable(),
+      triggerReanalysis: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
-      const { id, ...data } = input;
+    .mutation(async ({ input, ctx }) => {
+      const { id, triggerReanalysis, ...data } = input;
       await updateLead(id, data);
+      // إعادة تحليل تلقائية عند تعديل بيانات جوهرية
+      if (triggerReanalysis) {
+        const lead = await getLeadById(id);
+        if (lead) {
+          setImmediate(async () => {
+            try {
+              await updateLead(id, { analysisStatus: "analyzing" });
+              const { runEnrichmentPipeline } = await import("./enrichment/index");
+              await runEnrichmentPipeline(lead);
+            } catch (err: any) {
+              console.error("[auto-reanalysis] error:", err.message);
+              await updateLead(id, { analysisStatus: "failed" });
+            }
+          });
+        }
+      }
       return { success: true };
     }),
 

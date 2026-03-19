@@ -264,13 +264,14 @@ export async function runSeoAdvancedAnalysis(params: {
   businessType: string;
   city: string;
   websiteContent?: string;
+  additionalNotes?: string;
   pagespeedData?: {
     seoScore: number | null;
     performanceScore: number | null;
     mobilePerformanceScore: number | null;
   };
 }): Promise<SeoAdvancedReport> {
-    const { url, companyName, businessType, city, websiteContent, pagespeedData } = params;
+    const { url, companyName, businessType, city, websiteContent, pagespeedData, additionalNotes } = params;
   const domain = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "").split("/")[0];
   // ─── جمع البيانات بالتوازي (PageSpeed + SEO الحقيقي + SERP + Competitors + Backlinks) ─
   const [
@@ -323,13 +324,15 @@ export async function runSeoAdvancedAnalysis(params: {
   const effectiveMobileScore = realPagespeed?.fetchedSuccessfully ? realPagespeed.mobilePerformanceScore : pagespeedData?.mobilePerformanceScore;
   const effectiveBodyText = realSeo?.fetchedSuccessfully ? realSeo.bodyText : websiteContent;
 
+  const fallbackWebsiteInfo = websiteIntelContext || [
+    `درجة SEO: ${effectiveSeoScore ?? "غير متوفرة"}/100`,
+    `درجة الأداء: ${effectivePerfScore ?? "غير متوفرة"}/100`,
+    `درجة الجوال: ${effectiveMobileScore ?? "غير متوفرة"}/100`,
+  ].join("\n");
+
   const serpContext = `
 === بيانات الموقع الحقيقية ===
-${websiteIntelContext || [
-  `درجة SEO: ${effectiveSeoScore ?? "غير متوفرة"}/100`,
-  `درجة الأداء: ${effectivePerfScore ?? "غير متوفرة"}/100`,
-  `درجة الجوال: ${effectiveMobileScore ?? "غير متوفرة"}/100`,
-].join("\n")}
+${fallbackWebsiteInfo}
 
 === بيانات SERP ===
 نتائج البحث عن اسم النشاط "${companyName} ${city}": ${brandHtml ? "متوفرة" : "غير متوفرة"}
@@ -346,9 +349,11 @@ ${effectiveBodyText ? `
 ${effectiveBodyText.slice(0, 1000)}` : ""}
 `;
 
+    const additionalNotesSection = additionalNotes?.trim()
+      ? `\n\n**معلومات إضافية من صاحب النشاط (ضعها في الاعتبار عند كل تحليل):**\n${additionalNotes}`
+      : "";
     const prompt = `أنت خبير SEO متخصص في السوق السعودي. مهمتك تحليل بيانات حقيقية وتقديم رؤى منطقية مبنية على الأدلة.
-
-بيانات الموقع الحقيقية لـ "${companyName}" (${businessType} في ${city}):
+بيانات الموقع الحقيقية لـ "${companyName}" (${businessType} في ${city}):${additionalNotesSection}
 ${serpContext}
 
 تعليمات التحليل المنطقي:

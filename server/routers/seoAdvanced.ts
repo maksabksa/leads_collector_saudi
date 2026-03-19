@@ -19,6 +19,7 @@ export const seoAdvancedRouter = router({
       companyName: z.string(),
       businessType: z.string(),
       city: z.string().optional(),
+      additionalNotes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -30,6 +31,7 @@ export const seoAdvancedRouter = router({
           companyName: input.companyName,
           businessType: input.businessType,
           city: input.city ?? "",
+          additionalNotes: input.additionalNotes,
         });
 
         // حفظ النتائج في قاعدة البيانات

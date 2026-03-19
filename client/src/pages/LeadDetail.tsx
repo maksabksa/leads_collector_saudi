@@ -203,9 +203,28 @@ export default function LeadDetail() {
   const handleGeneratePDF = async () => {
     setPdfGenerating(true);
     try {
+      // استخدام السيرفر مباشرة لتوليد PDF وتحميله
+      const result = await generatePDF.mutateAsync({ leadId: id });
+      if (result.url) {
+        const a = document.createElement("a");
+        a.href = result.url;
+        a.download = result.filename || `تقرير-${data?.lead?.companyName || id}.pdf`;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setPdfUrl(result.url);
+        toast.success("تم توليد التقرير وبدأ التحميل تلقائياً");
+      }
+    } catch (e: any) {
+      toast.error("فشل توليد التقرير", { description: e.message });
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+  const _handleGeneratePDF_legacy = async () => {
+    try {
       const { generateLeadPDF } = await import("@/lib/generateLeadPDF");
-
-      // حساب نسب الفجوة بالذكاء الاصطناعي من السيرفر
       let aiGapPercentages: number[] | undefined;
       try {
         const lead = data?.lead;
@@ -502,6 +521,7 @@ export default function LeadDetail() {
       linkedinUrl: (lead as any).linkedinUrl || "",
       crNumber: (lead as any).crNumber || "",
       notes: lead.notes || "",
+      additionalNotes: (lead as any).additionalNotes || "",
       stage: (lead as any).stage || "new",
       priority: (lead as any).priority || "medium",
       nextStep: (lead as any).nextStep || "",
@@ -511,8 +531,22 @@ export default function LeadDetail() {
   };
 
   const handleSaveEdit = async () => {
-    await updateLead.mutateAsync({ id, ...editForm });
-    toast.success("تم التحديث");
+    const lead = data?.lead;
+    const coreFieldsChanged = lead && [
+      "companyName", "businessType", "city", "website",
+      "instagramUrl", "twitterUrl", "tiktokUrl", "facebookUrl", "snapchatUrl",
+      "additionalNotes"
+    ].some(f => editForm[f] !== (lead as any)[f]);
+    await updateLead.mutateAsync({
+      id,
+      ...editForm,
+      ...(coreFieldsChanged && lead?.website ? { triggerReanalysis: true } : {})
+    });
+    if (coreFieldsChanged && lead?.website) {
+      toast.success("تم التحديث — جاري إعادة التحليل تلقائياً...");
+    } else {
+      toast.success("تم التحديث");
+    }
     setIsEditing(false);
     utils.leads.getFullDetails.invalidate({ id });
   };
@@ -742,6 +776,22 @@ export default function LeadDetail() {
                 className="w-full px-3 py-2 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none"
                 placeholder="مثال: إرسال عرض سعر" />
             </div>
+          </div>
+          {/* حقل التوضيحات الإضافية للذكاء الاصطناعي */}
+          <div className="space-y-2 pt-3 border-t border-border">
+            <div className="flex items-center gap-2">
+              <Brain className="w-3.5 h-3.5" style={{ color: "oklch(0.75 0.18 280)" }} />
+              <label className="text-xs font-medium" style={{ color: "oklch(0.75 0.18 280)" }}>توضيحات إضافية للذكاء الاصطناعي</label>
+            </div>
+            <textarea
+              value={editForm.additionalNotes || ""}
+              onChange={e => setEditForm((f: any) => ({ ...f, additionalNotes: e.target.value }))}
+              rows={3}
+              className="w-full px-3 py-2 rounded-xl text-sm border bg-background text-foreground focus:outline-none resize-none"
+              style={{ borderColor: "oklch(0.75 0.18 280 / 0.4)" }}
+              placeholder="مثال: العميل يستهدف النساء 25-40 سنة • يريد التركيز على منتج معين • لديه منافسة شديدة من متجر X"
+            />
+            <p className="text-xs text-muted-foreground">سيأخذها الذكاء الاصطناعي بعين الاعتبار عند تحليل الموقع والتقرير</p>
           </div>
           <div className="flex gap-2">
             <button onClick={handleSaveEdit} disabled={updateLead.isPending}

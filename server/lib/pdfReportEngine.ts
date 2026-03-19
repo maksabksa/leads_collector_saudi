@@ -24,6 +24,7 @@ export interface PDFReportData {
     stage?: string | null;
     priority?: string | null;
     notes?: string | null;
+    additionalNotes?: string | null;
   };
   analysis?: {
     sectorMain?: string | null;

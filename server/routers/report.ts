@@ -145,9 +145,23 @@ async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses
   const activeSeason = await getActiveSeasonForBusiness(businessType).catch(() => null);
   const upcomingSeasons = await getUpcomingSeasonsForBusiness(businessType).catch(() => []);
   const competitors = await getCompetitors(lead.id, businessType, lead.city || "").catch(() => []);
+  // جلب آخر تحليل SEO متقدم محفوظ
+  let seoAdvancedData: any = null;
+  try {
+    const db = await getDb();
+    if (db) {
+      const { seoAdvancedAnalysis } = await import("../../drizzle/schema");
+      const { desc, eq } = await import("drizzle-orm");
+      const rows = await db.select().from(seoAdvancedAnalysis)
+        .where(eq(seoAdvancedAnalysis.leadId, lead.id))
+        .orderBy(desc(seoAdvancedAnalysis.analyzedAt))
+        .limit(1);
+      seoAdvancedData = rows[0] ?? null;
+    }
+  } catch { /* لا يوقف التقرير إذا فشل جلب SEO */ }
   // جلب إعدادات أسلوب الكتابة
   const styleSettings = await getReportStyleSettings().catch(() => null);
-  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company, activeSeason, upcomingSeasons, competitors, styleSettings);
+  const html = buildPDFHtml(lead, websiteAnalysis, socialAnalyses, company, activeSeason, upcomingSeasons, competitors, styleSettings, seoAdvancedData);
   
   let executablePath: string;
   try {
@@ -411,7 +425,7 @@ function getInspirationalQuote(businessType: string): { text: string; author: st
   return general[Math.abs(Math.floor(Date.now() / 1000)) % general.length];
 }
 
-function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any, activeSeason?: any, upcomingSeasons?: any[], competitors?: any[], styleSettings?: any): string {
+function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], company?: any, activeSeason?: any, upcomingSeasons?: any[], competitors?: any[], styleSettings?: any, seoAdvancedData?: any): string {
   const stageLabels: Record<string, string> = {
     new: "جديد", contacted: "تم التواصل", interested: "مهتم",
     price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه",
@@ -489,20 +503,36 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
   const instaProfilePic = (instaAnalysis as any)?.profilePicUrl || "";
 
   // بناء بطاقات السوشيال ميديا
-  const socialRows = socialAnalyses.length > 0 ? socialAnalyses.map(s => `
+  const socialRows = socialAnalyses.length > 0 ? socialAnalyses.map(s => {
+    // تحليل البيانات العميقة من AI
+    let summaryText = "";
+    let recommendationsList = "";
+    try {
+      if (s.summary) summaryText = typeof s.summary === "string" ? s.summary : JSON.stringify(s.summary);
+      else if (s.analysisText) summaryText = String(s.analysisText).substring(0, 250);
+      if (s.recommendations) {
+        const recs = typeof s.recommendations === "string" ? JSON.parse(s.recommendations) : s.recommendations;
+        if (Array.isArray(recs) && recs.length > 0) {
+          recommendationsList = recs.slice(0, 3).map((r: any) => `<li style="margin-bottom:4px;">${typeof r === "string" ? r : r.text || r.title || JSON.stringify(r)}</li>`).join("");
+        }
+      }
+    } catch { summaryText = s.analysisText ? String(s.analysisText).substring(0, 250) : ""; }
+    return `
     <div class="social-card">
       <div class="social-header">
         <span class="social-platform-name">${s.platform}</span>
-        ${s.engagementRate ? `<span class="social-score" style="background:${Number(s.engagementRate) >= 7 ? '#dcfce7' : '#fef3c7'};color:${Number(s.engagementRate) >= 7 ? '#166534' : '#92400e'};">${Number(s.engagementRate).toFixed(1)}/10</span>` : ""}
+        ${s.engagementRate ? `<span class="social-score" style="background:${Number(s.engagementRate) >= 7 ? '#dcfce7' : '#fef3c7'};color:${Number(s.engagementRate) >= 7 ? '#166534' : '#92400e'};">` + `${Number(s.engagementRate).toFixed(1)}/10</span>` : ""}
       </div>
       <div class="social-stats">
         ${s.followersCount ? `<div class="stat-chip">👥 ${Number(s.followersCount).toLocaleString("ar")} متابع</div>` : ""}
         ${s.postsCount ? `<div class="stat-chip">📝 ${s.postsCount} منشور</div>` : ""}
         ${s.engagementRate ? `<div class="stat-chip">📊 ${s.engagementRate}% تفاعل</div>` : ""}
       </div>
-      ${s.analysisText ? `<p class="social-analysis">${String(s.analysisText).substring(0, 180)}...</p>` : ""}
+      ${summaryText ? `<p class="social-analysis" style="margin-top:8px;">${summaryText}</p>` : ""}
+      ${recommendationsList ? `<div style="margin-top:8px;"><div style="font-size:10px;font-weight:700;color:#0f172a;margin-bottom:4px;">💡 توصيات:</div><ul style="margin:0;padding-right:16px;font-size:10px;color:#334155;line-height:1.6;">${recommendationsList}</ul></div>` : ""}
     </div>
-  `).join("") : `
+  `;
+  }).join("") : `
     <div class="empty-social">
       <div style="font-size:32px;margin-bottom:8px;">📊</div>
       <div style="font-size:13px;color:#64748b;font-weight:600;">لم يتم تحليل منصات التواصل بعد</div>
@@ -1109,16 +1139,38 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
     <div class="section">
       <div class="section-title">🌐 تحليل الموقع الإلكتروني</div>
       ${websiteAnalysis ? `
-        <div class="two-col" style="margin-bottom:14px;">
-          <div>
-            ${websiteAnalysis.seoScore ? `<div class="score-bar-row"><div class="score-bar-label">تحسين محركات البحث (SEO)</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${(Number(websiteAnalysis.seoScore)/10)*100}%"></div></div><div class="score-bar-value">${Number(websiteAnalysis.seoScore).toFixed(1)}</div></div>` : ""}
-            ${websiteAnalysis.socialPresenceScore ? `<div class="score-bar-row"><div class="score-bar-label">الحضور الاجتماعي</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${(Number(websiteAnalysis.socialPresenceScore)/10)*100}%"></div></div><div class="score-bar-value">${Number(websiteAnalysis.socialPresenceScore).toFixed(1)}</div></div>` : ""}
-            ${websiteAnalysis.contentQualityScore ? `<div class="score-bar-row"><div class="score-bar-label">جودة المحتوى</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${(Number(websiteAnalysis.contentQualityScore)/10)*100}%"></div></div><div class="score-bar-value">${Number(websiteAnalysis.contentQualityScore).toFixed(1)}</div></div>` : ""}
-          </div>
-          <div>
-            ${websiteAnalysis.analysisText ? `<div class="analysis-box" style="height:100%;"><div class="analysis-box-title">ملاحظات التحليل</div><p>${String(websiteAnalysis.analysisText).substring(0, 300)}</p></div>` : ""}
-          </div>
-        </div>
+        <!-- Gauge Cards بصرية -->
+        ${(() => {
+          const gaugeItems = [
+            { key: 'loadSpeedScore', label: 'سرعة الموقع', icon: '⚡', hint: 'كلما كان أسرع، كلما بقي الزوار أكثر' },
+            { key: 'mobileExperienceScore', label: 'تجربة الجوال', icon: '📱', hint: 'أغلب العملاء يتصفحون من الجوال' },
+            { key: 'seoScore', label: 'ظهور Google', icon: '🔍', hint: 'مدى ظهور الموقع في نتائج البحث' },
+            { key: 'contentQualityScore', label: 'جودة المحتوى', icon: '📝', hint: 'وضوح وإقناع المحتوى للزائر' },
+            { key: 'designScore', label: 'جودة التصميم', icon: '🎨', hint: 'المظهر العام وسهولة التصفح' },
+            { key: 'offerClarityScore', label: 'وضوح العرض', icon: '💰', hint: 'مدى وضوح الخدمات والأسعار' },
+          ];
+          const availableItems = gaugeItems.filter(g => (websiteAnalysis as any)[g.key] != null);
+          if (availableItems.length === 0) return "";
+          return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">${availableItems.map(g => {
+            const val = Number((websiteAnalysis as any)[g.key]);
+            const pct = Math.round((val/10)*100);
+            const color = val >= 7 ? '#22c55e' : val >= 5 ? '#f59e0b' : '#ef4444';
+            const label = val >= 7 ? 'جيد' : val >= 5 ? 'متوسط' : 'يحتاج تحسين';
+            const r = 22; const circ = 2 * Math.PI * r; const dash = (pct/100)*circ;
+            return `<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center;">
+              <div style="font-size:14px;margin-bottom:4px;">${g.icon}</div>
+              <svg width="60" height="60" viewBox="0 0 60 60" style="display:block;margin:0 auto 4px;">
+                <circle cx="30" cy="30" r="${r}" fill="none" stroke="#e2e8f0" stroke-width="5"/>
+                <circle cx="30" cy="30" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 30 30)"/>
+                <text x="30" y="34" text-anchor="middle" font-size="11" font-weight="800" fill="${color}" font-family="Tajawal,sans-serif">${val.toFixed(1)}</text>
+              </svg>
+              <div style="font-size:9.5px;font-weight:700;color:#1e293b;margin-bottom:2px;">${g.label}</div>
+              <div style="font-size:8.5px;color:${color};font-weight:700;">${label}</div>
+              <div style="font-size:8px;color:#94a3b8;margin-top:2px;">${g.hint}</div>
+            </div>`;
+          }).join("")}</div>`;
+        })()}
+        ${websiteAnalysis.summary ? `<div class="analysis-box"><div class="analysis-box-title">ملخص التحليل</div><p>${String(websiteAnalysis.summary).substring(0, 350)}</p></div>` : websiteAnalysis.analysisText ? `<div class="analysis-box"><div class="analysis-box-title">ملاحظات التحليل</div><p>${String(websiteAnalysis.analysisText).substring(0, 350)}</p></div>` : ""}
       ` : `
         <div style="background:#fef2f2;border:1px dashed #fca5a5;border-radius:10px;padding:18px;text-align:center;">
           <div style="font-size:28px;margin-bottom:8px;">🌐</div>
@@ -1126,8 +1178,45 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
           <div style="font-size:11px;color:#7f1d1d;">${lead.website ? `الموقع: ${lead.website} — اضغط "تحليل العميل" لجلب بيانات الموقع` : `غياب الموقع الإلكتروني يعني خسارة ${lead.businessType ? `عملاء ${lead.businessType}` : 'العملاء'} الذين يبحثون عبر Google`}</div>
         </div>
       `}
+     </div>
+    <!-- قسم SEO المتقدم -->
+    ${seoAdvancedData ? `
+    <div class="section">
+      <div class="section-title">🔍 تحليل SEO المتقدم</div>
+      <div class="two-col" style="margin-bottom:12px;">
+        <div>
+          ${seoAdvancedData.overallSeoHealth ? `<div class="score-bar-row"><div class="score-bar-label">صحة SEO العامة</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${(Number(seoAdvancedData.overallSeoHealth)/10)*100}%"></div></div><div class="score-bar-value">${Number(seoAdvancedData.overallSeoHealth).toFixed(1)}</div></div>` : ""}
+          ${seoAdvancedData.localSeoScore ? `<div class="score-bar-row"><div class="score-bar-label">SEO المحلي</div><div class="score-bar-track"><div class="score-bar-fill" style="width:${(Number(seoAdvancedData.localSeoScore)/10)*100}%"></div></div><div class="score-bar-value">${Number(seoAdvancedData.localSeoScore).toFixed(1)}</div></div>` : ""}
+          ${seoAdvancedData.topKeywords ? (() => { try { const kws = typeof seoAdvancedData.topKeywords === "string" ? JSON.parse(seoAdvancedData.topKeywords) : seoAdvancedData.topKeywords; return Array.isArray(kws) && kws.length > 0 ? `<div style="margin-top:8px;"><div style="font-size:10px;font-weight:700;margin-bottom:4px;">🎯 كلمات مفتاحية مستخدمة:</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${kws.slice(0,6).map((k: any) => `<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:12px;font-size:9px;">${typeof k === "string" ? k : k.keyword || k}</span>`).join("")}</div></div>` : ""; } catch { return ""; } })() : ""}
+        </div>
+        <div>
+          ${seoAdvancedData.seoSummary ? `<div class="analysis-box"><div class="analysis-box-title">ملخص SEO</div><p style="font-size:10px;line-height:1.7;">${String(seoAdvancedData.seoSummary).substring(0, 280)}</p></div>` : ""}
+        </div>
+      </div>
+      ${seoAdvancedData.priorityActions ? (() => { try { const actions = typeof seoAdvancedData.priorityActions === "string" ? JSON.parse(seoAdvancedData.priorityActions) : seoAdvancedData.priorityActions; return Array.isArray(actions) && actions.length > 0 ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;"><div style="font-size:10px;font-weight:700;color:#166534;margin-bottom:6px;">⚡ أولويات التحسين:</div><ul style="margin:0;padding-right:16px;font-size:10px;color:#14532d;line-height:1.7;">${actions.slice(0,4).map((a: any) => `<li>${typeof a === "string" ? a : a.action || a.title || JSON.stringify(a)}</li>`).join("")}</ul></div>` : ""; } catch { return ""; } })() : ""}
+      <!-- رسالة Backlinks -->
+      <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:4px;">🔗 الروابط الخارجية (Backlinks) — تقدير أولي</div>
+        <p style="font-size:10px;color:#78350f;margin:0;line-height:1.7;">${seoAdvancedData.estimatedBacklinks ? `عدد الروابط التقديري: ${seoAdvancedData.estimatedBacklinks} — هذا تقدير أولي غير مؤكد. للحصول على بيانات دقيقة وتحليل عميق للروابط والمنافسين، تواصل معنا للحصول على استشارة مجانية.` : `لم يتم قياس الروابط بعد — هذا الجانب يحتاج أدوات متخصصة مثل Ahrefs لقياسه بدقة. تواصل معنا للحصول على استشارة مجانية.`}</p>
+      </div>
     </div>
-
+    ` : ""}
+    <!-- مقارنة المنافسين من SERP -->
+    ${seoAdvancedData && seoAdvancedData.competitors && (() => { try { const comps = typeof seoAdvancedData.competitors === "string" ? JSON.parse(seoAdvancedData.competitors) : seoAdvancedData.competitors; return Array.isArray(comps) && comps.length > 0 ? `
+    <div class="section">
+      <div class="section-title">🏁 المنافسون في السوق</div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:10px;">منافسون حقيقيون في نفس النشاط والمنطقة — مجلوبون من نتائج Google</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+        ${comps.slice(0,3).map((c: any) => `<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+          <div style="font-size:10.5px;font-weight:700;color:#1e293b;margin-bottom:4px;">${c.name || "منافس"}</div>
+          ${c.url ? `<div style="font-size:9px;color:#3b82f6;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.url.replace(/^https?:\/\//, "").substring(0,30)}</div>` : ""}
+          ${c.seoScore ? `<div style="display:flex;align-items:center;gap:4px;"><div style="font-size:9px;color:#64748b;">SEO:</div><div style="flex:1;height:4px;background:#e2e8f0;border-radius:2px;"><div style="height:100%;background:#6366f1;border-radius:2px;width:${Math.min(100,(Number(c.seoScore)/10)*100)}%;"></div></div><div style="font-size:9px;font-weight:700;color:#6366f1;">${Number(c.seoScore).toFixed(1)}</div></div>` : ""}
+          ${c.strengths && Array.isArray(c.strengths) && c.strengths.length > 0 ? `<div style="margin-top:6px;"><div style="font-size:9px;color:#64748b;margin-bottom:2px;">نقاط قوته:</div>${c.strengths.slice(0,2).map((s: string) => `<div style="font-size:9px;color:#334155;background:#f1f5f9;padding:2px 6px;border-radius:4px;margin-bottom:2px;">${s}</div>`).join("")}</div>` : ""}
+        </div>`).join("")}
+      </div>
+      ${seoAdvancedData.competitorGaps && (() => { try { const gaps = typeof seoAdvancedData.competitorGaps === "string" ? JSON.parse(seoAdvancedData.competitorGaps) : seoAdvancedData.competitorGaps; return Array.isArray(gaps) && gaps.length > 0 ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;"><div style="font-size:10px;font-weight:700;color:#166534;margin-bottom:6px;">🎯 فرص التميز عن المنافسين:</div><ul style="margin:0;padding-right:16px;font-size:10px;color:#14532d;line-height:1.7;">${gaps.slice(0,3).map((g: string) => `<li>${g}</li>`).join("")}</ul></div>` : ""; } catch { return ""; } })()}
+    </div>
+    ` : ""; } catch { return ""; } })()}
     <!-- تحليل السوشيال ميديا -->
     <div class="section">
       <div class="section-title">📱 تحليل منصات التواصل الاجتماعي</div>

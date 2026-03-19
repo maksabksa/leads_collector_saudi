@@ -2069,3 +2069,20 @@
 - [x] تحسين socialEnrichment: إضافة تحليل AI عميق يملأ summary وrecommendations وscores
 - [x] تحديث التقرير: تمييز Backlinks التقديرية بـ "تقدير" باللون الأصفر
 - [x] إضافة رسالة استشارة مجانية في قسم Backlinks بالتقرير
+
+## مارس 2026 - تحديث تلقائي + توضيحات إضافية
+- [x] إضافة حقل additionalNotes (text) في جدول leads في schema
+- [x] migration SQL لإضافة العمود
+- [x] تحديث leads.update في routers.ts ليُشغّل إعادة التحليل تلقائياً بعد الحفظ
+- [x] إضافة حقل "توضيحات إضافية" في صفحة LeadDetail مع حفظ تلقائي
+- [x] تمرير additionalNotes للـ AI في websiteEnrichment وsocialEnrichment وseoAdvancedAnalysis
+- [ ] تمرير additionalNotes للـ AI في توليد التقرير (report.ts)
+
+## مارس 2026 - تطوير شامل (جولة 3)
+- [x] إضافة حقل "توضيحات إضافية" في صفحة ملف العميل (LeadDetail) مع حفظ تلقائي
+- [x] تمرير additionalNotes للـ AI في seoAdvancedAnalysis وsocialEnrichment وpdfReportEngine
+- [x] تحويل تحميل التقرير لـ PDF مباشر (download بدون فتح URL)
+- [x] توحيد زر المعاينة ليعرض نفس ملف PDF المحفوظ
+- [x] مراجعة ظهور التحليلات الفعلي في التقرير (SEO + سوشيال + منافسين)
+- [x] إضافة مقارنة السوشيال بالمنافسين في التقرير (بحث ذكي بنفس المنطقة والنشاط)
+- [x] إضافة gauge chart لـ PageSpeed وSEO مع شرح مبسط بالعربي
