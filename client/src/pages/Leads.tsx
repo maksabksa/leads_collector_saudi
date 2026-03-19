@@ -5,7 +5,7 @@ import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
   Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send, MessageSquare,
-  Target, FileText, CheckCircle2,
+  Target, FileText, CheckCircle2, Pencil,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import QuickEditDrawer from "@/components/leads/QuickEditDrawer";
 
 const statusColors: Record<string, { color: string; bg: string; label: string }> = {
   pending: { color: "oklch(0.55 0.01 240)", bg: "oklch(0.18 0.02 240)", label: "معلق" },
@@ -62,6 +63,8 @@ export default function Leads() {
   const [pendingAction, setPendingAction] = useState<"contact" | "template" | null>(null);
   // التبويب النشط: "all" = قائمة العملاء الجديدة | "contacted" = تم التواصل
   const [activeListTab, setActiveListTab] = useState<"all" | "contacted">("all");
+  const [quickEditLead, setQuickEditLead] = useState<NonNullable<typeof allLeads>[number] | null>(null);
+  const [showQuickEdit, setShowQuickEdit] = useState(false);
 
   const availableFilterCities = filterCountry
     ? (COUNTRIES_DATA.find(c => c.name === filterCountry)?.cities ?? [])
@@ -756,13 +759,23 @@ export default function Leads() {
                   {/* Actions */}
                   <div className="col-span-1 flex items-center justify-center gap-1">
                     <Link href={`/leads/${lead.id}`}>
-                      <button className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all">
+                      <button className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all" title="عرض التفاصيل">
                         <Eye className="w-4 h-4" />
                       </button>
                     </Link>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setQuickEditLead(lead); setShowQuickEdit(true); }}
+                      className="p-1.5 rounded-lg hover:bg-white/5 transition-all opacity-0 group-hover:opacity-100"
+                      style={{ color: "oklch(0.75 0.18 220)" }}
+                      title="تعديل سريع"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                     <button onClick={() => handleDelete(lead.id, lead.companyName)}
                       className="p-1.5 rounded-lg hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                      style={{ color: "var(--brand-red)" }}>
+                      style={{ color: "var(--brand-red)" }}
+                      title="حذف"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -772,6 +785,13 @@ export default function Leads() {
           </div>
         </div>
       )}
+
+      {/* ===== نافذة التعديل السريع ===== */}
+      <QuickEditDrawer
+        open={showQuickEdit}
+        onOpenChange={(v) => { setShowQuickEdit(v); if (!v) setQuickEditLead(null); }}
+        lead={quickEditLead}
+      />
 
       {/* ===== نافذة مراجعة أرقام الواتساب ===== */}
       <PhoneValidationDialog
