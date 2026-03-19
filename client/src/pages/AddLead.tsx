@@ -1,5 +1,4 @@
 import { trpc } from "@/lib/trpc";
-import PreSaveReviewModal from "@/components/PreSaveReviewModal";
 import { useState, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ArrowRight, Save, Globe, Instagram, Twitter, Phone, MapPin, Building2, Tag, MessageCircle, CheckCircle2, XCircle, HelpCircle, TrendingUp, Flag, Calendar, ChevronDown, Loader2, Sparkles, Wand2 } from "lucide-react";
@@ -54,7 +53,6 @@ export default function AddLead() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showReviewModal, setShowReviewModal] = useState(false);
 
   const handleParseBio = async () => {
     if (!bioText.trim()) return;
@@ -183,8 +181,8 @@ export default function AddLead() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    // فتح نافذة المراجعة بدلاً من الحفظ المباشر
-    setShowReviewModal(true);
+    // حفظ مباشر بدون مراجعة
+    await handleConfirmSave();
   };
 
   const handleConfirmSave = async () => {
@@ -197,7 +195,6 @@ export default function AddLead() {
       toast.success("تم إضافة العميل — جاري التحليل التلقائي في الخلفية...");
       utils.leads.list.invalidate();
       utils.leads.stats.invalidate();
-      setShowReviewModal(false);
       navigate(`/leads/${result.id}`);
     } catch (err) {
       toast.error("حدث خطأ أثناء الحفظ");
@@ -536,15 +533,16 @@ export default function AddLead() {
           </div>
         </div>
 
-        {/* Notes */}
-        <div className="rounded-2xl p-5 border border-border" style={{ background: "oklch(0.12 0.015 240)" }}>
-          <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
-            <Tag className="w-3.5 h-3.5" />
-            ملاحظات إضافية
+        {/* Notes for AI */}
+        <div className="rounded-2xl p-5 border-2 overflow-hidden" style={{ borderColor: "oklch(0.65 0.18 60 / 0.4)", background: "oklch(0.10 0.015 240)" }}>
+          <label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: "oklch(0.72 0.18 60)" }}>
+            <Sparkles className="w-3.5 h-3.5" />
+            ملاحظات للذكاء الاصطناعي
           </label>
+          <p className="text-xs text-muted-foreground mb-2">يقرأها الـ AI قبل التحليل — أضف أي توجيهات خاصة (مثل: "ركز على ضعف الإنستغرام" أو "العميل مهتم بالإعلانات")</p>
           <textarea value={form.notes} onChange={e => set("notes", e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary resize-none"
-            rows={3} placeholder="أي ملاحظات إضافية عن هذا النشاط..." />
+            rows={3} placeholder="مثال: العميل يريد التوسع في تيك توك، لديه ميزانية محدودة، منافسه الرئيسي هو..." />
         </div>
 
         {/* Submit */}
@@ -562,28 +560,7 @@ export default function AddLead() {
         </div>
       </form>
 
-      {/* نافذة المراجعة اليدوية قبل الحفظ */}
-      <PreSaveReviewModal
-        isOpen={showReviewModal}
-        onClose={() => setShowReviewModal(false)}
-        onConfirmSave={handleConfirmSave}
-        formData={{
-          companyName: form.companyName,
-          businessType: form.businessType,
-          city: form.city,
-          verifiedPhone: form.verifiedPhone || undefined,
-          website: form.website || undefined,
-          instagramUrl: form.instagramUrl || undefined,
-          twitterUrl: form.twitterUrl || undefined,
-          snapchatUrl: form.snapchatUrl || undefined,
-          tiktokUrl: form.tiktokUrl || undefined,
-          facebookUrl: form.facebookUrl || undefined,
-          googleMapsUrl: form.googleMapsUrl || undefined,
-          reviewCount: form.reviewCount || undefined,
-          notes: form.notes || undefined,
-        }}
-        isSaving={createLead.isPending}
-      />
+
     </div>
   );
 }

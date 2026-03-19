@@ -234,11 +234,12 @@ const leadsRouter = router({
       ownerUserId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
-      const id = await createLeadWithResolution(input);
-      // إذا كان مكرراً، أرجع خطأ واضح
-      if (id === null) {
-        throw new TRPCError({ code: 'CONFLICT', message: 'العميل موجود مسبقاً في قاعدة البيانات (تكرار محتمل)' });
-      }
+      // الإضافة اليدوية: حفظ مباشر بدون فحص تكرار
+      const id = await createLead({
+        ...input,
+        deduplicationStatus: "no_duplicate",
+        duplicateCandidateIds: [],
+      });
       // تشغيل التحليل التلقائي في الخلفية بعد الحفظ مباشرةة
       setImmediate(async () => {
         try {
@@ -261,7 +262,7 @@ const leadsRouter = router({
 - اسم النشاط: ${input.companyName}
 - نوع النشاط: ${input.businessType}
 - المدينة: ${input.city}
-- لا يوجد موقع إلكتروني أو حسابات سوشيال مسجلة
+- لا يوجد موقع إلكتروني أو حسابات سوشيال مسجلة${input.notes ? `\n- ملاحظات خاصة (مهمة جداً): ${input.notes}` : ''}
 
 أجب بـ JSON فقط:
 {
@@ -297,7 +298,7 @@ const leadsRouter = router({
           if (hasWebsite) {
             const websitePrompt = `أنت خبير تحليل تسويق رقمي متخصص في السوق السعودي.
 قم بتحليل الموقع الإلكتروني: ${input.website}
-اسم النشاط: ${input.companyName} | نوع: ${input.businessType} | مدينة: ${input.city}
+اسم النشاط: ${input.companyName} | نوع: ${input.businessType} | مدينة: ${input.city}${input.notes ? ` | ملاحظات خاصة: ${input.notes}` : ''}
 
 أجب بـ JSON فقط:
 {
