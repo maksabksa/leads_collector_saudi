@@ -2089,3 +2089,7 @@
 
 ## مارس 2026 - إصلاح تحميل PDF
 - [x] إصلاح مشكلة عدم تحميل ملف PDF في صفحة ملف العميل (استخدام fetch + blob URL بدلاً من a.click مباشرة لتجنب popup blocking)
+
+## مارس 2026 - إصلاح crash السيرفر عند توليد PDF
+- [ ] إصلاح crash السيرفر أثناء Puppeteer: إضافة خيارات تقليل الذاكرة + timeout + error handling
+- [x] استعادة التصميم الجميل للتقرير: ربط زر PDF في LeadDetail بـ pdfReport.generateAndSave بدلاً من report.generatePDF القديم

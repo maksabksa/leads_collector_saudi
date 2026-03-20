@@ -176,24 +176,72 @@ async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses
     executablePath = await chromium.executablePath();
   }
 
+  // خيارات محسّنة لتقليل استهلاك الذاكرة ومنع crash السيرفر
+  const extraArgs = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-breakpad",
+    "--disable-client-side-phishing-detection",
+    "--disable-component-update",
+    "--disable-default-apps",
+    "--disable-domain-reliability",
+    "--disable-features=AudioServiceOutOfProcess",
+    "--disable-hang-monitor",
+    "--disable-ipc-flooding-protection",
+    "--disable-notifications",
+    "--disable-offer-store-unmasked-wallet-cards",
+    "--disable-popup-blocking",
+    "--disable-print-preview",
+    "--disable-prompt-on-repost",
+    "--disable-renderer-backgrounding",
+    "--disable-sync",
+    "--disable-translate",
+    "--metrics-recording-only",
+    "--mute-audio",
+    "--no-first-run",
+    "--safebrowsing-disable-auto-update",
+    "--single-process",
+    "--memory-pressure-off",
+    "--js-flags=--max-old-space-size=512",
+  ];
+
   const browser = await puppeteer.launch({
     executablePath,
-    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+    args: extraArgs,
     headless: true,
     defaultViewport: { width: 1200, height: 900 },
   });
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
+    // تعطيل تحميل الصور والخطوط الخارجية لتسريع التوليد
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const rt = req.resourceType();
+      if (rt === 'image' || rt === 'font' || rt === 'media') {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 45000 });
+    // انتظار قصير لضمان اكتمال الرسم
+    await new Promise(r => setTimeout(r, 500));
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: "0", right: "0", bottom: "0", left: "0" },
+      timeout: 60000,
     });
     return Buffer.from(pdfBuffer);
   } finally {
-    await browser.close();
+    await browser.close().catch(() => {});
   }
 }
 

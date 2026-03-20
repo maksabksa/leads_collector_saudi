@@ -174,6 +174,7 @@ export default function LeadDetail() {
   };
   const getReportHtml = trpc.report.getHtml.useMutation();
   const generatePDF = trpc.report.generatePDF.useMutation();
+  const generateBeautifulReport = trpc.pdfReport.generateAndSave.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
   const computeGapPercentages = trpc.report.computeGapPercentages.useMutation();
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
@@ -203,30 +204,39 @@ export default function LeadDetail() {
   const handleGeneratePDF = async () => {
     setPdfGenerating(true);
     try {
-      // استخدام السيرفر مباشرة لتوليد PDF وتحميله
-      const result = await generatePDF.mutateAsync({ leadId: id });
-      if (result.url) {
-        setPdfUrl(result.url);
-        // تحميل الملف عبر fetch لتجنب حجب المتصفح للـ popup
-        try {
-          const response = await fetch(result.url);
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          a.download = result.filename || `تقرير-${data?.lead?.companyName || id}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        } catch {
-          // fallback: فتح في نافذة جديدة
-          window.open(result.url, "_blank");
-        }
-        toast.success("تم توليد التقرير وبدأ التحميل تلقائياً");
+      // استخدام pdfReport.generateAndSave للحصول على التصميم الاحترافي الجميل
+      const result = await generateBeautifulReport.mutateAsync({ leadId: id, reportType: "client_facing" });
+      if (result.reportUrl) {
+        setPdfUrl(result.reportUrl);
+        // فتح التقرير في نافذة جديدة (HTML مع زر طباعة/حفظ PDF)
+        window.open(result.reportUrl, "_blank");
+        toast.success(`تم توليد التقرير لـ ${result.leadName} — افتح النافذة الجديدة واضغط "حفظ PDF"`);
       }
     } catch (e: any) {
-      toast.error("فشل توليد التقرير", { description: e.message });
+      // fallback: استخدام report.generatePDF القديم
+      try {
+        const result2 = await generatePDF.mutateAsync({ leadId: id });
+        if (result2.url) {
+          setPdfUrl(result2.url);
+          try {
+            const response = await fetch(result2.url);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = result2.filename || `تقرير-${data?.lead?.companyName || id}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+          } catch {
+            window.open(result2.url, "_blank");
+          }
+          toast.success("تم توليد التقرير وبدأ التحميل تلقائياً");
+        }
+      } catch (e2: any) {
+        toast.error("فشل توليد التقرير", { description: e2.message });
+      }
     } finally {
       setPdfGenerating(false);
     }
