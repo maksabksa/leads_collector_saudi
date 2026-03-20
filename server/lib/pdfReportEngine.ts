@@ -74,6 +74,78 @@ export interface PDFReportData {
     priorityActions?: string[];
     analyzedAt?: Date;
   } | null;
+  // تحليل الموقع الإلكتروني
+  websiteData?: {
+    url: string;
+    hasWebsite: boolean;
+    loadSpeedScore?: number | null;
+    mobileExperienceScore?: number | null;
+    seoScore?: number | null;
+    contentQualityScore?: number | null;
+    designScore?: number | null;
+    offerClarityScore?: number | null;
+    overallScore?: number | null;
+    hasOnlineBooking?: boolean | null;
+    hasPaymentOptions?: boolean | null;
+    hasDeliveryInfo?: boolean | null;
+    hasSeasonalPage?: boolean | null;
+    technicalGaps?: string[] | null;
+    contentGaps?: string[] | null;
+    recommendations?: string[] | null;
+    summary?: string | null;
+    analyzedAt?: Date;
+  } | null;
+  // بيانات السوشيال الحقيقية (Bright Data)
+  socialSnapshot?: {
+    instagramFollowers?: number | null;
+    instagramFollowing?: number | null;
+    instagramPostsCount?: number | null;
+    instagramVerified?: boolean | null;
+    instagramEngagementRate?: number | null;
+    instagramBio?: string | null;
+    instagramUsername?: string | null;
+    tiktokFollowers?: number | null;
+    tiktokVideoCount?: number | null;
+    tiktokHearts?: number | null;
+    tiktokEngagementRate?: number | null;
+    tiktokVerified?: boolean | null;
+    tiktokDescription?: string | null;
+    tiktokUsername?: string | null;
+    twitterFollowers?: number | null;
+    twitterTweetsCount?: number | null;
+    twitterVerified?: boolean | null;
+    twitterBlueVerified?: boolean | null;
+    twitterDescription?: string | null;
+    twitterUsername?: string | null;
+    backlinkTotal?: number | null;
+    backlinkHasGMB?: boolean | null;
+    fetchedAt?: Date;
+  } | null;
+  // تحليل السوشيال (AI analysis per platform)
+  socialAnalyses?: Array<{
+    platform: string;
+    hasAccount: boolean;
+    followersCount?: number | null;
+    engagementRate?: number | null;
+    postsCount?: number | null;
+    avgLikes?: number | null;
+    avgViews?: number | null;
+    overallScore?: number | null;
+    engagementScore?: number | null;
+    contentQualityScore?: number | null;
+    postingFrequencyScore?: number | null;
+    contentStrategyScore?: number | null;
+    digitalPresenceScore?: number | null;
+    hasSeasonalContent?: boolean | null;
+    hasPricingContent?: boolean | null;
+    hasCallToAction?: boolean | null;
+    gaps?: string[] | null;
+    recommendations?: string[] | null;
+    summary?: string | null;
+    analysisText?: string | null;
+    dataSource?: string | null;
+    profileUrl?: string | null;
+  }> | null;
 }
 
 // ===== Helpers =====
@@ -319,6 +391,13 @@ export function generateReportHTML(data: PDFReportData): string {
   const digitalScore = !!(lead.instagramUrl || lead.tiktokUrl || lead.snapchatUrl) ? Math.min(priorityScore + 2, 10) : 3;
   const seo = data.seoData || null;
   const hasSeo = !!seo;
+  const web = data.websiteData || null;
+  const hasWeb = !!web && web.hasWebsite;
+  const snap = data.socialSnapshot || null;
+  const socialArr = data.socialAnalyses || [];
+  const hasSocial = !!(snap || socialArr.length > 0);
+  // حساب عدد الصفحات الكلي
+  const totalPages = 5 + (hasWeb ? 1 : 0) + (hasSocial ? 1 : 0) + (hasSeo ? 1 : 0);
 
 
   const PAGE_STYLE = `width:210mm;min-height:297mm;padding:0;margin:0 auto;background:linear-gradient(160deg,#020810 0%,#060d1a 60%,#020810 100%);position:relative;overflow:hidden;font-family:'Tajawal','Cairo','Arial',sans-serif;direction:rtl;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;page-break-after:always;break-after:page;`;
@@ -356,9 +435,89 @@ export function generateReportHTML(data: PDFReportData): string {
   const seoLabel = seoHealthLabel[seo?.overallSeoHealth || "average"] || "متوسط";
   const backlinkQualityLabel: Record<string, string> = { weak: "ضعيف", average: "متوسط", good: "جيد", strong: "قوي" };
 
+  // ===== صفحة تحليل الموقع الحقيقي =====
+  const webScoreColor = (s: number | null | undefined) => !s ? "#64748b" : s >= 7 ? "#22c55e" : s >= 5 ? "#f59e0b" : "#ef4444";
+  const webScoreLabel = (s: number | null | undefined) => !s ? "غير محلل" : s >= 7 ? "جيد" : s >= 5 ? "متوسط" : "يحتاج تحسين";
+  const webPageNum = 6;
+  const pageWebsite = hasWeb ? `<div style="${PAGE_STYLE}">
+    ${WATERMARK_HTML}
+    ${HEADER_HTML(webPageNum, totalPages, "تحليل الموقع الإلكتروني", "السرعة · SEO · المحتوى · تجربة الجوال · الثغرات", "#0ea5e9")}
+    <div style="padding:14px 28px;position:relative;z-index:1;">
+      <div style="display:flex;gap:10px;margin-bottom:14px;">
+        <div style="flex:1;background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:9px;color:#64748b;margin-bottom:3px;">الدرجة الكلية</div>
+          <div style="font-size:28px;font-weight:900;color:${webScoreColor(web!.overallScore)};">${web!.overallScore != null ? Math.round(web!.overallScore * 10) / 10 : "—"}</div>
+          <div style="font-size:9px;color:#475569;">${webScoreLabel(web!.overallScore)}</div>
+        </div>
+        <div style="flex:2;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          ${[["⚡ السرعة", web!.loadSpeedScore],["📱 الجوال", web!.mobileExperienceScore],["🔍 SEO", web!.seoScore],["📝 المحتوى", web!.contentQualityScore],["🎨 التصميم", web!.designScore],["🎯 وضوح العرض", web!.offerClarityScore]].map(([lbl, sc]) => {
+            const s = sc as number | null | undefined;
+            const c = webScoreColor(s);
+            return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:9px;color:#94a3b8;">${lbl}</span><span style="font-size:13px;font-weight:900;color:${c};">${s != null ? Math.round(s * 10) / 10 : "—"}</span></div>`;
+          }).join("")}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        ${[["📅 صفحة موسمية", web!.hasSeasonalPage],["🛒 حجز أونلاين", web!.hasOnlineBooking],["💳 خيارات دفع", web!.hasPaymentOptions],["🚚 معلومات توصيل", web!.hasDeliveryInfo]].map(([lbl, val]) => `<div style="padding:5px 12px;border-radius:20px;font-size:9px;font-weight:700;background:${val ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.08)"};color:${val ? "#22c55e" : "#ef4444"};border:1px solid ${val ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.2)"}">${val ? "✅" : "❌"} ${lbl}</div>`).join("")}
+      </div>
+      ${web!.summary ? `<div style="margin-bottom:12px;padding:12px 14px;background:rgba(14,165,233,0.04);border:1px solid rgba(14,165,233,0.15);border-radius:12px;"><div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:4px;">📋 ملخص تحليل الموقع</div><div style="font-size:10px;color:#cbd5e1;line-height:1.7;">${web!.summary}</div></div>` : ""}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${(web!.technicalGaps?.length || 0) > 0 ? `<div style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.15);border-radius:10px;padding:10px 12px;"><div style="font-size:9px;font-weight:800;color:#ef4444;margin-bottom:6px;">🔧 ثغرات تقنية</div>${(web!.technicalGaps!).slice(0,5).map((g: string) => `<div style="font-size:9px;color:#e2e8f0;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);">⚠️ ${g}</div>`).join("")}</div>` : ""}
+        ${(web!.contentGaps?.length || 0) > 0 ? `<div style="background:rgba(249,115,22,0.04);border:1px solid rgba(249,115,22,0.15);border-radius:10px;padding:10px 12px;"><div style="font-size:9px;font-weight:800;color:#f97316;margin-bottom:6px;">📄 ثغرات المحتوى</div>${(web!.contentGaps!).slice(0,5).map((g: string) => `<div style="font-size:9px;color:#e2e8f0;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);">⚠️ ${g}</div>`).join("")}</div>` : ""}
+      </div>
+      ${(web!.recommendations?.length || 0) > 0 ? `<div style="margin-top:10px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:10px;padding:10px 12px;"><div style="font-size:9px;font-weight:800;color:#22c55e;margin-bottom:6px;">✅ توصيات الموقع</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${(web!.recommendations!).slice(0,6).map((r: string, i: number) => `<div style="font-size:9px;color:#e2e8f0;padding:2px 0;"><span style="color:#22c55e;font-weight:700;">${i+1}.</span> ${r}</div>`).join("")}</div></div>` : ""}
+    </div>
+    ${FOOTER_HTML(webPageNum, reportSerial)}
+  </div>` : "";
+
+  // ===== صفحة تحليل السوشيال الكاملة =====
+  const socialPageNum = hasWeb ? 7 : 6;
+  const getPlatformLabel = (p: string) => ({ instagram: "إنستغرام", tiktok: "تيك توك", twitter: "تويتر/X", snapchat: "سناب شات", facebook: "فيسبوك" }[p] || p);
+  const getPlatformColor = (p: string) => ({ instagram: "#e1306c", tiktok: "#69c9d0", twitter: "#1da1f2", snapchat: "#fffc00", facebook: "#1877f2" }[p] || "#94a3b8");
+  const getPlatformIcon = (p: string) => ({ instagram: "📸", tiktok: "🎵", twitter: "🐦", snapchat: "👻", facebook: "📘" }[p] || "📱");
+  const fmtNum = (n: number | null | undefined) => n == null ? "—" : n >= 1000000 ? (n/1000000).toFixed(1)+"M" : n >= 1000 ? (n/1000).toFixed(1)+"K" : n.toString();
+
+  const pageSocial = hasSocial ? `<div style="${PAGE_STYLE}">
+    ${WATERMARK_HTML}
+    ${HEADER_HTML(socialPageNum, totalPages, "تحليل السوشيال ميديا", "إنستغرام · تيك توك · تويتر · سناب شات — أرقام حقيقية وتحليل ذكي", "#e1306c")}
+    <div style="padding:14px 28px;position:relative;z-index:1;">
+      ${snap ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
+        ${snap.instagramFollowers != null ? `<div style="background:rgba(225,48,108,0.06);border:1px solid rgba(225,48,108,0.2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:9px;color:#f472b6;font-weight:700;margin-bottom:3px;">📸 إنستغرام</div><div style="font-size:22px;font-weight:900;color:#f472b6;">${fmtNum(snap.instagramFollowers)}</div><div style="font-size:8px;color:#64748b;">متابع${snap.instagramVerified ? " · ✅ موثّق" : ""}</div>${snap.instagramEngagementRate != null ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">تفاعل: ${(snap.instagramEngagementRate*100).toFixed(1)}%</div>` : ""}</div>` : ""}
+        ${snap.tiktokFollowers != null ? `<div style="background:rgba(105,201,208,0.06);border:1px solid rgba(105,201,208,0.2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:9px;color:#69c9d0;font-weight:700;margin-bottom:3px;">🎵 تيك توك</div><div style="font-size:22px;font-weight:900;color:#69c9d0;">${fmtNum(snap.tiktokFollowers)}</div><div style="font-size:8px;color:#64748b;">متابع${snap.tiktokVerified ? " · ✅ موثّق" : ""}</div>${snap.tiktokHearts != null ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">❤️ ${fmtNum(snap.tiktokHearts)} إعجاب</div>` : ""}</div>` : ""}
+        ${snap.twitterFollowers != null ? `<div style="background:rgba(29,161,242,0.06);border:1px solid rgba(29,161,242,0.2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:3px;">🐦 تويتر/X</div><div style="font-size:22px;font-weight:900;color:#7dd3fc;">${fmtNum(snap.twitterFollowers)}</div><div style="font-size:8px;color:#64748b;">متابع${snap.twitterVerified || snap.twitterBlueVerified ? " · ✅ موثّق" : ""}</div>${snap.twitterTweetsCount != null ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${fmtNum(snap.twitterTweetsCount)} تغريدة</div>` : ""}</div>` : ""}
+      </div>` : ""}
+      ${socialArr.length > 0 ? `<div style="display:flex;flex-direction:column;gap:10px;">
+        ${socialArr.slice(0,4).map(sa => {
+          const pc = getPlatformColor(sa.platform);
+          const pi = getPlatformIcon(sa.platform);
+          const pl = getPlatformLabel(sa.platform);
+          const sc = sa.overallScore;
+          const scColor = sc != null ? (sc >= 7 ? "#22c55e" : sc >= 5 ? "#f59e0b" : "#ef4444") : "#64748b";
+          return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">${pi}</span><div><div style="font-size:11px;font-weight:800;color:#f1f5f9;">${pl}</div>${sa.profileUrl ? `<div style="font-size:8px;color:#475569;">${sa.profileUrl.replace(/https?:\/\/(www\.)?/,"").slice(0,40)}</div>` : ""}</div></div>
+              ${sc != null ? `<div style="text-align:center;"><div style="font-size:20px;font-weight:900;color:${scColor};">${Math.round(sc)}</div><div style="font-size:8px;color:#64748b;">/10</div></div>` : ""}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">
+              ${[["📊 التفاعل",sa.engagementScore],["📝 المحتوى",sa.contentQualityScore],["🗓️ التكرار",sa.postingFrequencyScore],["🎯 الاستراتيجية",sa.contentStrategyScore]].map(([lbl,val]) => { const v = val as number|null|undefined; const c2 = v != null ? (v>=7?"#22c55e":v>=5?"#f59e0b":"#ef4444") : "#64748b"; return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:5px;text-align:center;"><div style="font-size:8px;color:#64748b;margin-bottom:2px;">${lbl}</div><div style="font-size:14px;font-weight:900;color:${c2};">${v != null ? Math.round(v) : "—"}</div></div>`; }).join("")}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+              ${sa.hasSeasonalContent ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ محتوى موسمي</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا محتوى موسمي</span>`}
+              ${sa.hasPricingContent ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ أسعار معروضة</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا أسعار</span>`}
+              ${sa.hasCallToAction ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ CTA واضح</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا CTA</span>`}
+            </div>
+            ${sa.summary ? `<div style="font-size:9px;color:#94a3b8;line-height:1.6;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:8px;">${sa.summary}</div>` : ""}
+            ${(sa.gaps?.length || 0) > 0 ? `<div style="margin-top:6px;font-size:8.5px;color:#fca5a5;">${(sa.gaps!).slice(0,3).map((g:string)=>`⚠️ ${g}`).join(" · ")}</div>` : ""}
+          </div>`;
+        }).join("")}
+      </div>` : ""}
+    </div>
+    ${FOOTER_HTML(socialPageNum, reportSerial)}
+  </div>` : "";
+
   const pageSEO = hasSeo ? `
   <div style="${PAGE_STYLE}">
-    ${HEADER_HTML(6, 6, "تحليل SEO المتقدم", "الكلمات المفتاحية · الروابط الخارجية · المنافسون · ترتيب البحث", "#06b6d4")}
+    ${HEADER_HTML(totalPages, totalPages, "تحليل SEO المتقدم", "الكلمات المفتاحية · الروابط الخارجية · المنافسون · ترتيب البحث", "#06b6d4")}
     <div style="padding:16px 28px;">
       <div style="display:flex;gap:12px;margin-bottom:14px;">
         <div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;">
@@ -701,6 +860,8 @@ export function generateReportHTML(data: PDFReportData): string {
   <div class="page-wrapper">${page3}</div>
   <div class="page-wrapper">${page4}</div>
   <div class="page-wrapper">${page5}</div>
+  ${hasWeb ? `<div class="page-wrapper">${pageWebsite}</div>` : ""}
+  ${hasSocial ? `<div class="page-wrapper">${pageSocial}</div>` : ""}
   ${hasSeo ? `<div class="page-wrapper">${pageSEO}</div>` : ""}
 </div>
 </body>

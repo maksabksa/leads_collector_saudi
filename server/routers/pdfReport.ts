@@ -5,7 +5,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { leads, seoAdvancedAnalysis } from "../../drizzle/schema";
+import { leads, seoAdvancedAnalysis, websiteAnalyses, socialAnalyses as socialAnalysesTable, realSocialSnapshots } from "../../drizzle/schema";
 import { eq, isNotNull, ne, or } from "drizzle-orm";
 import { generateReportHTML, type PDFReportData } from "../lib/pdfReportEngine";
 import { storagePut } from "../storage";
@@ -201,6 +201,99 @@ export const pdfReportRouter = router({
             backlinkGaps: (seoRow2.backlinkGaps as any[])?.length ? seoRow2.backlinkGaps as any : undefined,
           };
         }
+
+        // جلب تحليل الموقع الإلكتروني
+        const [websiteRow] = await db.select().from(websiteAnalyses)
+          .where(eq(websiteAnalyses.leadId, input.leadId))
+          .orderBy(websiteAnalyses.analyzedAt)
+          .limit(1);
+        if (websiteRow) {
+          reportData.websiteData = {
+            url: websiteRow.url,
+            hasWebsite: websiteRow.hasWebsite ?? false,
+            loadSpeedScore: websiteRow.loadSpeedScore,
+            mobileExperienceScore: websiteRow.mobileExperienceScore,
+            seoScore: websiteRow.seoScore,
+            contentQualityScore: websiteRow.contentQualityScore,
+            designScore: websiteRow.designScore,
+            offerClarityScore: websiteRow.offerClarityScore,
+            overallScore: websiteRow.overallScore,
+            hasOnlineBooking: websiteRow.hasOnlineBooking,
+            hasPaymentOptions: websiteRow.hasPaymentOptions,
+            hasDeliveryInfo: websiteRow.hasDeliveryInfo,
+            hasSeasonalPage: websiteRow.hasSeasonalPage,
+            technicalGaps: websiteRow.technicalGaps as string[] | null,
+            contentGaps: websiteRow.contentGaps as string[] | null,
+            recommendations: websiteRow.recommendations as string[] | null,
+            summary: websiteRow.summary,
+            analyzedAt: websiteRow.analyzedAt,
+          };
+        }
+
+        // جلب بيانات السوشيال الحقيقية (Bright Data snapshot)
+        const [socialSnap] = await db.select().from(realSocialSnapshots)
+          .where(eq(realSocialSnapshots.leadId, input.leadId))
+          .orderBy(realSocialSnapshots.fetchedAt)
+          .limit(1);
+        if (socialSnap) {
+          reportData.socialSnapshot = {
+            instagramFollowers: socialSnap.instagramFollowers,
+            instagramFollowing: socialSnap.instagramFollowing,
+            instagramPostsCount: socialSnap.instagramPostsCount,
+            instagramVerified: socialSnap.instagramVerified,
+            instagramEngagementRate: socialSnap.instagramEngagementRate,
+            instagramBio: socialSnap.instagramBio,
+            instagramUsername: socialSnap.instagramUsername,
+            tiktokFollowers: socialSnap.tiktokFollowers,
+            tiktokVideoCount: socialSnap.tiktokVideoCount,
+            tiktokHearts: socialSnap.tiktokHearts,
+            tiktokEngagementRate: socialSnap.tiktokEngagementRate,
+            tiktokVerified: socialSnap.tiktokVerified,
+            tiktokDescription: socialSnap.tiktokDescription,
+            tiktokUsername: socialSnap.tiktokUsername,
+            twitterFollowers: socialSnap.twitterFollowers,
+            twitterTweetsCount: socialSnap.twitterTweetsCount,
+            twitterVerified: socialSnap.twitterVerified,
+            twitterBlueVerified: socialSnap.twitterBlueVerified,
+            twitterDescription: socialSnap.twitterDescription,
+            twitterUsername: socialSnap.twitterUsername,
+            backlinkTotal: socialSnap.backlinkTotal,
+            backlinkHasGMB: socialSnap.backlinkHasGMB,
+            fetchedAt: socialSnap.fetchedAt,
+          };
+        }
+
+        // جلب تحليل السوشيال (AI analysis per platform)
+        const socialRows = await db.select().from(socialAnalysesTable)
+          .where(eq(socialAnalysesTable.leadId, input.leadId))
+          .orderBy(socialAnalysesTable.analyzedAt);
+        if (socialRows.length > 0) {
+          reportData.socialAnalyses = socialRows.map(r => ({
+            platform: r.platform,
+            hasAccount: r.hasAccount ?? false,
+            followersCount: r.followersCount,
+            engagementRate: r.engagementRate,
+            postsCount: r.postsCount,
+            avgLikes: r.avgLikes,
+            avgViews: r.avgViews,
+            overallScore: r.overallScore,
+            engagementScore: r.engagementScore,
+            contentQualityScore: r.contentQualityScore,
+            postingFrequencyScore: r.postingFrequencyScore,
+            contentStrategyScore: r.contentStrategyScore,
+            digitalPresenceScore: r.digitalPresenceScore,
+            hasSeasonalContent: r.hasSeasonalContent,
+            hasPricingContent: r.hasPricingContent,
+            hasCallToAction: r.hasCallToAction,
+            gaps: r.gaps as string[] | null,
+            recommendations: r.recommendations as string[] | null,
+            summary: r.summary,
+            analysisText: r.analysisText,
+            dataSource: r.dataSource,
+            profileUrl: r.profileUrl,
+          }));
+        }
+
         const html = generateReportHTML(reportData);
 
         const fileKey = `reports/lead-${lead.id}-${input.reportType}-${Date.now()}.html`;

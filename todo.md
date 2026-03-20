@@ -2093,3 +2093,17 @@
 ## مارس 2026 - إصلاح crash السيرفر عند توليد PDF
 - [ ] إصلاح crash السيرفر أثناء Puppeteer: إضافة خيارات تقليل الذاكرة + timeout + error handling
 - [x] استعادة التصميم الجميل للتقرير: ربط زر PDF في LeadDetail بـ pdfReport.generateAndSave بدلاً من report.generatePDF القديم
+
+## مارس 2026 - دمج بيانات تحليل الموقع والسوشيال في التقرير الجميل
+- [ ] تحديث PDFReportData interface لإضافة websiteAnalysis وsocialAnalyses وreviews
+- [ ] تحديث pdfReport.ts لجلب وتمرير كل البيانات المحللة
+- [ ] تحديث pdfReportEngine.ts لعرض صفحة تحليل الموقع الكاملة (PageSpeed، SEO، محتوى)
+- [ ] تحديث pdfReportEngine.ts لعرض صفحة تحليل السوشيال (إنستغرام، تيك توك، سناب، تويتر)
+- [ ] تحديث pdfReportEngine.ts لعرض تحليل التعليقات والتقييمات
+
+## مارس 2026 - دمج بيانات الموقع والسوشيال في التقرير الجميل
+- [x] تحديث PDFReportData interface: إضافة websiteData + socialSnapshot + socialAnalyses
+- [x] تحديث pdfReport.ts: جلب websiteAnalyses + realSocialSnapshots + socialAnalyses من DB
+- [x] إضافة صفحة تحليل الموقع (pageWebsite) في pdfReportEngine.ts: درجات + ثغرات + توصيات
+- [x] إضافة صفحة تحليل السوشيال (pageSocial) في pdfReportEngine.ts: أرقام حقيقية + تحليل AI
+- [x] حساب totalPages ديناميكياً حسب البيانات المتاحة
