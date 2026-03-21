@@ -8,9 +8,8 @@ import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
+import { ENV } from "../_core/env";
+import { sdk } from "../_core/sdk";
 
 export const staffAuthRouter = router({
   // تسجيل دخول الموظف بكلمة مرور
@@ -30,9 +29,14 @@ export const staffAuthRouter = router({
       const valid = await bcrypt.compare(input.password, user.passwordHash);
       if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
 
-      const token = jwt.sign({ userId: user.id, openId: user.openId }, JWT_SECRET, { expiresIn: "7d" });
+      // استخدام sdk.signSession لضمان توافق JWT مع verifySession في sdk.ts (jose + cookieSecret)
+      const sessionToken = await sdk.signSession({
+        openId: user.openId,
+        appId: ENV.appId,
+        name: user.name || user.email || "staff",
+      });
       const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+      ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
 
       return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
     }),
@@ -76,10 +80,14 @@ export const staffAuthRouter = router({
 
       await db.update(userInvitations).set({ status: "accepted" }).where(eq(userInvitations.id, invitation.id));
 
-      const token = jwt.sign({ userId, openId }, JWT_SECRET, { expiresIn: "7d" });
+      // استخدام sdk.signSession لضمان توافق JWT مع verifySession في sdk.ts (jose + cookieSecret)
+      const sessionToken = await sdk.signSession({
+        openId,
+        appId: ENV.appId,
+        name: input.name,
+      });
       const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
-
+      ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
       return { success: true };
     }),
 
