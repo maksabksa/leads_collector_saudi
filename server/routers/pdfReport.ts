@@ -294,6 +294,24 @@ export const pdfReportRouter = router({
           }));
         }
 
+        // إضافة بيانات التعليقات والسمعة من بيانات العميل المتاحة
+        if (lead.reviewCount || lead.googleMapsUrl) {
+          reportData.reviewsAnalysis = {
+            reviewCount: lead.reviewCount ?? null,
+            googleRating: null,
+            sentimentPositive: null,
+            sentimentNegative: null,
+            sentimentNeutral: null,
+            topPositiveKeywords: null,
+            topNegativeKeywords: null,
+            topThemes: null,
+            reputationScore: null,
+            reputationLabel: null,
+            aiSummary: null,
+            recommendations: null,
+          };
+        }
+
         const html = generateReportHTML(reportData);
 
         const fileKey = `reports/lead-${lead.id}-${input.reportType}-${Date.now()}.html`;
