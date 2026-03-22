@@ -56,6 +56,7 @@ export default function LeadEditPanel({ lead, onClose, onSaved }: LeadEditPanelP
     city: lead.city || "",
     district: lead.district || "",
     verifiedPhone: lead.verifiedPhone || "",
+    email: (lead as any).email || "",
     website: lead.website || "",
     googleMapsUrl: lead.googleMapsUrl || "",
     instagramUrl: lead.instagramUrl || "",
@@ -179,6 +180,7 @@ export default function LeadEditPanel({ lead, onClose, onSaved }: LeadEditPanelP
           <Section id="contact" title="بيانات التواصل" icon={<Phone className="w-4 h-4" />}>
             <div className="grid grid-cols-2 gap-3">
               <Field label="رقم الهاتف" fieldKey="verifiedPhone" placeholder="+966..." dir="ltr" />
+              <Field label="البريد الإلكتروني" fieldKey="email" placeholder="example@domain.com" dir="ltr" type="email" />
               <Field label="الموقع الإلكتروني" fieldKey="website" placeholder="https://..." dir="ltr" />
               <div className="col-span-2">
                 <Field label="رابط Google Maps" fieldKey="googleMapsUrl" placeholder="https://maps.google.com/..." dir="ltr" />

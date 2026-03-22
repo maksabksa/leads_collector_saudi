@@ -217,22 +217,30 @@ function getServiceLabel(service: string): string {
   return labels[service] || service;
 }
 
-function calcLostRevenue(analysis: PDFReportData["analysis"], lead: PDFReportData["lead"]): number {
+// ===== أثر نوعي بدلاً من أرقام مالية =====
+function getImpactOnTrust(analysis: PDFReportData["analysis"], lead: PDFReportData["lead"]): string {
   const score = analysis?.leadPriorityScore || 5;
-  const hasWebsite = !!lead.website;
-  const hasSocial = !!(lead.instagramUrl || lead.tiktokUrl || lead.snapchatUrl);
-  const hasSnap = !!lead.snapchatUrl;
-  let base = 8000;
-  if (score >= 8) base = 25000;
-  else if (score >= 6) base = 15000;
-  if (!hasWebsite) base += 5000;
-  if (!hasSocial) base += 4000;
-  if (!hasSnap) base += 3000;
-  return Math.round(base / 1000) * 1000;
+  if (!lead.website && !lead.instagramUrl && !lead.tiktokUrl) return "الحضور الرقمي الحالي لا يبني الثقة بالشكل الكافي لدعم قرار الشراء";
+  if (score < 4) return "طريقة العرض الحالية لا تساعد العميل على فهم القيمة بسرعة";
+  if (score < 6) return "الأصل الرقمي الحالي لا يعكس قوة النشاط بالشكل الكافي";
+  return "النشاط حاضر لكن ليس بالوضوح الذي يدعم قرار الشراء بالكامل";
 }
-
-function calcRevenueOpportunity(analysis: PDFReportData["analysis"], lead: PDFReportData["lead"]): number {
-  return calcLostRevenue(analysis, lead) * 4;
+function getTopImpactLabel(analysis: PDFReportData["analysis"], lead: PDFReportData["lead"]): string {
+  const score = analysis?.leadPriorityScore || 5;
+  if (!lead.website) return "يضعف الثقة ويؤخر القرار";
+  if (!lead.instagramUrl && !lead.tiktokUrl) return "يقلل الاستفادة من الطلب المتاح";
+  if (score < 4) return "يفتح مجالاً للمنافس";
+  if (score < 6) return "لا يستثمر الظهور الحالي بشكل كافٍ";
+  return "يزيد التردد ويؤخر القرار";
+}
+function getPriorityOneLabel(analysis: PDFReportData["analysis"], lead: PDFReportData["lead"]): string {
+  const hasSocial = !!(lead.instagramUrl || lead.tiktokUrl || lead.snapchatUrl);
+  const hasWebsite = !!lead.website;
+  const score = analysis?.leadPriorityScore || 5;
+  if (hasSocial && !hasWebsite) return "تطوير الأصل الرقمي الأساسي";
+  if (hasWebsite && score < 5) return "تحسين نقطة التحويل في الموقع";
+  if (!hasSocial && !hasWebsite) return "تطوير الجاهزية الرقمية الأساسية";
+  return "تحسين وضوح النشاط ودعم قرار الشراء";
 }
 
 // تصنيف الحالة العامة بدلاً من الأرقام المجردة
@@ -242,7 +250,7 @@ function getDigitalReadinessLabel(score: number): { status: string; readiness: s
   return { status: "منخفض", readiness: "أولية", priority: "عاجلة", statusColor: "#ef4444", priorityColor: "#ef4444" };
 }
 
-const FINANCIAL_DISCLAIMER = `<div style="margin-top:6px;padding:5px 10px;background:rgba(255,255,255,0.03);border-right:2px solid rgba(148,163,184,0.3);border-radius:0 6px 6px 0;"><span style="font-size:8px;color:#475569;font-style:italic;">تقدير أولي استرشادي مبني على فجوات الحضور الرقمي وسلوك الطلب المحلي وحجم الأثر المتوقع عند معالجة الثغرة. يحتاج التأكيد في التحليل المتقدم.</span></div>`;
+const IMPACT_NOTE = `<div style="margin-top:6px;padding:5px 10px;background:rgba(255,255,255,0.03);border-right:2px solid rgba(34,197,94,0.3);border-radius:0 6px 6px 0;"><span style="font-size:8px;color:#475569;font-style:italic;">هذا التحليل تشخيص أولي لفرص التحسين. التفاصيل والخطة التنفيذية تُحدد في جلسة التحليل المتقدم.</span></div>`;
 
 function getCurrentSeason(): { name: string; emoji: string; color: string; urgency: string; tip: string } {
   const now = new Date();
@@ -447,7 +455,7 @@ function buildRecommendations(analysis: PDFReportData["analysis"]): string {
           <span style="font-size:9px;font-weight:700;color:${c.badge};padding:2px 7px;background:${c.bg};border:1px solid ${c.border};border-radius:10px;">${c.text}</span>
         </div>
         <div style="font-size:10px;color:#94a3b8;line-height:1.6;">${s.reason || ""}</div>
-        ${s.expectedImpact ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic;">التأثير المتوقع: ${s.expectedImpact}</div>` : ""}
+        ${s.expectedImpact ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic;">الأثر المتوقع على النشاط: ${s.expectedImpact}</div>` : ""}
       </div>
     </div>`;
   }).join("");
@@ -460,8 +468,9 @@ export function generateReportHTML(data: PDFReportData): string {
   const dateStr = generatedAt.toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
   const sectorLabel = getSectorLabel(analysis?.sectorMain);
   const priorityScore = analysis?.leadPriorityScore || 0;
-  const lostRevenue = calcLostRevenue(analysis, lead);
-  const revenueOpp = calcRevenueOpportunity(analysis, lead);
+  const impactOnTrust = getImpactOnTrust(analysis, lead);
+  const topImpactLabel = getTopImpactLabel(analysis, lead);
+  const priorityOneLabel = getPriorityOneLabel(analysis, lead);
   const season = data.seasonOverride || getCurrentSeason();
   const reportSerial = `RPT-${lead.id.toString().padStart(4, "0")}-${generatedAt.getFullYear()}`;
   const radarChart = buildRadarChart(analysis, lead);
@@ -711,17 +720,13 @@ export function generateReportHTML(data: PDFReportData): string {
         ].map(p => `<div style="padding:4px 11px;border-radius:20px;font-size:10px;font-weight:600;background:${p.active ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.06)"};border:1px solid ${p.active ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.2)"};color:${p.active ? "#22c55e" : "#ef4444"};">${p.icon} ${p.label} ${p.active ? "✓" : "✗"}</div>`).join("")}
       </div>
     </div>
-    <div style="margin:0 36px 14px;padding:12px 18px;background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(249,115,22,0.07));border:1px solid rgba(239,68,68,0.3);border-radius:14px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:24px;">⚠️</div>
-        <div>
-          <div style="font-size:11px;color:#fca5a5;font-weight:900;margin-bottom:2px;">تنبيه: إيراد ضائع يمكن استعادته</div>
-          <div style="font-size:9px;color:#94a3b8;line-height:1.6;">بناءً على تحليل الحضور الرقمي والفجوات التسويقية، هناك فرص إيرادية غير مستغلة تحتاج معالجة فورية</div>
-        </div>
-      </div>
-      <div style="text-align:center;padding:9px 16px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);border-radius:12px;flex-shrink:0;">
-        <div style="font-size:20px;font-weight:900;color:#ef4444;">${lostRevenue.toLocaleString("ar-SA")}+</div>
-        <div style="font-size:8px;color:#64748b;margin-top:2px;">ريال/شهر</div>
+    <div style="margin:0 36px 14px;padding:14px 18px;background:linear-gradient(135deg,rgba(34,197,94,0.07),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.25);border-radius:14px;position:relative;z-index:1;">
+      <div style="font-size:9px;color:#86efac;font-weight:700;letter-spacing:1px;margin-bottom:6px;">🎯 أبرز فرصة تحسين</div>
+      <div style="font-size:12px;font-weight:800;color:#f1f5f9;margin-bottom:6px;">${priorityOneLabel}</div>
+      <div style="font-size:9px;color:#94a3b8;line-height:1.7;">${impactOnTrust}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+        <div style="padding:3px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:20px;font-size:8px;color:#fca5a5;">⚡ ${topImpactLabel}</div>
+        <div style="padding:3px 10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:20px;font-size:8px;color:#86efac;">الأولوية الآن: ${priorityOneLabel}</div>
       </div>
     </div>
     ${FOOTER_HTML(1, reportSerial)}
@@ -743,33 +748,41 @@ export function generateReportHTML(data: PDFReportData): string {
         <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:14px;padding:14px;text-align:center;">
           <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;letter-spacing:1px;">جاهزية رقمية</div>
           <div style="font-size:22px;font-weight:900;color:#ef4444;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).readiness}</div>
-          <div style="font-size:9px;color:#475569;">فجوة: ${10 - (priorityScore || 5)} نقطة</div>
-          <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;"><div style="height:100%;width:${(10 - (priorityScore || 5)) * 10}%;background:#ef4444;border-radius:2px;"></div></div>
+          <div style="font-size:9px;color:#475569;">${getDigitalReadinessLabel(priorityScore).readiness === 'أولية' ? 'تحتاج تطوير أساسي' : getDigitalReadinessLabel(priorityScore).readiness === 'متوسطة' ? 'مجال واسع للتحسين' : 'حضور جيد قابل للتعزيز'}</div>
         </div>
         <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:14px;text-align:center;">
           <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;letter-spacing:1px;">أولوية التحسين</div>
           <div style="font-size:22px;font-weight:900;color:#22c55e;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).priority}</div>
-          <div style="font-size:9px;color:#475569;">فرصة: ${(revenueOpp / 1000).toFixed(0)}K+ ريال</div>
+          <div style="font-size:9px;color:#475569;">فرص قابلة للتحسين</div>
           <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;"><div style="height:100%;width:85%;background:#22c55e;border-radius:2px;"></div></div>
         </div>
       </div>
       <div style="margin-bottom:16px;padding:18px 22px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.2);border-radius:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
-                   <div style="font-size:10px;color:#86efac;font-weight:800;margin-bottom:5px;letter-spacing:1px;">💰 الفرصة المالية المقدّرة (استرشادي)</div>           <div style="font-size:38px;font-weight:900;color:#22c55e;line-height:1;text-shadow:0 0 30px rgba(34,197,94,0.3);">${revenueOpp.toLocaleString("ar-SA")}</div>
-            <div style="font-size:10px;color:#475569;margin-top:3px;">ريال سعودي / شهرياً — بعد تطبيق التوصيات</div>
+        <div style="font-size:10px;color:#86efac;font-weight:800;margin-bottom:10px;letter-spacing:1px;">🎯 أثر التحسين المتوقع على النشاط</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="padding:10px 12px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:10px;">
+            <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:4px;">✅ رفع مستوى الثقة</div>
+            <div style="font-size:8.5px;color:#94a3b8;line-height:1.6;">تحسين الأصل الرقمي يعزز الانطباع الأول ويدعم قرار العميل</div>
           </div>
-          <div style="text-align:center;padding:14px 18px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:12px;flex-shrink:0;">
-            <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:5px;">العائد المتوقع</div>
-            <div style="font-size:26px;font-weight:900;color:#22c55e;">4X</div>
-            <div style="font-size:9px;color:#475569;margin-top:2px;">على الاستثمار التسويقي</div>
+          <div style="padding:10px 12px;background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:10px;">
+            <div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:4px;">✅ تحسين وضوح النشاط</div>
+            <div style="font-size:8.5px;color:#94a3b8;line-height:1.6;">عرض القيمة بشكل أوضح يقلل التردد ويسرّع القرار</div>
+          </div>
+          <div style="padding:10px 12px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);border-radius:10px;">
+            <div style="font-size:9px;color:#c4b5fd;font-weight:700;margin-bottom:4px;">✅ رفع جودة التحويل</div>
+            <div style="font-size:8.5px;color:#94a3b8;line-height:1.6;">استثمار الظهور الحالي بشكل أفضل يحوّل الزوار لعملاء</div>
+          </div>
+          <div style="padding:10px 12px;background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.2);border-radius:10px;">
+            <div style="font-size:9px;color:#fdba74;font-weight:700;margin-bottom:4px;">✅ تعزيز التميز التنافسي</div>
+            <div style="font-size:8.5px;color:#94a3b8;line-height:1.6;">حضور رقمي أقوى يقلل مجال المنافس ويرفع الظهور</div>
           </div>
         </div>
-        <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(34,197,94,0.1);">
-          <div style="font-size:9px;color:#475569;line-height:1.7;">⚡ هذا التقدير مبني على: تحليل الحضور الرقمي الحالي، مقارنة بمعيار السوق في ${sectorLabel || lead.businessType}، وتقدير الفجوات التسويقية القابلة للمعالجة خلال 90 يوماً.</div>
+        <div style="padding-top:10px;border-top:1px solid rgba(34,197,94,0.1);">
+          <div style="font-size:9px;color:#475569;line-height:1.7;">⚡ الأولوية الآن: <span style="color:#86efac;font-weight:700;">${priorityOneLabel}</span> — هذه هي الخطوة الأكثر تأثيراً في المرحلة الحالية.</div>
         </div>
       </div>
       ${analysis?.marketingGapSummary ? `<div style="margin-bottom:12px;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#7dd3fc;margin-bottom:7px;">🔍 ملخص الفجوة التسويقية</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.marketingGapSummary}</div></div>` : ""}
-      ${analysis?.primaryOpportunity ? `<div style="margin-bottom:12px;padding:14px 18px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:7px;">🎯 نقطة التأثير الأعلى</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.primaryOpportunity}</div>${FINANCIAL_DISCLAIMER}</div>` : ""}
+      ${analysis?.primaryOpportunity ? `<div style="margin-bottom:12px;padding:14px 18px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:7px;">🎯 أبرز فرصة غير مستثمرة</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.primaryOpportunity}</div>${IMPACT_NOTE}</div>` : ""}
       ${analysis?.competitivePosition ? `<div style="padding:14px 18px;background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#c4b5fd;margin-bottom:7px;">🏆 الموقع التنافسي</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.competitivePosition}</div></div>` : ""}
     </div>
     ${FOOTER_HTML(2, reportSerial)}
@@ -810,7 +823,7 @@ export function generateReportHTML(data: PDFReportData): string {
           }).join("")}
         </div>
         ${web?.summary ? `<div style="margin-top:8px;padding:7px 10px;background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.15);border-radius:8px;font-size:9px;color:#7dd3fc;line-height:1.6;">${web.summary}</div>` : ""}
-        ${!lead.website ? `<div style="margin-top:8px;padding:7px 10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;font-size:9px;color:#fca5a5;">⚠️ لا يوجد موقع إلكتروني — هذا يعني خسارة مباشرة في العملاء الذين يبحثون على جوجل</div>` : ""}
+        ${!lead.website ? `<div style="margin-top:8px;padding:7px 10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;font-size:9px;color:#fde68a;">💡 غياب الموقع يجعل العملاء الباحثين على جوجل لا يجدون نقطة تحويل واضحة — فرصة تحسين ذات أثر مباشر على الثقة</div>` : ""}
       </div>
       ${analysis?.sectorInsights || analysis?.benchmarkComparison ? `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px 14px;"><div style="font-size:10px;font-weight:800;color:#94a3b8;margin-bottom:7px;">💡 رؤى قطاعية ومقارنة بالسوق</div>${analysis?.sectorInsights ? `<div style="font-size:9px;color:#64748b;line-height:1.7;margin-bottom:5px;">${analysis.sectorInsights}</div>` : ""}${analysis?.benchmarkComparison ? `<div style="font-size:9px;color:#64748b;line-height:1.7;">${analysis.benchmarkComparison}</div>` : ""}</div>` : ""}
     </div>
