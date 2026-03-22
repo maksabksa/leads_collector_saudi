@@ -71,6 +71,14 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
+    // تجاهل خطأ HTML response (يحدث عند server restart أثناء التطوير)
+    if (error instanceof TRPCClientError) {
+      const isHtmlResponse = error.message?.includes('<!doctype') || error.message?.includes('<html') || error.message?.includes('not valid JSON');
+      if (isHtmlResponse) {
+        console.warn('[API] السيرفر يُعيد التشغيل - جاري إعادة المحاولة...');
+        return;
+      }
+    }
     console.error("[API Mutation Error]", error);
   }
 });
