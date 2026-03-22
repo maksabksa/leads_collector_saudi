@@ -2057,8 +2057,8 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   activePages.push({ key: 'p2', html: p2 }); // الملخص التنفيذي دائماً
   if (hasDigitalData) activePages.push({ key: 'p3', html: p3 }); // التحليل الرقمي فقط إذا كانت هناك بيانات
   if (hasBrandData && p_brand) activePages.push({ key: 'p_brand', html: p_brand }); // الهوية البصرية فقط إذا كانت هناك بيانات
+  if (hasCompetitors) activePages.push({ key: 'p5', html: p5 }); // المنافسون قبل التوصيات
   activePages.push({ key: 'p4', html: p4 }); // التوصيات دائماً
-  if (hasCompetitors) activePages.push({ key: 'p5', html: p5 }); // المنافسون فقط إذا كانوا موجودين
   activePages.push({ key: 'pSign', html: pSign }); // صفحة التوقيع الرقمي دائماً في الآخر
 
   const totalPages = activePages.length;
