@@ -646,6 +646,166 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
     dataUrl ? `<img src="${dataUrl}" width="${size}" height="${size}" style="border-radius:6px;display:block;" />` : "";
 
   // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE 0 — MAKSAB WELCOME PAGE (صفحة استقبال مكسب)
+  // ═══════════════════════════════════════════════════════════════════════
+  const p0 = page(`
+    <!-- خلفية زخرفية متدرجة -->
+    <div style="position:absolute;top:0;left:0;right:0;bottom:0;
+      background:linear-gradient(160deg,#020810 0%,#040d1e 40%,#061428 70%,#020810 100%);
+      pointer-events:none;"></div>
+
+    <!-- دوائر ضوئية زخرفية -->
+    <div style="position:absolute;top:-120px;right:-120px;width:500px;height:500px;border-radius:50%;
+      background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 65%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-100px;left:-100px;width:450px;height:450px;border-radius:50%;
+      background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 65%);pointer-events:none;"></div>
+    <div style="position:absolute;top:40%;right:30%;width:300px;height:300px;border-radius:50%;
+      background:radial-gradient(circle,rgba(167,139,250,0.03) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <!-- شريط علوي فاخر -->
+    <div style="padding:16px 40px;display:flex;align-items:center;justify-content:space-between;
+      background:rgba(0,0,0,0.25);border-bottom:1px solid rgba(34,197,94,0.15);">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e;"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#0ea5e9;box-shadow:0 0 8px #0ea5e9;"></div>
+        <div style="width:4px;height:4px;border-radius:50%;background:#a78bfa;box-shadow:0 0 6px #a78bfa;"></div>
+      </div>
+      <div style="font-size:9px;color:#334155;letter-spacing:2px;font-weight:600;">MAKSAB · وكالة تسويق رقمي · المملكة العربية السعودية</div>
+      <div style="font-size:9px;color:#334155;">${reportDate}</div>
+    </div>
+
+    <!-- قسم الشعار والهوية الرئيسية -->
+    <div style="padding:40px 40px 28px;text-align:center;position:relative;">
+      <!-- شعار مكسب -->
+      <div style="margin-bottom:24px;display:flex;justify-content:center;">
+        ${coLogo
+          ? `<div style="padding:16px 24px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:20px;display:inline-block;">
+               <img src="${coLogo}" style="height:70px;width:auto;max-width:220px;" alt="${coName}">
+             </div>`
+          : `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:8px;">
+               <div style="width:90px;height:90px;border-radius:24px;
+                 background:linear-gradient(135deg,#16a34a 0%,#22c55e 50%,#0ea5e9 100%);
+                 display:flex;align-items:center;justify-content:center;
+                 font-size:42px;font-weight:900;color:white;
+                 box-shadow:0 0 40px rgba(34,197,94,0.4),0 0 80px rgba(34,197,94,0.15);
+                 border:2px solid rgba(34,197,94,0.3);">م</div>
+             </div>`
+        }
+      </div>
+
+      <!-- اسم الشركة -->
+      <div style="font-size:52px;font-weight:900;color:#f8fafc;letter-spacing:2px;margin-bottom:6px;
+        text-shadow:0 0 60px rgba(34,197,94,0.2),0 0 120px rgba(34,197,94,0.08);">${coName}</div>
+      <div style="font-size:14px;color:#22c55e;font-weight:700;letter-spacing:3px;margin-bottom:6px;">وكالة التسويق الرقمي المتخصصة</div>
+      <div style="font-size:11px;color:#475569;letter-spacing:1px;">المملكة العربية السعودية · خبرة أكثر من 5 سنوات في السوق السعودي</div>
+
+      <!-- خط فاصل مضيء -->
+      <div style="margin:20px auto;width:200px;height:2px;
+        background:linear-gradient(90deg,transparent,#22c55e,#0ea5e9,transparent);
+        border-radius:2px;box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
+    </div>
+
+    <!-- قسم الشرح والخدمات -->
+    <div style="padding:0 40px 24px;">
+      <!-- عنوان القسم -->
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 20px;
+          background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:20px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></div>
+          <span style="font-size:11px;color:#22c55e;font-weight:800;letter-spacing:1px;">من نحن وماذا نقدم</span>
+        </div>
+      </div>
+
+      <!-- بطاقة الوصف الرئيسي -->
+      <div style="margin-bottom:18px;padding:20px 24px;
+        background:linear-gradient(135deg,rgba(34,197,94,0.05) 0%,rgba(14,165,233,0.04) 100%);
+        border:1px solid rgba(34,197,94,0.15);border-radius:16px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-20px;left:-20px;width:120px;height:120px;border-radius:50%;
+          background:radial-gradient(circle,rgba(34,197,94,0.06) 0%,transparent 70%);pointer-events:none;"></div>
+        <div style="font-size:13px;color:#cbd5e1;line-height:2;text-align:center;position:relative;z-index:1;">
+          <strong style="color:#f1f5f9;font-size:15px;">مكسب</strong> هي وكالة تسويق رقمي سعودية متخصصة في مساعدة الأنشطة التجارية على
+          <strong style="color:#22c55e;"> بناء حضور رقمي قوي</strong>، تحقيق نمو مستدام، وتحويل الزوار إلى عملاء حقيقيين.
+          نعمل مع أصحاب الأعمال في جميع مناطق المملكة لتقديم حلول تسويقية مخصصة ومبنية على بيانات حقيقية.
+        </div>
+      </div>
+
+      <!-- شبكة الخدمات -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">
+        ${[
+          { icon: '📱', title: 'إدارة السوشيال ميديا', desc: 'محتوى إبداعي يومي على إنستغرام، تيك توك، سناب شات وتويتر', color: '#e1306c' },
+          { icon: '🌐', title: 'تصميم المواقع', desc: 'مواقع احترافية سريعة ومتجاوبة مع جميع الأجهزة', color: '#0ea5e9' },
+          { icon: '🎯', title: 'الإعلانات المدفوعة', desc: 'حملات جوجل وميتا وسناب شات بعائد استثمار مضمون', color: '#f97316' },
+          { icon: '🔍', title: 'تحسين محركات البحث', desc: 'تصدر نتائج جوجل وزيادة الزيارات العضوية المجانية', color: '#22c55e' },
+          { icon: '🤖', title: 'تحليل بالذكاء الاصطناعي', desc: 'تقارير تحليلية عميقة مبنية على بيانات حقيقية من السوق', color: '#a78bfa' },
+          { icon: '📊', title: 'استراتيجية التسويق', desc: 'خطط تسويقية مخصصة لكل نشاط وكل مدينة في السعودية', color: '#eab308' },
+        ].map(s => `
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+          border-radius:12px;padding:12px 14px;border-top:2px solid ${s.color}22;
+          transition:all 0.2s;">
+          <div style="font-size:20px;margin-bottom:6px;">${s.icon}</div>
+          <div style="font-size:10.5px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">${s.title}</div>
+          <div style="font-size:9px;color:#475569;line-height:1.6;">${s.desc}</div>
+        </div>`).join('')}
+      </div>
+
+      <!-- أرقام الإنجاز -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+        ${[
+          { num: '+500', label: 'عميل راضٍ', color: '#22c55e' },
+          { num: '+5', label: 'سنوات خبرة', color: '#0ea5e9' },
+          { num: '+20', label: 'مدينة سعودية', color: '#a78bfa' },
+          { num: '24/7', label: 'دعم متواصل', color: '#eab308' },
+        ].map(n => `
+        <div style="text-align:center;padding:14px 8px;
+          background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+          border-radius:12px;">
+          <div style="font-size:26px;font-weight:900;color:${n.color};
+            text-shadow:0 0 20px ${n.color}66;line-height:1;margin-bottom:4px;">${n.num}</div>
+          <div style="font-size:9px;color:#64748b;font-weight:600;">${n.label}</div>
+        </div>`).join('')}
+      </div>
+
+      <!-- رسالة الترحيب بالعميل -->
+      <div style="padding:20px 24px;
+        background:linear-gradient(135deg,rgba(14,165,233,0.06) 0%,rgba(167,139,250,0.04) 100%);
+        border:1px solid rgba(14,165,233,0.2);border-radius:16px;
+        position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-30px;right:-30px;width:150px;height:150px;border-radius:50%;
+          background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+        <div style="display:flex;align-items:flex-start;gap:14px;position:relative;z-index:1;">
+          <div style="font-size:32px;flex-shrink:0;">🤝</div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:#7dd3fc;margin-bottom:8px;">أهلاً وسهلاً بك في مكسب</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.9;">
+              يسعدنا تقديم هذا التقرير التحليلي المخصص لـ
+              <strong style="color:#f1f5f9;">${lead.companyName || 'نشاطك التجاري'}</strong>.
+              لقد أجرينا تحليلاً شاملاً لحضورك الرقمي وقارنّاه بالسوق والمنافسين،
+              وأعددنا لك خارطة طريق واضحة لتحقيق نمو ملموس.
+              <strong style="color:#22c55e;">هذا التقرير هو بداية شراكة نجاح حقيقية.</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- فوتر الصفحة -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
+      background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:#334155;">© ${new Date().getFullYear()} ${coName} — جميع الحقوق محفوظة</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        ${waPhone ? `<span style="font-size:9px;color:#334155;">📱 ${waPhone}</span>` : ''}
+        ${coWebsite ? `<span style="font-size:9px;color:#334155;">· 🌐 ${coWebsite}</span>` : ''}
+      </div>
+    </div>
+
+    <!-- علامة مائية -->
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
+      font-size:64px;font-weight:900;color:rgba(34,197,94,0.018);white-space:nowrap;
+      pointer-events:none;z-index:0;letter-spacing:6px;">مكسب للتسويق الرقمي</div>
+  `);
+
+  // ═══════════════════════════════════════════════════════════════════════
   //  PAGE 1 — EXECUTIVE COVER (DARK)
   // ═══════════════════════════════════════════════════════════════════════
   const p1 = page(`
@@ -2053,6 +2213,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
 
   // بناء قائمة الصفحات الديناميكية
   const activePages: Array<{ key: string; html: string }> = [];
+  activePages.push({ key: 'p0', html: p0 }); // صفحة استقبال مكسب دائماً
   activePages.push({ key: 'p1', html: p1 }); // الغلاف دائماً
   activePages.push({ key: 'p2', html: p2 }); // الملخص التنفيذي دائماً
   if (hasDigitalData) activePages.push({ key: 'p3', html: p3 }); // التحليل الرقمي فقط إذا كانت هناك بيانات
