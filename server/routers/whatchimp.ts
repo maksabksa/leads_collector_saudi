@@ -146,9 +146,79 @@ type LeadForWhatchimp = {
   notes?: string | null;
   crNumber?: string | null;
   socialSince?: string | null;
-};
+  revenueOpportunity?: string | null;
+  analysisStatus?: string | null;
+};// ─── Build professional lead brief for Whatchimp note ──────────────────────────────────────
+function buildLeadBrief(lead: LeadForWhatchimp): string {
+  const lines: string[] = [];
 
-// ─── Build custom fields object for Whatchimp ─────────────────────────────────
+  // ─── هوية النشاط
+  lines.push(`🏢 بريف عميل | نظام مكسب`);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`📌 اسم النشاط: ${lead.companyName}`);
+  if (lead.businessType) lines.push(`💼 نوع النشاط: ${lead.businessType}`);
+  const loc = [lead.city, lead.district].filter(Boolean).join(", ");
+  if (loc) lines.push(`📍 الموقع: ${loc}`);
+  if (lead.crNumber) lines.push(`📄 سجل تجاري: ${lead.crNumber}`);
+
+  // ─── الحضور الرقمي
+  const digitalPresence: string[] = [];
+  if (lead.website) digitalPresence.push(`موقع: ${lead.website}`);
+  if (lead.instagramUrl) digitalPresence.push(`إنستغرام`);
+  if (lead.tiktokUrl) digitalPresence.push(`تيك توك`);
+  if (lead.snapchatUrl) digitalPresence.push(`سناب`);
+  if (lead.twitterUrl) digitalPresence.push(`تويتر`);
+  if (lead.facebookUrl) digitalPresence.push(`فيسبوك`);
+  if (lead.googleMapsUrl) digitalPresence.push(`خرائط جوجل`);
+  if (digitalPresence.length) {
+    lines.push(``);
+    lines.push(`🌐 الحضور الرقمي:`);
+    lines.push(digitalPresence.join(" · "));
+  } else {
+    lines.push(``);
+    lines.push(`⚠️ لا يوجد حضور رقمي مسجّل`);
+  }
+  if (lead.reviewCount && lead.reviewCount > 0) {
+    lines.push(`⭐ عدد التقييمات: ${lead.reviewCount}`);
+  }
+  if (lead.socialSince) lines.push(`📅 ظهور على السوشيال منذ: ${lead.socialSince}`);
+
+  // ─── نتائج التحليل
+  const hasAnalysis = lead.biggestMarketingGap || lead.revenueOpportunity || lead.suggestedSalesEntryAngle;
+  if (hasAnalysis) {
+    lines.push(``);
+    lines.push(`🔍 نتائج التحليل:`);
+    if (lead.biggestMarketingGap) lines.push(`⚡ أكبر ثغرة: ${lead.biggestMarketingGap}`);
+    if (lead.revenueOpportunity) lines.push(`💰 فرصة الإيراد: ${lead.revenueOpportunity}`);
+    if (lead.suggestedSalesEntryAngle) lines.push(`🎯 زاوية الدخول: ${lead.suggestedSalesEntryAngle}`);
+  } else {
+    lines.push(``);
+    lines.push(`⏳ جاري التحليل التلقائي...`);
+  }
+
+  // ─── درجة الأولوية
+  if (lead.leadPriorityScore != null) {
+    const score = lead.leadPriorityScore;
+    const stars = score >= 80 ? "⭐⭐⭐" : score >= 60 ? "⭐⭐" : "⭐";
+    lines.push(``);
+    lines.push(`📊 درجة الأولوية: ${score}/100 ${stars}`);
+  }
+
+  // ─── ملاحظات
+  if (lead.notes) {
+    lines.push(``);
+    lines.push(`📝 ملاحظات: ${lead.notes}`);
+  }
+
+  lines.push(``);
+  lines.push(`――――――――――――――――――――`);
+  lines.push(`📱 مصدر: نظام مكسب لجمع بيانات العملاء`);
+  lines.push(`🔗 maksab-sales.xyz`);
+
+  return lines.join("\n");
+}
+
+// ─── Build custom fields object for Whatchimp ────────────────────────────────────────────────────
 function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
   const fields: Record<string, string> = {};
 
@@ -206,6 +276,9 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
 
   // ملاحظات
   if (lead.notes) fields["ملاحظات"] = lead.notes;
+
+  // فرصة الإيراد
+  if ((lead as any).revenueOpportunity) fields["فرصة الإيراد"] = (lead as any).revenueOpportunity;
 
   // مصدر البيانات
   fields["مصدر البيانات"] = "نظام مكسب - مجمع البيانات";
@@ -281,7 +354,7 @@ async function sendLeadToWhatchimp(
         apiToken: settings.apiToken,
         phone_number_id: settings.phoneNumberId,
         phone_number: phone,
-        note_text: `مصدر: نظام مكسب للعملاء | اسم النشاط: ${lead.companyName}`,
+        note_text: buildLeadBrief(lead),
       });
     } catch { /* non-fatal */ }
 
