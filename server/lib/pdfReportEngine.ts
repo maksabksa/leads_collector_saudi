@@ -500,12 +500,14 @@ export function generateReportHTML(data: PDFReportData): string {
   const seoPageNum = hasSeo ? ++_pageCounter : 0;
   const reviewsPageNum = hasReviews ? ++_pageCounter : 0;
   const deepAnalysisPageNum = ++_pageCounter; // التحليل العميق بعد كل التفاصيل
+  const hasCompetitors = !!(seo?.competitors && seo.competitors.length > 0);
+  const competitorsPageNum = hasCompetitors ? ++_pageCounter : 0; // صفحة مقارنة المنافسين
   const recommendationsPageNum = ++_pageCounter;
   const closingPageNum = ++_pageCounter;
   const totalPages = _pageCounter;
 
 
-  const PAGE_STYLE = `width:210mm;min-height:297mm;padding:0;margin:0 auto;background:linear-gradient(160deg,#020810 0%,#060d1a 60%,#020810 100%);position:relative;overflow:hidden;font-family:'Tajawal','Cairo','Arial',sans-serif;direction:rtl;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;page-break-after:always;break-after:page;`;
+  const PAGE_STYLE = `width:210mm;height:297mm;padding:0;margin:0 auto;background:linear-gradient(160deg,#020810 0%,#060d1a 60%,#020810 100%);position:relative;overflow:hidden;font-family:'Tajawal','Cairo','Arial',sans-serif;direction:rtl;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;page-break-after:always;break-after:page;display:flex;flex-direction:column;`;
 
   const HEADER_HTML = (pageNum: number, totalPages: number, title: string, subtitle: string, accentColor = "#22c55e") => `
   <div style="padding:12px 36px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.25);">
@@ -1030,12 +1032,86 @@ export function generateReportHTML(data: PDFReportData): string {
     ${FOOTER_HTML(deepAnalysisPageNum, reportSerial)}
   </div>`;
 
+  // ===== PAGE COMPETITORS: مقارنة المنافسين =====
+  const pageCompetitors = hasCompetitors ? (() => {
+    const comps = seo!.competitors!;
+    const clientSeoScore = seo?.localSeoScore ?? (seo?.overallSeoHealth === "good" ? 7 : seo?.overallSeoHealth === "excellent" ? 9 : seo?.overallSeoHealth === "average" ? 5 : 3);
+    const maxScore = Math.max(clientSeoScore, ...comps.map(c => c.seoScore));
+    const allEntities = [
+      { name: lead.companyName, url: lead.website || "", seoScore: clientSeoScore, strengths: (seo?.competitiveAdvantages || [analysis?.primaryOpportunity || ""].filter(Boolean)) as string[], isClient: true },
+      ...comps.slice(0, 4).map(c => ({ ...c, isClient: false }))
+    ];
+    return `<div style="${PAGE_STYLE}">
+    <div style="position:absolute;top:-80px;left:-60px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(239,68,68,0.06) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-60px;right:-40px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+    ${WATERMARK_HTML}
+    ${HEADER_HTML(competitorsPageNum, totalPages, "مقارنة المنافسين", "تحليل تنافسي شامل · نقاط القوة والضعف · فرص التفوق", "#ef4444")}
+    <div style="padding:14px 36px;position:relative;z-index:1;flex:1;overflow:hidden;">
+
+      <!-- مؤشر المقارنة السريعة -->
+      <div style="display:grid;grid-template-columns:repeat(${Math.min(allEntities.length, 5)},1fr);gap:8px;margin-bottom:14px;">
+        ${allEntities.map((e, i) => {
+          const scoreColor = e.seoScore >= 7 ? "#22c55e" : e.seoScore >= 5 ? "#f59e0b" : "#ef4444";
+          const scoreWidth = Math.round((e.seoScore / 10) * 100);
+          const rankEmoji = e.isClient ? "⭐" : i === 1 ? "🥇" : i === 2 ? "🥈" : i === 3 ? "🥉" : "🔵";
+          return `<div style="background:${e.isClient ? "linear-gradient(135deg,rgba(34,197,94,0.08),rgba(6,182,212,0.05))" : "rgba(255,255,255,0.02)"};border:1.5px solid ${e.isClient ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.07)"};border-radius:12px;padding:10px;text-align:center;">
+            <div style="font-size:18px;margin-bottom:4px;">${rankEmoji}</div>
+            <div style="font-size:9px;font-weight:800;color:${e.isClient ? "#86efac" : "#f1f5f9"};margin-bottom:2px;line-height:1.3;">${e.name.slice(0, 18)}${e.name.length > 18 ? "..." : ""}</div>
+            ${e.url ? `<div style="font-size:7px;color:#334155;margin-bottom:6px;">${e.url.replace(/https?:\/\/(www\.)?/, "").slice(0, 22)}</div>` : `<div style="margin-bottom:6px;"></div>`}
+            <div style="font-size:24px;font-weight:900;color:${scoreColor};">${e.seoScore}</div>
+            <div style="font-size:7px;color:#475569;margin-bottom:6px;">SEO /10</div>
+            <div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;"><div style="height:100%;width:${scoreWidth}%;background:linear-gradient(90deg,${scoreColor},${scoreColor}99);border-radius:3px;"></div></div>
+          </div>`;
+        }).join("")}
+      </div>
+
+      <!-- جدول المقارنة التفصيلي -->
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;overflow:hidden;margin-bottom:12px;">
+        <div style="padding:8px 14px;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.06);display:grid;grid-template-columns:120px repeat(${Math.min(allEntities.length, 5)},1fr);gap:6px;">
+          <div style="font-size:8px;color:#475569;font-weight:700;">معيار المقارنة</div>
+          ${allEntities.map(e => `<div style="font-size:8px;font-weight:800;color:${e.isClient ? "#86efac" : "#94a3b8"};text-align:center;">${e.name.slice(0, 12)}${e.name.length > 12 ? "..." : ""}</div>`).join("")}
+        </div>
+        ${[
+          { label: "📊 درجة SEO", getValue: (e: typeof allEntities[0]) => { const c = e.seoScore >= 7 ? "#22c55e" : e.seoScore >= 5 ? "#f59e0b" : "#ef4444"; return `<span style="color:${c};font-weight:900;">${e.seoScore}/10</span>`; } },
+          { label: "🌐 الموقع الإلكتروني", getValue: (e: typeof allEntities[0]) => e.url ? `<span style="color:#22c55e;">✓</span>` : `<span style="color:#ef4444;">✗</span>` },
+          { label: "🔗 عدد الروابط", getValue: (e: typeof allEntities[0]) => e.isClient ? `<span style="color:#a78bfa;">${seo?.estimatedBacklinks ?? "؟"}</span>` : `<span style="color:#64748b;">غير محدد</span>` },
+          { label: "📈 نقاط القوة", getValue: (e: typeof allEntities[0]) => e.strengths?.slice(0,1)[0] ? `<span style="font-size:7px;color:#86efac;">${e.strengths[0].slice(0,15)}</span>` : `<span style="color:#334155;">—</span>` },
+        ].map(row => `<div style="padding:7px 14px;border-bottom:1px solid rgba(255,255,255,0.04);display:grid;grid-template-columns:120px repeat(${Math.min(allEntities.length, 5)},1fr);gap:6px;align-items:center;">
+            <div style="font-size:8.5px;color:#64748b;font-weight:600;">${row.label}</div>
+            ${allEntities.map(e => `<div style="text-align:center;font-size:9px;">${row.getValue(e)}</div>`).join("")}
+          </div>`).join("")}
+      </div>
+
+      <!-- فرص التفوق والثغرات التنافسية -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:8px;">🚀 فرص التفوق على المنافسين</div>
+          ${(seo?.competitorGaps || []).slice(0, 4).map(g => `<div style="font-size:9px;color:#e2e8f0;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#22c55e;font-weight:700;">◆</span> ${g}</div>`).join("") || `<div style="font-size:9px;color:#475569;">تحليل الفرص يتطلب تحليل SEO متقدم</div>`}
+        </div>
+        <div style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:800;color:#fca5a5;margin-bottom:8px;">⚠️ ميزات المنافسين</div>
+          ${comps.slice(0, 3).map(c => `<div style="font-size:9px;color:#e2e8f0;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+            <span style="color:#f87171;font-weight:700;">${c.name.slice(0, 12)}:</span> ${c.strengths?.slice(0,1)[0] || "لا توجد بيانات"}
+          </div>`).join("")}
+        </div>
+      </div>
+
+      <!-- توصية استراتيجية -->
+      ${analysis?.competitivePosition ? `<div style="margin-top:10px;padding:10px 14px;background:linear-gradient(135deg,rgba(34,197,94,0.05),rgba(6,182,212,0.03));border:1px solid rgba(34,197,94,0.2);border-radius:10px;">
+        <div style="font-size:9px;font-weight:800;color:#86efac;margin-bottom:4px;">🎯 الموقف التنافسي</div>
+        <div style="font-size:9px;color:#94a3b8;line-height:1.7;">${analysis.competitivePosition}</div>
+      </div>` : ""}
+    </div>
+    ${FOOTER_HTML(competitorsPageNum, reportSerial)}
+  </div>`;
+  })() : "";
+
   // ===== PAGE 4: التوصيات والموسم =====
   const page4 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;bottom:-80px;right:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.05) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
     ${HEADER_HTML(recommendationsPageNum, totalPages, "التوصيات والخطة", "الأولويات المرتبة وتوقيت التنفيذ المثالي", "#f97316")}
-    <div style="padding:12px 36px;position:relative;z-index:1;">
+    <div style="padding:12px 36px;position:relative;z-index:1;flex:1;overflow:hidden;">
       <!-- بطاقة الموسم التسويقي المفصلة -->
       <div style="margin-bottom:12px;background:linear-gradient(135deg,${season.color}18,${season.color}08);border:1.5px solid ${season.color}50;border-radius:16px;position:relative;overflow:hidden;">
         <div style="position:absolute;top:-20px;left:-20px;font-size:80px;opacity:0.06;">${season.emoji}</div>
@@ -1294,6 +1370,7 @@ export function generateReportHTML(data: PDFReportData): string {
   ${hasSeo ? `<div class="page-wrapper">${pageSEO}</div>` : ""}
   ${hasReviews ? `<div class="page-wrapper">${pageReviews}</div>` : ""}
   <div class="page-wrapper">${page3}</div>
+  ${hasCompetitors ? `<div class="page-wrapper">${pageCompetitors}</div>` : ""}
   <div class="page-wrapper">${page4}</div>
   <div class="page-wrapper">${page5}</div>
 </div>

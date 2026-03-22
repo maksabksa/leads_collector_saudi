@@ -302,6 +302,13 @@
       "when": 1774142995982,
       "tag": "0042_new_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1774210906353,
+      "tag": "0043_mixed_imperial_guard",
+      "breakpoints": true
     }
   ]
 }

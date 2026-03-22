@@ -515,6 +515,8 @@ export default function LeadDetail() {
     { value: "meeting", label: "اجتماع", color: "oklch(0.65 0.18 280)" },
     { value: "won", label: "عميل فعلي", color: "oklch(0.65 0.18 145)" },
     { value: "lost", label: "خسرناه", color: "oklch(0.55 0.18 25)" },
+    { value: "deferred", label: "مؤجل", color: "oklch(0.65 0.18 60)" },
+    { value: "cancelled", label: "ملغي التواصل", color: "oklch(0.55 0.2 25)" },
   ];
 
   const PRIORITY_OPTIONS = [
@@ -603,8 +605,8 @@ export default function LeadDetail() {
           <p className="text-sm text-muted-foreground mt-0.5">{lead.businessType} · {lead.city}{lead.district ? ` · ${lead.district}` : ""}</p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {(lead as any).stage && (() => {
-              const stageColors: Record<string, string> = { new: "oklch(0.65 0.05 240)", contacted: "oklch(0.65 0.15 200)", interested: "oklch(0.65 0.18 145)", price_offer: "oklch(0.65 0.18 60)", meeting: "oklch(0.65 0.18 280)", won: "oklch(0.65 0.18 145)", lost: "oklch(0.55 0.18 25)" };
-              const stageLabels: Record<string, string> = { new: "جديد", contacted: "تم التواصل", interested: "مهتم", price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه" };
+              const stageColors: Record<string, string> = { new: "oklch(0.65 0.05 240)", contacted: "oklch(0.65 0.15 200)", interested: "oklch(0.65 0.18 145)", price_offer: "oklch(0.65 0.18 60)", meeting: "oklch(0.65 0.18 280)", won: "oklch(0.65 0.18 145)", lost: "oklch(0.55 0.18 25)", deferred: "oklch(0.65 0.18 60)", cancelled: "oklch(0.55 0.2 25)" };
+              const stageLabels: Record<string, string> = { new: "جديد", contacted: "تم التواصل", interested: "مهتم", price_offer: "عرض سعر", meeting: "اجتماع", won: "عميل فعلي", lost: "خسرناه", deferred: "مؤجل", cancelled: "ملغي التواصل" };
               const c = stageColors[(lead as any).stage] ?? "oklch(0.65 0.05 240)";
               return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `color-mix(in oklch, ${c} 15%, transparent)`, color: c, border: `1px solid color-mix(in oklch, ${c} 30%, transparent)` }}>• {stageLabels[(lead as any).stage] ?? (lead as any).stage}</span>;
             })()}

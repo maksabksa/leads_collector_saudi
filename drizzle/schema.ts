@@ -88,7 +88,7 @@ export const leads = mysqlTable("leads", {
   lastWhatsappSentAt: timestamp("lastWhatsappSentAt"),
   notes: text("notes"),
   // ===== التصنيف الإلزامي =====
-  stage: mysqlEnum("stage", ["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).default("new").notNull(),
+  stage: mysqlEnum("stage", ["new", "contacted", "interested", "price_offer", "meeting", "won", "lost", "deferred", "cancelled"]).default("new").notNull(),
   priority: mysqlEnum("priority", ["high", "medium", "low"]).default("medium").notNull(),
   nextStep: text("next_step"),
   nextFollowup: bigint("next_followup", { mode: "number" }),
@@ -495,7 +495,7 @@ export const whatsappChats = mysqlTable("whatsapp_chats", {
   sentiment: mysqlEnum("sentiment", ["positive", "neutral", "negative", "unknown"]).default("unknown"), // مشاعر العميل
   opportunityMissed: boolean("opportunityMissed").default(false).notNull(), // فرصة ضائعة
   // ===== نظام Stage + Follow-up =====
-  stage: mysqlEnum("stage", ["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).default("new").notNull(),
+  stage: mysqlEnum("stage", ["new", "contacted", "interested", "price_offer", "meeting", "won", "lost", "deferred", "cancelled"]).default("new").notNull(),
   nextStep: text("nextStep"),                                          // الخطوة القادمة
   followUpDate: timestamp("followUpDate"),                             // تاريخ المتابعة القادمة
   ownerUserId: int("ownerUserId"),                                     // المسؤول عن المحادثة

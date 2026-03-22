@@ -5,7 +5,7 @@ import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
   Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send, MessageSquare,
-  Target, FileText, CheckCircle2, Pencil,
+  Target, FileText, CheckCircle2, Pencil, Clock, XCircle,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -61,8 +61,8 @@ export default function Leads() {
   const [bulkSelectedTemplate, setBulkSelectedTemplate] = useState<string>("");
   const [showPhoneValidation, setShowPhoneValidation] = useState(false);
   const [pendingAction, setPendingAction] = useState<"contact" | "template" | null>(null);
-  // التبويب النشط: "all" = قائمة العملاء الجديدة | "contacted" = تم التواصل
-  const [activeListTab, setActiveListTab] = useState<"all" | "contacted">("all");
+  // التبويب النشط: "all" = قائمة العملاء الجديدة | "contacted" = تم التواصل | "deferred" = مؤجلين | "cancelled" = ملغي التواصل
+  const [activeListTab, setActiveListTab] = useState<"all" | "contacted" | "deferred" | "cancelled">("all");
   const [quickEditLead, setQuickEditLead] = useState<NonNullable<typeof allLeads>[number] | null>(null);
   const [showQuickEdit, setShowQuickEdit] = useState(false);
 
@@ -87,8 +87,14 @@ export default function Leads() {
     if (activeListTab === "contacted") {
       return allLeads.filter(l => CONTACTED_STAGES.includes((l as any).stage ?? ""));
     }
-    // التبويب الرئيسي: العملاء الجدد (stage = new أو فارغ)
-    return allLeads.filter(l => !CONTACTED_STAGES.includes((l as any).stage ?? ""));
+    if (activeListTab === "deferred") {
+      return allLeads.filter(l => (l as any).stage === "deferred");
+    }
+    if (activeListTab === "cancelled") {
+      return allLeads.filter(l => (l as any).stage === "cancelled");
+    }
+    // التبويب الرئيسي: العملاء الجدد (stage = new أو فارغ) - بدون deferred وcancelled
+    return allLeads.filter(l => !CONTACTED_STAGES.includes((l as any).stage ?? "") && (l as any).stage !== "deferred" && (l as any).stage !== "cancelled");
   })();
 
   // تطبيق فلتر stage الإضافي داخل التبويب
@@ -235,8 +241,10 @@ export default function Leads() {
   };
 
   // عدد العملاء في كل تبويب
-  const newCount = (allLeads ?? []).filter(l => !CONTACTED_STAGES.includes((l as any).stage ?? "")).length;
+  const newCount = (allLeads ?? []).filter(l => !CONTACTED_STAGES.includes((l as any).stage ?? "") && (l as any).stage !== "deferred" && (l as any).stage !== "cancelled").length;
   const contactedCount = (allLeads ?? []).filter(l => CONTACTED_STAGES.includes((l as any).stage ?? "")).length;
+  const deferredCount = (allLeads ?? []).filter(l => (l as any).stage === "deferred").length;
+  const cancelledCount = (allLeads ?? []).filter(l => (l as any).stage === "cancelled").length;
 
   return (
     <div className="space-y-5">
@@ -380,6 +388,38 @@ export default function Leads() {
               ? { background: "oklch(1 0 0 / 0.2)", color: "white" }
               : { background: "oklch(0.65 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)" }}>
             {contactedCount}
+          </span>
+        </button>
+        <button
+          onClick={() => { setActiveListTab("deferred"); setSelectedIds(new Set()); setFilterStage(""); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+          style={activeListTab === "deferred"
+            ? { background: "oklch(0.65 0.18 60)", color: "white" }
+            : { color: "oklch(0.6 0.01 240)" }}
+        >
+          <Clock className="w-4 h-4" />
+          مؤجلين
+          <span className="px-1.5 py-0.5 rounded-full text-xs font-bold"
+            style={activeListTab === "deferred"
+              ? { background: "oklch(1 0 0 / 0.2)", color: "white" }
+              : { background: "oklch(0.65 0.18 60 / 0.15)", color: "oklch(0.65 0.18 60)" }}>
+            {deferredCount}
+          </span>
+        </button>
+        <button
+          onClick={() => { setActiveListTab("cancelled"); setSelectedIds(new Set()); setFilterStage(""); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+          style={activeListTab === "cancelled"
+            ? { background: "oklch(0.55 0.2 25)", color: "white" }
+            : { color: "oklch(0.6 0.01 240)" }}
+        >
+          <XCircle className="w-4 h-4" />
+          ملغي التواصل
+          <span className="px-1.5 py-0.5 rounded-full text-xs font-bold"
+            style={activeListTab === "cancelled"
+              ? { background: "oklch(1 0 0 / 0.2)", color: "white" }
+              : { background: "oklch(0.55 0.2 25 / 0.15)", color: "oklch(0.55 0.2 25)" }}>
+            {cancelledCount}
           </span>
         </button>
       </div>
