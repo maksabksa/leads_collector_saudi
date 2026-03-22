@@ -458,10 +458,24 @@ export default function SearchHub() {
   const handleAddLead = async () => {
     if (!addDialog.result || !addForm.companyName) return;
     try {
-      if (addDialog.platform === "instagram" && addDialog.result.id) {
-        await addInstagramAsLead.mutateAsync({ accountId: addDialog.result.id, companyName: addForm.companyName, businessType: addForm.businessType || "غير محدد", city: addForm.city, instagramUrl: `https://instagram.com/${addDialog.result.username}`, phone: addForm.phone || undefined, website: addForm.website || undefined, notes: addForm.notes || undefined });
+      const r = addDialog.result;
+      const username = r.username || r.user_name || r.screen_name || "";
+      // بناء رابط المنصة تلقائياً
+      const platformUrls: Record<string, string | undefined> = {
+        instagramUrl: addDialog.platform === "instagram" ? (r.profile_url || (username ? `https://instagram.com/${username}` : undefined)) : undefined,
+        tiktokUrl: addDialog.platform === "tiktok" ? (r.profile_url || r.url || (username ? `https://tiktok.com/@${username}` : undefined)) : undefined,
+        snapchatUrl: addDialog.platform === "snapchat" ? (r.profile_url || r.url || (username ? `https://snapchat.com/add/${username}` : undefined)) : undefined,
+        twitterUrl: addDialog.platform === "twitter" ? (r.profile_url || r.url || (username ? `https://twitter.com/${username}` : undefined)) : undefined,
+        facebookUrl: addDialog.platform === "facebook" ? (r.profile_url || r.url || undefined) : undefined,
+        linkedinUrl: addDialog.platform === "linkedin" ? (r.profile_url || r.url || undefined) : undefined,
+        googleMapsUrl: addDialog.platform === "google" ? (r.url || (r.place_id ? `https://maps.google.com/?place_id=${r.place_id}` : undefined)) : undefined,
+      };
+      const cleanUrls = Object.fromEntries(Object.entries(platformUrls).filter(([, v]) => v != null)) as Record<string, string>;
+
+      if (addDialog.platform === "instagram" && r.id) {
+        await addInstagramAsLead.mutateAsync({ accountId: r.id, companyName: addForm.companyName, businessType: addForm.businessType || "غير محدد", city: addForm.city, instagramUrl: platformUrls.instagramUrl || `https://instagram.com/${username}`, phone: addForm.phone || undefined, website: addForm.website || undefined, notes: addForm.notes || undefined });
       } else {
-        await createLead.mutateAsync({ companyName: addForm.companyName, businessType: addForm.businessType || "غير محدد", city: addForm.city || "غير محدد", verifiedPhone: addForm.phone || undefined, website: addForm.website || undefined, notes: addForm.notes || undefined });
+        await createLead.mutateAsync({ companyName: addForm.companyName, businessType: addForm.businessType || "غير محدد", city: addForm.city || "غير محدد", verifiedPhone: addForm.phone || undefined, website: addForm.website || undefined, ...cleanUrls, notes: addForm.notes || undefined });
       }
       setAddedNames(prev => { const next = new Set(prev); next.add(addForm.companyName); return next; });
       toast.success("تمت الإضافة كعميل محتمل", { description: addForm.companyName });
