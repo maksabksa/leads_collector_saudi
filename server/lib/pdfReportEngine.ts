@@ -493,11 +493,13 @@ export function generateReportHTML(data: PDFReportData): string {
   const reviews = data.reviewsAnalysis || null;
   const hasReviews = !!(reviews || (lead.reviewCount && lead.reviewCount > 0));
   // حساب أرقام الصفحات ديناميكياً
-  let _pageCounter = 3; // 1=الغلاف, 2=الملخص, 3=التحليل العميق
+  // الترتيب المنطقي: 1=الغلاف, 2=الملخص, ثم التفاصيل (موقع+سوشيال+SEO+تعليقات), ثم التحليل العميق, ثم التوصيات, ثم الإغلاق
+  let _pageCounter = 2; // 1=الغلاف, 2=الملخص التنفيذي
   const webPageNum = hasWeb ? ++_pageCounter : 0;
   const socialPageNum = hasSocial ? ++_pageCounter : 0;
   const seoPageNum = hasSeo ? ++_pageCounter : 0;
   const reviewsPageNum = hasReviews ? ++_pageCounter : 0;
+  const deepAnalysisPageNum = ++_pageCounter; // التحليل العميق بعد كل التفاصيل
   const recommendationsPageNum = ++_pageCounter;
   const closingPageNum = ++_pageCounter;
   const totalPages = _pageCounter;
@@ -797,7 +799,7 @@ export function generateReportHTML(data: PDFReportData): string {
   const page3 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;top:-80px;right:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,0.05) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
-    ${HEADER_HTML(3, totalPages, "التحليل العميق", "مقارنة الأداء بمعيار السوق وتحليل المنصات", "#a78bfa")}
+    ${HEADER_HTML(deepAnalysisPageNum, totalPages, "التحليل العميق", "مقارنة الأداء بمعيار السوق وتحليل المنصات", "#a78bfa")}
     <div style="padding:14px 36px;position:relative;z-index:1;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
         <div style="background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.15);border-radius:14px;padding:14px;">
@@ -834,7 +836,7 @@ export function generateReportHTML(data: PDFReportData): string {
       </div>` : ""}
       ${analysis?.sectorInsights || analysis?.benchmarkComparison ? `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px 14px;"><div style="font-size:10px;font-weight:800;color:#94a3b8;margin-bottom:7px;">💡 رؤى قطاعية ومقارنة بالسوق</div>${analysis?.sectorInsights ? `<div style="font-size:9px;color:#64748b;line-height:1.7;margin-bottom:5px;">${analysis.sectorInsights}</div>` : ""}${analysis?.benchmarkComparison ? `<div style="font-size:9px;color:#64748b;line-height:1.7;">${analysis.benchmarkComparison}</div>` : ""}</div>` : ""}
     </div>
-    ${FOOTER_HTML(3, reportSerial)}
+    ${FOOTER_HTML(deepAnalysisPageNum, reportSerial)}
   </div>`;
 
   // ===== PAGE 4: التوصيات والموسم =====
@@ -1053,11 +1055,11 @@ export function generateReportHTML(data: PDFReportData): string {
 <div class="pages-container">
   <div class="page-wrapper">${page1}</div>
   <div class="page-wrapper">${page2}</div>
-  <div class="page-wrapper">${page3}</div>
   ${hasWeb ? `<div class="page-wrapper">${pageWebsite}</div>` : ""}
   ${hasSocial ? `<div class="page-wrapper">${pageSocial}</div>` : ""}
   ${hasSeo ? `<div class="page-wrapper">${pageSEO}</div>` : ""}
   ${hasReviews ? `<div class="page-wrapper">${pageReviews}</div>` : ""}
+  <div class="page-wrapper">${page3}</div>
   <div class="page-wrapper">${page4}</div>
   <div class="page-wrapper">${page5}</div>
 </div>
