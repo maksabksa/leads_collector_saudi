@@ -1325,23 +1325,74 @@ ${realDataSummary}
                 suggestedSalesEntryAngle: report.salesScript || null,
                 analysisStatus: "completed",
               });
-              // حفظ تحليل السوشيال إذا كانت هناك بيانات
-              if (report.platformsSummary) {
+              // حفظ تحليل السوشيال مع الأرقام الحقيقية من allData (مع fallback من real_social_snapshots)
+              {
                 const { createSocialAnalysis } = await import("./db");
-                const platforms: Array<{ platform: "instagram" | "twitter" | "tiktok" | "snapchat" | "facebook"; summary: string }> = [
-                  { platform: "instagram", summary: report.platformsSummary.instagram || "" },
-                  { platform: "twitter", summary: report.platformsSummary.twitter || "" },
-                  { platform: "tiktok", summary: report.platformsSummary.tiktok || "" },
-                ];
-                for (const p of platforms) {
-                  if (p.summary && p.summary !== "ملخص إنستغرام" && p.summary !== "ملخص تويتر" && p.summary !== "ملخص تيك توك") {
+                // جلب السنابشوت السابقة كـ fallback
+                const { realSocialSnapshots: rssTable } = await import("../drizzle/schema");
+                const { eq: eqFb } = await import("drizzle-orm");
+                const dbFb = await (await import("./db")).getDb();
+                const prevSnapshot = dbFb ? await dbFb.select().from(rssTable).where(eqFb(rssTable.leadId, leadId)).limit(1).then(r => r[0] ?? null) : null;
+                // دمج بيانات allData مع السنابشوت السابقة
+                const igFollowers = (allData.instagram?.followersCount ?? 0) > 0 ? allData.instagram!.followersCount : (prevSnapshot?.instagramFollowers ?? 0);
+                const igPosts = (allData.instagram?.postsCount ?? 0) > 0 ? allData.instagram!.postsCount : (prevSnapshot?.instagramPostsCount ?? 0);
+                const ttFollowers = (allData.tiktok?.followersCount ?? 0) > 0 ? allData.tiktok!.followersCount : (prevSnapshot?.tiktokFollowers ?? 0);
+                const ttVideos = (allData.tiktok?.videosCount ?? 0) > 0 ? allData.tiktok!.videosCount : (prevSnapshot?.tiktokVideoCount ?? 0);
+                const twFollowers = (allData.twitter?.followersCount ?? 0) > 0 ? allData.twitter!.followersCount : (prevSnapshot?.twitterFollowers ?? 0);
+                const twTweets = (allData.twitter?.tweetsCount ?? 0) > 0 ? allData.twitter!.tweetsCount : (prevSnapshot?.twitterTweetsCount ?? 0);
+                // Instagram
+                if (igFollowers > 0) {
+                  const igSummary = (report.platformsSummary?.instagram || "");
+                  if (igSummary && igSummary !== "ملخص إنستغرام") {
                     await createSocialAnalysis({
                       leadId,
-                      platform: p.platform,
+                      platform: "instagram" as const,
+                      profileUrl: lead.instagramUrl ?? undefined,
+                      hasAccount: true,
+                      followersCount: igFollowers ?? undefined,
+                      postsCount: igPosts ?? undefined,
                       overallScore: report.digitalPresenceScore || 5,
                       engagementScore: null,
                       contentQualityScore: null,
-                      summary: p.summary,
+                      summary: igSummary,
+                      rawAnalysis: content,
+                    });
+                  }
+                }
+                // TikTok
+                if (ttFollowers > 0) {
+                  const ttSummary = (report.platformsSummary?.tiktok || "");
+                  if (ttSummary && ttSummary !== "ملخص تيك توك") {
+                    await createSocialAnalysis({
+                      leadId,
+                      platform: "tiktok" as const,
+                      profileUrl: lead.tiktokUrl ?? undefined,
+                      hasAccount: true,
+                      followersCount: ttFollowers ?? undefined,
+                      postsCount: ttVideos ?? undefined,
+                      overallScore: report.digitalPresenceScore || 5,
+                      engagementScore: null,
+                      contentQualityScore: null,
+                      summary: ttSummary,
+                      rawAnalysis: content,
+                    });
+                  }
+                }
+                // Twitter
+                if (twFollowers > 0) {
+                  const twSummary = (report.platformsSummary?.twitter || "");
+                  if (twSummary && twSummary !== "ملخص تويتر") {
+                    await createSocialAnalysis({
+                      leadId,
+                      platform: "twitter" as const,
+                      profileUrl: lead.twitterUrl ?? undefined,
+                      hasAccount: true,
+                      followersCount: twFollowers ?? undefined,
+                      postsCount: twTweets ?? undefined,
+                      overallScore: report.digitalPresenceScore || 5,
+                      engagementScore: null,
+                      contentQualityScore: null,
+                      summary: twSummary,
                       rawAnalysis: content,
                     });
                   }
