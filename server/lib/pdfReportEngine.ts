@@ -752,19 +752,57 @@ export function generateReportHTML(data: PDFReportData): string {
           <div style="font-size:8px;color:#64748b;font-weight:600;">دعم متواصل</div>
         </div>
       </div>
-      <div style="padding:14px 18px;background:linear-gradient(135deg,rgba(14,165,233,0.06) 0%,rgba(167,139,250,0.04) 100%);border:1px solid rgba(14,165,233,0.2);border-radius:13px;">
+      <div style="padding:14px 18px;background:linear-gradient(135deg,rgba(14,165,233,0.06) 0%,rgba(167,139,250,0.04) 100%);border:1px solid rgba(14,165,233,0.2);border-radius:13px;margin-bottom:12px;">
         <div style="display:flex;align-items:flex-start;gap:12px;">
           <div style="font-size:26px;flex-shrink:0;">🤝</div>
           <div>
             <div style="font-size:12px;font-weight:800;color:#7dd3fc;margin-bottom:5px;">أهلاً وسهلاً بك في مكسب</div>
-            <div style="font-size:10px;color:#94a3b8;line-height:1.9;">
-              يسعدنا تقديم هذا التقرير التحليلي المخصص لـ
+            <div style="font-size:10.5px;color:#94a3b8;line-height:2;">
+              يسعدنا تقديم هذا التقرير التحليلي المخصص لعناية
               <strong style="color:#f1f5f9;">${lead.companyName}</strong>.
               لقد أجرينا تحليلاً شاملاً لحضورك الرقمي وقارنّاه بالسوق والمنافسين،
-              وأعددنا لك خارطة طريق واضحة لتحقيق نمو ملموس.
+              وأعددنا لك خارطة طريق واضحة لتحقيق نمو ملموس في السوق السعودي.
               <strong style="color:#22c55e;">هذا التقرير هو بداية شراكة نجاح حقيقية.</strong>
             </div>
           </div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="text-align:center;margin-bottom:8px;">
+          <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 18px;background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);border-radius:20px;">
+            <div style="width:5px;height:5px;border-radius:50%;background:#a78bfa;box-shadow:0 0 8px #a78bfa;"></div>
+            <span style="font-size:10px;color:#a78bfa;font-weight:800;letter-spacing:1px;">لماذا تختار مكسب؟</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="padding:10px 14px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.12);border-radius:10px;display:flex;align-items:flex-start;gap:8px;">
+            <div style="font-size:16px;flex-shrink:0;">🎯</div>
+            <div><div style="font-size:9.5px;font-weight:800;color:#86efac;margin-bottom:2px;">تخصص 100% في السوق السعودي</div><div style="font-size:8.5px;color:#475569;line-height:1.5;">نفهم طبيعة المستهلك السعودي وموسمياته وسلوكه الشرائي</div></div>
+          </div>
+          <div style="padding:10px 14px;background:rgba(14,165,233,0.04);border:1px solid rgba(14,165,233,0.12);border-radius:10px;display:flex;align-items:flex-start;gap:8px;">
+            <div style="font-size:16px;flex-shrink:0;">📊</div>
+            <div><div style="font-size:9.5px;font-weight:800;color:#7dd3fc;margin-bottom:2px;">تقارير مبنية على بيانات حقيقية</div><div style="font-size:8.5px;color:#475569;line-height:1.5;">لا تخمين — كل توصية مدعومة بأرقام وتحليل ذكاء اصطناعي</div></div>
+          </div>
+          <div style="padding:10px 14px;background:rgba(249,115,22,0.04);border:1px solid rgba(249,115,22,0.12);border-radius:10px;display:flex;align-items:flex-start;gap:8px;">
+            <div style="font-size:16px;flex-shrink:0;">⚡</div>
+            <div><div style="font-size:9.5px;font-weight:800;color:#fdba74;margin-bottom:2px;">نتائج قابلة للقياس خلال 90 يوماً</div><div style="font-size:8.5px;color:#475569;line-height:1.5;">نلتزم بمؤشرات أداء واضحة ونراجعها معك شهرياً</div></div>
+          </div>
+          <div style="padding:10px 14px;background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.12);border-radius:10px;display:flex;align-items:flex-start;gap:8px;">
+            <div style="font-size:16px;flex-shrink:0;">🤝</div>
+            <div><div style="font-size:9.5px;font-weight:800;color:#c4b5fd;margin-bottom:2px;">شراكة طويلة الأمد لا مجرد خدمة</div><div style="font-size:8.5px;color:#475569;line-height:1.5;">نتعامل مع نشاطك كأنه نشاطنا ونستثمر في نجاحك</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="text-align:center;margin-bottom:8px;">
+          <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 18px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:20px;">
+            <div style="width:5px;height:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></div>
+            <span style="font-size:10px;color:#22c55e;font-weight:800;letter-spacing:1px;">كيف نعمل معك؟</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:0;position:relative;">
+          <div style="position:absolute;top:20px;right:10%;left:10%;height:2px;background:linear-gradient(90deg,#22c55e40,#0ea5e940,#a78bfa40);z-index:0;"></div>
+          ${[{n:"1",c:"#22c55e",t:"تحليل وتشخيص",d:"نفحص حضورك الرقمي بالكامل"},{n:"2",c:"#0ea5e9",t:"استراتيجية مخصصة",d:"نبني خطة مبنية على بياناتك"},{n:"3",c:"#a78bfa",t:"تنفيذ احترافي",d:"فريق متخصص ينفذ كل خطوة"},{n:"4",c:"#f97316",t:"قياس ونمو",d:"نتابع ونحسّن باستمرار"}].map(s=>`<div style="flex:1;text-align:center;position:relative;z-index:1;"><div style="width:40px;height:40px;border-radius:50%;background:${s.c}22;border:2px solid ${s.c};display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:14px;font-weight:900;color:${s.c};">${s.n}</div><div style="font-size:8.5px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">${s.t}</div><div style="font-size:7.5px;color:#475569;line-height:1.4;">${s.d}</div></div>`).join("")}
         </div>
       </div>
     </div>
@@ -851,29 +889,38 @@ export function generateReportHTML(data: PDFReportData): string {
   // ===== PAGE 2: الملخص التنفيذي =====
   const page2 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;top:-60px;left:-60px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-80px;right:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.04) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
-    ${HEADER_HTML(3, totalPages, "الملخص التنفيذي", "تقييم شامل للحضور الرقمي والفرص المتاحة")}
-    <div style="padding:16px 36px;position:relative;z-index:1;">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
-        <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:14px;padding:14px;text-align:center;">
-          <div style="font-size:9px;color:#7dd3fc;font-weight:700;margin-bottom:6px;letter-spacing:1px;">الحالة العامة</div>
-          <div style="font-size:22px;font-weight:900;color:#0ea5e9;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).status}</div>
-          <div style="font-size:9px;color:#475569;">${priorityScore > 0 ? priorityScore + "/10" : "—"}</div>
-          <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;"><div style="height:100%;width:${priorityScore * 10}%;background:#0ea5e9;border-radius:2px;"></div></div>
+    ${HEADER_HTML(3, totalPages, "الملخص التنفيذي", "نظرة شاملة على الحضور الرقمي · الفرص · الأولويات · خارطة الطريق", "#0ea5e9")}
+    <div style="padding:14px 36px;position:relative;z-index:1;">
+      <!-- شريط الحالة العامة -->
+      <div style="margin-bottom:14px;padding:14px 18px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(34,197,94,0.05));border:1.5px solid rgba(14,165,233,0.3);border-radius:16px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#0ea5e9,#22c55e,#a78bfa);"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:9px;color:#7dd3fc;font-weight:700;letter-spacing:1px;margin-bottom:4px;">الحالة الرقمية العامة لـ ${lead.companyName}</div>
+            <div style="font-size:20px;font-weight:900;color:#f1f5f9;">${getDigitalReadinessLabel(priorityScore).status}</div>
+            <div style="font-size:9px;color:#475569;margin-top:2px;">${getDigitalReadinessLabel(priorityScore).readiness === 'أولية' ? 'تحتاج تطوير أساسي عاجل' : getDigitalReadinessLabel(priorityScore).readiness === 'متوسطة' ? 'مجال واسع للتحسين والنمو' : 'حضور جيد قابل للتعزيز والتوسع'}</div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <div style="text-align:center;"><div style="font-size:28px;font-weight:900;color:${prColor};text-shadow:0 0 20px ${prColor}66;">${priorityScore > 0 ? priorityScore : "—"}</div><div style="font-size:8px;color:#475569;">درجة الأولوية</div></div>
+            <div style="text-align:center;"><div style="font-size:28px;font-weight:900;color:#22c55e;text-shadow:0 0 20px #22c55e66;">${confidenceScore}%</div><div style="font-size:8px;color:#475569;">دقة التحليل</div></div>
+            <div style="text-align:center;"><div style="font-size:28px;font-weight:900;color:#0ea5e9;text-shadow:0 0 20px #0ea5e966;">${websiteScore}</div><div style="font-size:8px;color:#475569;">تقييم الموقع</div></div>
+          </div>
         </div>
-        <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:14px;padding:14px;text-align:center;">
-          <div style="font-size:9px;color:#fca5a5;font-weight:700;margin-bottom:6px;letter-spacing:1px;">جاهزية رقمية</div>
-          <div style="font-size:22px;font-weight:900;color:#ef4444;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).readiness}</div>
-          <div style="font-size:9px;color:#475569;">${getDigitalReadinessLabel(priorityScore).readiness === 'أولية' ? 'تحتاج تطوير أساسي' : getDigitalReadinessLabel(priorityScore).readiness === 'متوسطة' ? 'مجال واسع للتحسين' : 'حضور جيد قابل للتعزيز'}</div>
-        </div>
-        <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:14px;text-align:center;">
-          <div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:6px;letter-spacing:1px;">أولوية التحسين</div>
-          <div style="font-size:22px;font-weight:900;color:#22c55e;line-height:1;margin-bottom:5px;">${getDigitalReadinessLabel(priorityScore).priority}</div>
-          <div style="font-size:9px;color:#475569;">فرص قابلة للتحسين</div>
-          <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;"><div style="height:100%;width:85%;background:#22c55e;border-radius:2px;"></div></div>
+        <div style="margin-top:10px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:8px;color:#475569;">مستوى الحضور الرقمي</span><span style="font-size:8px;color:#0ea5e9;font-weight:700;">${priorityScore * 10}%</span></div>
+          <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;"><div style="height:100%;width:${priorityScore * 10}%;background:linear-gradient(90deg,#0ea5e9,#22c55e);border-radius:3px;box-shadow:0 0 8px rgba(14,165,233,0.4);"></div></div>
         </div>
       </div>
-      <div style="margin-bottom:16px;padding:18px 22px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.2);border-radius:16px;">
+      <!-- المؤشرات التفصيلية -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+        <div style="background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.2);border-radius:12px;padding:10px;text-align:center;border-top:2px solid #0ea5e9;"><div style="font-size:8px;color:#7dd3fc;font-weight:700;margin-bottom:4px;">الموقع</div><div style="font-size:22px;font-weight:900;color:#0ea5e9;">${websiteScore}</div><div style="font-size:7px;color:#475569;">من 10</div></div>
+        <div style="background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:10px;text-align:center;border-top:2px solid #22c55e;"><div style="font-size:8px;color:#86efac;font-weight:700;margin-bottom:4px;">التفاعل الرقمي</div><div style="font-size:22px;font-weight:900;color:#22c55e;">${digitalScore}</div><div style="font-size:7px;color:#475569;">من 10</div></div>
+        <div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.2);border-radius:12px;padding:10px;text-align:center;border-top:2px solid #a78bfa;"><div style="font-size:8px;color:#c4b5fd;font-weight:700;margin-bottom:4px;">جودة البيانات</div><div style="font-size:22px;font-weight:900;color:#a78bfa;">${confidenceScore}%</div><div style="font-size:7px;color:#475569;">دقة التحليل</div></div>
+        <div style="background:rgba(${priorityScore>=8?'239,68,68':priorityScore>=6?'245,158,11':'34,197,94'},0.05);border:1px solid rgba(${priorityScore>=8?'239,68,68':priorityScore>=6?'245,158,11':'34,197,94'},0.2);border-radius:12px;padding:10px;text-align:center;border-top:2px solid ${prColor};"><div style="font-size:8px;color:${prColor};font-weight:700;margin-bottom:4px;">الأولوية</div><div style="font-size:22px;font-weight:900;color:${prColor};">${priorityScore > 0 ? priorityScore : "—"}</div><div style="font-size:7px;color:#475569;">من 10</div></div>
+      </div>
+      <div style="margin-bottom:12px;padding:16px 18px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.2);border-radius:16px;">
         <div style="font-size:10px;color:#86efac;font-weight:800;margin-bottom:10px;letter-spacing:1px;">🎯 أثر التحسين المتوقع على النشاط</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
           <div style="padding:10px 12px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:10px;">
@@ -943,7 +990,42 @@ export function generateReportHTML(data: PDFReportData): string {
         <div style="font-size:10px;font-weight:800;color:#fde68a;margin-bottom:6px;">🌐 الموقع الإلكتروني — غير متاح</div>
         <div style="font-size:10px;color:#94a3b8;line-height:1.7;">💡 غياب الموقع يجعل العملاء الباحثين على جوجل لا يجدون نقطة تحويل واضحة — فرصة تحسين ذات أثر مباشر على الثقة والمبيعات</div>
       </div>` : ""}
-      ${analysis?.sectorInsights || analysis?.benchmarkComparison ? `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px 14px;"><div style="font-size:10px;font-weight:800;color:#94a3b8;margin-bottom:7px;">💡 رؤى قطاعية ومقارنة بالسوق</div>${analysis?.sectorInsights ? `<div style="font-size:9px;color:#64748b;line-height:1.7;margin-bottom:5px;">${analysis.sectorInsights}</div>` : ""}${analysis?.benchmarkComparison ? `<div style="font-size:9px;color:#64748b;line-height:1.7;">${analysis.benchmarkComparison}</div>` : ""}</div>` : ""}
+      ${analysis?.sectorInsights || analysis?.benchmarkComparison ? `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px 14px;margin-bottom:12px;"><div style="font-size:10px;font-weight:800;color:#94a3b8;margin-bottom:7px;">💡 رؤى قطاعية ومقارنة بالسوق</div>${analysis?.sectorInsights ? `<div style="font-size:9px;color:#64748b;line-height:1.7;margin-bottom:5px;">${analysis.sectorInsights}</div>` : ""}${analysis?.benchmarkComparison ? `<div style="font-size:9px;color:#64748b;line-height:1.7;">${analysis.benchmarkComparison}</div>` : ""}</div>` : ""}
+      ${(() => {
+        const competitors = data.seoData?.competitors;
+        if (!competitors || competitors.length === 0) return "";
+        return `<div style="background:rgba(239,68,68,0.03);border:1px solid rgba(239,68,68,0.15);border-radius:14px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:800;color:#fca5a5;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <span>🏆</span>
+            <span>المنافسون في السوق — مقارنة تنافسية</span>
+            <span style="font-size:8px;color:#475569;font-weight:400;margin-right:auto;">مبني على تحليل SEO حقيقي</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            ${competitors.slice(0,4).map((comp, idx) => {
+              const scoreColor = comp.seoScore >= 7 ? "#22c55e" : comp.seoScore >= 5 ? "#f59e0b" : "#ef4444";
+              const scoreWidth = comp.seoScore * 10;
+              const rank = idx + 1;
+              const rankColors = ["#fbbf24","#94a3b8","#cd7f32","#64748b"];
+              return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                  <div style="width:22px;height:22px;border-radius:50%;background:${rankColors[idx]}22;border:1.5px solid ${rankColors[idx]};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:${rankColors[idx]};flex-shrink:0;">${rank}</div>
+                  <div style="flex:1;">
+                    <div style="font-size:10px;font-weight:800;color:#f1f5f9;">${comp.name}</div>
+                    <div style="font-size:8px;color:#475569;">${comp.url.replace(/https?:\/\/(www\.)?/,"").slice(0,40)}</div>
+                  </div>
+                  <div style="text-align:center;">
+                    <div style="font-size:18px;font-weight:900;color:${scoreColor};">${comp.seoScore}</div>
+                    <div style="font-size:7px;color:#475569;">SEO /10</div>
+                  </div>
+                </div>
+                <div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;margin-bottom:6px;"><div style="height:100%;width:${scoreWidth}%;background:${scoreColor};border-radius:2px;"></div></div>
+                ${comp.strengths && comp.strengths.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">${comp.strengths.slice(0,3).map((s:string)=>`<span style="font-size:7.5px;padding:2px 7px;background:rgba(34,197,94,0.08);color:#86efac;border:1px solid rgba(34,197,94,0.2);border-radius:10px;">✓ ${s}</span>`).join("")}</div>` : ""}
+              </div>`;
+            }).join("")}
+          </div>
+          ${data.seoData?.competitorGaps && data.seoData.competitorGaps.length > 0 ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.15);border-radius:8px;"><div style="font-size:9px;color:#86efac;font-weight:700;margin-bottom:4px;">🚀 فرص تفوق على المنافسين</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${data.seoData.competitorGaps.slice(0,4).map((g:string)=>`<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.08);color:#22c55e;border:1px solid rgba(34,197,94,0.2);border-radius:10px;">${g}</span>`).join("")}</div></div>` : ""}
+        </div>`;
+      })()}
     </div>
     ${FOOTER_HTML(deepAnalysisPageNum, reportSerial)}
   </div>`;
@@ -953,25 +1035,67 @@ export function generateReportHTML(data: PDFReportData): string {
     <div style="position:absolute;bottom:-80px;right:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.05) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
     ${HEADER_HTML(recommendationsPageNum, totalPages, "التوصيات والخطة", "الأولويات المرتبة وتوقيت التنفيذ المثالي", "#f97316")}
-    <div style="padding:14px 36px;position:relative;z-index:1;">
-      <div style="margin-bottom:16px;padding:16px 18px;background:linear-gradient(135deg,${season.color}18,${season.color}08);border:1.5px solid ${season.color}50;border-radius:16px;position:relative;overflow:hidden;">
-        <div style="position:absolute;top:-20px;left:-20px;font-size:80px;opacity:0.07;">${season.emoji}</div>
-        <div style="display:flex;align-items:flex-start;gap:12px;position:relative;z-index:1;">
-          <div style="font-size:36px;flex-shrink:0;">${season.emoji}</div>
-          <div style="flex:1;">
-            <div style="font-size:9px;font-weight:700;color:${season.color};letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">🗓️ الموسم التسويقي الحالي</div>
-            <div style="font-size:13px;font-weight:900;color:#e2e8f0;margin-bottom:5px;">${season.name}</div>
-            ${season.urgency ? `<div style="font-size:10px;color:${season.color};font-weight:700;margin-bottom:6px;">${season.urgency}</div>` : ""}
-            ${season.tip ? `<div style="font-size:9.5px;color:#94a3b8;line-height:1.8;padding:8px 12px;background:rgba(0,0,0,0.25);border-radius:8px;border-right:3px solid ${season.color};">${season.tip}</div>` : ""}
+    <div style="padding:12px 36px;position:relative;z-index:1;">
+      <!-- بطاقة الموسم التسويقي المفصلة -->
+      <div style="margin-bottom:12px;background:linear-gradient(135deg,${season.color}18,${season.color}08);border:1.5px solid ${season.color}50;border-radius:16px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-20px;left:-20px;font-size:80px;opacity:0.06;">${season.emoji}</div>
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${season.color},${season.color}60,transparent);"></div>
+        <div style="padding:14px 18px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;">
+            <div style="font-size:32px;flex-shrink:0;">${season.emoji}</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+                <div style="font-size:9px;font-weight:700;color:${season.color};letter-spacing:1px;">🗓️ الموسم التسويقي الحالي</div>
+                ${season.urgency ? `<div style="padding:2px 8px;background:${season.color}22;border:1px solid ${season.color}50;border-radius:10px;font-size:8px;color:${season.color};font-weight:700;">${season.urgency}</div>` : ""}
+              </div>
+              <div style="font-size:15px;font-weight:900;color:#e2e8f0;margin-bottom:4px;">${season.name}</div>
+              ${season.tip ? `<div style="font-size:9.5px;color:#94a3b8;line-height:1.8;padding:8px 12px;background:rgba(0,0,0,0.25);border-radius:8px;border-right:3px solid ${season.color};">${season.tip}</div>` : ""}
+            </div>
+          </div>
+          <!-- فرص الموسم التفصيلية -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
+            <div style="padding:9px 10px;background:rgba(0,0,0,0.2);border:1px solid ${season.color}30;border-radius:9px;">
+              <div style="font-size:8px;color:${season.color};font-weight:700;margin-bottom:3px;">📈 فرصة الموسم</div>
+              <div style="font-size:8.5px;color:#cbd5e1;line-height:1.5;">الطلب يرتفع في هذا الموسم — التوقيت مثالي للتسويق</div>
+            </div>
+            <div style="padding:9px 10px;background:rgba(0,0,0,0.2);border:1px solid ${season.color}30;border-radius:9px;">
+              <div style="font-size:8px;color:${season.color};font-weight:700;margin-bottom:3px;">🎯 القنوات المثلى</div>
+              <div style="font-size:8.5px;color:#cbd5e1;line-height:1.5;">سناب شات + إنستغرام + جوجل للوصول للعميل السعودي</div>
+            </div>
+            <div style="padding:9px 10px;background:rgba(0,0,0,0.2);border:1px solid ${season.color}30;border-radius:9px;">
+              <div style="font-size:8px;color:${season.color};font-weight:700;margin-bottom:3px;">⚡ الإجراء الفوري</div>
+              <div style="font-size:8.5px;color:#cbd5e1;line-height:1.5;">ابدأ بالتسويق الآن لاستثمار الموسم قبل انتهائه</div>
+            </div>
           </div>
         </div>
       </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-size:11px;font-weight:800;color:#f97316;margin-bottom:8px;display:flex;align-items:center;gap:6px;"><span>🎯</span> التوصيات المرتبة حسب الأولوية</div>
-        <div style="display:flex;flex-direction:column;gap:9px;">${recommendations}</div>
+      <!-- التوصيات المرتبة -->
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:800;color:#f97316;margin-bottom:7px;display:flex;align-items:center;gap:6px;"><span>🎯</span> التوصيات المرتبة حسب الأولوية</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">${recommendations}</div>
       </div>
-      ${analysis?.iceBreaker && !isClientFacing ? `<div style="padding:12px 16px;background:linear-gradient(135deg,rgba(34,197,94,0.05),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:7px;">💬 نص التواصل المقترح (Ice Breaker)</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;font-style:italic;padding-right:10px;border-right:3px solid rgba(34,197,94,0.4);">"${analysis.iceBreaker}"</div></div>` : ""}
-      ${analysis?.urgencyLevel ? `<div style="margin-top:12px;padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px;display:flex;align-items:center;justify-content:space-between;"><div style="font-size:9px;color:#94a3b8;">مستوى الإلحاح</div><div style="font-size:10px;font-weight:700;color:${analysis.urgencyLevel === "high" ? "#ef4444" : analysis.urgencyLevel === "medium" ? "#f59e0b" : "#22c55e"};">${getUrgencyLabel(analysis.urgencyLevel)}</div></div>` : ""}
+      <!-- الخطة المبدئية المفصلة -->
+      <div style="margin-bottom:10px;padding:12px 16px;background:rgba(14,165,233,0.04);border:1px solid rgba(14,165,233,0.2);border-radius:14px;">
+        <div style="font-size:10px;font-weight:800;color:#7dd3fc;margin-bottom:8px;">📋 الخطة المبدئية المقترحة</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
+          <div style="padding:9px 10px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.15);border-radius:9px;">
+            <div style="font-size:8px;color:#86efac;font-weight:700;margin-bottom:3px;">📅 الشهر الأول</div>
+            <div style="font-size:8.5px;color:#94a3b8;line-height:1.5;">تأسيس الحضور الرقمي: تحسين الملف التجاري + إنشاء أو تحديث حسابات السوشيال</div>
+          </div>
+          <div style="padding:9px 10px;background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.15);border-radius:9px;">
+            <div style="font-size:8px;color:#7dd3fc;font-weight:700;margin-bottom:3px;">📅 الشهر الثاني</div>
+            <div style="font-size:8.5px;color:#94a3b8;line-height:1.5;">تفعيل المحتوى: حملة موسمية + إعلانات مدفوعة مستهدفة للجمهور المحلي</div>
+          </div>
+          <div style="padding:9px 10px;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.15);border-radius:9px;">
+            <div style="font-size:8px;color:#c4b5fd;font-weight:700;margin-bottom:3px;">📅 الشهر الثالث</div>
+            <div style="font-size:8.5px;color:#94a3b8;line-height:1.5;">قياس النتائج: تحليل الأداء + تحسين الحملات + رفع العائد على الاستثمار</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:8px 10px;background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.15);border-radius:8px;">
+          <div style="font-size:8.5px;color:#fdba74;line-height:1.7;">⚡ الأولوية الآن: <strong style="color:#f97316;">${priorityOneLabel}</strong> — هذه الخطوة ستحقق أكبر أثر في أقل وقت ممكن. ${analysis?.urgencyLevel ? `مستوى الإلحاح: <strong style="color:${analysis.urgencyLevel === 'high' ? '#ef4444' : analysis.urgencyLevel === 'medium' ? '#f59e0b' : '#22c55e'}">${getUrgencyLabel(analysis.urgencyLevel)}</strong>` : ""}</div>
+        </div>
+      </div>
+      ${analysis?.iceBreaker && !isClientFacing ? `<div style="padding:10px 14px;background:linear-gradient(135deg,rgba(34,197,94,0.05),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.15);border-radius:12px;"><div style="font-size:9.5px;font-weight:800;color:#86efac;margin-bottom:5px;">💬 نص التواصل المقترح (Ice Breaker)</div><div style="font-size:9.5px;color:#94a3b8;line-height:1.8;font-style:italic;padding-right:10px;border-right:3px solid rgba(34,197,94,0.4);">"${analysis.iceBreaker}"</div></div>` : ""}
     </div>
     ${FOOTER_HTML(recommendationsPageNum, reportSerial)}
   </div>`;
