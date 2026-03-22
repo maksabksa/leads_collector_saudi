@@ -52,11 +52,12 @@ export default function AuditLog() {
   const [searchUser, setSearchUser] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const { data: logs = [], isLoading, refetch } = trpc.auditLog.getAll.useQuery({
+  const { data: logsData, isLoading, refetch } = trpc.auditLog.getAll.useQuery({
     limit,
     action: filterAction !== "all" ? filterAction : undefined,
     // entityType: filterEntity !== "all" ? filterEntity : undefined,
   });
+  const logs = Array.isArray(logsData) ? logsData : (logsData?.logs ?? []);
 
   const { data: stats } = trpc.auditLog.getStats.useQuery();
 
