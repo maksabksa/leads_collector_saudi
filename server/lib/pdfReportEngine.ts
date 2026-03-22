@@ -1194,13 +1194,26 @@ export function generateReportHTML(data: PDFReportData): string {
           <div style="text-align:center;"><div style="font-size:8px;color:#475569;margin-bottom:3px;">السجل التجاري</div><div style="font-size:11px;font-weight:800;color:#94a3b8;font-family:monospace;">7040860202</div></div>
         </div>
       </div>
-      <div style="margin-bottom:16px;padding:16px 20px;background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.05));border:1px solid rgba(34,197,94,0.25);border-radius:16px;">
-        <div style="font-size:12px;font-weight:900;color:#f1f5f9;margin-bottom:5px;text-align:center;">🚀 هذا التقرير هو البداية فقط</div>
-        <div style="font-size:9px;color:#94a3b8;line-height:1.8;text-align:center;margin-bottom:12px;">ما تراه هنا هو تشخيص أولي. فريق مكسب مستعد لتقديم خطة تنفيذية مخصصة بالكامل لنشاطك التجاري، مع ضمان نتائج قابلة للقياس خلال 90 يوماً.</div>
-        <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
-          <div style="padding:9px 18px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);border-radius:10px;text-align:center;"><div style="font-size:10px;font-weight:800;color:#22c55e;margin-bottom:2px;">📞 تواصل معنا الآن</div><div style="font-size:8px;color:#475569;">واتساب مباشر</div></div>
-          <div style="padding:9px 18px;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25);border-radius:10px;text-align:center;"><div style="font-size:10px;font-weight:800;color:#0ea5e9;margin-bottom:2px;">📊 طلب تحليل موسّع</div><div style="font-size:8px;color:#475569;">تقرير تفصيلي 20+ صفحة</div></div>
-          <div style="padding:9px 18px;background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:10px;text-align:center;"><div style="font-size:10px;font-weight:800;color:#a78bfa;margin-bottom:2px;">🗓️ حجز استشارة مجانية</div><div style="font-size:8px;color:#475569;">30 دقيقة مع خبير</div></div>
+      <div style="margin-bottom:16px;padding:20px 24px;background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(249,115,22,0.06),rgba(34,197,94,0.05));border:1.5px solid rgba(239,68,68,0.3);border-radius:18px;position:relative;overflow:hidden;">
+        <!-- خط علوي متدرج -->
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#ef4444,#f97316,#22c55e);"></div>
+        <!-- تحذير التأخير -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444;animation:pulse 1.5s infinite;"></div>
+          <div style="font-size:13px;font-weight:900;color:#fca5a5;letter-spacing:0.5px;">كل يوم تأخير يعني فرصًا ضائعة ومبيعات أقل</div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444;"></div>
+        </div>
+        <!-- النص الرئيسي -->
+        <div style="font-size:9.5px;color:#cbd5e1;line-height:2;text-align:center;margin-bottom:14px;max-width:520px;margin-left:auto;margin-right:auto;">
+          ما ظهر في هذا التقرير ليس مجرد ملاحظات، بل <strong style="color:#f1f5f9;">مؤشرات واضحة على فرص يمكن استغلالها فورًا</strong> لتحسين حضورك الرقمي وزيادة نتائج نشاطك.
+          <br/>الخطوة التالية ليست القراءة… <strong style="color:#22c55e;">الخطوة التالية هي التحرك.</strong>
+        </div>
+        <!-- زر CTA الرئيسي -->
+        <div style="text-align:center;">
+          <div style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:50px;box-shadow:0 0 30px rgba(34,197,94,0.4),0 4px 20px rgba(0,0,0,0.3);">
+            <div style="font-size:14px;font-weight:900;color:#fff;letter-spacing:1px;">🚀 ابدأ خطتك الآن</div>
+            <div style="font-size:8px;color:rgba(255,255,255,0.75);margin-top:2px;">تواصل مع فريق مكسب عبر واتساب</div>
+          </div>
         </div>
       </div>
       <div style="display:flex;justify-content:center;gap:20px;margin-bottom:14px;">
