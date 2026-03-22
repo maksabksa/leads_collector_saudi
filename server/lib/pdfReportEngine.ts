@@ -492,8 +492,15 @@ export function generateReportHTML(data: PDFReportData): string {
   const hasSocial = !!(snap || socialArr.length > 0);
   const reviews = data.reviewsAnalysis || null;
   const hasReviews = !!(reviews || (lead.reviewCount && lead.reviewCount > 0));
-  // حساب عدد الصفحات الكلي (page5 دائماً آخر صفحة)
-  const totalPages = 5 + (hasWeb ? 1 : 0) + (hasSocial ? 1 : 0) + (hasSeo ? 1 : 0) + (hasReviews ? 1 : 0);
+  // حساب أرقام الصفحات ديناميكياً
+  let _pageCounter = 3; // 1=الغلاف, 2=الملخص, 3=التحليل العميق
+  const webPageNum = hasWeb ? ++_pageCounter : 0;
+  const socialPageNum = hasSocial ? ++_pageCounter : 0;
+  const seoPageNum = hasSeo ? ++_pageCounter : 0;
+  const reviewsPageNum = hasReviews ? ++_pageCounter : 0;
+  const recommendationsPageNum = ++_pageCounter;
+  const closingPageNum = ++_pageCounter;
+  const totalPages = _pageCounter;
 
 
   const PAGE_STYLE = `width:210mm;min-height:297mm;padding:0;margin:0 auto;background:linear-gradient(160deg,#020810 0%,#060d1a 60%,#020810 100%);position:relative;overflow:hidden;font-family:'Tajawal','Cairo','Arial',sans-serif;direction:rtl;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;page-break-after:always;break-after:page;`;
@@ -534,7 +541,6 @@ export function generateReportHTML(data: PDFReportData): string {
   // ===== صفحة تحليل الموقع الحقيقي =====
   const webScoreColor = (s: number | null | undefined) => !s ? "#64748b" : s >= 7 ? "#22c55e" : s >= 5 ? "#f59e0b" : "#ef4444";
   const webScoreLabel = (s: number | null | undefined) => !s ? "غير محلل" : s >= 7 ? "جيد" : s >= 5 ? "متوسط" : "يحتاج تحسين";
-  const webPageNum = 4;
   const pageWebsite = hasWeb ? `<div style="${PAGE_STYLE}">
     ${WATERMARK_HTML}
     ${HEADER_HTML(webPageNum, totalPages, "تحليل الموقع الإلكتروني", "السرعة · SEO · المحتوى · تجربة الجوال · الثغرات", "#0ea5e9")}
@@ -567,7 +573,6 @@ export function generateReportHTML(data: PDFReportData): string {
   </div>` : "";
 
   // ===== صفحة تحليل السوشيال الكاملة =====
-  const socialPageNum = hasWeb ? 5 : 4;
   const getPlatformLabel = (p: string) => ({ instagram: "إنستغرام", tiktok: "تيك توك", twitter: "تويتر/X", snapchat: "سناب شات", facebook: "فيسبوك" }[p] || p);
   const getPlatformColor = (p: string) => ({ instagram: "#e1306c", tiktok: "#69c9d0", twitter: "#1da1f2", snapchat: "#fffc00", facebook: "#1877f2" }[p] || "#94a3b8");
   const getPlatformIcon = (p: string) => ({ instagram: "📸", tiktok: "🎵", twitter: "🐦", snapchat: "👻", facebook: "📘" }[p] || "📱");
@@ -613,7 +618,7 @@ export function generateReportHTML(data: PDFReportData): string {
 
   const pageSEO = hasSeo ? `
   <div style="${PAGE_STYLE}">
-    ${HEADER_HTML(4 + (hasWeb?1:0) + (hasSocial?1:0) + 1, totalPages, "تحليل SEO المتقدم", "الكلمات المفتاحية · الروابط الخارجية · المنافسون · ترتيب البحث", "#06b6d4")}
+    ${HEADER_HTML(seoPageNum, totalPages, "تحليل SEO المتقدم", "الكلمات المفتاحية · الروابط الخارجية · المنافسون · ترتيب البحث", "#06b6d4")}
     <div style="padding:16px 28px;">
       <div style="display:flex;gap:12px;margin-bottom:14px;">
         <div style="flex:1;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;text-align:center;">
@@ -652,7 +657,7 @@ export function generateReportHTML(data: PDFReportData): string {
         </div>
       </div>
     </div>
-    ${FOOTER_HTML(4 + (hasWeb?1:0) + (hasSocial?1:0) + 1, reportSerial)}
+    ${FOOTER_HTML(seoPageNum, reportSerial)}
   </div>` : "";
 
   // ===== PAGE 1: الغلاف =====
@@ -808,23 +813,25 @@ export function generateReportHTML(data: PDFReportData): string {
           <div style="display:flex;flex-direction:column;gap:7px;">${platformBlocks}</div>
         </div>
       </div>
-      <div style="background:rgba(14,165,233,0.04);border:1px solid rgba(14,165,233,0.15);border-radius:14px;padding:12px 14px;margin-bottom:12px;">
+      ${hasWeb && web ? `<div style="background:rgba(14,165,233,0.04);border:1px solid rgba(14,165,233,0.15);border-radius:14px;padding:12px 14px;margin-bottom:12px;">
         <div style="font-size:10px;font-weight:800;color:#7dd3fc;margin-bottom:8px;">🌐 تحليل الموقع الإلكتروني</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
           ${[
-            { label: "السرعة", score: web?.loadSpeedScore ?? websiteScore, icon: "⚡" },
-            { label: "SEO", score: web?.seoScore ?? Math.min(websiteScore + 1, 10), icon: "🔍" },
-            { label: "المحتوى", score: web?.contentQualityScore ?? Math.max(websiteScore - 1, 1), icon: "📝" },
-            { label: "الجوال", score: web?.mobileExperienceScore ?? Math.max(websiteScore - 2, 1), icon: "📱" },
-          ].map(m => {
-            const s = Math.round((m.score as number) ?? 0);
+            { label: "السرعة", score: web.loadSpeedScore, icon: "⚡" },
+            { label: "SEO", score: web.seoScore, icon: "🔍" },
+            { label: "المحتوى", score: web.contentQualityScore, icon: "📝" },
+            { label: "الجوال", score: web.mobileExperienceScore, icon: "📱" },
+          ].filter(m => m.score != null).map(m => {
+            const s = Math.round(m.score as number);
             const c = s >= 7 ? "#22c55e" : s >= 5 ? "#f59e0b" : "#ef4444";
             return `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:9px;text-align:center;"><div style="font-size:15px;margin-bottom:3px;">${m.icon}</div><div style="font-size:20px;font-weight:900;color:${c};line-height:1;">${s}</div><div style="font-size:8px;color:#64748b;margin-top:2px;">${m.label}</div></div>`;
           }).join("")}
         </div>
-        ${web?.summary ? `<div style="margin-top:8px;padding:7px 10px;background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.15);border-radius:8px;font-size:9px;color:#7dd3fc;line-height:1.6;">${web.summary}</div>` : ""}
-        ${!lead.website ? `<div style="margin-top:8px;padding:7px 10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;font-size:9px;color:#fde68a;">💡 غياب الموقع يجعل العملاء الباحثين على جوجل لا يجدون نقطة تحويل واضحة — فرصة تحسين ذات أثر مباشر على الثقة</div>` : ""}
-      </div>
+        ${web.summary ? `<div style="margin-top:8px;padding:7px 10px;background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.15);border-radius:8px;font-size:9px;color:#7dd3fc;line-height:1.6;">${web.summary}</div>` : ""}
+      </div>` : !lead.website ? `<div style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.2);border-radius:14px;padding:12px 14px;margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:800;color:#fde68a;margin-bottom:6px;">🌐 الموقع الإلكتروني — غير متاح</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.7;">💡 غياب الموقع يجعل العملاء الباحثين على جوجل لا يجدون نقطة تحويل واضحة — فرصة تحسين ذات أثر مباشر على الثقة والمبيعات</div>
+      </div>` : ""}
       ${analysis?.sectorInsights || analysis?.benchmarkComparison ? `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px 14px;"><div style="font-size:10px;font-weight:800;color:#94a3b8;margin-bottom:7px;">💡 رؤى قطاعية ومقارنة بالسوق</div>${analysis?.sectorInsights ? `<div style="font-size:9px;color:#64748b;line-height:1.7;margin-bottom:5px;">${analysis.sectorInsights}</div>` : ""}${analysis?.benchmarkComparison ? `<div style="font-size:9px;color:#64748b;line-height:1.7;">${analysis.benchmarkComparison}</div>` : ""}</div>` : ""}
     </div>
     ${FOOTER_HTML(3, reportSerial)}
@@ -834,7 +841,7 @@ export function generateReportHTML(data: PDFReportData): string {
   const page4 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;bottom:-80px;right:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.05) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
-    ${HEADER_HTML(4, totalPages, "التوصيات والخطة", "الأولويات المرتبة وتوقيت التنفيذ المثالي", "#f97316")}
+    ${HEADER_HTML(recommendationsPageNum, totalPages, "التوصيات والخطة", "الأولويات المرتبة وتوقيت التنفيذ المثالي", "#f97316")}
     <div style="padding:14px 36px;position:relative;z-index:1;">
       <div style="margin-bottom:16px;padding:16px 18px;background:linear-gradient(135deg,${season.color}18,${season.color}08);border:1.5px solid ${season.color}50;border-radius:16px;position:relative;overflow:hidden;">
         <div style="position:absolute;top:-20px;left:-20px;font-size:80px;opacity:0.07;">${season.emoji}</div>
@@ -855,14 +862,14 @@ export function generateReportHTML(data: PDFReportData): string {
       ${analysis?.iceBreaker && !isClientFacing ? `<div style="padding:12px 16px;background:linear-gradient(135deg,rgba(34,197,94,0.05),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:7px;">💬 نص التواصل المقترح (Ice Breaker)</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;font-style:italic;padding-right:10px;border-right:3px solid rgba(34,197,94,0.4);">"${analysis.iceBreaker}"</div></div>` : ""}
       ${analysis?.urgencyLevel ? `<div style="margin-top:12px;padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px;display:flex;align-items:center;justify-content:space-between;"><div style="font-size:9px;color:#94a3b8;">مستوى الإلحاح</div><div style="font-size:10px;font-weight:700;color:${analysis.urgencyLevel === "high" ? "#ef4444" : analysis.urgencyLevel === "medium" ? "#f59e0b" : "#22c55e"};">${getUrgencyLabel(analysis.urgencyLevel)}</div></div>` : ""}
     </div>
-    ${FOOTER_HTML(4, reportSerial)}
+    ${FOOTER_HTML(recommendationsPageNum, reportSerial)}
   </div>`;
 
   // ===== PAGE 5: الإغلاق والثقة =====
   const page5 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;top:-60px;right:-40px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.06) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
-    ${HEADER_HTML(totalPages, totalPages, "الإغلاق والتواصل", "شهادة الاعتماد وقنوات التواصل المباشر", "#22c55e")}
+    ${HEADER_HTML(closingPageNum, totalPages, "الإغلاق والتواصل", "شهادة الاعتماد وقنوات التواصل المباشر", "#22c55e")}
     <div style="padding:16px 36px;position:relative;z-index:1;">
       <div style="margin-bottom:16px;padding:18px 22px;background:linear-gradient(135deg,rgba(34,197,94,0.05),rgba(14,165,233,0.04));border:2px solid rgba(34,197,94,0.2);border-radius:16px;text-align:center;position:relative;overflow:hidden;">
         <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#a78bfa);"></div>
@@ -921,11 +928,10 @@ export function generateReportHTML(data: PDFReportData): string {
         <div style="font-size:7.5px;color:#334155;line-height:1.8;text-align:center;">هذا التقرير سري ومخصص حصريًا لعناية العميل المذكور أعلاه ويحظر توزيعه أو نسخه دون إذن كتابي مسبق. جميع التحليلات والتوصيات هي آراء مهنية مبنية على بيانات متاحة وقت إعداده ولا تمثل ضمانًا لنتائج محددة. <strong style="color:#22c55e;">رقم التقرير: ${reportSerial}</strong></div>
       </div>
     </div>
-    ${FOOTER_HTML(totalPages, reportSerial)}
+    ${FOOTER_HTML(closingPageNum, reportSerial)}
   </div>`;
 
   // ===== REVIEWS PAGE =====
-  const reviewsPageNum = 5 + (hasWeb ? 1 : 0) + (hasSocial ? 1 : 0) + (hasSeo ? 1 : 0) + 1;
   const reviewCount = reviews?.reviewCount ?? lead.reviewCount ?? 0;
   const googleRating = reviews?.googleRating ?? null;
   const sentPos = reviews?.sentimentPositive ?? (reviewCount > 50 ? 72 : reviewCount > 20 ? 65 : 60);
