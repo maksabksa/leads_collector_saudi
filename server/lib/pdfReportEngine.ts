@@ -245,27 +245,95 @@ function getDigitalReadinessLabel(score: number): { status: string; readiness: s
 const FINANCIAL_DISCLAIMER = `<div style="margin-top:6px;padding:5px 10px;background:rgba(255,255,255,0.03);border-right:2px solid rgba(148,163,184,0.3);border-radius:0 6px 6px 0;"><span style="font-size:8px;color:#475569;font-style:italic;">تقدير أولي استرشادي مبني على فجوات الحضور الرقمي وسلوك الطلب المحلي وحجم الأثر المتوقع عند معالجة الثغرة. يحتاج التأكيد في التحليل المتقدم.</span></div>`;
 
 function getCurrentSeason(): { name: string; emoji: string; color: string; urgency: string; tip: string } {
-  const month = new Date().getMonth() + 1;
-  if (month === 3 || month === 4) return {
-    name: "موسم رمضان والعيد", emoji: "🌙", color: "#a78bfa",
-    urgency: "⚡ أعلى موسم مبيعات في السنة — لا تفوّت الفرصة",
-    tip: "الآن هو الوقت الأمثل لإطلاق حملات المحتوى والعروض الحصرية"
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const mmdd = month * 100 + day; // MMDD للمقارنة السريعة
+
+  // ===== تواريخ رمضان الدقيقة (ميلادية) =====
+  const ramadanRanges: Record<number, [number, number]> = {
+    2025: [301, 330],  // 1 مارس - 30 مارس 2025
+    2026: [218, 319],  // 18 فبراير - 19 مارس 2026
+    2027: [208, 308],  // 8 فبراير - 8 مارس 2027
+    2028: [128, 226],  // 28 يناير - 26 فبراير 2028
   };
-  if (month >= 8 && month <= 9) return {
-    name: "موسم العودة للمدارس", emoji: "📚", color: "#0ea5e9",
-    urgency: "🎯 موسم شراء نشط — الأسر تبحث عن العروض",
-    tip: "ركّز على المحتوى التعليمي والعروض العائلية"
+  // عيد الفطر: 3 أيام بعد انتهاء رمضان
+  const eidFitrRanges: Record<number, [number, number]> = {
+    2025: [330, 402],
+    2026: [319, 323],
+    2027: [308, 312],
+    2028: [226, 302],
   };
-  if (month === 9 || month === 10) return {
-    name: "موسم اليوم الوطني", emoji: "🇸🇦", color: "#22c55e",
-    urgency: "🎉 فرصة ذهبية للحملات الوطنية",
-    tip: "استخدم الهوية الوطنية في المحتوى لزيادة التفاعل"
+  // عيد الأضحى
+  const eidAdhaRanges: Record<number, [number, number]> = {
+    2025: [606, 613],
+    2026: [526, 602],
+    2027: [516, 523],
+    2028: [504, 511],
   };
-  if (month === 11 || month === 12) return {
-    name: "موسم نهاية العام", emoji: "🎄", color: "#f97316",
-    urgency: "🛍️ موسم التسوق الأكثر نشاطاً",
-    tip: "العروض والتخفيضات تحقق أعلى معدلات تحويل"
-  };
+
+  const ramadan = ramadanRanges[year];
+  const eidFitr = eidFitrRanges[year];
+  const eidAdha = eidAdhaRanges[year];
+
+  // رمضان الكريم
+  if (ramadan && mmdd >= ramadan[0] && mmdd <= ramadan[1]) {
+    return {
+      name: "موسم رمضان المبارك", emoji: "🌙", color: "#a78bfa",
+      urgency: "⚡ أعلى موسم مبيعات في السنة — لا تفوّت الفرصة",
+      tip: "الآن هو الوقت الأمثل لإطلاق حملات المحتوى والعروض الحصرية"
+    };
+  }
+  // عيد الفطر
+  if (eidFitr && mmdd >= eidFitr[0] && mmdd <= eidFitr[1]) {
+    return {
+      name: "موسم عيد الفطر المبارك", emoji: "🎉", color: "#f59e0b",
+      urgency: "🎊 موسم الإنفاق الأعلى — العائلات تتسوق بكثافة",
+      tip: "ركّز على العروض العائلية والهدايا والأجواء الاحتفالية"
+    };
+  }
+  // عيد الأضحى
+  if (eidAdha && mmdd >= eidAdha[0] && mmdd <= eidAdha[1]) {
+    return {
+      name: "موسم عيد الأضحى المبارك", emoji: "🐑", color: "#f59e0b",
+      urgency: "🎉 موسم الإنفاق العائلي الأعلى — فرصة ذهبية",
+      tip: "ركّز على العروض العائلية والخدمات الموسمية والهدايا"
+    };
+  }
+  // اليوم الوطني السعودي: 23 سبتمبر ± 7 أيام
+  if (mmdd >= 916 && mmdd <= 1001) {
+    return {
+      name: "موسم اليوم الوطني السعودي", emoji: "🇸🇦", color: "#22c55e",
+      urgency: "🎉 فرصة ذهبية للحملات الوطنية والعروض الخاصة",
+      tip: "استخدم الهوية الوطنية في المحتوى لزيادة التفاعل والمبيعات"
+    };
+  }
+  // موسم العودة للمدارس: أغسطس - أوائل سبتمبر
+  if (mmdd >= 801 && mmdd <= 915) {
+    return {
+      name: "موسم العودة للمدارس", emoji: "📚", color: "#0ea5e9",
+      urgency: "🎯 موسم شراء نشط — الأسر تبحث عن العروض",
+      tip: "ركّز على المحتوى التعليمي والعروض العائلية والمستلزمات المدرسية"
+    };
+  }
+  // موسم الصيف: يونيو - يوليو
+  if (mmdd >= 601 && mmdd <= 731) {
+    return {
+      name: "موسم الصيف والسفر", emoji: "☀️", color: "#eab308",
+      urgency: "🌴 موسم السفر والترفيه — فرصة للخدمات الترفيهية",
+      tip: "ركّز على المحتوى الترفيهي والعروض الصيفية والسياحة الداخلية"
+    };
+  }
+  // نهاية العام: نوفمبر - ديسمبر
+  if (mmdd >= 1101 && mmdd <= 1231) {
+    return {
+      name: "موسم نهاية العام والجمعة البيضاء", emoji: "🛍️", color: "#f97316",
+      urgency: "🛍️ موسم التسوق الأكثر نشاطاً عالمياً",
+      tip: "العروض والتخفيضات تحقق أعلى معدلات تحويل — ابدأ التحضير مبكراً"
+    };
+  }
+  // الموسم العادي
   return {
     name: "الموسم العادي", emoji: "📅", color: "#64748b",
     urgency: "📊 وقت مثالي لبناء الأساس الرقمي",
@@ -947,7 +1015,8 @@ export function generateReportHTML(data: PDFReportData): string {
   #print-toolbar .btn-close { background:rgba(255,255,255,0.04); color:#64748b; border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:8px 14px; font-size:12px; cursor:pointer; font-family:'Tajawal',sans-serif; }
   .pages-container { padding:60px 16px 20px; display:flex; flex-direction:column; align-items:center; gap:16px; }
   @media print { .pages-container { padding:0; gap:0; } }
-  .page-wrapper { width:210mm; box-shadow:0 8px 40px rgba(0,0,0,0.6), 0 0 60px rgba(34,197,94,0.04); }
+  .page-wrapper { width:210mm; box-shadow:0 8px 40px rgba(0,0,0,0.6), 0 0 60px rgba(34,197,94,0.04); position:relative; overflow:hidden; }
+  .page-wrapper::after { content:"حصري من مكسب"; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-35deg); font-size:56px; font-weight:900; color:rgba(34,197,94,0.035); white-space:nowrap; pointer-events:none; z-index:9999; font-family:'Cairo',sans-serif; letter-spacing:6px; }
 </style>
 </head>
 <body>
