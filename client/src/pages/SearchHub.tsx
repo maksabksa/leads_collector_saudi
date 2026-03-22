@@ -169,7 +169,10 @@ export default function SearchHub() {
 
   // إضافة عميل
   const [addDialog, setAddDialog] = useState<{ open: boolean; result: any | null; platform: PlatformId | "" }>({ open: false, result: null, platform: "" });
-  const [addForm, setAddForm] = useState({ companyName: "", businessType: "", city: "", phone: "", website: "", notes: "" });
+  const [addForm, setAddForm] = useState({
+    companyName: "", businessType: "", city: "", phone: "", email: "", website: "", notes: "",
+    instagramUrl: "", tiktokUrl: "", snapchatUrl: "", twitterUrl: "", facebookUrl: "", linkedinUrl: "", googleMapsUrl: "",
+  });
   const [addedNames, setAddedNames] = useState<Set<string>>(new Set());
 
   // Popup الخريطة
@@ -450,7 +453,25 @@ export default function SearchHub() {
 
   const handleOpenAddDialog = (result: any, platform: PlatformId) => {
     setAddDialog({ open: true, result, platform });
-    setAddForm({ companyName: result.name || result.fullName || result.username || "", businessType: result.businessCategory || result.types?.[0] || "", city: result.city || city, phone: result.phone || result.formatted_phone_number || "", website: result.website || "", notes: result.bio || result.description || "" });
+    const username = result.username || result.user_name || result.screen_name || "";
+    // بناء روابط المنصات تلقائياً من نتيجة البحث
+    const instagramUrl = platform === "instagram" ? (result.profile_url || (username ? `https://instagram.com/${username}` : "")) : "";
+    const tiktokUrl = platform === "tiktok" ? (result.profile_url || result.url || (username ? `https://tiktok.com/@${username}` : "")) : "";
+    const snapchatUrl = platform === "snapchat" ? (result.profile_url || result.url || (username ? `https://snapchat.com/add/${username}` : "")) : "";
+    const twitterUrl = platform === "twitter" ? (result.profile_url || result.url || (username ? `https://twitter.com/${username}` : "")) : "";
+    const facebookUrl = platform === "facebook" ? (result.profile_url || result.url || "") : "";
+    const linkedinUrl = platform === "linkedin" ? (result.profile_url || result.url || "") : "";
+    const googleMapsUrl = platform === "google" ? (result.url || (result.place_id ? `https://maps.google.com/?place_id=${result.place_id}` : "")) : "";
+    setAddForm({
+      companyName: result.name || result.fullName || result.username || "",
+      businessType: result.businessCategory || result.types?.[0] || "",
+      city: result.city || city,
+      phone: result.phone || result.formatted_phone_number || "",
+      email: result.email || "",
+      website: result.website || "",
+      notes: result.bio || result.description || "",
+      instagramUrl, tiktokUrl, snapchatUrl, twitterUrl, facebookUrl, linkedinUrl, googleMapsUrl,
+    });
     if (platform === "google" && result.place_id) setCurrentPlaceId(result.place_id);
     else setCurrentPlaceId(null);
   };
@@ -460,22 +481,29 @@ export default function SearchHub() {
     try {
       const r = addDialog.result;
       const username = r.username || r.user_name || r.screen_name || "";
-      // بناء رابط المنصة تلقائياً
-      const platformUrls: Record<string, string | undefined> = {
-        instagramUrl: addDialog.platform === "instagram" ? (r.profile_url || (username ? `https://instagram.com/${username}` : undefined)) : undefined,
-        tiktokUrl: addDialog.platform === "tiktok" ? (r.profile_url || r.url || (username ? `https://tiktok.com/@${username}` : undefined)) : undefined,
-        snapchatUrl: addDialog.platform === "snapchat" ? (r.profile_url || r.url || (username ? `https://snapchat.com/add/${username}` : undefined)) : undefined,
-        twitterUrl: addDialog.platform === "twitter" ? (r.profile_url || r.url || (username ? `https://twitter.com/${username}` : undefined)) : undefined,
-        facebookUrl: addDialog.platform === "facebook" ? (r.profile_url || r.url || undefined) : undefined,
-        linkedinUrl: addDialog.platform === "linkedin" ? (r.profile_url || r.url || undefined) : undefined,
-        googleMapsUrl: addDialog.platform === "google" ? (r.url || (r.place_id ? `https://maps.google.com/?place_id=${r.place_id}` : undefined)) : undefined,
-      };
-      const cleanUrls = Object.fromEntries(Object.entries(platformUrls).filter(([, v]) => v != null)) as Record<string, string>;
+      // استخدام الروابط من addForm (قابلة للتعديل من المستخدم)
+      const cleanUrls: Record<string, string> = {};
+      if (addForm.instagramUrl) cleanUrls.instagramUrl = addForm.instagramUrl;
+      if (addForm.tiktokUrl) cleanUrls.tiktokUrl = addForm.tiktokUrl;
+      if (addForm.snapchatUrl) cleanUrls.snapchatUrl = addForm.snapchatUrl;
+      if (addForm.twitterUrl) cleanUrls.twitterUrl = addForm.twitterUrl;
+      if (addForm.facebookUrl) cleanUrls.facebookUrl = addForm.facebookUrl;
+      if (addForm.linkedinUrl) cleanUrls.linkedinUrl = addForm.linkedinUrl;
+      if (addForm.googleMapsUrl) cleanUrls.googleMapsUrl = addForm.googleMapsUrl;
 
       if (addDialog.platform === "instagram" && r.id) {
-        await addInstagramAsLead.mutateAsync({ accountId: r.id, companyName: addForm.companyName, businessType: addForm.businessType || "غير محدد", city: addForm.city, instagramUrl: platformUrls.instagramUrl || `https://instagram.com/${username}`, phone: addForm.phone || undefined, website: addForm.website || undefined, notes: addForm.notes || undefined });
+        await addInstagramAsLead.mutateAsync({ accountId: r.id, companyName: addForm.companyName, businessType: addForm.businessType || "غير محدد", city: addForm.city, instagramUrl: addForm.instagramUrl || `https://instagram.com/${username}`, phone: addForm.phone || undefined, website: addForm.website || undefined, notes: addForm.notes || undefined });
       } else {
-        await createLead.mutateAsync({ companyName: addForm.companyName, businessType: addForm.businessType || "غير محدد", city: addForm.city || "غير محدد", verifiedPhone: addForm.phone || undefined, website: addForm.website || undefined, ...cleanUrls, notes: addForm.notes || undefined });
+        await createLead.mutateAsync({
+          companyName: addForm.companyName,
+          businessType: addForm.businessType || "غير محدد",
+          city: addForm.city || "غير محدد",
+          verifiedPhone: addForm.phone || undefined,
+          email: addForm.email || undefined,
+          website: addForm.website || undefined,
+          notes: addForm.notes || undefined,
+          ...cleanUrls,
+        });
       }
       setAddedNames(prev => { const next = new Set(prev); next.add(addForm.companyName); return next; });
       toast.success("تمت الإضافة كعميل محتمل", { description: addForm.companyName });
@@ -937,42 +965,148 @@ export default function SearchHub() {
 
       {/* ===== نافذة إضافة عميل ===== */}
       <Dialog open={addDialog.open} onOpenChange={open => !open && setAddDialog({ open: false, result: null, platform: "" })}>
-        <DialogContent className="max-w-md" dir="rtl">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-primary" />
               إضافة كعميل محتمل
+              {addDialog.platform && (
+                <span className="text-xs text-muted-foreground font-normal">
+                  — من {PLATFORMS.find(p => p.id === addDialog.platform)?.label}
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">اسم النشاط *</Label>
-              <Input value={addForm.companyName} onChange={e => setAddForm(f => ({ ...f, companyName: e.target.value }))} className="h-9 text-sm" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            {/* البيانات الأساسية */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">البيانات الأساسية</p>
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">نوع النشاط</Label>
-                <Input value={addForm.businessType} onChange={e => setAddForm(f => ({ ...f, businessType: e.target.value }))} className="h-9 text-sm" placeholder="مطعم، صالون..." />
+                <Label className="text-xs text-muted-foreground mb-1 block">اسم النشاط *</Label>
+                <Input value={addForm.companyName} onChange={e => setAddForm(f => ({ ...f, companyName: e.target.value }))} className="h-9 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">نوع النشاط</Label>
+                  <Input value={addForm.businessType} onChange={e => setAddForm(f => ({ ...f, businessType: e.target.value }))} className="h-9 text-sm" placeholder="مطعم، صالون..." />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">المدينة</Label>
+                  <Input value={addForm.city} onChange={e => setAddForm(f => ({ ...f, city: e.target.value }))} className="h-9 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Phone className="w-3 h-3" />رقم الهاتف</Label>
+                  <Input value={addForm.phone} onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))} className="h-9 text-sm font-mono" dir="ltr" placeholder="+966..." />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Mail className="w-3 h-3" />الإيميل</Label>
+                  <Input value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} className="h-9 text-sm" dir="ltr" placeholder="info@example.com" type="email" />
+                </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">المدينة</Label>
-                <Input value={addForm.city} onChange={e => setAddForm(f => ({ ...f, city: e.target.value }))} className="h-9 text-sm" />
+                <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Globe className="w-3 h-3" />الموقع الإلكتروني</Label>
+                <Input value={addForm.website} onChange={e => setAddForm(f => ({ ...f, website: e.target.value }))} className="h-9 text-sm" dir="ltr" placeholder="https://..." />
               </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">رقم الهاتف</Label>
-              <Input value={addForm.phone} onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))} className="h-9 text-sm font-mono" dir="ltr" placeholder="+966..." />
+
+            {/* روابط السوشيال */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">روابط السوشيال ميديا</p>
+              {(addForm.instagramUrl || addDialog.platform === "instagram") && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Instagram className="w-3 h-3 text-pink-400" />إنستجرام</Label>
+                  <Input value={addForm.instagramUrl} onChange={e => setAddForm(f => ({ ...f, instagramUrl: e.target.value }))} className="h-8 text-xs" dir="ltr" placeholder="https://instagram.com/..." />
+                </div>
+              )}
+              {(addForm.tiktokUrl || addDialog.platform === "tiktok") && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Video className="w-3 h-3 text-purple-400" />تيك توك</Label>
+                  <Input value={addForm.tiktokUrl} onChange={e => setAddForm(f => ({ ...f, tiktokUrl: e.target.value }))} className="h-8 text-xs" dir="ltr" placeholder="https://tiktok.com/@..." />
+                </div>
+              )}
+              {(addForm.snapchatUrl || addDialog.platform === "snapchat") && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Camera className="w-3 h-3 text-yellow-400" />سناب شات</Label>
+                  <Input value={addForm.snapchatUrl} onChange={e => setAddForm(f => ({ ...f, snapchatUrl: e.target.value }))} className="h-8 text-xs" dir="ltr" placeholder="https://snapchat.com/add/..." />
+                </div>
+              )}
+              {(addForm.twitterUrl || addDialog.platform === "twitter") && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Twitter className="w-3 h-3 text-sky-400" />تويتر / X</Label>
+                  <Input value={addForm.twitterUrl} onChange={e => setAddForm(f => ({ ...f, twitterUrl: e.target.value }))} className="h-8 text-xs" dir="ltr" placeholder="https://twitter.com/..." />
+                </div>
+              )}
+              {(addForm.facebookUrl || addDialog.platform === "facebook") && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Users className="w-3 h-3 text-blue-400" />فيسبوك</Label>
+                  <Input value={addForm.facebookUrl} onChange={e => setAddForm(f => ({ ...f, facebookUrl: e.target.value }))} className="h-8 text-xs" dir="ltr" placeholder="https://facebook.com/..." />
+                </div>
+              )}
+              {(addForm.linkedinUrl || addDialog.platform === "linkedin") && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Linkedin className="w-3 h-3 text-blue-500" />لينكدإن</Label>
+                  <Input value={addForm.linkedinUrl} onChange={e => setAddForm(f => ({ ...f, linkedinUrl: e.target.value }))} className="h-8 text-xs" dir="ltr" placeholder="https://linkedin.com/..." />
+                </div>
+              )}
+              {(addForm.googleMapsUrl || addDialog.platform === "google") && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Map className="w-3 h-3 text-green-400" />Google Maps</Label>
+                  <Input value={addForm.googleMapsUrl} onChange={e => setAddForm(f => ({ ...f, googleMapsUrl: e.target.value }))} className="h-8 text-xs" dir="ltr" placeholder="https://maps.google.com/..." />
+                </div>
+              )}
+              {/* إضافة روابط منصات إضافية */}
+              <div className="flex flex-wrap gap-1 pt-1">
+                {!addForm.instagramUrl && addDialog.platform !== "instagram" && (
+                  <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-pink-400 hover:bg-pink-500/10" onClick={() => setAddForm(f => ({ ...f, instagramUrl: "https://instagram.com/" }))}>
+                    <Instagram className="w-3 h-3 mr-1" />+ إنستجرام
+                  </Button>
+                )}
+                {!addForm.tiktokUrl && addDialog.platform !== "tiktok" && (
+                  <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-purple-400 hover:bg-purple-500/10" onClick={() => setAddForm(f => ({ ...f, tiktokUrl: "https://tiktok.com/@" }))}>
+                    <Video className="w-3 h-3 mr-1" />+ تيك توك
+                  </Button>
+                )}
+                {!addForm.snapchatUrl && addDialog.platform !== "snapchat" && (
+                  <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-yellow-400 hover:bg-yellow-500/10" onClick={() => setAddForm(f => ({ ...f, snapchatUrl: "https://snapchat.com/add/" }))}>
+                    <Camera className="w-3 h-3 mr-1" />+ سناب
+                  </Button>
+                )}
+                {!addForm.twitterUrl && addDialog.platform !== "twitter" && (
+                  <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-sky-400 hover:bg-sky-500/10" onClick={() => setAddForm(f => ({ ...f, twitterUrl: "https://twitter.com/" }))}>
+                    <Twitter className="w-3 h-3 mr-1" />+ تويتر
+                  </Button>
+                )}
+                {!addForm.facebookUrl && addDialog.platform !== "facebook" && (
+                  <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-blue-400 hover:bg-blue-500/10" onClick={() => setAddForm(f => ({ ...f, facebookUrl: "https://facebook.com/" }))}>
+                    <Users className="w-3 h-3 mr-1" />+ فيسبوك
+                  </Button>
+                )}
+                {!addForm.linkedinUrl && addDialog.platform !== "linkedin" && (
+                  <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-blue-500 hover:bg-blue-600/10" onClick={() => setAddForm(f => ({ ...f, linkedinUrl: "https://linkedin.com/company/" }))}>
+                    <Linkedin className="w-3 h-3 mr-1" />+ لينكدإن
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {/* الملاحظات */}
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">الموقع الإلكتروني</Label>
-              <Input value={addForm.website} onChange={e => setAddForm(f => ({ ...f, website: e.target.value }))} className="h-9 text-sm" dir="ltr" />
+              <Label className="text-xs text-muted-foreground mb-1 block">ملاحظات</Label>
+              <textarea
+                value={addForm.notes}
+                onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))}
+                className="w-full h-16 text-xs bg-background border border-input rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="ملاحظات إضافية..."
+              />
             </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setAddDialog({ open: false, result: null, platform: "" })}>إلغاء</Button>
             <Button onClick={handleAddLead} disabled={!addForm.companyName || createLead.isPending || addInstagramAsLead.isPending} className="gap-2">
               {(createLead.isPending || addInstagramAsLead.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              إضافة
+              إضافة كعميل
             </Button>
           </DialogFooter>
         </DialogContent>

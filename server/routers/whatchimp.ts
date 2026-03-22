@@ -148,6 +148,7 @@ type LeadForWhatchimp = {
   socialSince?: string | null;
   revenueOpportunity?: string | null;
   analysisStatus?: string | null;
+  email?: string | null;
 };// ─── Build professional lead brief for Whatchimp note ──────────────────────────────────────
 function buildLeadBrief(lead: LeadForWhatchimp): string {
   const lines: string[] = [];
@@ -160,6 +161,7 @@ function buildLeadBrief(lead: LeadForWhatchimp): string {
   const loc = [lead.city, lead.district].filter(Boolean).join(", ");
   if (loc) lines.push(`📍 الموقع: ${loc}`);
   if (lead.crNumber) lines.push(`📄 سجل تجاري: ${lead.crNumber}`);
+  if (lead.email) lines.push(`📧 الإيميل: ${lead.email}`);
 
   // ─── الحضور الرقمي
   const digitalPresence: string[] = [];
@@ -270,6 +272,9 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
 
   // رقم السجل التجاري
   if (lead.crNumber) fields["السجل التجاري"] = lead.crNumber;
+
+  // الإيميل
+  if (lead.email) fields["الإيميل"] = lead.email;
 
   // تاريخ الظهور على السوشيال
   if (lead.socialSince) fields["تاريخ الظهور على السوشيال"] = lead.socialSince;
@@ -384,6 +389,14 @@ async function sendLeadToWhatchimp(
     });
     return { success: false, phone, error: errorMessage };
   }
+}
+
+// ─── Export for internal use (called after analysis completes) ──────────────
+export async function sendLeadToWhatchimpInternal(
+  settings: typeof whatchimpSettings.$inferSelect,
+  lead: LeadForWhatchimp
+): Promise<{ success: boolean; phone: string; error?: string }> {
+  return sendLeadToWhatchimp(settings, lead, undefined, undefined);
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -526,6 +539,8 @@ export const whatchimpRouter = router({
         notes: leads.notes,
         crNumber: leads.crNumber,
         socialSince: leads.socialSince,
+        email: leads.email,
+        analysisStatus: leads.analysisStatus,
       }).from(leads).where(eq(leads.id, input.leadId)).limit(1);
 
       if (!leadRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
@@ -571,6 +586,8 @@ export const whatchimpRouter = router({
         notes: leads.notes,
         crNumber: leads.crNumber,
         socialSince: leads.socialSince,
+        email: leads.email,
+        analysisStatus: leads.analysisStatus,
       }).from(leads).where(inArray(leads.id, input.leadIds));
 
       let success = 0, failed = 0, skipped = 0;

@@ -60,7 +60,7 @@ import { serpQueueRouter } from "./routers/serpQueue";
 import { seasonsRouter } from "./routers/seasons";
 import { reportStyleRouter } from "./routers/reportStyle";
 import { leadIntelligenceRouter } from "./routers/leadIntelligence";
-import { whatchimpRouter } from "./routers/whatchimp";
+import { whatchimpRouter, sendLeadToWhatchimpInternal } from "./routers/whatchimp";
 import { missingFieldsSearchRouter } from "./routers/missingFieldsSearch";
 import { autoSearchRouter } from "./routers/autoSearch";
 import { seoAdvancedRouter } from "./routers/seoAdvanced";
@@ -214,6 +214,7 @@ const leadsRouter = router({
       zoneId: z.number().optional(),
       zoneName: z.string().optional(),
       verifiedPhone: z.string().optional(),
+      email: z.string().email().optional().or(z.literal('')),
       website: z.string().optional(),
       googleMapsUrl: z.string().optional(),
       instagramUrl: z.string().optional(),
@@ -404,6 +405,24 @@ const leadsRouter = router({
           }
 
           await updateLead(id, { analysisStatus: "completed" });
+
+          // ─── إرسال Whatchimp بعد اكتمال التحليل ───────────────────────────────
+          try {
+            const dbConn = await getDb();
+            if (dbConn) {
+              const { whatchimpSettings: wsTable } = await import('../drizzle/schema');
+              const { eq: eqOp } = await import('drizzle-orm');
+              const settingsRows = await dbConn.select().from(wsTable).where(eqOp(wsTable.isActive, true)).limit(1);
+              if (settingsRows[0]) {
+                const completedLead = await getLeadById(id);
+                if (completedLead) {
+                  await sendLeadToWhatchimpInternal(settingsRows[0], completedLead);
+                }
+              }
+            }
+          } catch (wErr) {
+            console.error("[Auto-Whatchimp] فشل إرسال Whatchimp بعد التحليل:", wErr);
+          }
         } catch (err) {
           console.error("[Auto-Analysis] فشل التحليل التلقائي:", err);
           await updateLead(id, { analysisStatus: "failed" });
@@ -423,6 +442,7 @@ const leadsRouter = router({
       zoneId: z.number().optional(),
       zoneName: z.string().optional(),
       verifiedPhone: z.string().optional(),
+      email: z.string().email().optional().or(z.literal('')).nullable(),
       website: z.string().optional(),
       googleMapsUrl: z.string().optional(),
       instagramUrl: z.string().optional(),

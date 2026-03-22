@@ -61,6 +61,7 @@ export const leads = mysqlTable("leads", {
   zoneId: int("zoneId"),
   zoneName: varchar("zoneName", { length: 100 }),
   verifiedPhone: varchar("verifiedPhone", { length: 20 }),
+  email: varchar("email", { length: 320 }),  // إيميل النشاط التجاري
   website: varchar("website", { length: 500 }),
   googleMapsUrl: varchar("googleMapsUrl", { length: 1000 }),
   instagramUrl: varchar("instagramUrl", { length: 500 }),
