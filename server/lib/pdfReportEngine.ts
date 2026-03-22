@@ -494,7 +494,7 @@ export function generateReportHTML(data: PDFReportData): string {
   const hasReviews = !!(reviews || (lead.reviewCount && lead.reviewCount > 0));
   // حساب أرقام الصفحات ديناميكياً
   // الترتيب المنطقي: 1=الغلاف, 2=الملخص, ثم التفاصيل (موقع+سوشيال+SEO+تعليقات), ثم التحليل العميق, ثم التوصيات, ثم الإغلاق
-  let _pageCounter = 2; // 1=الغلاف, 2=الملخص التنفيذي
+  let _pageCounter = 3; // 1=استقبال مكسب, 2=الغلاف, 3=الملخص التنفيذي
   const webPageNum = hasWeb ? ++_pageCounter : 0;
   const socialPageNum = hasSocial ? ++_pageCounter : 0;
   const seoPageNum = hasSeo ? ++_pageCounter : 0;
@@ -662,6 +662,115 @@ export function generateReportHTML(data: PDFReportData): string {
     ${FOOTER_HTML(seoPageNum, reportSerial)}
   </div>` : "";
 
+
+  // ===== PAGE 0: صفحة استقبال مكسب =====
+  const page0 = `<div style="${PAGE_STYLE}">
+    <div style="position:absolute;top:-120px;right:-120px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 65%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-100px;left:-100px;width:450px;height:450px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.06) 0%,transparent 65%);pointer-events:none;"></div>
+    ${WATERMARK_HTML}
+    <div style="padding:14px 36px;display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(34,197,94,0.15);">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e;"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#0ea5e9;box-shadow:0 0 8px #0ea5e9;"></div>
+        <div style="width:4px;height:4px;border-radius:50%;background:#a78bfa;box-shadow:0 0 6px #a78bfa;"></div>
+      </div>
+      <div style="font-size:9px;color:#334155;letter-spacing:2px;font-weight:600;">MAKSAB · وكالة تسويق رقمي · المملكة العربية السعودية</div>
+      <div style="font-size:9px;color:#334155;">${dateStr}</div>
+    </div>
+    <div style="padding:28px 36px 16px;text-align:center;position:relative;z-index:1;">
+      <div style="margin-bottom:16px;display:flex;justify-content:center;">
+        <div style="padding:12px 18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;display:inline-block;">
+          <img src="${MAKSAB_LOGO_URL}" style="height:60px;width:auto;max-width:190px;" onerror="this.style.display='none'" />
+        </div>
+      </div>
+      <div style="font-size:44px;font-weight:900;color:#f8fafc;letter-spacing:2px;margin-bottom:4px;text-shadow:0 0 60px rgba(34,197,94,0.2);">مكسب لخدمات الاعمال</div>
+      <div style="font-size:13px;color:#22c55e;font-weight:700;letter-spacing:3px;margin-bottom:4px;">وكالة التسويق الرقمي المتخصصة</div>
+      <div style="font-size:10px;color:#475569;letter-spacing:1px;">المملكة العربية السعودية · خبرة أكثر من 5 سنوات في السوق السعودي</div>
+      <div style="margin:14px auto;width:180px;height:2px;background:linear-gradient(90deg,transparent,#22c55e,#0ea5e9,transparent);border-radius:2px;box-shadow:0 0 12px rgba(34,197,94,0.5);"></div>
+    </div>
+    <div style="padding:0 36px 16px;position:relative;z-index:1;">
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 18px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:20px;">
+          <div style="width:5px;height:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></div>
+          <span style="font-size:10px;color:#22c55e;font-weight:800;letter-spacing:1px;">من نحن وماذا نقدم</span>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;padding:14px 18px;background:linear-gradient(135deg,rgba(34,197,94,0.05) 0%,rgba(14,165,233,0.04) 100%);border:1px solid rgba(34,197,94,0.15);border-radius:13px;">
+        <div style="font-size:11.5px;color:#cbd5e1;line-height:2;text-align:center;">
+          <strong style="color:#f1f5f9;font-size:13px;">مكسب</strong> هي وكالة تسويق رقمي سعودية متخصصة في مساعدة الأنشطة التجارية على
+          <strong style="color:#22c55e;"> بناء حضور رقمي قوي</strong>، تحقيق نمو مستدام، وتحويل الزوار إلى عملاء حقيقيين.
+          نعمل مع أصحاب الأعمال في جميع مناطق المملكة لتقديم حلول تسويقية مخصصة ومبنية على بيانات حقيقية.
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;border-top:2px solid #e1306c33;">
+          <div style="font-size:17px;margin-bottom:4px;">📱</div>
+          <div style="font-size:9.5px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">إدارة السوشيال ميديا</div>
+          <div style="font-size:8px;color:#475569;line-height:1.5;">محتوى إبداعي يومي على إنستغرام، تيك توك، سناب شات وتويتر</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;border-top:2px solid #0ea5e933;">
+          <div style="font-size:17px;margin-bottom:4px;">🌐</div>
+          <div style="font-size:9.5px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">تصميم المواقع</div>
+          <div style="font-size:8px;color:#475569;line-height:1.5;">مواقع احترافية سريعة ومتجاوبة مع جميع الأجهزة</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;border-top:2px solid #f9731633;">
+          <div style="font-size:17px;margin-bottom:4px;">🎯</div>
+          <div style="font-size:9.5px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">الإعلانات المدفوعة</div>
+          <div style="font-size:8px;color:#475569;line-height:1.5;">حملات جوجل وميتا وسناب شات بعائد استثمار مضمون</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;border-top:2px solid #22c55e33;">
+          <div style="font-size:17px;margin-bottom:4px;">🔍</div>
+          <div style="font-size:9.5px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">تحسين محركات البحث</div>
+          <div style="font-size:8px;color:#475569;line-height:1.5;">تصدر نتائج جوجل وزيادة الزيارات العضوية المجانية</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;border-top:2px solid #a78bfa33;">
+          <div style="font-size:17px;margin-bottom:4px;">🤖</div>
+          <div style="font-size:9.5px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">تحليل بالذكاء الاصطناعي</div>
+          <div style="font-size:8px;color:#475569;line-height:1.5;">تقارير تحليلية عميقة مبنية على بيانات حقيقية من السوق</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;border-top:2px solid #eab30833;">
+          <div style="font-size:17px;margin-bottom:4px;">📊</div>
+          <div style="font-size:9.5px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">استراتيجية التسويق</div>
+          <div style="font-size:8px;color:#475569;line-height:1.5;">خطط تسويقية مخصصة لكل نشاط وكل مدينة في السعودية</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+        <div style="text-align:center;padding:11px 6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;">
+          <div style="font-size:22px;font-weight:900;color:#22c55e;text-shadow:0 0 20px #22c55e66;line-height:1;margin-bottom:3px;">+500</div>
+          <div style="font-size:8px;color:#64748b;font-weight:600;">عميل راضٍ</div>
+        </div>
+        <div style="text-align:center;padding:11px 6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;">
+          <div style="font-size:22px;font-weight:900;color:#0ea5e9;text-shadow:0 0 20px #0ea5e966;line-height:1;margin-bottom:3px;">+5</div>
+          <div style="font-size:8px;color:#64748b;font-weight:600;">سنوات خبرة</div>
+        </div>
+        <div style="text-align:center;padding:11px 6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;">
+          <div style="font-size:22px;font-weight:900;color:#a78bfa;text-shadow:0 0 20px #a78bfa66;line-height:1;margin-bottom:3px;">+20</div>
+          <div style="font-size:8px;color:#64748b;font-weight:600;">مدينة سعودية</div>
+        </div>
+        <div style="text-align:center;padding:11px 6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;">
+          <div style="font-size:22px;font-weight:900;color:#eab308;text-shadow:0 0 20px #eab30866;line-height:1;margin-bottom:3px;">24/7</div>
+          <div style="font-size:8px;color:#64748b;font-weight:600;">دعم متواصل</div>
+        </div>
+      </div>
+      <div style="padding:14px 18px;background:linear-gradient(135deg,rgba(14,165,233,0.06) 0%,rgba(167,139,250,0.04) 100%);border:1px solid rgba(14,165,233,0.2);border-radius:13px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div style="font-size:26px;flex-shrink:0;">🤝</div>
+          <div>
+            <div style="font-size:12px;font-weight:800;color:#7dd3fc;margin-bottom:5px;">أهلاً وسهلاً بك في مكسب</div>
+            <div style="font-size:10px;color:#94a3b8;line-height:1.9;">
+              يسعدنا تقديم هذا التقرير التحليلي المخصص لـ
+              <strong style="color:#f1f5f9;">${lead.companyName}</strong>.
+              لقد أجرينا تحليلاً شاملاً لحضورك الرقمي وقارنّاه بالسوق والمنافسين،
+              وأعددنا لك خارطة طريق واضحة لتحقيق نمو ملموس.
+              <strong style="color:#22c55e;">هذا التقرير هو بداية شراكة نجاح حقيقية.</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${FOOTER_HTML(1, reportSerial)}
+  </div>`;
+
   // ===== PAGE 1: الغلاف =====
   const page1 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;top:-100px;right:-100px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 70%);pointer-events:none;"></div>
@@ -736,14 +845,14 @@ export function generateReportHTML(data: PDFReportData): string {
         <div style="padding:3px 10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:20px;font-size:8px;color:#86efac;">الأولوية الآن: ${priorityOneLabel}</div>
       </div>
     </div>
-    ${FOOTER_HTML(1, reportSerial)}
+    ${FOOTER_HTML(2, reportSerial)}
   </div>`;
 
   // ===== PAGE 2: الملخص التنفيذي =====
   const page2 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;top:-60px;left:-60px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.05) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
-    ${HEADER_HTML(2, totalPages, "الملخص التنفيذي", "تقييم شامل للحضور الرقمي والفرص المتاحة")}
+    ${HEADER_HTML(3, totalPages, "الملخص التنفيذي", "تقييم شامل للحضور الرقمي والفرص المتاحة")}
     <div style="padding:16px 36px;position:relative;z-index:1;">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
         <div style="background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:14px;padding:14px;text-align:center;">
@@ -792,7 +901,7 @@ export function generateReportHTML(data: PDFReportData): string {
       ${analysis?.primaryOpportunity ? `<div style="margin-bottom:12px;padding:14px 18px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:7px;">🎯 أبرز فرصة غير مستثمرة</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.primaryOpportunity}</div>${IMPACT_NOTE}</div>` : ""}
       ${analysis?.competitivePosition ? `<div style="padding:14px 18px;background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.15);border-radius:14px;"><div style="font-size:10px;font-weight:800;color:#c4b5fd;margin-bottom:7px;">🏆 الموقع التنافسي</div><div style="font-size:10px;color:#94a3b8;line-height:1.8;">${analysis.competitivePosition}</div></div>` : ""}
     </div>
-    ${FOOTER_HTML(2, reportSerial)}
+    ${FOOTER_HTML(3, reportSerial)}
   </div>`;
 
   // ===== PAGE 3: التحليل العميق =====
@@ -1053,6 +1162,7 @@ export function generateReportHTML(data: PDFReportData): string {
   </div>
 </div>
 <div class="pages-container">
+  <div class="page-wrapper">${page0}</div>
   <div class="page-wrapper">${page1}</div>
   <div class="page-wrapper">${page2}</div>
   ${hasWeb ? `<div class="page-wrapper">${pageWebsite}</div>` : ""}
