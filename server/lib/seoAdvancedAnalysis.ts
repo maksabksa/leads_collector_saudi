@@ -63,23 +63,28 @@ export interface SeoAdvancedReport {
 
 // ─── SERP Helper ─────────────────────────────────────────────────────────────
 async function fetchSerpResults(query: string): Promise<string> {
-  const serpHost = ENV.brightDataSerpHost;
-  const serpUser = ENV.brightDataSerpUsername;
-  const serpPass = ENV.brightDataSerpPassword;
+  const apiToken = ENV.brightDataApiToken;
+  const serpZone = ENV.brightDataSerpZone || "serp_api1";
 
-  if (!serpHost || !serpUser || !serpPass) {
+  if (!apiToken) {
     return "";
   }
 
   try {
+    // استخدام Bright Data REST API الصحيح مع URL مشفر بالكامل
     const targetUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=10&hl=ar&gl=sa`;
-    const response = await fetch(targetUrl, {
-      method: "GET",
+    const response = await fetch("https://api.brightdata.com/request", {
+      method: "POST",
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "x-proxy-url": `http://${serpUser}:${serpPass}@${serpHost}`,
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiToken}`,
       },
-      signal: AbortSignal.timeout(30000),
+      body: JSON.stringify({
+        zone: serpZone,
+        url: targetUrl,
+        format: "raw",
+      }),
+      signal: AbortSignal.timeout(35000),
     });
     if (!response.ok) return "";
     return await response.text();
@@ -93,8 +98,10 @@ function extractSerpSnippets(html: string): { title: string; url: string; snippe
   const results: { title: string; url: string; snippet: string }[] = [];
   if (!html) return results;
 
-  // استخراج URLs من نتائج البحث
-  const urlPattern = /href="\/url\?q=([^&"]+)/g;
+  // استخراج URLs من نتائج البحث - نستخدم jsname="UWckNb" الذي يحتوي على روابط النتائج الحقيقية
+  const urlPattern = /jsname="UWckNb"[^>]*href="([^"]+)"/g;
+  // fallback: href مباشر
+  const urlFallback = /href="(https?:\/\/(?!(?:www\.)?(?:google|gstatic|googleapis|youtube|facebook|twitter|instagram|tiktok|snapchat|linkedin|pinterest|reddit|wikipedia|amazon|noon|tripadvisor|yelp|foursquare|maps\.google))[^"]+)"/g;
   const titlePattern = /<h3[^>]*>([^<]+)<\/h3>/g;
 
   let urlMatch;
@@ -102,18 +109,29 @@ function extractSerpSnippets(html: string): { title: string; url: string; snippe
   const urls: string[] = [];
   const titles: string[] = [];
 
+  // محاولة استخراج بـ jsname أولاً
   while ((urlMatch = urlPattern.exec(html)) !== null) {
-    const url = decodeURIComponent(urlMatch[1]);
-    if (url.startsWith("http") && !url.includes("google.com")) {
+    const url = urlMatch[1];
+    if (url.startsWith("http") && !url.includes("google")) {
       urls.push(url);
     }
   }
 
-  while ((titleMatch = titlePattern.exec(html)) !== null) {
-    titles.push(titleMatch[1].replace(/<[^>]+>/g, "").trim());
+  // إذا لم نجد نتائج، نستخدم الـ fallback
+  if (urls.length === 0) {
+    while ((urlMatch = urlFallback.exec(html)) !== null) {
+      const url = urlMatch[1];
+      if (!urls.includes(url)) urls.push(url);
+    }
   }
 
-  for (let i = 0; i < Math.min(urls.length, titles.length, 5); i++) {
+  while ((titleMatch = titlePattern.exec(html)) !== null) {
+    const title = titleMatch[1].replace(/<[^>]+>/g, "").trim();
+    if (title) titles.push(title);
+  }
+
+  const count = Math.min(urls.length, Math.max(titles.length, 1), 10);
+  for (let i = 0; i < count; i++) {
     results.push({ title: titles[i] || "", url: urls[i] || "", snippet: "" });
   }
 
@@ -226,12 +244,9 @@ async function findCompetitors(
   }
 
   return allResults;
-}
-
-// ─── Estimate backlinks via scraping ─────────────────────────────────────────
+}// ─── Estimate backlinks via scraping ─────────────────────────────────────────────
 async function estimateBacklinks(url: string): Promise<{ count: number; domains: string[] }> {
   try {
-    // نستخدم Open Link Profile من Bing Webmaster أو نجمع من SERP
     const domain = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "").split("/")[0];
     const query = `link:${domain} -site:${domain}`;
     const html = await fetchSerpResults(query);
@@ -244,11 +259,22 @@ async function estimateBacklinks(url: string): Promise<{ count: number; domains:
       })
       .filter(Boolean);
 
-    // تقدير عدد الـ backlinks بناءً على نتائج البحث
-    const countMatch = html.match(/(\d[\d,]+)\s*نتيجة|About\s*([\d,]+)\s*results/i);
-    const count = countMatch
-      ? parseInt((countMatch[1] || countMatch[2] || "0").replace(/,/g, ""))
-      : domains.length * 10;
+    // تقدير عدد الـ backlinks - نحاول أنماط متعددة
+    const countPatterns = [
+      /(\d[\d,]+)\s*نتيجة/i,
+      /About\s*([\d,]+)\s*results/i,
+      /([\d,]+)\s*results/i,
+    ];
+    let count = 0;
+    for (const pattern of countPatterns) {
+      const m = html.match(pattern);
+      if (m) {
+        count = parseInt((m[1] || "0").replace(/,/g, ""));
+        if (count > 0) break;
+      }
+    }
+    // إذا لم نجد رقماً، نقدّر بناءً على عدد النتائج
+    if (count === 0) count = domains.length * 15;
 
     const uniqueDomains = Array.from(new Set(domains)).slice(0, 5);
     return { count: Math.min(count, 50000), domains: uniqueDomains };

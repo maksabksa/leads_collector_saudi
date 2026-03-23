@@ -17,4 +17,5 @@ export const ENV = {
   brightDataSerpPort: parseInt(process.env.BRIGHT_DATA_SERP_PORT ?? "33335"),
   brightDataSerpUsername: process.env.BRIGHT_DATA_SERP_USERNAME ?? "",
   brightDataSerpPassword: process.env.BRIGHT_DATA_SERP_PASSWORD ?? "",
+  brightDataSerpZone: process.env.BRIGHT_DATA_SERP_ZONE ?? "serp_api1",
 };

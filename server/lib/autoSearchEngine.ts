@@ -265,24 +265,27 @@ async function searchViaSERP(
   leadBusinessType: string
 ): Promise<SearchCandidate[]> {
   try {
-    const serpHost = ENV.brightDataSerpHost;
-    const serpUser = ENV.brightDataSerpUsername;
-    const serpPass = ENV.brightDataSerpPassword;
+    const apiToken = ENV.brightDataApiToken;
+    const serpZone = ENV.brightDataSerpZone || "serp_api1";
 
-    if (!serpHost || !serpUser || !serpPass) {
+    if (!apiToken) {
       return [];
     }
 
-    const proxyUrl = `http://${serpUser}:${serpPass}@${serpHost}`;
     const targetUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=5&hl=ar&gl=sa`;
 
-    const response = await fetch(targetUrl, {
-      method: "GET",
+    const response = await fetch("https://api.brightdata.com/request", {
+      method: "POST",
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "x-proxy-url": proxyUrl,
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiToken}`,
       },
-      signal: AbortSignal.timeout(30000),
+      body: JSON.stringify({
+        zone: serpZone,
+        url: targetUrl,
+        format: "raw",
+      }),
+      signal: AbortSignal.timeout(35000),
     });
 
     if (!response.ok) return [];
