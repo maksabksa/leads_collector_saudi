@@ -258,40 +258,57 @@ export async function getSocialAnalysesByLeadId(leadId: number) {
   const db = await getDb();
   if (!db) return [];
   const all = await db.select().from(socialAnalyses).where(eq(socialAnalyses.leadId, leadId)).orderBy(desc(socialAnalyses.analyzedAt));
-  // لكل منصة: ندمج أحدث سجل يحتوي على درجات AI + أحدث سجل يحتوي على بيانات حقيقية
-  const platformMap = new Map<string, typeof all[0]>();
+
+  // لكل منصة: نجمع أفضل سجل لكل نوع من البيانات
+  // aiMap: أحدث سجل يحتوي على overallScore (تحليل AI)
+  // realDataMap: السجل الذي يحتوي على أعلى followersCount (بيانات حقيقية)
+  const aiMap = new Map<string, typeof all[0]>();
   const realDataMap = new Map<string, typeof all[0]>();
+
   for (const sa of all) {
-    // سجل بيانات حقيقية (Bright Data)
-    if ((sa.followersCount ?? 0) > 0 || (sa.postsCount ?? 0) > 0) {
+    // سجل بيانات حقيقية: نأخذ الأعلى followersCount (وليس الأحدث)
+    const followers = sa.followersCount ?? 0;
+    const posts = sa.postsCount ?? 0;
+    if (followers > 0 || posts > 0) {
       const existing = realDataMap.get(sa.platform);
-      if (!existing || sa.id > existing.id) realDataMap.set(sa.platform, sa);
+      const existingFollowers = existing?.followersCount ?? 0;
+      // نفضل السجل الذي يحتوي على أعلى عدد متابعين
+      if (!existing || followers > existingFollowers) {
+        realDataMap.set(sa.platform, sa);
+      }
     }
-    // سجل تحليل AI (يحتوي على درجات)
+    // سجل تحليل AI: نأخذ الأحدث (أعلى id)
     if (sa.overallScore !== null && sa.overallScore !== undefined) {
-      const existing = platformMap.get(sa.platform);
-      if (!existing || sa.id > existing.id) platformMap.set(sa.platform, sa);
+      const existing = aiMap.get(sa.platform);
+      if (!existing || sa.id > existing.id) aiMap.set(sa.platform, sa);
     }
   }
+
   // اجمع كل المنصات المعروفة
-  const allPlatformsSet = new Set(Array.from(platformMap.keys()).concat(Array.from(realDataMap.keys())));
-  // إضافة المنصات التي ليس لديها أي نوع من البيانات
+  const allPlatformsSet = new Set<string>([
+    ...Array.from(aiMap.keys()),
+    ...Array.from(realDataMap.keys()),
+  ]);
+
+  // إضافة المنصات التي ليس لديها أي نوع من البيانات (فقط أحدث سجل)
   for (const sa of all) {
     if (!allPlatformsSet.has(sa.platform)) {
       allPlatformsSet.add(sa.platform);
-      platformMap.set(sa.platform, sa);
+      aiMap.set(sa.platform, sa);
     }
   }
+
   const merged: typeof all = [];
   for (const platform of Array.from(allPlatformsSet)) {
-    const aiRecord = platformMap.get(platform);
+    const aiRecord = aiMap.get(platform);
     const realRecord = realDataMap.get(platform);
-    if (aiRecord && realRecord && aiRecord.id !== realRecord.id) {
+
+    if (aiRecord && realRecord) {
       // دمج: خذ الدرجات من AI + البيانات الحقيقية من Bright Data
       merged.push({
         ...aiRecord,
-        followersCount: realRecord.followersCount ?? aiRecord.followersCount,
-        postsCount: realRecord.postsCount ?? aiRecord.postsCount,
+        followersCount: (realRecord.followersCount ?? 0) > 0 ? realRecord.followersCount : aiRecord.followersCount,
+        postsCount: (realRecord.postsCount ?? 0) > 0 ? realRecord.postsCount : aiRecord.postsCount,
         engagementRate: realRecord.engagementRate ?? aiRecord.engagementRate,
         avgLikes: realRecord.avgLikes ?? aiRecord.avgLikes,
         avgViews: realRecord.avgViews ?? aiRecord.avgViews,

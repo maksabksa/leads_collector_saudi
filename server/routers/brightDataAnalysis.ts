@@ -15,6 +15,7 @@ import {
   scrapeTikTok,
   scrapeAllPlatforms,
   formatScrapedDataForLLM,
+  type TwitterScrapedData,
 } from "../lib/brightDataScraper";
 import {
   gatherWebsiteIntelligence,
@@ -551,13 +552,45 @@ const analyzeTwitterWithBrightData = protectedProcedure
   .mutation(async ({ input }) => {
     try {
       let realData = "";
-      let twitterStats = { followersCount: 0, isVerified: false };
+      let twitterStats: { followersCount: number; isVerified: boolean; tweetsCount?: number; following?: number; displayName?: string; bio?: string } = { followersCount: 0, isVerified: false };
 
+      // أولاً: نحاول Bright Data API الرسمي (أكثر موثوقية)
       try {
-        const scraped = await scrapeTwitter(input.profileUrl);
-        if (scraped.loadedSuccessfully) {
+        const { fetchTwitterData } = await import("./realSocialData");
+        const apiData = await fetchTwitterData(input.profileUrl);
+        if (apiData && apiData.followers > 0) {
           realData = `
-=== بيانات تويتر/X الحقيقية (Bright Data) ===
+=== بيانات تويتر/X الحقيقية (Bright Data API) ===
+الاسم: ${apiData.displayName}
+البيو: ${apiData.description}
+المتابعون: ${apiData.followers.toLocaleString()}
+يتابع: ${apiData.following.toLocaleString()}
+عدد التغريدات: ${apiData.tweetsCount.toLocaleString()}
+موثّق: ${apiData.isBlueVerified ? "نعم ✓ (Blue)" : apiData.verified ? "نعم ✓" : "لا"}
+الموقع: ${apiData.location || "غير محدد"}
+=== نهاية البيانات الحقيقية ===`;
+
+          twitterStats = {
+            followersCount: apiData.followers,
+            isVerified: apiData.isBlueVerified || apiData.verified,
+            tweetsCount: apiData.tweetsCount,
+            following: apiData.following,
+            displayName: apiData.displayName,
+            bio: apiData.description,
+          };
+          console.log(`[BD analyzeTwitter] API success: ${apiData.followers} followers`);
+        }
+      } catch (apiErr) {
+        console.warn("[BD analyzeTwitter] API failed, trying scraper:", apiErr);
+      }
+
+      // ثانياً: fallback إلى scraping إذا فشل API
+      if (!realData) {
+        try {
+          const scraped = await scrapeTwitter(input.profileUrl);
+          if (scraped.loadedSuccessfully && scraped.followersCount > 0) {
+            realData = `
+=== بيانات تويتر/X الحقيقية (Bright Data Scraper) ===
 الاسم: ${scraped.displayName}
 البيو: ${scraped.bio}
 المتابعون: ${scraped.followersCount.toLocaleString()}
@@ -565,13 +598,14 @@ const analyzeTwitterWithBrightData = protectedProcedure
 موثّق: ${scraped.isVerified ? "نعم ✓" : "لا"}
 === نهاية البيانات الحقيقية ===`;
 
-          twitterStats = {
-            followersCount: scraped.followersCount,
-            isVerified: scraped.isVerified,
-          };
+            twitterStats = {
+              followersCount: scraped.followersCount,
+              isVerified: scraped.isVerified,
+            };
+          }
+        } catch (scrapeErr) {
+          console.warn("[BD analyzeTwitter] Scrape also failed:", scrapeErr);
         }
-      } catch (scrapeErr) {
-        console.warn("[BD analyzeTwitter] Scrape failed:", scrapeErr);
       }
 
       const prompt = `أنت خبير تحليل سوشيال ميديا ومحلل هوية بصرية متخصص في السوق السعودي.
