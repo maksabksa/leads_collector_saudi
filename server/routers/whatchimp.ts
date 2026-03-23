@@ -709,7 +709,9 @@ export const whatchimpRouter = router({
       phone: z.string().min(10),
       templateName: z.string(),
       languageCode: z.string().default("ar"),
-      variables: z.record(z.string(), z.string()).optional(), // { variable1: "...", variable2: "..." }
+      variables: z.record(z.string(), z.string()).optional(),
+      headerDocumentUrl: z.string().url().optional(),      // رابط PDF كـ header مرفق
+      headerDocumentFilename: z.string().optional(),       // اسم الملف في واتساب
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -726,6 +728,13 @@ export const whatchimpRouter = router({
         language_code: input.languageCode,
         ...(input.variables ?? {}),
       };
+      // إرسال PDF كـ header document مرفق (يتطلب template من نوع Documentation)
+      if (input.headerDocumentUrl) {
+        sendParams["header_document_url"] = input.headerDocumentUrl;
+        if (input.headerDocumentFilename) {
+          sendParams["header_document_filename"] = input.headerDocumentFilename;
+        }
+      }
       const result = await whatchimpPost("/whatsapp/send", sendParams);
       const success = String(result.status) === "1";
       return {
@@ -735,6 +744,7 @@ export const whatchimpRouter = router({
         sentTo: phone,
         templateName: input.templateName,
         variablesUsed: input.variables ?? {},
+        withDocument: !!input.headerDocumentUrl,
       };
     }),
 
@@ -743,8 +753,10 @@ export const whatchimpRouter = router({
       leadId: z.number(),
       templateName: z.string(),
       languageCode: z.string().default("ar"),
-      pdfUrl: z.string().url().optional(),
-      variables: z.record(z.string(), z.string()).optional(), // متغيرات إضافية
+      pdfUrl: z.string().url().optional(),                  // رابط PDF كـ variable1 (نص)
+      headerDocumentUrl: z.string().url().optional(),       // رابط PDF كـ header مرفق فعلي
+      headerDocumentFilename: z.string().optional(),        // اسم الملف في واتساب
+      variables: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
@@ -772,9 +784,16 @@ export const whatchimpRouter = router({
       if (input.variables) {
         Object.assign(sendParams, input.variables);
       }
-      // رابط PDF كـ variable1 (يُكتب فوق أي variable1 مخصص)
+      // رابط PDF كـ variable1 (نص في جسم الرسالة)
       if (input.pdfUrl) {
         sendParams["variable1"] = input.pdfUrl;
+      }
+      // رابط PDF كـ header document مرفق فعلي (يتطلب template من نوع Documentation)
+      if (input.headerDocumentUrl) {
+        sendParams["header_document_url"] = input.headerDocumentUrl;
+        if (input.headerDocumentFilename) {
+          sendParams["header_document_filename"] = input.headerDocumentFilename;
+        }
       }
 
       // Send template message
@@ -793,7 +812,7 @@ export const whatchimpRouter = router({
       });
 
       if (!success) throw new TRPCError({ code: "BAD_REQUEST", message: String(result.message ?? "فشل إرسال الرسالة") });
-      return { success: true, withPdf: !!input.pdfUrl };
+      return { success: true, withPdf: !!input.pdfUrl, withDocument: !!input.headerDocumentUrl };
     }),
 
   // ── Bulk Send Template Messages ────────────────────────────────────────────
@@ -802,6 +821,9 @@ export const whatchimpRouter = router({
       leadIds: z.array(z.number()).min(1),
       templateName: z.string(),
       languageCode: z.string().default("ar"),
+      headerDocumentUrl: z.string().url().optional(),      // رابط PDF مرفق لجميع العملاء
+      headerDocumentFilename: z.string().optional(),
+      variables: z.record(z.string(), z.string()).optional(), // متغيرات مشتركة
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
@@ -819,13 +841,21 @@ export const whatchimpRouter = router({
         if (!lead.verifiedPhone) { skipped++; continue; }
         const phone = normalizePhone(lead.verifiedPhone);
         try {
-          const result = await whatchimpPost("/whatsapp/send", {
+          const bulkParams: Record<string, string | number> = {
             apiToken,
             phone_number_id: phoneNumberId,
             phone_number: phone,
             template_name: input.templateName,
             language_code: input.languageCode,
-          });
+            ...(input.variables ?? {}),
+          };
+          if (input.headerDocumentUrl) {
+            bulkParams["header_document_url"] = input.headerDocumentUrl;
+            if (input.headerDocumentFilename) {
+              bulkParams["header_document_filename"] = input.headerDocumentFilename;
+            }
+          }
+          const result = await whatchimpPost("/whatsapp/send", bulkParams);
           const success = String(result.status) === "1";
           await db.insert(whatchimpSendLog).values({
             leadId: lead.id,

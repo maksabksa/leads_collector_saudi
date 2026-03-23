@@ -25,7 +25,9 @@ function WhatchimpTemplatesTab() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [testPhone, setTestPhone] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string; sentTo: string } | null>(null);
+  const [headerDocumentUrl, setHeaderDocumentUrl] = useState("");
+  const [headerDocumentFilename, setHeaderDocumentFilename] = useState("");
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; sentTo: string; withDocument?: boolean } | null>(null);
 
   const { data: templates, isLoading: loadingTemplates, refetch } = trpc.whatchimp.getTemplates.useQuery(undefined, {
     retry: false,
@@ -66,6 +68,8 @@ function WhatchimpTemplatesTab() {
       templateName: selectedTemplate,
       languageCode: activeTemplate?.language ?? "ar",
       variables: Object.keys(vars).length > 0 ? vars : undefined,
+      headerDocumentUrl: headerDocumentUrl.trim() || undefined,
+      headerDocumentFilename: headerDocumentFilename.trim() || undefined,
     });
   };
 
@@ -193,6 +197,29 @@ function WhatchimpTemplatesTab() {
                   </div>
                 </div>
               )}
+
+              {/* إرسال PDF كمرفق (Documentation Template) */}
+              <div className="border border-border/40 rounded-lg p-3 bg-background/30">
+                <Label className="text-xs font-semibold text-amber-400 mb-2 flex items-center gap-1.5 block">
+                  <FileText className="h-3.5 w-3.5" />إرسال PDF كمرفق (Documentation Template)
+                </Label>
+                <p className="text-xs text-muted-foreground mb-2">يتطلب قالب من نوع Documentation معتمد في Meta</p>
+                <div className="flex flex-col gap-2">
+                  <Input
+                    placeholder="رابط PDF (https://...)"
+                    value={headerDocumentUrl}
+                    onChange={(e) => setHeaderDocumentUrl(e.target.value)}
+                    dir="ltr"
+                    className="bg-background/50 text-sm"
+                  />
+                  <Input
+                    placeholder="اسم الملف (مثال: تقرير-مكسب.pdf)"
+                    value={headerDocumentFilename}
+                    onChange={(e) => setHeaderDocumentFilename(e.target.value)}
+                    className="bg-background/50 text-sm"
+                  />
+                </div>
+              </div>
 
               <Button
                 onClick={handleTest}
