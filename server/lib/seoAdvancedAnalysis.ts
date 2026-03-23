@@ -11,7 +11,7 @@ import { fetchViaProxy, fetchWithScrapingBrowser } from "./brightDataScraper";
 import { invokeLLM } from "../_core/llm";
 import { gatherWebsiteIntelligence, buildWebsiteIntelligenceContext } from "./websiteIntelligence";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ========================================
 export interface KeywordData {
   keyword: string;
   volume: string;
@@ -61,7 +61,7 @@ export interface SeoAdvancedReport {
   priorityActions: string[];
 }
 
-// ─── SERP Helper ─────────────────────────────────────────────────────────────
+// ========================================
 async function fetchSerpResults(query: string): Promise<string> {
   const apiToken = ENV.brightDataApiToken;
   const serpZone = ENV.brightDataSerpZone || "serp_api1";
@@ -93,7 +93,7 @@ async function fetchSerpResults(query: string): Promise<string> {
   }
 }
 
-// ─── Extract SERP snippets ────────────────────────────────────────────────────
+// ========================================
 function extractSerpSnippets(html: string): { title: string; url: string; snippet: string }[] {
   const results: { title: string; url: string; snippet: string }[] = [];
   if (!html) return results;
@@ -138,7 +138,7 @@ function extractSerpSnippets(html: string): { title: string; url: string; snippe
   return results;
 }
 
-// ─── Check site ranking for a keyword ────────────────────────────────────────
+// ========================================
 async function checkKeywordRanking(domain: string, keyword: string): Promise<number | null> {
   const html = await fetchSerpResults(keyword);
   if (!html) return null;
@@ -154,7 +154,7 @@ async function checkKeywordRanking(domain: string, keyword: string): Promise<num
   return null;
 }
 
-// ─── Domain classification helpers ────────────────────────────────────────────
+// ========================================
 // نطاقات المحتوى غير التجاري (مقالات ومدونات ومحتوى)
 const NON_BUSINESS_DOMAINS = [
   "youtube.com", "facebook.com", "instagram.com", "twitter.com", "tiktok.com",
@@ -199,7 +199,7 @@ function isLikelyBusinessUrl(url: string, title: string): boolean {
   }
 }
 
-// ─── Find competitors via SERP ────────────────────────────────────────────
+// ========================================
 async function findCompetitors(
   businessType: string,
   city: string,
@@ -244,7 +244,7 @@ async function findCompetitors(
   }
 
   return allResults;
-}// ─── Estimate backlinks via scraping ─────────────────────────────────────────────
+}// ===== Estimate backlinks via scraping =====
 async function estimateBacklinks(url: string): Promise<{ count: number; domains: string[] }> {
   try {
     const domain = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "").split("/")[0];
@@ -283,7 +283,7 @@ async function estimateBacklinks(url: string): Promise<{ count: number; domains:
   }
 }
 
-// ─── Main Analysis Function ───────────────────────────────────────────────────
+// ===== Main Analysis Function =====
 export async function runSeoAdvancedAnalysis(params: {
   url: string;
   companyName: string;
@@ -299,7 +299,7 @@ export async function runSeoAdvancedAnalysis(params: {
 }): Promise<SeoAdvancedReport> {
     const { url, companyName, businessType, city, websiteContent, pagespeedData, additionalNotes } = params;
   const domain = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "").split("/")[0];
-  // ─── جمع البيانات بالتوازي (PageSpeed + SEO الحقيقي + SERP + Competitors + Backlinks) ─
+  // ========================================
   const [
     websiteIntelResult,
     brandRankingHtml,
@@ -324,7 +324,7 @@ export async function runSeoAdvancedAnalysis(params: {
   const competitors = competitorsList.status === "fulfilled" ? competitorsList.value : [];
   const backlinks = backlinkData.status === "fulfilled" ? backlinkData.value : { count: 0, domains: [] };
 
-  // ─── تحقق من ترتيب الموقع في نتائج البحث ─────────────────────────────────
+  // ========================================
   const brandPosition = brandHtml
     ? extractSerpSnippets(brandHtml).findIndex((r) => r.url.includes(domain)) + 1 || null
     : null;
@@ -332,12 +332,12 @@ export async function runSeoAdvancedAnalysis(params: {
     ? extractSerpSnippets(businessHtml).findIndex((r) => r.url.includes(domain)) + 1 || null
     : null;
 
-  // ─── عدد الإشارات للعلامة التجارية ──────────────────────────────────────
+  // ========================================
   const brandMentions = brandHtml
     ? (brandHtml.match(new RegExp(companyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi")) || []).length
     : 0;
 
-  // ─── تحليل بالـ AI ────────────────────────────────────────────────────────
+  // ========================================
   // متغيرات مسبقة لتجنب template literal المتداخل
   const brandPositionStr = brandPosition ? String(brandPosition) : "null";
   const businessPositionStr = businessPosition ? String(businessPosition) : "null";

@@ -5,7 +5,7 @@ import {
   Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
   Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send, MessageSquare,
-  Target, FileText, CheckCircle2, Pencil, Clock, XCircle,
+  Target, FileText, CheckCircle2, Pencil, Clock, XCircle, FileDown, BrainCircuit,
 } from "lucide-react";
 import BulkImport from "./BulkImport";
 import { BulkImportInline } from "./BulkImport";
@@ -146,6 +146,14 @@ export default function Leads() {
     onError: (e) => toast.error("فشل الإرجاع: " + e.message),
   });
   const exportCSV = trpc.export.exportCSV.useMutation();
+  const bulkGeneratePDF = trpc.pdfReport.generateBulk.useMutation({
+    onSuccess: (data) => {
+      toast.success(`تم إرسال ${data.queued} تقرير للتوليد في الخلفية`);
+      setSelectedIds(new Set());
+      setTimeout(() => utils.leads.list.invalidate(), 3000);
+    },
+    onError: (e) => toast.error("فشل توليد PDF: " + e.message),
+  });
   const bulkAnalyze = trpc.analysis.bulkAnalyze.useMutation({
     onSuccess: (data) => {
       toast.success(`تم إرسال ${data.queued} عميل للتحليل في الخلفية`);
@@ -290,6 +298,15 @@ export default function Leads() {
                 {bulkAnalyze.isPending ? "جاري التحليل..." : `تحليل ${selectedIds.size} عميل`}
               </button>
               <button
+                onClick={() => bulkGeneratePDF.mutate({ leadIds: Array.from(selectedIds), reportType: "client_facing" })}
+                disabled={bulkGeneratePDF.isPending}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                style={{ background: "oklch(0.55 0.18 280 / 0.15)", color: "oklch(0.75 0.18 280)", border: "1px solid oklch(0.55 0.18 280 / 0.3)" }}
+              >
+                {bulkGeneratePDF.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                {bulkGeneratePDF.isPending ? "جاري توليد التقارير..." : `تقرير PDF لـ ${selectedIds.size}`}
+              </button>
+              <button
                 onClick={() => setShowSegmentDialog(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
                 style={{ background: "oklch(0.65 0.18 200 / 0.15)", color: "var(--brand-cyan)", border: "1px solid oklch(0.65 0.18 200 / 0.3)" }}
@@ -329,6 +346,19 @@ export default function Leads() {
               </button>
             </>
           )}
+          <button
+            onClick={() => {
+              const allIds = filteredLeads.map(l => l.id);
+              setSelectedIds(new Set(allIds));
+              setTimeout(() => bulkAnalyze.mutate({ leadIds: allIds }), 100);
+            }}
+            disabled={bulkAnalyze.isPending || !filteredLeads.length}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "oklch(0.85 0.16 75 / 0.1)", color: "oklch(0.85 0.16 75)", border: "1px solid oklch(0.85 0.16 75 / 0.25)" }}
+          >
+            {bulkAnalyze.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+            تحليل الكل ({filteredLeads.length})
+          </button>
           <button
             onClick={handleExport}
             disabled={exportCSV.isPending || !allLeads?.length}

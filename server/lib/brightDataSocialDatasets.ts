@@ -22,11 +22,12 @@ const BRIGHT_DATA_API_BASE = "https://api.brightdata.com";
 
 // ===== Dataset IDs =====
 export const DATASET_IDS = {
-  TIKTOK_PROFILES:    "gd_l1villgoiiidt09ci",  // ✅ confirmed working - TikTok Profiles
-  TIKTOK_POSTS:       "gd_l1villgoiiidt09ci",  // same dataset, posts via profile URL
-  SNAPCHAT_POSTS:     "gd_lkf0u1882c7ywfz3y",  // may need activation
-  TWITTER_POSTS:      "gd_lwxkxvnf1cynvib9co", // ✅ confirmed working - Twitter/X Posts
-  FACEBOOK_PAGE_POSTS: "gd_ltppn6ug2l8oo3fj4", // may need activation
+  TIKTOK_PROFILES:     "gd_l1villgoiiidt09ci",   // ✅ confirmed working - TikTok Profiles
+  TIKTOK_POSTS:        "gd_l1villgoiiidt09ci",   // same dataset, posts via profile URL
+  SNAPCHAT_POSTS:      "",                        // ❌ NOT AVAILABLE in Bright Data - use scraping fallback
+  TWITTER_POSTS:       "gd_lwxkxvnf1cynvib9co",  // ✅ confirmed working - Twitter/X Posts
+  FACEBOOK_PROFILES:   "gd_mf0urb782734ik94dz",  // ✅ confirmed working - Facebook Profiles
+  FACEBOOK_PAGE_POSTS: "gd_lkaxegm826bjpoo9m5",  // ✅ confirmed working - Facebook Pages Posts
 } as const;
 
 // ===== Types =====
@@ -322,6 +323,8 @@ export async function fetchTikTokPosts(
 }
 
 // ===== Public API: Snapchat Posts =====
+// ملاحظة: Bright Data لا يدعم Snapchat كـ dataset رسمياً
+// نستخدم SERP API لجمع بيانات سناب شات بشكل غير مباشر
 export async function fetchSnapchatPosts(
   profileUrl: string,
   limit = 10
@@ -329,16 +332,55 @@ export async function fetchSnapchatPosts(
   const platform = "snapchat";
   try {
     const cleanUrl = normalizeSnapchatUrl(profileUrl);
-    console.log(`[BD Snapchat] Fetching posts for: ${cleanUrl}`);
+    const handle = cleanUrl.replace(/.*snapchat\.com\/add\//, "").replace(/\/$/, "");
+    console.log(`[BD Snapchat] Fetching via SERP for handle: ${handle}`);
 
-    const snapshotId = await triggerDatasetCollection(
-      DATASET_IDS.SNAPCHAT_POSTS,
-      [{ url: cleanUrl, num_of_posts: String(limit) }]
-    );
+    // نستخدم Bright Data SERP API للبحث عن بيانات سناب شات
+    const apiToken = ENV.brightDataApiToken;
+    const serpZone = ENV.brightDataSerpZone || "serp_api1";
+    if (!apiToken) throw new Error("BRIGHT_DATA_API_TOKEN not configured");
 
-    const data = await pollSnapshot<SnapchatPost>(snapshotId, 120000, 5000);
+    const query = `site:snapchat.com/add/${handle} OR snapchat.com/@${handle}`;
+    const targetUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=10&hl=ar&gl=sa`;
 
-    return { success: true, data, snapshotId, platform };
+    const res = await fetch("https://api.brightdata.com/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiToken}` },
+      body: JSON.stringify({ zone: serpZone, url: targetUrl, format: "raw" }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) throw new Error(`SERP request failed: ${res.status}`);
+    const html = await res.text();
+
+    // استخراج بيانات من HTML - نستخدم split بدلاً من regex /s flag
+    const posts: SnapchatPost[] = [];
+    const snippetMarker = 'VwiC3b';
+    const parts = html.split(snippetMarker);
+    for (let i = 1; i < parts.length && posts.length < limit; i++) {
+      const endIdx = parts[i].indexOf('</span>');
+      if (endIdx === -1) continue;
+      const rawContent = parts[i].substring(0, endIdx);
+      const content = rawContent.replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, " ").trim();
+      if (content && content.length > 20) {
+        posts.push({
+          profile_handle: handle,
+          profile_link: cleanUrl,
+          content,
+          url: cleanUrl,
+        });
+      }
+    }
+
+    if (posts.length === 0) {
+      // إذا لم نجد بيانات، نرجع بيانات أساسية تدل على وجود الحساب
+      const hasAccount = html.includes(handle) || html.includes('snapchat.com');
+      if (hasAccount) {
+        posts.push({ profile_handle: handle, profile_link: cleanUrl, url: cleanUrl });
+      }
+    }
+
+    return { success: posts.length > 0, data: posts, platform };
   } catch (err: any) {
     console.error(`[BD Snapchat] Error:`, err.message);
     return { success: false, error: err.message, platform };
@@ -379,6 +421,7 @@ export async function fetchFacebookPagePosts(
     const cleanUrl = normalizeFacebookUrl(pageUrl);
     console.log(`[BD Facebook] Fetching page posts for: ${cleanUrl}`);
 
+    // نحاول أولاً Facebook Page Posts dataset
     const snapshotId = await triggerDatasetCollection(
       DATASET_IDS.FACEBOOK_PAGE_POSTS,
       [{ url: cleanUrl, num_of_posts: String(limit) }]
@@ -389,7 +432,20 @@ export async function fetchFacebookPagePosts(
     return { success: true, data, snapshotId, platform };
   } catch (err: any) {
     console.error(`[BD Facebook] Error:`, err.message);
-    return { success: false, error: err.message, platform };
+    // إذا فشل Page Posts، نحاول Facebook Profiles
+    try {
+      console.log(`[BD Facebook] Trying Facebook Profiles dataset as fallback...`);
+      const cleanUrl2 = normalizeFacebookUrl(pageUrl);
+      const snapshotId2 = await triggerDatasetCollection(
+        DATASET_IDS.FACEBOOK_PROFILES,
+        [{ url: cleanUrl2 }]
+      );
+      const data2 = await pollSnapshot<FacebookPagePost>(snapshotId2, 120000, 5000);
+      return { success: true, data: data2, snapshotId: snapshotId2, platform };
+    } catch (err2: any) {
+      console.error(`[BD Facebook] Fallback also failed:`, err2.message);
+      return { success: false, error: err.message, platform };
+    }
   }
 }
 

@@ -1172,84 +1172,106 @@ export function generateReportHTML(data: PDFReportData): string {
         </div>
       </div>
       ${analysis?.iceBreaker && !isClientFacing ? `<div style="padding:10px 14px;background:linear-gradient(135deg,rgba(34,197,94,0.05),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.15);border-radius:12px;"><div style="font-size:9.5px;font-weight:800;color:#86efac;margin-bottom:5px;">💬 نص التواصل المقترح (Ice Breaker)</div><div style="font-size:9.5px;color:#94a3b8;line-height:1.8;font-style:italic;padding-right:10px;border-right:3px solid rgba(34,197,94,0.4);">"${analysis.iceBreaker}"</div></div>` : ""}
+      <!-- CTA في نهاية صفحة التوصيات -->
+      <div style="margin-top:10px;padding:12px 16px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(14,165,233,0.04));border:1px solid rgba(34,197,94,0.2);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="flex:1;">
+          <div style="font-size:10px;font-weight:800;color:#86efac;margin-bottom:3px;">🚀 هذه التوصيات قابلة للتنفيذ فوراً</div>
+          <div style="font-size:8px;color:#475569;line-height:1.5;">فريق مكسب جاهز لتحويل هذه التوصيات إلى نتائج حقيقية خلال 90 يوماً</div>
+        </div>
+        <div style="flex-shrink:0;padding:8px 18px;background:linear-gradient(135deg,#25D366,#128C7E);border-radius:30px;text-align:center;box-shadow:0 0 15px rgba(37,211,102,0.25);">
+          <div style="font-size:9px;font-weight:900;color:#fff;">💬 ابدأ الآن</div>
+          <div style="font-size:7px;color:rgba(255,255,255,0.75);">واتساب · رد فوري</div>
+        </div>
+      </div>
     </div>
     ${FOOTER_HTML(recommendationsPageNum, reportSerial)}
   </div>`;
 
   // ===== PAGE 5: الإغلاق والثقة =====
+  const MAKSAB_WA_LINK = `https://wa.me/966500000000?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%A7%D8%B7%D9%84%D8%B9%D8%AA%20%D8%B9%D9%84%D9%89%20%D8%AA%D9%82%D8%B1%D9%8A%D8%B1%20${encodeURIComponent(lead.companyName)}%20%D9%88%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%AA%D9%88%D8%A7%D8%B5%D9%84`;
   const page5 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;top:-60px;right:-40px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.06) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-80px;left:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.04) 0%,transparent 70%);pointer-events:none;"></div>
     ${WATERMARK_HTML}
-    ${HEADER_HTML(closingPageNum, totalPages, "الإغلاق والتواصل", "شهادة الاعتماد وقنوات التواصل المباشر", "#22c55e")}
-    <div style="padding:16px 36px;position:relative;z-index:1;">
-      <div style="margin-bottom:16px;padding:18px 22px;background:linear-gradient(135deg,rgba(34,197,94,0.05),rgba(14,165,233,0.04));border:2px solid rgba(34,197,94,0.2);border-radius:16px;text-align:center;position:relative;overflow:hidden;">
+    ${HEADER_HTML(closingPageNum, totalPages, "الخطوة التالية", "ابدأ خطتك الرقمية اليوم مع مكسب", "#22c55e")}
+    <div style="padding:12px 36px 16px;position:relative;z-index:1;">
+
+      <!-- بطاقة الاعتماد المدمجة -->
+      <div style="margin-bottom:12px;padding:12px 18px;background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.15);border-radius:12px;display:flex;align-items:center;gap:14px;">
+        <div style="font-size:28px;flex-shrink:0;">🏅</div>
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:900;color:#f1f5f9;margin-bottom:2px;">تقرير معتمد من مكسب لخدمات الأعمال</div>
+          <div style="font-size:8px;color:#475569;">تحليل ذكاء اصطناعي + مراجعة بشرية متخصصة</div>
+        </div>
+        <div style="display:flex;gap:16px;flex-shrink:0;">
+          <div style="text-align:center;"><div style="font-size:7px;color:#475569;margin-bottom:2px;">رقم التقرير</div><div style="font-size:9px;font-weight:800;color:#22c55e;font-family:monospace;">${reportSerial}</div></div>
+          <div style="text-align:center;"><div style="font-size:7px;color:#475569;margin-bottom:2px;">تاريخ الإصدار</div><div style="font-size:9px;font-weight:800;color:#94a3b8;">${dateStr}</div></div>
+          <div style="text-align:center;"><div style="font-size:7px;color:#475569;margin-bottom:2px;">السجل التجاري</div><div style="font-size:9px;font-weight:800;color:#94a3b8;font-family:monospace;">7040860202</div></div>
+        </div>
+      </div>
+
+      <!-- CTA الرئيسي - ثلاث خطوات -->
+      <div style="margin-bottom:12px;padding:18px 20px;background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,165,233,0.05));border:1.5px solid rgba(34,197,94,0.25);border-radius:16px;position:relative;overflow:hidden;">
         <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#a78bfa);"></div>
-        <div style="font-size:26px;margin-bottom:7px;">🏅</div>
-        <div style="font-size:13px;font-weight:900;color:#f1f5f9;margin-bottom:4px;">تقرير معتمد من مكسب لخدمات الاعمال</div>
-        <div style="font-size:9px;color:#475569;margin-bottom:12px;">هذا التقرير صادر بناءً على تحليل ذكاء اصطناعي معتمد ومراجعة بشرية متخصصة</div>
-        <div style="display:flex;justify-content:center;gap:22px;flex-wrap:wrap;">
-          <div style="text-align:center;"><div style="font-size:8px;color:#475569;margin-bottom:3px;">رقم التقرير</div><div style="font-size:11px;font-weight:800;color:#22c55e;font-family:monospace;">${reportSerial}</div></div>
-          <div style="text-align:center;"><div style="font-size:8px;color:#475569;margin-bottom:3px;">تاريخ الإصدار</div><div style="font-size:11px;font-weight:800;color:#94a3b8;">${dateStr}</div></div>
-          ${generatedBy ? `<div style="text-align:center;"><div style="font-size:8px;color:#475569;margin-bottom:3px;">المحلل</div><div style="font-size:11px;font-weight:800;color:#94a3b8;">${generatedBy}</div></div>` : ""}
-          <div style="text-align:center;"><div style="font-size:8px;color:#475569;margin-bottom:3px;">السجل التجاري</div><div style="font-size:11px;font-weight:800;color:#94a3b8;font-family:monospace;">7040860202</div></div>
+        <div style="text-align:center;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:900;color:#f1f5f9;margin-bottom:4px;">هذا التقرير هو البداية — الخطة الكاملة تنتظرك</div>
+          <div style="font-size:9px;color:#94a3b8;line-height:1.7;">التحليل الذي بين يديك هو تشخيص أولي دقيق. الخطوة التالية هي جلسة تحليل مخصصة نبني فيها معك خارطة طريق واضحة لتحقيق نمو ملموس في السوق السعودي.</div>
+        </div>
+        <!-- 3 خطوات -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+          <div style="padding:10px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:10px;text-align:center;">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(34,197,94,0.15);border:1.5px solid #22c55e;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:12px;font-weight:900;color:#22c55e;">1</div>
+            <div style="font-size:8.5px;font-weight:800;color:#86efac;margin-bottom:3px;">تواصل معنا</div>
+            <div style="font-size:7.5px;color:#475569;line-height:1.5;">أرسل لنا عبر واتساب وسنرد خلال ساعات</div>
+          </div>
+          <div style="padding:10px;background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:10px;text-align:center;">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(14,165,233,0.15);border:1.5px solid #0ea5e9;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:12px;font-weight:900;color:#0ea5e9;">2</div>
+            <div style="font-size:8.5px;font-weight:800;color:#7dd3fc;margin-bottom:3px;">جلسة تحليل</div>
+            <div style="font-size:7.5px;color:#475569;line-height:1.5;">30 دقيقة نبني فيها خطتك المخصصة</div>
+          </div>
+          <div style="padding:10px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);border-radius:10px;text-align:center;">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(167,139,250,0.15);border:1.5px solid #a78bfa;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:12px;font-weight:900;color:#a78bfa;">3</div>
+            <div style="font-size:8.5px;font-weight:800;color:#c4b5fd;margin-bottom:3px;">ابدأ النمو</div>
+            <div style="font-size:7.5px;color:#475569;line-height:1.5;">تنفيذ فوري بفريق متخصص ونتائج قابلة للقياس</div>
+          </div>
+        </div>
+        <!-- زر واتساب -->
+        <div style="text-align:center;">
+          <a href="${MAKSAB_WA_LINK}" style="display:inline-block;text-decoration:none;">
+            <div style="display:inline-flex;align-items:center;gap:10px;padding:13px 36px;background:linear-gradient(135deg,#25D366,#128C7E);border-radius:50px;box-shadow:0 0 25px rgba(37,211,102,0.35),0 4px 16px rgba(0,0,0,0.3);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              <div>
+                <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:0.5px;">تواصل معنا الآن عبر واتساب</div>
+                <div style="font-size:7.5px;color:rgba(255,255,255,0.8);margin-top:1px;">ردّ فوري · استشارة مجانية · بدون التزام</div>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
-      <div style="margin-bottom:16px;padding:20px 24px;background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(249,115,22,0.06),rgba(34,197,94,0.05));border:1.5px solid rgba(239,68,68,0.3);border-radius:18px;position:relative;overflow:hidden;">
-        <!-- خط علوي متدرج -->
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#ef4444,#f97316,#22c55e);"></div>
-        <!-- تحذير التأخير -->
-        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;">
-          <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444;animation:pulse 1.5s infinite;"></div>
-          <div style="font-size:13px;font-weight:900;color:#fca5a5;letter-spacing:0.5px;">كل يوم تأخير يعني فرصًا ضائعة ومبيعات أقل</div>
-          <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444;"></div>
+
+      <!-- معلومات التواصل المدمجة -->
+      <div style="margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
+          <div style="font-size:8px;color:#475569;font-weight:700;margin-bottom:6px;letter-spacing:1px;">📞 قنوات التواصل</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#25D366;font-weight:700;">واتساب:</span> 966-50-000-0000+</div>
+            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#0ea5e9;font-weight:700;">إيميل:</span> info@maksab.sa</div>
+            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#a78bfa;font-weight:700;">الموقع:</span> www.maksab.sa</div>
+          </div>
         </div>
-        <!-- النص الرئيسي -->
-        <div style="font-size:9.5px;color:#cbd5e1;line-height:2;text-align:center;margin-bottom:14px;max-width:520px;margin-left:auto;margin-right:auto;">
-          ما ظهر في هذا التقرير ليس مجرد ملاحظات، بل <strong style="color:#f1f5f9;">مؤشرات واضحة على فرص يمكن استغلالها فورًا</strong> لتحسين حضورك الرقمي وزيادة نتائج نشاطك.
-          <br/>الخطوة التالية ليست القراءة… <strong style="color:#22c55e;">الخطوة التالية هي التحرك.</strong>
-        </div>
-        <!-- زر CTA الرئيسي -->
-        <div style="text-align:center;">
-          <div style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:50px;box-shadow:0 0 30px rgba(34,197,94,0.4),0 4px 20px rgba(0,0,0,0.3);">
-            <div style="font-size:14px;font-weight:900;color:#fff;letter-spacing:1px;">🚀 ابدأ خطتك الآن</div>
-            <div style="font-size:8px;color:rgba(255,255,255,0.75);margin-top:2px;">تواصل مع فريق مكسب عبر واتساب</div>
+        <div style="padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
+          <div style="font-size:8px;color:#475569;font-weight:700;margin-bottom:6px;letter-spacing:1px;">⚡ لماذا الآن؟</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-size:8px;color:#94a3b8;line-height:1.5;">• منافسوك يتحركون الآن في السوق</div>
+            <div style="font-size:8px;color:#94a3b8;line-height:1.5;">• كل يوم تأخير = فرص ضائعة</div>
+            <div style="font-size:8px;color:#94a3b8;line-height:1.5;">• الاستشارة الأولى مجانية تماماً</div>
           </div>
         </div>
       </div>
-      <div style="display:flex;justify-content:center;gap:20px;margin-bottom:14px;">
-        <div style="text-align:center;">
-          <div style="padding:5px;background:white;border-radius:10px;display:inline-block;box-shadow:0 0 14px rgba(34,197,94,0.2);margin-bottom:5px;">
-            <svg width="72" height="72" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-              <rect width="100" height="100" fill="white"/>
-              <rect x="10" y="10" width="30" height="30" fill="black"/><rect x="15" y="15" width="20" height="20" fill="white"/><rect x="18" y="18" width="14" height="14" fill="black"/>
-              <rect x="60" y="10" width="30" height="30" fill="black"/><rect x="65" y="15" width="20" height="20" fill="white"/><rect x="68" y="18" width="14" height="14" fill="black"/>
-              <rect x="10" y="60" width="30" height="30" fill="black"/><rect x="15" y="65" width="20" height="20" fill="white"/><rect x="18" y="68" width="14" height="14" fill="black"/>
-              <rect x="50" y="50" width="8" height="8" fill="black"/><rect x="62" y="50" width="8" height="8" fill="black"/><rect x="74" y="50" width="8" height="8" fill="black"/>
-              <rect x="50" y="62" width="8" height="8" fill="black"/><rect x="74" y="62" width="8" height="8" fill="black"/>
-              <rect x="50" y="74" width="8" height="8" fill="black"/><rect x="62" y="74" width="8" height="8" fill="black"/><rect x="74" y="74" width="8" height="8" fill="black"/>
-              <rect x="42" y="10" width="6" height="6" fill="black"/><rect x="42" y="22" width="6" height="6" fill="black"/><rect x="42" y="34" width="6" height="6" fill="black"/>
-            </svg>
-          </div>
-          <div style="font-size:9px;color:#86efac;font-weight:700;">واتساب</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="padding:5px;background:white;border-radius:10px;display:inline-block;box-shadow:0 0 14px rgba(14,165,233,0.2);margin-bottom:5px;">
-            <svg width="72" height="72" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-              <rect width="100" height="100" fill="white"/>
-              <rect x="10" y="10" width="30" height="30" fill="black"/><rect x="15" y="15" width="20" height="20" fill="white"/><rect x="18" y="18" width="14" height="14" fill="black"/>
-              <rect x="60" y="10" width="30" height="30" fill="black"/><rect x="65" y="15" width="20" height="20" fill="white"/><rect x="68" y="18" width="14" height="14" fill="black"/>
-              <rect x="10" y="60" width="30" height="30" fill="black"/><rect x="15" y="65" width="20" height="20" fill="white"/><rect x="18" y="68" width="14" height="14" fill="black"/>
-              <rect x="50" y="50" width="6" height="6" fill="black"/><rect x="60" y="50" width="6" height="6" fill="black"/><rect x="70" y="50" width="6" height="6" fill="black"/><rect x="80" y="50" width="6" height="6" fill="black"/>
-              <rect x="50" y="60" width="6" height="6" fill="black"/><rect x="70" y="60" width="6" height="6" fill="black"/>
-              <rect x="50" y="70" width="6" height="6" fill="black"/><rect x="60" y="70" width="6" height="6" fill="black"/><rect x="80" y="70" width="6" height="6" fill="black"/>
-              <rect x="50" y="80" width="6" height="6" fill="black"/><rect x="70" y="80" width="6" height="6" fill="black"/><rect x="80" y="80" width="6" height="6" fill="black"/>
-            </svg>
-          </div>
-          <div style="font-size:9px;color:#7dd3fc;font-weight:700;">السجل التجاري</div>
-        </div>
-      </div>
-      <div style="padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;">
-        <div style="font-size:7.5px;color:#334155;line-height:1.8;text-align:center;">هذا التقرير سري ومخصص حصريًا لعناية العميل المذكور أعلاه ويحظر توزيعه أو نسخه دون إذن كتابي مسبق. جميع التحليلات والتوصيات هي آراء مهنية مبنية على بيانات متاحة وقت إعداده ولا تمثل ضمانًا لنتائج محددة. <strong style="color:#22c55e;">رقم التقرير: ${reportSerial}</strong></div>
+
+      <!-- إخلاء المسؤولية -->
+      <div style="padding:8px 12px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.05);border-radius:8px;">
+        <div style="font-size:7px;color:#334155;line-height:1.7;text-align:center;">هذا التقرير سري ومخصص حصريًا لعناية <strong style="color:#475569;">${lead.companyName}</strong> ويحظر توزيعه أو نسخه دون إذن كتابي. جميع التحليلات آراء مهنية مبنية على بيانات متاحة ولا تمثل ضمانًا لنتائج محددة. <strong style="color:#22c55e;">رقم التقرير: ${reportSerial}</strong></div>
       </div>
     </div>
     ${FOOTER_HTML(closingPageNum, reportSerial)}

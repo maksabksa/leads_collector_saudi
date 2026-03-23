@@ -352,4 +352,127 @@ export const pdfReportRouter = router({
 
       return lead || null;
     }),
+
+  // توليد PDF جماعي لعدة عملاء
+  generateBulk: protectedProcedure
+    .input(z.object({
+      leadIds: z.array(z.number()).min(1).max(200),
+      reportType: z.enum(["internal", "client_facing"]).default("client_facing"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      let queued = 0;
+      let skipped = 0;
+      for (const leadId of input.leadIds) {
+        const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
+        if (!lead) { skipped++; continue; }
+        queued++;
+        // تشغيل توليد التقرير في الخلفية
+        setImmediate(async () => {
+          try {
+            await db.update(leads)
+              .set({ pdfGenerationStatus: "generating" as const })
+              .where(eq(leads.id, leadId));
+            const activeSeason = await getActiveSeasonForBusiness(lead.businessType || "");
+            const reportData = buildReportData(lead, input.reportType, ctx.user?.name || undefined);
+            if (activeSeason) {
+              reportData.seasonOverride = {
+                name: activeSeason.name,
+                emoji: activeSeason.icon || "📅",
+                color: activeSeason.color || "#64748b",
+                urgency: (activeSeason as any).urgency_text || activeSeason.description || "",
+                tip: (activeSeason as any).tip_text || (Array.isArray(activeSeason.opportunities) ? activeSeason.opportunities[0] : "") || "",
+              };
+            }
+            const [seoRow] = await db.select().from(seoAdvancedAnalysis)
+              .where(eq(seoAdvancedAnalysis.leadId, leadId)).limit(1);
+            if (seoRow) {
+              reportData.seoData = {
+                url: seoRow.url,
+                overallSeoHealth: seoRow.overallSeoHealth || undefined,
+                localSeoScore: seoRow.localSeoScore || undefined,
+                estimatedBacklinks: seoRow.estimatedBacklinks || undefined,
+                backlinkQuality: seoRow.backlinkQuality || undefined,
+                seoSummary: seoRow.seoSummary || undefined,
+                topKeywords: (seoRow.topKeywords as any[])?.length ? seoRow.topKeywords as any : undefined,
+                competitors: (seoRow.competitors as any[])?.length ? seoRow.competitors as any : undefined,
+                priorityActions: (seoRow.priorityActions as any[])?.length ? seoRow.priorityActions as any : undefined,
+              };
+            }
+            const [websiteRow] = await db.select().from(websiteAnalyses)
+              .where(eq(websiteAnalyses.leadId, leadId)).limit(1);
+            if (websiteRow) {
+              reportData.websiteData = {
+                url: websiteRow.url,
+                hasWebsite: websiteRow.hasWebsite ?? false,
+                loadSpeedScore: websiteRow.loadSpeedScore,
+                mobileExperienceScore: websiteRow.mobileExperienceScore,
+                seoScore: websiteRow.seoScore,
+                contentQualityScore: websiteRow.contentQualityScore,
+                designScore: websiteRow.designScore,
+                offerClarityScore: websiteRow.offerClarityScore,
+                overallScore: websiteRow.overallScore,
+                hasOnlineBooking: websiteRow.hasOnlineBooking,
+                hasPaymentOptions: websiteRow.hasPaymentOptions,
+                hasDeliveryInfo: websiteRow.hasDeliveryInfo,
+                hasSeasonalPage: websiteRow.hasSeasonalPage,
+                technicalGaps: websiteRow.technicalGaps as string[] | null,
+                contentGaps: websiteRow.contentGaps as string[] | null,
+                recommendations: websiteRow.recommendations as string[] | null,
+                summary: websiteRow.summary,
+                analyzedAt: websiteRow.analyzedAt,
+              };
+            }
+            const [socialSnap] = await db.select().from(realSocialSnapshots)
+              .where(eq(realSocialSnapshots.leadId, leadId)).limit(1);
+            if (socialSnap) {
+              reportData.socialSnapshot = {
+                instagramFollowers: socialSnap.instagramFollowers,
+                instagramFollowing: socialSnap.instagramFollowing,
+                instagramPostsCount: socialSnap.instagramPostsCount,
+                instagramVerified: socialSnap.instagramVerified,
+                instagramEngagementRate: socialSnap.instagramEngagementRate,
+                instagramBio: socialSnap.instagramBio,
+                instagramUsername: socialSnap.instagramUsername,
+                tiktokFollowers: socialSnap.tiktokFollowers,
+                tiktokVideoCount: socialSnap.tiktokVideoCount,
+                tiktokHearts: socialSnap.tiktokHearts,
+                tiktokEngagementRate: socialSnap.tiktokEngagementRate,
+                tiktokVerified: socialSnap.tiktokVerified,
+                tiktokDescription: socialSnap.tiktokDescription,
+                tiktokUsername: socialSnap.tiktokUsername,
+                twitterFollowers: socialSnap.twitterFollowers,
+                twitterTweetsCount: socialSnap.twitterTweetsCount,
+                twitterVerified: socialSnap.twitterVerified,
+                twitterBlueVerified: socialSnap.twitterBlueVerified,
+                twitterDescription: socialSnap.twitterDescription,
+                twitterUsername: socialSnap.twitterUsername,
+                backlinkTotal: socialSnap.backlinkTotal,
+                backlinkHasGMB: socialSnap.backlinkHasGMB,
+                fetchedAt: socialSnap.fetchedAt,
+              };
+            }
+            const html = generateReportHTML(reportData);
+            const fileKey = `reports/lead-${leadId}-${input.reportType}-${Date.now()}.html`;
+            const { url } = await storagePut(fileKey, Buffer.from(html, "utf-8"), "text/html");
+            await db.update(leads)
+              .set({
+                pdfGenerationStatus: "ready" as const,
+                pdfFileUrl: url,
+                pdfGeneratedAt: new Date(),
+                reportStatus: "ready" as const,
+                reportTemplateType: input.reportType,
+              })
+              .where(eq(leads.id, leadId));
+          } catch (err) {
+            console.error(`[PDF Bulk] Failed for lead ${leadId}:`, err);
+            await db.update(leads)
+              .set({ pdfGenerationStatus: "failed" as const })
+              .where(eq(leads.id, leadId));
+          }
+        });
+      }
+      return { queued, skipped };
+    }),
 });
