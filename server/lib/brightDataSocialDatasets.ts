@@ -34,10 +34,17 @@ export const DATASET_IDS = {
 export interface TikTokProfile {
   id?: string;
   username?: string;
+  account_id?: string;          // username field from Bright Data API
   nickname?: string;
   biography?: string;
   bio_link?: string;
   profile_url?: string;
+  // Actual field names returned by Bright Data TikTok API
+  followers?: number;           // actual API field
+  following?: number;
+  likes?: number;
+  awg_engagement_rate?: number; // actual API field (note: awg not avg)
+  // Legacy/alternative field names
   followers_count?: number;
   following_count?: number;
   likes_count?: number;
@@ -46,7 +53,9 @@ export interface TikTokProfile {
   comment_engagement_rate?: number;
   like_engagement_rate?: number;
   is_verified?: boolean;
+  predicted_lang?: string;
   predicted_language?: string;
+  create_time?: string;
   error?: string;
 }
 
@@ -485,13 +494,17 @@ export function extractSocialStats(platform: string, data: any[]): {
 
   if (platform === "tiktok") {
     const profile = data[0] as TikTokProfile;
+    // Bright Data TikTok API returns: followers, likes, videos_count, awg_engagement_rate
+    const followersCount = profile.followers ?? profile.followers_count ?? 0;
+    const engagementRate = profile.awg_engagement_rate ?? profile.avg_engagement_rate ?? 0;
+    const profileName = profile.nickname || profile.account_id || profile.username;
     return {
-      followersCount: profile.followers_count,
+      followersCount,
       postsCount: profile.videos_count,
-      engagementRate: profile.avg_engagement_rate,
+      engagementRate,
       bio: profile.biography,
       isVerified: profile.is_verified,
-      profileName: profile.nickname || profile.username,
+      profileName,
     };
   }
 

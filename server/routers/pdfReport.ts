@@ -10,6 +10,8 @@ import { eq, isNotNull, ne, or } from "drizzle-orm";
 import { generateReportHTML, type PDFReportData } from "../lib/pdfReportEngine";
 import { storagePut } from "../storage";
 import { getActiveSeasonForBusiness } from "./seasons";
+import { getReportStyleSettings } from "./reportStyle";
+import { companySettings } from "../../drizzle/schema";
 
 function buildReportData(lead: typeof leads.$inferSelect, reportType: "internal" | "client_facing", generatedBy?: string): PDFReportData {
   return {
@@ -105,9 +107,27 @@ export const pdfReportRouter = router({
 
       const [lead] = await db.select().from(leads).where(eq(leads.id, input.leadId));
       if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
-
       const activeSeason = await getActiveSeasonForBusiness(lead.businessType || "");
       const reportData = buildReportData(lead, input.reportType, ctx.user?.name || undefined);
+      // ربط إعدادات التقارير ومعلومات الشركة بالتقرير
+      const [styleRow, companyRow] = await Promise.all([
+        getReportStyleSettings(),
+        db.select().from(companySettings).limit(1).then(r => r[0] || null),
+      ]);
+      reportData.styleSettings = {
+        tone: styleRow?.tone || "professional",
+        brandKeywords: (styleRow?.brandKeywords as string[]) || [],
+        closingStatement: styleRow?.closingStatement || "",
+        includeSeasonSection: styleRow?.includeSeasonSection !== false,
+        includeCompetitorsSection: styleRow?.includeCompetitorsSection !== false,
+        detailLevel: styleRow?.detailLevel || "standard",
+        whatsappNumber: companyRow?.phone || "966500000000",
+        companyPhone: companyRow?.phone || "+966-50-000-0000",
+        companyEmail: companyRow?.email || "info@maksab.sa",
+        companyWebsite: companyRow?.website || "www.maksab.sa",
+        analystName: companyRow?.analystName || ctx.user?.name || "فريق مكسب",
+        analystTitle: companyRow?.analystTitle || "محلل تسويق رقمي",
+      };
       if (activeSeason) {
         reportData.seasonOverride = {
           name: activeSeason.name,
@@ -117,7 +137,7 @@ export const pdfReportRouter = router({
           tip: (activeSeason as any).tip_text || (Array.isArray(activeSeason.opportunities) ? activeSeason.opportunities[0] : "") || "",
         };
       }
-      // جلب بيانات SEO المتقدم إن وجدت
+      // جلب بيانات SEO المتقدم إن وجدتت
       const [seoRow] = await db.select().from(seoAdvancedAnalysis)
         .where(eq(seoAdvancedAnalysis.leadId, input.leadId))
         .orderBy(seoAdvancedAnalysis.analyzedAt)
@@ -167,6 +187,25 @@ export const pdfReportRouter = router({
       try {
         const activeSeason = await getActiveSeasonForBusiness(lead.businessType || "");
         const reportData = buildReportData(lead, input.reportType, ctx.user?.name || undefined);
+        // ربط إعدادات التقارير ومعلومات الشركة
+        const [styleRow2, companyRow2] = await Promise.all([
+          getReportStyleSettings(),
+          db.select().from(companySettings).limit(1).then(r => r[0] || null),
+        ]);
+        reportData.styleSettings = {
+          tone: styleRow2?.tone || "professional",
+          brandKeywords: (styleRow2?.brandKeywords as string[]) || [],
+          closingStatement: styleRow2?.closingStatement || "",
+          includeSeasonSection: styleRow2?.includeSeasonSection !== false,
+          includeCompetitorsSection: styleRow2?.includeCompetitorsSection !== false,
+          detailLevel: styleRow2?.detailLevel || "standard",
+          whatsappNumber: companyRow2?.phone || "966500000000",
+          companyPhone: companyRow2?.phone || "+966-50-000-0000",
+          companyEmail: companyRow2?.email || "info@maksab.sa",
+          companyWebsite: companyRow2?.website || "www.maksab.sa",
+          analystName: companyRow2?.analystName || ctx.user?.name || "فريق مكسب",
+          analystTitle: companyRow2?.analystTitle || "محلل تسويق رقمي",
+        };
         if (activeSeason) {
           reportData.seasonOverride = {
             name: activeSeason.name,
@@ -376,6 +415,25 @@ export const pdfReportRouter = router({
               .where(eq(leads.id, leadId));
             const activeSeason = await getActiveSeasonForBusiness(lead.businessType || "");
             const reportData = buildReportData(lead, input.reportType, ctx.user?.name || undefined);
+            // ربط إعدادات التقارير ومعلومات الشركة
+            const [styleRowB, companyRowB] = await Promise.all([
+              getReportStyleSettings(),
+              db.select().from(companySettings).limit(1).then(r => r[0] || null),
+            ]);
+            reportData.styleSettings = {
+              tone: styleRowB?.tone || "professional",
+              brandKeywords: (styleRowB?.brandKeywords as string[]) || [],
+              closingStatement: styleRowB?.closingStatement || "",
+              includeSeasonSection: styleRowB?.includeSeasonSection !== false,
+              includeCompetitorsSection: styleRowB?.includeCompetitorsSection !== false,
+              detailLevel: styleRowB?.detailLevel || "standard",
+              whatsappNumber: companyRowB?.phone || "966500000000",
+              companyPhone: companyRowB?.phone || "+966-50-000-0000",
+              companyEmail: companyRowB?.email || "info@maksab.sa",
+              companyWebsite: companyRowB?.website || "www.maksab.sa",
+              analystName: companyRowB?.analystName || ctx.user?.name || "فريق مكسب",
+              analystTitle: companyRowB?.analystTitle || "محلل تسويق رقمي",
+            };
             if (activeSeason) {
               reportData.seasonOverride = {
                 name: activeSeason.name,

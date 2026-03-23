@@ -137,6 +137,21 @@ export interface PDFReportData {
     recommendations?: string[] | null;
     competitorAvgRating?: number | null;
   } | null;
+  // إعدادات أسلوب الكتابة والتقارير
+  styleSettings?: {
+    tone?: string | null;           // professional | friendly | direct | consultative
+    brandKeywords?: string[] | null;
+    closingStatement?: string | null;
+    includeSeasonSection?: boolean | null;
+    includeCompetitorsSection?: boolean | null;
+    detailLevel?: string | null;    // standard | detailed | concise
+    whatsappNumber?: string | null; // رقم واتساب مكسب
+    analystName?: string | null;
+    analystTitle?: string | null;
+    companyPhone?: string | null;
+    companyEmail?: string | null;
+    companyWebsite?: string | null;
+  } | null;
   // تحليل السوشيال (AI analysis per platform)
   socialAnalyses?: Array<{
     platform: string;
@@ -472,6 +487,24 @@ export function generateReportHTML(data: PDFReportData): string {
   const topImpactLabel = getTopImpactLabel(analysis, lead);
   const priorityOneLabel = getPriorityOneLabel(analysis, lead);
   const season = data.seasonOverride || getCurrentSeason();
+  // إعدادات أسلوب التقرير من صفحة الإعدادات
+  const style = data.styleSettings || {};
+  const styleTone = style.tone || "professional";
+  const styleKeywords: string[] = (style.brandKeywords as string[]) || [];
+  const styleClosing = style.closingStatement || "";
+  const includeSeasonSection = style.includeSeasonSection !== false;
+  const waNumber = style.whatsappNumber?.replace(/[^0-9]/g, "") || "966500000000";
+  const companyPhone = style.companyPhone || style.whatsappNumber || "+966-50-000-0000";
+  const companyEmail = style.companyEmail || "info@maksab.sa";
+  const companyWebsite = style.companyWebsite || "www.maksab.sa";
+  const analystName = style.analystName || generatedBy || "فريق مكسب";
+  // نص الخاتمة حسب الأسلوب
+  const closingText = styleClosing || (
+    styleTone === "friendly" ? `نحن سعداء بمساعدتك في رحلة النمو الرقمي. تواصل معنا وابدأ التحول اليوم.` :
+    styleTone === "direct" ? `الفرصة متاحة الآن. تواصل معنا لنبدأ فوراً.` :
+    styleTone === "consultative" ? `بناءً على هذا التحليل، نوصي بجلسة عمل لوضع خطة تنفيذية مخصصة لـ ${lead.companyName}.` :
+    `ما تقرأه هنا هو تشخيص أولي للوضع الرقمي. التحليل الأعمق والخطة التنفيذية المخصصة تتطلب جلسة عمل مع فريقنا.`
+  );
   const reportSerial = `RPT-${lead.id.toString().padStart(4, "0")}-${generatedAt.getFullYear()}`;
   const radarChart = buildRadarChart(analysis, lead);
   const platformBlocks = buildPlatformBlocks(lead, analysis);
@@ -1188,7 +1221,7 @@ export function generateReportHTML(data: PDFReportData): string {
   </div>`;
 
   // ===== PAGE 5: الإغلاق والثقة =====
-  const MAKSAB_WA_LINK = `https://wa.me/966500000000?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%A7%D8%B7%D9%84%D8%B9%D8%AA%20%D8%B9%D9%84%D9%89%20%D8%AA%D9%82%D8%B1%D9%8A%D8%B1%20${encodeURIComponent(lead.companyName)}%20%D9%88%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%AA%D9%88%D8%A7%D8%B5%D9%84`;
+  const MAKSAB_WA_LINK = `https://wa.me/${waNumber}?text=${encodeURIComponent(`مرحباً، اطلعت على تقرير ${lead.companyName} وأريد التواصل`)}`;
   const page5 = `<div style="${PAGE_STYLE}">
     <div style="position:absolute;top:-60px;right:-40px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.06) 0%,transparent 70%);pointer-events:none;"></div>
     <div style="position:absolute;bottom:-80px;left:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.04) 0%,transparent 70%);pointer-events:none;"></div>
@@ -1215,7 +1248,7 @@ export function generateReportHTML(data: PDFReportData): string {
         <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#22c55e,#0ea5e9,#a78bfa);"></div>
         <div style="text-align:center;margin-bottom:12px;">
           <div style="font-size:14px;font-weight:900;color:#f1f5f9;margin-bottom:4px;">هذا التقرير هو البداية — الخطة الكاملة تنتظرك</div>
-          <div style="font-size:9px;color:#94a3b8;line-height:1.7;">التحليل الذي بين يديك هو تشخيص أولي دقيق. الخطوة التالية هي جلسة تحليل مخصصة نبني فيها معك خارطة طريق واضحة لتحقيق نمو ملموس في السوق السعودي.</div>
+          <div style="font-size:9px;color:#94a3b8;line-height:1.7;">${closingText}</div>
         </div>
         <!-- 3 خطوات -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
@@ -1254,9 +1287,9 @@ export function generateReportHTML(data: PDFReportData): string {
         <div style="padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
           <div style="font-size:8px;color:#475569;font-weight:700;margin-bottom:6px;letter-spacing:1px;">📞 قنوات التواصل</div>
           <div style="display:flex;flex-direction:column;gap:4px;">
-            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#25D366;font-weight:700;">واتساب:</span> 966-50-000-0000+</div>
-            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#0ea5e9;font-weight:700;">إيميل:</span> info@maksab.sa</div>
-            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#a78bfa;font-weight:700;">الموقع:</span> www.maksab.sa</div>
+            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#25D366;font-weight:700;">واتساب:</span> ${companyPhone}</div>
+            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#0ea5e9;font-weight:700;">إيميل:</span> ${companyEmail}</div>
+            <div style="font-size:8.5px;color:#94a3b8;"><span style="color:#a78bfa;font-weight:700;">الموقع:</span> ${companyWebsite}</div>
           </div>
         </div>
         <div style="padding:10px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
