@@ -1730,14 +1730,23 @@ export default function LeadDetail() {
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full" style={{ background: pc.color }} />
-                  تحليل {pc.label}
+                  {pc.label}
                   {hasRealData && (
-                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "oklch(0.55 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)" }}>بيانات حقيقية</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "oklch(0.55 0.18 145 / 0.15)", color: "oklch(0.65 0.18 145)" }}>✓ بيانات حقيقية</span>
+                  )}
+                  {sa.profileUrl && (
+                    <a href={sa.profileUrl} target="_blank" rel="noopener noreferrer" className="opacity-60 hover:opacity-100 transition-opacity">
+                      <ExternalLink className="w-3 h-3" style={{ color: pc.color }} />
+                    </a>
                   )}
                 </h3>
-                <span className="text-lg font-bold" style={{ color: sa.overallScore && sa.overallScore >= 7 ? "var(--brand-green)" : sa.overallScore && sa.overallScore >= 5 ? "var(--brand-gold)" : "var(--brand-red)" }}>
-                  {sa.overallScore?.toFixed(1)}/10
-                </span>
+                {sa.overallScore !== null && sa.overallScore !== undefined ? (
+                  <span className="text-lg font-bold" style={{ color: sa.overallScore >= 7 ? "var(--brand-green)" : sa.overallScore >= 5 ? "var(--brand-gold)" : "var(--brand-red)" }}>
+                    {sa.overallScore.toFixed(1)}/10
+                  </span>
+                ) : hasRealData ? (
+                  <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "oklch(0.78 0.16 75 / 0.15)", color: "oklch(0.78 0.16 75)" }}>يحتاج تحليل</span>
+                ) : null}
               </div>
 
               {/* بيانات حقيقية من Bright Data Dataset API */}
@@ -1777,12 +1786,24 @@ export default function LeadDetail() {
               )}
 
               {sa.summary && <p className="text-sm text-muted-foreground leading-relaxed">{sa.summary}</p>}
-              <div className="space-y-2">
-                <ScoreBar label="تكرار النشر" value={sa.postingFrequencyScore} color={pc.color} />
-                <ScoreBar label="التفاعل" value={sa.engagementScore} color="oklch(0.65 0.18 200)" />
-                <ScoreBar label="جودة المحتوى" value={sa.contentQualityScore} color="oklch(0.78 0.16 75)" />
-                <ScoreBar label="استراتيجية المحتوى" value={sa.contentStrategyScore} color="oklch(0.65 0.18 145)" />
-              </div>
+              {/* عرض درجات التحليل فقط إذا كانت متوفرة */}
+              {(sa.postingFrequencyScore !== null || sa.engagementScore !== null || sa.contentQualityScore !== null || sa.contentStrategyScore !== null) ? (
+                <div className="space-y-2">
+                  <ScoreBar label="تكرار النشر" value={sa.postingFrequencyScore} color={pc.color} />
+                  <ScoreBar label="التفاعل" value={sa.engagementScore} color="oklch(0.65 0.18 200)" />
+                  <ScoreBar label="جودة المحتوى" value={sa.contentQualityScore} color="oklch(0.78 0.16 75)" />
+                  <ScoreBar label="استراتيجية المحتوى" value={sa.contentStrategyScore} color="oklch(0.65 0.18 145)" />
+                </div>
+              ) : hasRealData ? (
+                <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: "oklch(0.78 0.16 75 / 0.06)", border: "1px solid oklch(0.78 0.16 75 / 0.2)" }}>
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: "oklch(0.78 0.16 75)" }} />
+                  <div>
+                    <p className="text-xs font-medium" style={{ color: "oklch(0.78 0.16 75)" }}>تم جلب البيانات الحقيقية</p>
+                    <p className="text-xs text-muted-foreground">اضغط "تحليل شامل" لتحليل هذه المنصة بالذكاء الاصطناعي</p>
+                  </div>
+                </div>
+              ) : null}
+              {(sa.postingFrequencyScore !== null || sa.engagementScore !== null) && (
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { label: "محتوى موسمي", value: sa.hasSeasonalContent },
@@ -1795,6 +1816,7 @@ export default function LeadDetail() {
                   </div>
                 ))}
               </div>
+              )}
               {(sa.gaps as string[] | null)?.length ? (
                 <div className="flex flex-wrap gap-1.5">
                   {(sa.gaps as string[]).map((gap, i) => (
