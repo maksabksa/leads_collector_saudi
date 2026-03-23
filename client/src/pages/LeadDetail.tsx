@@ -945,6 +945,16 @@ export default function LeadDetail() {
                 <span className="text-sm font-semibold" style={{ color: "var(--brand-cyan)" }}>{(lead as any).socialSince}</span>
               </div>
             )}
+            {/* ملاحظات الفريق */}
+            {lead.notes && (
+              <div className="mt-2 p-3 rounded-xl space-y-1" style={{ background: "oklch(0.75 0.18 280 / 0.08)", border: "1px solid oklch(0.75 0.18 280 / 0.25)" }}>
+                <p className="text-xs font-semibold flex items-center gap-1" style={{ color: "oklch(0.75 0.18 280)" }}>
+                  <Brain className="w-3 h-3" />
+                  ملاحظات الفريق
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: "oklch(0.75 0.18 280 / 0.9)" }}>{lead.notes}</p>
+              </div>
+            )}
           </div>
 
           {/* WhatsApp Section — hidden */}
@@ -1692,7 +1702,20 @@ export default function LeadDetail() {
           )}
 
           {/* Social analyses */}
-          {socialAnalyses.length > 0 && socialAnalyses.map((sa) => {
+          {socialAnalyses.length > 0 && (
+            <div className="rounded-2xl border overflow-hidden" style={{ background: "oklch(0.10 0.015 240)", borderColor: "oklch(0.62 0.18 285 / 0.3)" }}>
+              {/* Section header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "oklch(0.62 0.18 285 / 0.2)", background: "oklch(0.62 0.18 285 / 0.06)" }}>
+                <h3 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+                  <Users className="w-4 h-4" style={{ color: "oklch(0.72 0.18 285)" }} />
+                  تحليل السوشيال ميديا
+                </h3>
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "oklch(0.62 0.18 285 / 0.15)", color: "oklch(0.72 0.18 285)" }}>
+                  {socialAnalyses.length} منصة
+                </span>
+              </div>
+              <div className="p-4 space-y-4">
+          {socialAnalyses.map((sa) => {
             const platformConfig: Record<string, { label: string; color: string }> = {
               instagram: { label: "إنستغرام", color: "oklch(0.62 0.18 285)" },
               tiktok:    { label: "تيك توك",   color: "oklch(0.58 0.22 25)" },
@@ -1782,6 +1805,9 @@ export default function LeadDetail() {
             </div>
             );
           })}
+              </div>
+            </div>
+          )}
 
           {/* Instagram Dataset API Results Card */}
           {bdResults.instagram && bdResults.instagram.followersCount > 0 && (

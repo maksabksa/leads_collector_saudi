@@ -6,7 +6,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { leads } from "../../drizzle/schema";
+import { leads, socialAnalyses, websiteAnalyses } from "../../drizzle/schema";
 import { eq, inArray, and, or, isNull } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import {
@@ -46,6 +46,41 @@ function extractContent(content: string | any[]): string {
   return "";
 }
 
+// Build rich social media summary from Bright Data real data
+function buildSocialSummary(socialData: any[]): string {
+  if (!socialData.length) return "";
+  const parts: string[] = [];
+  for (const s of socialData) {
+    const platform = s.platform;
+    const lines: string[] = [`منصة ${platform}:`];
+    if (s.followersCount > 0) lines.push(`  - المتابعون: ${s.followersCount.toLocaleString()}`);
+    if (s.postsCount > 0) lines.push(`  - عدد المنشورات: ${s.postsCount}`);
+    if (s.engagementRate > 0) lines.push(`  - معدل التفاعل: ${s.engagementRate.toFixed(2)}%`);
+    if (s.avgLikes > 0) lines.push(`  - متوسط الإعجابات: ${s.avgLikes}`);
+    if (s.avgViews > 0) lines.push(`  - متوسط المشاهدات: ${s.avgViews}`);
+    if (s.summary) lines.push(`  - ملخص: ${s.summary}`);
+    if (s.overallScore) lines.push(`  - التقييم: ${s.overallScore}/10`);
+    if (Array.isArray(s.gaps) && s.gaps.length > 0) lines.push(`  - الثغرات: ${s.gaps.join("، ")}`);
+    parts.push(lines.join("\n"));
+  }
+  return parts.join("\n\n");
+}
+
+// Build rich website summary from analysis data
+function buildWebsiteSummary(wa: any): string {
+  if (!wa) return "";
+  const lines: string[] = ["تحليل الموقع الإلكتروني:"];
+  if (wa.overallScore) lines.push(`  - التقييم العام: ${wa.overallScore}/10`);
+  if (wa.loadSpeedScore) lines.push(`  - سرعة التحميل: ${wa.loadSpeedScore}/10`);
+  if (wa.seoScore) lines.push(`  - تقييم SEO: ${wa.seoScore}/10`);
+  if (wa.mobileExperienceScore) lines.push(`  - تجربة الجوال: ${wa.mobileExperienceScore}/10`);
+  if (wa.contentQualityScore) lines.push(`  - جودة المحتوى: ${wa.contentQualityScore}/10`);
+  if (wa.summary) lines.push(`  - الملخص: ${wa.summary}`);
+  if (Array.isArray(wa.technicalGaps) && wa.technicalGaps.length > 0) lines.push(`  - الثغرات التقنية: ${wa.technicalGaps.join("، ")}`);
+  if (Array.isArray(wa.contentGaps) && wa.contentGaps.length > 0) lines.push(`  - ثغرات المحتوى: ${wa.contentGaps.join("، ")}`);
+  return lines.join("\n");
+}
+
 // Process a single lead analysis
 async function analyzeSingleLead(
   leadId: number,
@@ -54,9 +89,20 @@ async function analyzeSingleLead(
 ): Promise<void> {
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) throw new Error("Lead not found");
-
   const sector: Sector = (lead.sectorMain as Sector | null)
     || detectSectorFromBusinessType(lead.businessType);
+
+  // جلب بيانات Bright Data من قاعدة البيانات
+  const [socialData, websiteData] = await Promise.all([
+    db.select().from(socialAnalyses).where(eq(socialAnalyses.leadId, leadId)),
+    db.select().from(websiteAnalyses).where(eq(websiteAnalyses.leadId, leadId)).limit(1),
+  ]);
+  const websiteAnalysis = websiteData[0] || null;
+  const socialAnalysisSummary = buildSocialSummary(socialData);
+  const websiteAnalysisSummary = buildWebsiteSummary(websiteAnalysis);
+
+  // بناء ملخص الملاحظات الإضافية
+  const notesContext = lead.notes ? `ملاحظات إضافية من الفريق: ${lead.notes}` : "";
 
   const prompt = buildSectorAnalysisPrompt({
     companyName: lead.companyName,
@@ -72,7 +118,9 @@ async function analyzeSingleLead(
     hasFacebook: !!lead.facebookUrl,
     hasGoogleMaps: !!lead.googleMapsUrl,
     reviewCount: lead.reviewCount,
-    notes: lead.notes,
+    notes: [lead.notes, notesContext].filter(Boolean).join("\n"),
+    websiteAnalysis: websiteAnalysisSummary || undefined,
+    socialAnalysis: socialAnalysisSummary || undefined,
   });
 
   await db.update(leads)
