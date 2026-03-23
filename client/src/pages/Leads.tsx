@@ -145,6 +145,24 @@ export default function Leads() {
     },
     onError: (e) => toast.error("فشل الإرجاع: " + e.message),
   });
+  const bulkMoveDeferred = trpc.leads.bulkUpdateStage.useMutation({
+    onSuccess: (data) => {
+      toast.success(`⏸️ تم ترحيل ${data.updated} عميل إلى المؤجلين`);
+      setSelectedIds(new Set());
+      utils.leads.list.invalidate();
+      utils.leads.stats.invalidate();
+    },
+    onError: (e) => toast.error("فشل الترحيل: " + e.message),
+  });
+  const bulkMoveCancelled = trpc.leads.bulkUpdateStage.useMutation({
+    onSuccess: (data) => {
+      toast.success(`🚫 تم ترحيل ${data.updated} عميل إلى ملغي التواصل`);
+      setSelectedIds(new Set());
+      utils.leads.list.invalidate();
+      utils.leads.stats.invalidate();
+    },
+    onError: (e) => toast.error("فشل الترحيل: " + e.message),
+  });
   const exportCSV = trpc.export.exportCSV.useMutation();
   const bulkGeneratePDF = trpc.pdfReport.generateBulk.useMutation({
     onSuccess: (data) => {
@@ -276,8 +294,8 @@ export default function Leads() {
                   ترحيل {selectedIds.size} للمتواصَل معهم
                 </button>
               )}
-              {/* زر الإرجاع — يظهر فقط في تبويب "تم التواصل" */}
-              {activeListTab === "contacted" && (
+              {/* زر الإرجاع — يظهر فقط في تبويب "تم التواصل" أو "مؤجلين" أو "ملغي" */}
+              {(activeListTab === "contacted" || activeListTab === "deferred" || activeListTab === "cancelled") && (
                 <button
                   onClick={() => bulkReturnToNew.mutate({ ids: Array.from(selectedIds), stage: "new" })}
                   disabled={bulkReturnToNew.isPending}
@@ -286,6 +304,30 @@ export default function Leads() {
                 >
                   <ArrowRightLeft className="w-4 h-4" />
                   {bulkReturnToNew.isPending ? "جاري الإرجاع..." : `إرجاع ${selectedIds.size} للقائمة الرئيسية`}
+                </button>
+              )}
+              {/* زر ترحيل مؤجلين — يظهر في كل التبويبات عدا مؤجلين */}
+              {activeListTab !== "deferred" && (
+                <button
+                  onClick={() => bulkMoveDeferred.mutate({ ids: Array.from(selectedIds), stage: "deferred" })}
+                  disabled={bulkMoveDeferred.isPending}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: "oklch(0.75 0.15 55 / 0.15)", color: "oklch(0.85 0.15 55)", border: "1px solid oklch(0.75 0.15 55 / 0.3)" }}
+                >
+                  <Clock className="w-4 h-4" />
+                  {bulkMoveDeferred.isPending ? "جاري الترحيل..." : `⏸️ مؤجلين (${selectedIds.size})`}
+                </button>
+              )}
+              {/* زر ترحيل ملغي التواصل — يظهر في كل التبويبات عدا ملغي */}
+              {activeListTab !== "cancelled" && (
+                <button
+                  onClick={() => bulkMoveCancelled.mutate({ ids: Array.from(selectedIds), stage: "cancelled" })}
+                  disabled={bulkMoveCancelled.isPending}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: "oklch(0.58 0.22 25 / 0.15)", color: "oklch(0.75 0.18 25)", border: "1px solid oklch(0.58 0.22 25 / 0.3)" }}
+                >
+                  <XCircle className="w-4 h-4" />
+                  {bulkMoveCancelled.isPending ? "جاري الترحيل..." : `🚫 ملغي التواصل (${selectedIds.size})`}
                 </button>
               )}
               <button
@@ -833,6 +875,19 @@ export default function Leads() {
                         <Eye className="w-4 h-4" />
                       </button>
                     </Link>
+                    {(lead as any).pdfReportUrl && (
+                      <a
+                        href={(lead as any).pdfReportUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
+                        style={{ color: "oklch(0.75 0.18 280)" }}
+                        title="عرض التقرير"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </a>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); setQuickEditLead(lead); setShowQuickEdit(true); }}
                       className="p-1.5 rounded-lg hover:bg-white/5 transition-all opacity-0 group-hover:opacity-100"

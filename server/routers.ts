@@ -634,13 +634,13 @@ const leadsRouter = router({
   bulkUpdateStage: protectedProcedure
     .input(z.object({
       ids: z.array(z.number()).min(1).max(5000),
-      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]),
+      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost", "deferred", "cancelled"]),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
       const { leads: leadsTable } = await import("../drizzle/schema");
-      await db.update(leadsTable).set({ stage: input.stage }).where(inArray(leadsTable.id, input.ids));
+      await db.update(leadsTable).set({ stage: input.stage as any }).where(inArray(leadsTable.id, input.ids));
       return { success: true, updated: input.ids.length };
     }),
 
