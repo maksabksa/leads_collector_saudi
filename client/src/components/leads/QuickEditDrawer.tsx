@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import {
   Building2, Phone, MapPin, Globe, Instagram, Twitter,
-  Music2, Camera, Facebook, Linkedin, Save, Loader2, Link2,
+  Music2, Camera, Facebook, Linkedin, Save, Loader2, Link2, Mail,
 } from "lucide-react";
 import { COUNTRIES_DATA } from "../../../../shared/countries";
 
@@ -43,6 +43,7 @@ interface QuickEditDrawerProps {
     tiktokUrl?: string | null;
     facebookUrl?: string | null;
     linkedinUrl?: string | null;
+    email?: string | null;
     notes?: string | null;
   } | null;
   onSaved?: () => void;
@@ -57,6 +58,7 @@ export default function QuickEditDrawer({ open, onOpenChange, lead, onSaved }: Q
     city: "",
     district: "",
     verifiedPhone: "",
+    email: "",
     website: "",
     googleMapsUrl: "",
     instagramUrl: "",
@@ -79,6 +81,7 @@ export default function QuickEditDrawer({ open, onOpenChange, lead, onSaved }: Q
         city: lead.city ?? "",
         district: lead.district ?? "",
         verifiedPhone: lead.verifiedPhone ?? "",
+        email: (lead as any).email ?? "",
         website: lead.website ?? "",
         googleMapsUrl: lead.googleMapsUrl ?? "",
         instagramUrl: lead.instagramUrl ?? "",
@@ -118,6 +121,7 @@ export default function QuickEditDrawer({ open, onOpenChange, lead, onSaved }: Q
       city: form.city || undefined,
       district: form.district || undefined,
       verifiedPhone: form.verifiedPhone || undefined,
+      email: form.email || undefined,
       website: form.website || undefined,
       googleMapsUrl: form.googleMapsUrl || undefined,
       instagramUrl: form.instagramUrl || undefined,
@@ -215,6 +219,22 @@ export default function QuickEditDrawer({ open, onOpenChange, lead, onSaved }: Q
                 value={form.verifiedPhone}
                 onChange={e => f("verifiedPhone", e.target.value)}
                 placeholder="05xxxxxxxx"
+                dir="ltr"
+                className="text-sm h-9"
+                style={{ background: "oklch(0.16 0.01 240)", border: "1px solid oklch(0.25 0.02 240)", color: "oklch(0.9 0.01 240)" }}
+              />
+            </div>
+
+            {/* البريد الإلكتروني */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "oklch(0.7 0.01 240)" }}>
+                <Mail className="w-3.5 h-3.5" /> البريد الإلكتروني
+              </Label>
+              <Input
+                value={form.email}
+                onChange={e => f("email", e.target.value)}
+                placeholder="example@domain.com"
+                type="email"
                 dir="ltr"
                 className="text-sm h-9"
                 style={{ background: "oklch(0.16 0.01 240)", border: "1px solid oklch(0.25 0.02 240)", color: "oklch(0.9 0.01 240)" }}

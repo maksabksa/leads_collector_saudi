@@ -465,7 +465,7 @@ const leadsRouter = router({
       notes: z.string().optional(),
       crNumber: z.string().optional(),
       clientLogoUrl: z.string().optional(),
-      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost"]).optional(),
+      stage: z.enum(["new", "contacted", "interested", "price_offer", "meeting", "won", "lost", "deferred", "cancelled"]).optional(),
       priority: z.enum(["high", "medium", "low"]).optional(),
       nextStep: z.string().optional(),
       nextFollowup: z.number().optional(),

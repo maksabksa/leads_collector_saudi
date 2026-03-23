@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Link } from "wouter";
 import {
-  Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone,
+  Plus, Search, Filter, Download, Trash2, Eye, Globe, Instagram, Phone, Mail,
   MapPin, ChevronDown, Layers, CheckSquare, Square, Zap,
   Loader2, Upload, AlertTriangle, ArrowRightLeft, UserCheck, Users, Send, MessageSquare,
   Target, FileText, CheckCircle2, Pencil, Clock, XCircle, FileDown, BrainCircuit,
@@ -785,16 +785,22 @@ export default function Leads() {
                   </div>
                   {/* Contact */}
                   <div className="col-span-2">
-                    {lead.verifiedPhone ? (
-                      <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5">
+                      {lead.verifiedPhone ? (
                         <div className="flex items-center gap-1.5">
                           <Phone className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                           <span className="text-xs text-foreground font-mono">{lead.verifiedPhone}</span>
                         </div>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">لا يوجد</span>
-                    )}
+                      ) : (
+                        <span className="text-xs text-muted-foreground">لا يوجد هاتف</span>
+                      )}
+                      {(lead as any).email && (
+                        <div className="flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-xs font-mono truncate max-w-[130px]" style={{ color: "oklch(0.75 0.18 200)" }} title={(lead as any).email}>{(lead as any).email}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {/* Digital presence */}
                   <div className="col-span-2 flex items-center gap-2">

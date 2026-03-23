@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useParams, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import {
-  ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3,
+  ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3, Mail,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
   Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown, MessagesSquare,
   Activity, Users, Clock, Brain, ChevronUp, Sparkles, FileText, Download, Eye
@@ -532,6 +532,7 @@ export default function LeadDetail() {
       city: lead.city,
       district: lead.district || "",
       verifiedPhone: lead.verifiedPhone || "",
+      email: (lead as any).email || "",
       website: lead.website || "",
       googleMapsUrl: lead.googleMapsUrl || "",
       instagramUrl: lead.instagramUrl || "",
@@ -739,6 +740,7 @@ export default function LeadDetail() {
             {[
               { field: "companyName", label: "اسم النشاط", type: "text" },
               { field: "verifiedPhone", label: "الهاتف", type: "text" },
+              { field: "email", label: "الإيميل", type: "text" },
               { field: "website", label: "الموقع", type: "text" },
               { field: "instagramUrl", label: "إنستغرام", type: "text" },
               { field: "twitterUrl", label: "تويتر", type: "text" },
@@ -915,6 +917,12 @@ export default function LeadDetail() {
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm text-foreground font-mono">{lead.verifiedPhone}</span>
+              </div>
+            )}
+            {(lead as any).email && (
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <a href={`mailto:${(lead as any).email}`} className="text-sm font-mono hover:underline" style={{ color: "oklch(0.75 0.18 200)" }}>{(lead as any).email}</a>
               </div>
             )}
             {lead.googleMapsUrl && (
