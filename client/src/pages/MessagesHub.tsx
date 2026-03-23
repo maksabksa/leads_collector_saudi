@@ -18,6 +18,245 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
+import { Send, FileText, TestTube2, CheckCircle2, XCircle, Variable } from "lucide-react";
+
+// ===== تبويب Whatchimp Templates =====
+function WhatchimpTemplatesTab() {
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [testPhone, setTestPhone] = useState("");
+  const [variables, setVariables] = useState<Record<string, string>>({});
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; sentTo: string } | null>(null);
+
+  const { data: templates, isLoading: loadingTemplates, refetch } = trpc.whatchimp.getTemplates.useQuery(undefined, {
+    retry: false,
+  });
+
+  const testMutation = trpc.whatchimp.testTemplate.useMutation({
+    onSuccess: (data) => {
+      setTestResult(data);
+      if (data.success) {
+        toast.success(`✅ تم الإرسال بنجاح إلى ${data.sentTo}`);
+      } else {
+        toast.error(`❌ فشل: ${data.message}`);
+      }
+    },
+    onError: (err) => {
+      toast.error(err.message);
+      setTestResult({ success: false, message: err.message, sentTo: testPhone });
+    },
+  });
+
+  const activeTemplate = templates?.find((t: any) => t.name === selectedTemplate);
+  const templateVars: string[] = activeTemplate?.variables ?? [];
+
+  const handleVarChange = (key: string, value: string) => {
+    setVariables((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleTest = () => {
+    if (!selectedTemplate) return toast.error("اختر تمبلت أولاً");
+    if (!testPhone.trim()) return toast.error("أدخل رقم الهاتف");
+    const vars: Record<string, string> = {};
+    templateVars.forEach((_: string, i: number) => {
+      const key = `variable${i + 1}`;
+      if (variables[key]) vars[key] = variables[key];
+    });
+    testMutation.mutate({
+      phone: testPhone.trim(),
+      templateName: selectedTemplate,
+      languageCode: activeTemplate?.language ?? "ar",
+      variables: Object.keys(vars).length > 0 ? vars : undefined,
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold">قوالب واتساب (Templates)</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">اختبر إرسال قوالب واتساب المعتمدة من Meta مباشرة</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+          <RefreshCw className="h-4 w-4" />تحديث
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* قائمة التمبلتات */}
+        <Card className="border-border/50 bg-card/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-400" />القوالب المتاحة
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingTemplates ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
+                <Loader2 className="h-4 w-4 animate-spin" />جاري تحميل القوالب...
+              </div>
+            ) : !templates || templates.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">لا توجد قوالب — تأكد من ربط Whatchimp</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+                {templates.map((t: any) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setSelectedTemplate(t.name); setVariables({}); setTestResult(null); }}
+                    className={cn(
+                      "w-full text-right p-3 rounded-lg border transition-all",
+                      selectedTemplate === t.name
+                        ? "border-green-500/40 bg-green-500/10 text-green-300"
+                        : "border-border/40 bg-background/50 hover:bg-card text-foreground"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-sm font-medium truncate">{t.name}</span>
+                        <span className="text-xs text-muted-foreground">{t.category} · {t.language}</span>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className={cn(
+                          "text-xs px-2 py-0.5 rounded-full font-medium",
+                          t.status === "APPROVED" ? "bg-green-500/15 text-green-400" :
+                          t.status === "PENDING" ? "bg-yellow-500/15 text-yellow-400" :
+                          "bg-red-500/15 text-red-400"
+                        )}>{t.status === "APPROVED" ? "✅ معتمد" : t.status === "PENDING" ? "⏳ مراجعة" : t.status}</span>
+                        {t.variables?.length > 0 && (
+                          <span className="text-xs text-purple-400 flex items-center gap-1">
+                            <Variable className="h-3 w-3" />{t.variables.length} متغير
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* نموذج الاختبار */}
+        <div className="flex flex-col gap-4">
+          <Card className="border-border/50 bg-card/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <TestTube2 className="h-4 w-4 text-purple-400" />اختبار الإرسال
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">القالب المختار</Label>
+                {selectedTemplate ? (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/10 border border-green-500/30">
+                    <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
+                    <span className="text-sm font-medium text-green-300 truncate">{selectedTemplate}</span>
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border/40 text-sm text-muted-foreground">
+                    ← اختر قالباً من القائمة
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">رقم الهاتف للاختبار</Label>
+                <Input
+                  placeholder="مثال: 966501234567"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  dir="ltr"
+                  className="bg-background/50"
+                />
+                <p className="text-xs text-muted-foreground mt-1">بدون + وبدون مسافات (966501234567)</p>
+              </div>
+
+              {templateVars.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">
+                    متغيرات القالب ({templateVars.length})
+                  </Label>
+                  <div className="flex flex-col gap-2">
+                    {templateVars.map((varName: string, i: number) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="text-xs text-purple-400 font-mono bg-purple-500/10 px-2 py-1.5 rounded shrink-0">&#123;&#123;{i+1}&#125;&#125;</span>
+                        <Input
+                          placeholder={varName || `المتغير ${i + 1}`}
+                          value={variables[`variable${i + 1}`] ?? ""}
+                          onChange={(e) => handleVarChange(`variable${i + 1}`, e.target.value)}
+                          className="bg-background/50 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Button
+                onClick={handleTest}
+                disabled={!selectedTemplate || !testPhone || testMutation.isPending}
+                className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                {testMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />جاري الإرسال...</>
+                ) : (
+                  <><Send className="h-4 w-4" />إرسال تجريبي</>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {testResult && (
+            <Card className={cn(
+              "border",
+              testResult.success ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"
+            )}>
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  {testResult.success
+                    ? <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
+                    : <XCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />}
+                  <div className="flex flex-col gap-1">
+                    <p className={cn("text-sm font-semibold", testResult.success ? "text-green-300" : "text-red-300")}>
+                      {testResult.success ? "تم الإرسال بنجاح" : "فشل الإرسال"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">إلى: <span dir="ltr">{testResult.sentTo}</span></p>
+                    {testResult.message && (
+                      <p className="text-xs font-mono bg-background/50 p-2 rounded mt-1 text-muted-foreground break-all">{testResult.message}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <Card className="border-border/30 bg-card/30">
+        <CardContent className="pt-4">
+          <h3 className="text-sm font-semibold mb-3">كيف تعمل قوالب واتساب؟</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { num: "1️⃣", title: "إنشاء القالب", desc: "أنشئ القالب في Meta Business وانتظر الاعتماد (24-48 ساعة)" },
+              { num: "2️⃣", title: "المتغيرات", desc: "استخدم {{1}} {{2}} في نص القالب لإدراج بيانات ديناميكية كاسم العميل أو رابط التقرير" },
+              { num: "3️⃣", title: "الإرسال", desc: "بعد الاعتماد، يمكن إرسال القالب لأي عميل مع تعبئة المتغيرات تلقائياً" },
+            ].map((s) => (
+              <div key={s.title} className="flex gap-3">
+                <span className="text-xl shrink-0">{s.num}</span>
+                <div>
+                  <p className="text-sm font-medium">{s.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 // ===== تبويب واتساب =====
 function WhatsAppTab() {
@@ -517,7 +756,7 @@ function QuickActionCard({ icon, title, description, badge, badgeVariant, onClic
 }
 
 // ===== الصفحة الرئيسية =====
-type MessageTab = "whatsapp" | "instagram";
+type MessageTab = "whatsapp" | "instagram" | "templates";
 
 export default function MessagesHub() {
   const [activeTab, setActiveTab] = useState<MessageTab>("whatsapp");
@@ -541,6 +780,15 @@ export default function MessagesHub() {
       activeBg: "bg-pink-500/10 border-pink-500/30 text-pink-300",
       badge: 0,
       badgeColor: "bg-pink-500",
+    },
+    {
+      id: "templates" as MessageTab,
+      label: "قوالب واتساب",
+      icon: FileText,
+      color: "text-blue-400",
+      activeBg: "bg-blue-500/10 border-blue-500/30 text-blue-300",
+      badge: 0,
+      badgeColor: "bg-blue-500",
     },
   ];
 
@@ -593,6 +841,7 @@ export default function MessagesHub() {
         <div className="flex-1 overflow-y-auto">
           {activeTab === "whatsapp" && <WhatsAppTab />}
           {activeTab === "instagram" && <InstagramTab />}
+          {activeTab === "templates" && <WhatchimpTemplatesTab />}
         </div>
     </div>
   );

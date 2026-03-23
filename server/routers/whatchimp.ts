@@ -703,12 +703,48 @@ export const whatchimpRouter = router({
   }),
 
   // ── Send Template Message (single lead) ───────────────────────────────────
+  // ── Test Template (no lead required) ─────────────────────────────────────
+  testTemplate: protectedProcedure
+    .input(z.object({
+      phone: z.string().min(10),
+      templateName: z.string(),
+      languageCode: z.string().default("ar"),
+      variables: z.record(z.string(), z.string()).optional(), // { variable1: "...", variable2: "..." }
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const settings = await db.select().from(whatchimpSettings).where(eq(whatchimpSettings.isActive, true)).limit(1);
+      if (!settings[0]) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Whatchimp غير مربوط" });
+      const { apiToken, phoneNumberId } = settings[0];
+      const phone = normalizePhone(input.phone);
+      const sendParams: Record<string, string | number> = {
+        apiToken,
+        phone_number_id: phoneNumberId,
+        phone_number: phone,
+        template_name: input.templateName,
+        language_code: input.languageCode,
+        ...(input.variables ?? {}),
+      };
+      const result = await whatchimpPost("/whatsapp/send", sendParams);
+      const success = String(result.status) === "1";
+      return {
+        success,
+        message: String(result.message ?? ""),
+        rawStatus: result.status,
+        sentTo: phone,
+        templateName: input.templateName,
+        variablesUsed: input.variables ?? {},
+      };
+    }),
+
   sendTemplateMessage: protectedProcedure
     .input(z.object({
       leadId: z.number(),
       templateName: z.string(),
       languageCode: z.string().default("ar"),
-      pdfUrl: z.string().url().optional(), // رابط التقرير — يُمرَّر كـ variable1 في نص الرسالة
+      pdfUrl: z.string().url().optional(),
+      variables: z.record(z.string(), z.string()).optional(), // متغيرات إضافية
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
@@ -732,9 +768,12 @@ export const whatchimpRouter = router({
         template_name: input.templateName,
         language_code: input.languageCode,
       };
+      // دمج المتغيرات المخصصة
+      if (input.variables) {
+        Object.assign(sendParams, input.variables);
+      }
+      // رابط PDF كـ variable1 (يُكتب فوق أي variable1 مخصص)
       if (input.pdfUrl) {
-        // Whatchimp API does not support header_document_url dynamically.
-        // Instead, pass the PDF URL as variable1 so the template body can include {{1}}.
         sendParams["variable1"] = input.pdfUrl;
       }
 
