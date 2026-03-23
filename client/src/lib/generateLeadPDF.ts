@@ -1923,6 +1923,154 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   `);
 
   // ═══════════════════════════════════════════════════════════════════════
+  //  PAGE SOCIAL — صفحة تحليل السوشيال ميديا التفصيلي
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const p_social = socialAnalyses.length > 0 ? page(`
+    <div style="position:absolute;top:-80px;left:-80px;width:320px;height:320px;border-radius:50%;
+      background:radial-gradient(circle,rgba(225,48,108,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-60px;right:-60px;width:280px;height:280px;border-radius:50%;
+      background:radial-gradient(circle,rgba(105,201,208,0.04) 0%,transparent 70%);pointer-events:none;"></div>
+
+    ${pageHeader("تحليل السوشيال ميديا التفصيلي", `${socialAnalyses.length} منصة محللة — أرقام حقيقية وتقييم ذكي`, "صفحة X/Y", coName, lead)}
+
+    <div style="padding:14px 40px;">
+
+      <!-- Summary row -->
+      <div style="display:grid;grid-template-columns:repeat(${Math.min(socialAnalyses.length, 4)},1fr);gap:8px;margin-bottom:16px;">
+        ${socialAnalyses.slice(0, 4).map((s: any) => {
+          const meta = pm(s.platform);
+          const extra = parseSocialExtra(s.rawData);
+          const followers = extra.followers ?? extra.followersCount ?? s.followersCount ?? 0;
+          const score = s.overallScore ? Number(s.overallScore) : null;
+          const color = sc(score);
+          return `<div style="background:rgba(255,255,255,0.03);border:1px solid ${meta.color}33;
+            border-radius:12px;padding:10px 12px;text-align:center;border-top:3px solid ${meta.color};">
+            <div style="font-size:18px;margin-bottom:4px;">${meta.icon}</div>
+            <div style="font-size:10px;font-weight:800;color:#f1f5f9;margin-bottom:6px;">${meta.name}</div>
+            <div style="font-size:20px;font-weight:900;color:${color};text-shadow:0 0 10px ${color}66;">${followers > 0 ? fmtK(followers) : (score ? score.toFixed(1) : '—')}</div>
+            <div style="font-size:8px;color:#475569;margin-top:2px;">${followers > 0 ? 'متابع' : (score ? 'تقييم / 10' : 'لم يُحلَّل')}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Detailed platform cards -->
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${socialAnalyses.slice(0, 4).map((s: any) => {
+          const meta = pm(s.platform);
+          const extra = parseSocialExtra(s.rawData);
+          const followers = extra.followers ?? extra.followersCount ?? s.followersCount ?? 0;
+          const posts = extra.posts ?? extra.postsCount ?? s.postsCount ?? 0;
+          const following = extra.following ?? extra.followingCount ?? 0;
+          const engRate = extra.engagementRate ?? s.engagementRate ?? 0;
+          const avgLikes = extra.avgLikes ?? 0;
+          const avgViews = extra.avgViews ?? 0;
+          const overallScore = s.overallScore ? Number(s.overallScore) : null;
+          const engScore = s.engagementScore ? Number(s.engagementScore) : null;
+          const contentScore = s.contentQualityScore ? Number(s.contentQualityScore) : null;
+          const stratScore = s.strategyScore ? Number(s.strategyScore) : null;
+          const hasCTA = s.hasCTA;
+          const hasSeasonalContent = s.hasSeasonalContent;
+          const hasPricing = s.hasPricing;
+          const summary = s.summary || extra.summary || '';
+          const recommendations = s.recommendations || extra.recommendations || [];
+          const recsArr = Array.isArray(recommendations) ? recommendations : (typeof recommendations === 'string' ? [recommendations] : []);
+          const hasRealData = followers > 0 || posts > 0;
+          const hasAiData = overallScore !== null;
+          const scoreColor = sc(overallScore);
+          return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+            border-radius:14px;overflow:hidden;border-right:4px solid ${meta.color};">
+            <!-- Platform header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;
+              padding:10px 16px;background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.04);">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="font-size:22px;">${meta.icon}</div>
+                <div>
+                  <div style="font-size:13px;font-weight:800;color:#f1f5f9;">${meta.name}</div>
+                  ${s.profileUrl || lead[s.platform + 'Url'] ? `<div style="font-size:9px;color:#475569;">${cleanUrl(s.profileUrl || lead[s.platform + 'Url'], s.platform)}</div>` : ''}
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                ${hasCTA === false ? `<span style="padding:3px 8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;font-size:8px;color:#fca5a5;font-weight:700;">لا CTA ✗</span>` : hasCTA === true ? `<span style="padding:3px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;font-size:8px;color:#86efac;font-weight:700;">CTA ✓</span>` : ''}
+                ${hasSeasonalContent === false ? `<span style="padding:3px 8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;font-size:8px;color:#fca5a5;font-weight:700;">لا محتوى موسمي ✗</span>` : hasSeasonalContent === true ? `<span style="padding:3px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;font-size:8px;color:#86efac;font-weight:700;">محتوى موسمي ✓</span>` : ''}
+                ${hasPricing === false ? `<span style="padding:3px 8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;font-size:8px;color:#fca5a5;font-weight:700;">لا أسعار ✗</span>` : hasPricing === true ? `<span style="padding:3px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;font-size:8px;color:#86efac;font-weight:700;">أسعار ✓</span>` : ''}
+                ${hasAiData ? `<div style="text-align:center;">
+                  <div style="font-size:22px;font-weight:900;color:${scoreColor};text-shadow:0 0 12px ${scoreColor}66;">${overallScore!.toFixed(1)}</div>
+                  <div style="font-size:8px;color:#475569;">تقييم / 10</div>
+                </div>` : `<div style="padding:4px 10px;background:rgba(100,116,139,0.1);border:1px solid rgba(100,116,139,0.2);border-radius:8px;"><span style="font-size:9px;color:#64748b;">لم يُحلَّل بعد</span></div>`}
+              </div>
+            </div>
+            <!-- Stats + Scores -->
+            <div style="padding:10px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <!-- Real data stats -->
+              <div>
+                <div style="font-size:9px;color:#475569;font-weight:700;margin-bottom:8px;letter-spacing:1px;">📊 البيانات الحقيقية</div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
+                  ${[
+                    { v: followers > 0 ? fmtK(followers) : '—', label: 'متابع', color: '#22c55e' },
+                    { v: posts > 0 ? fmtK(posts) : '—', label: 'منشور', color: '#0ea5e9' },
+                    { v: following > 0 ? fmtK(following) : (engRate > 0 ? engRate.toFixed(1)+'%' : '—'), label: following > 0 ? 'يتابع' : 'تفاعل', color: '#a78bfa' },
+                  ].map(({ v, label, color }) => `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+                    border-radius:8px;padding:8px 6px;text-align:center;">
+                    <div style="font-size:16px;font-weight:900;color:${color};text-shadow:0 0 8px ${color}66;">${v}</div>
+                    <div style="font-size:8px;color:#475569;margin-top:2px;">${label}</div>
+                  </div>`).join('')}
+                </div>
+                ${avgLikes > 0 || avgViews > 0 ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                  ${avgLikes > 0 ? `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:6px 8px;text-align:center;">
+                    <div style="font-size:13px;font-weight:900;color:#f97316;">${fmtK(avgLikes)}</div>
+                    <div style="font-size:8px;color:#475569;">متوسط لايكات</div>
+                  </div>` : ''}
+                  ${avgViews > 0 ? `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:6px 8px;text-align:center;">
+                    <div style="font-size:13px;font-weight:900;color:#eab308;">${fmtK(avgViews)}</div>
+                    <div style="font-size:8px;color:#475569;">متوسط مشاهدات</div>
+                  </div>` : ''}
+                </div>` : ''}
+                ${!hasRealData ? `<div style="padding:8px;background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.1);border-radius:8px;text-align:center;">
+                  <div style="font-size:9px;color:#475569;">لم يتم جلب البيانات الحقيقية بعد</div>
+                </div>` : ''}
+              </div>
+              <!-- AI scores -->
+              <div>
+                <div style="font-size:9px;color:#475569;font-weight:700;margin-bottom:8px;letter-spacing:1px;">🤖 تقييم الذكاء الاصطناعي</div>
+                ${hasAiData ? `
+                  ${bar(engScore, 'التفاعل')}
+                  ${bar(contentScore, 'جودة المحتوى')}
+                  ${bar(stratScore, 'الاستراتيجية')}
+                ` : `<div style="padding:8px;background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.1);border-radius:8px;text-align:center;">
+                  <div style="font-size:9px;color:#475569;">اضغط "تحليل شامل" للحصول على تقييم AI</div>
+                </div>`}
+              </div>
+            </div>
+            ${summary ? `<div style="padding:0 16px 8px;">
+              <div style="padding:8px 12px;background:rgba(255,255,255,0.02);border-right:3px solid ${meta.color}66;border-radius:0 8px 8px 0;">
+                <div style="font-size:10px;color:#94a3b8;line-height:1.7;">${summary.substring(0, 200)}${summary.length > 200 ? '...' : ''}</div>
+              </div>
+            </div>` : ''}
+            ${recsArr.length > 0 ? `<div style="padding:0 16px 10px;">
+              <div style="font-size:9px;color:#475569;font-weight:700;margin-bottom:6px;">💡 التوصيات</div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                ${recsArr.slice(0, 2).map((r: string) => `<div style="display:flex;align-items:flex-start;gap:6px;">
+                  <span style="color:${meta.color};font-size:10px;flex-shrink:0;">▸</span>
+                  <span style="font-size:9.5px;color:#94a3b8;line-height:1.6;">${r.substring(0, 120)}${r.length > 120 ? '...' : ''}</span>
+                </div>`).join('')}
+              </div>
+            </div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 40px;
+      background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.04);
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:9px;color:#334155;">${coName} · تقرير سري ومخصص</div>
+      <div style="font-size:9px;color:#334155;">صفحة X من Y</div>
+    </div>
+  `) : null;
+
+  // ═══════════════════════════════════════════════════════════════════════
   //  PAGE BRAND — صفحة الهوية البصرية والبراند
   // ═══════════════════════════════════════════════════════════════════════
 
@@ -2217,6 +2365,7 @@ export async function generateLeadPDF(options: GeneratePDFOptions): Promise<void
   activePages.push({ key: 'p1', html: p1 }); // الغلاف دائماً
   activePages.push({ key: 'p2', html: p2 }); // الملخص التنفيذي دائماً
   if (hasDigitalData) activePages.push({ key: 'p3', html: p3 }); // التحليل الرقمي فقط إذا كانت هناك بيانات
+  if (hasSocialData && p_social) activePages.push({ key: 'p_social', html: p_social }); // تحليل السوشيال التفصيلي
   if (hasBrandData && p_brand) activePages.push({ key: 'p_brand', html: p_brand }); // الهوية البصرية فقط إذا كانت هناك بيانات
   if (hasCompetitors) activePages.push({ key: 'p5', html: p5 }); // المنافسون قبل التوصيات
   activePages.push({ key: 'p4', html: p4 }); // التوصيات دائماً
