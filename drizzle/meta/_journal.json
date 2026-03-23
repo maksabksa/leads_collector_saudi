@@ -309,6 +309,13 @@
       "when": 1774210906353,
       "tag": "0043_mixed_imperial_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "5",
+      "when": 1774228282778,
+      "tag": "0044_late_pride",
+      "breakpoints": true
     }
   ]
 }
