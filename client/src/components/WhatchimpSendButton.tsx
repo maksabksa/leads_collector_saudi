@@ -124,32 +124,7 @@ export default function WhatchimpSendButton({
 
   const isSending = pdfGenerating || sendTemplateMutation.isPending;
 
-  const sendMutation = trpc.whatchimp.sendLead.useMutation({
-    onSuccess: (res) => {
-      if (res.success) {
-        toast.success(`تم إرسال ${name} إلى Whatchimp بنجاح`);
-        utils.whatchimp.getSendHistory.invalidate({ leadId });
-      } else {
-        toast.error(res.error || "فشل الإرسال");
-      }
-    },
-    onError: (e) => {
-      // اصطياد خطأ نافذة 24 ساعة — فتح Template Dialog تلقائياً
-      const msg = e.message ?? "";
-      if (
-        msg.includes("24 hour") ||
-        msg.includes("outside 24") ||
-        msg.includes("template message") ||
-        msg.includes("window is not allowed")
-      ) {
-        setOpenedDue24h(true);
-        setShowTemplateDialog(true);
-        // لا نعرض toast error — سيظهر التنبيه داخل Dialog
-      } else {
-        toast.error(e.message);
-      }
-    },
-  });
+  // sendMutation تم حذفه — النظام يستخدم Template فقط
 
   if (!configured?.configured) {
     return (
@@ -165,48 +140,25 @@ export default function WhatchimpSendButton({
 
   return (
     <div className="space-y-3">
-      {/* أزرار الإرسال */}
-      <div className="flex gap-2">
-        {/* زر إرسال Contact */}
-        <button
-          onClick={() => sendMutation.mutate({ leadId })}
-          disabled={sendMutation.isPending}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all"
-          style={{
-            background: "oklch(0.55 0.2 145 / 0.15)",
-            color: "oklch(0.65 0.2 145)",
-            border: "1px solid oklch(0.55 0.2 145 / 0.3)",
-            opacity: sendMutation.isPending ? 0.7 : 1,
-          }}
-        >
-          {sendMutation.isPending ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <Send className="w-3 h-3" />
-          )}
-          {lastSent?.status === "success" ? "إعادة الإرسال" : "إرسال Contact"}
-        </button>
-
-        {/* زر إرسال Template */}
-        <button
-          onClick={() => setShowTemplateDialog(true)}
-          disabled={sendTemplateMutation.isPending}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all"
-          style={{
-            background: "oklch(0.55 0.2 250 / 0.15)",
-            color: "oklch(0.65 0.2 250)",
-            border: "1px solid oklch(0.55 0.2 250 / 0.3)",
-            opacity: sendTemplateMutation.isPending ? 0.7 : 1,
-          }}
-        >
-          {sendTemplateMutation.isPending ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <MessageSquare className="w-3 h-3" />
-          )}
-          إرسال Template
-        </button>
-      </div>
+      {/* زر إرسال Template — الزر الرئيسي الوحيد */}
+      <button
+        onClick={() => setShowTemplateDialog(true)}
+        disabled={sendTemplateMutation.isPending || isSending}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+        style={{
+          background: "oklch(0.55 0.2 145 / 0.2)",
+          color: "oklch(0.7 0.2 145)",
+          border: "1px solid oklch(0.55 0.2 145 / 0.4)",
+          opacity: (sendTemplateMutation.isPending || isSending) ? 0.7 : 1,
+        }}
+      >
+        {sendTemplateMutation.isPending || isSending ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <MessageSquare className="w-4 h-4" />
+        )}
+        {lastSent?.status === "success" ? "إعادة إرسال Template" : "إرسال Template واتساب"}
+      </button>
 
       {/* سجل الإرسال */}
       {!historyLoading && history && history.length > 0 && (
