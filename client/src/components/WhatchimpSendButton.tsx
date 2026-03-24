@@ -55,7 +55,7 @@ export default function WhatchimpSendButton({
   }, [autoOpenTemplate]);
 
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [attachPdf, setAttachPdf] = useState(false);
+  const [attachPdf, setAttachPdf] = useState(true); // PDF مُفعَّل افتراضياً
   const [pdfGenerating, setPdfGenerating] = useState(false);
 
   const { data: history, isLoading: historyLoading } = trpc.whatchimp.getSendHistory.useQuery(
@@ -124,7 +124,30 @@ export default function WhatchimpSendButton({
 
   const isSending = pdfGenerating || sendTemplateMutation.isPending;
 
-  // sendMutation تم حذفه — النظام يستخدم Template فقط
+  const sendContactMutation = trpc.whatchimp.sendLead.useMutation({
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(`تم إرسال جهة اتصال ${name} بنجاح`);
+        utils.whatchimp.getSendHistory.invalidate({ leadId });
+      } else {
+        toast.error(res.error || "فشل الإرسال");
+      }
+    },
+    onError: (e) => {
+      const msg = e.message ?? "";
+      if (
+        msg.includes("24 hour") ||
+        msg.includes("outside 24") ||
+        msg.includes("template message") ||
+        msg.includes("window is not allowed")
+      ) {
+        setOpenedDue24h(true);
+        setShowTemplateDialog(true);
+      } else {
+        toast.error(e.message);
+      }
+    },
+  });
 
   if (!configured?.configured) {
     return (
@@ -140,25 +163,48 @@ export default function WhatchimpSendButton({
 
   return (
     <div className="space-y-3">
-      {/* زر إرسال Template — الزر الرئيسي الوحيد */}
-      <button
-        onClick={() => setShowTemplateDialog(true)}
-        disabled={sendTemplateMutation.isPending || isSending}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-        style={{
-          background: "oklch(0.55 0.2 145 / 0.2)",
-          color: "oklch(0.7 0.2 145)",
-          border: "1px solid oklch(0.55 0.2 145 / 0.4)",
-          opacity: (sendTemplateMutation.isPending || isSending) ? 0.7 : 1,
-        }}
-      >
-        {sendTemplateMutation.isPending || isSending ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <MessageSquare className="w-4 h-4" />
-        )}
-        {lastSent?.status === "success" ? "إعادة إرسال Template" : "إرسال Template واتساب"}
-      </button>
+      {/* أزرار الإرسال */}
+      <div className="flex gap-2">
+        {/* زر إرسال جهة الاتصال */}
+        <button
+          onClick={() => sendContactMutation.mutate({ leadId })}
+          disabled={sendContactMutation.isPending}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all"
+          style={{
+            background: "oklch(0.55 0.2 145 / 0.15)",
+            color: "oklch(0.65 0.2 145)",
+            border: "1px solid oklch(0.55 0.2 145 / 0.3)",
+            opacity: sendContactMutation.isPending ? 0.7 : 1,
+          }}
+        >
+          {sendContactMutation.isPending ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Send className="w-3 h-3" />
+          )}
+          {lastSent?.status === "success" ? "إعادة إرسال" : "إرسال جهة اتصال"}
+        </button>
+
+        {/* زر إرسال Template */}
+        <button
+          onClick={() => setShowTemplateDialog(true)}
+          disabled={sendTemplateMutation.isPending || isSending}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all"
+          style={{
+            background: "oklch(0.55 0.2 250 / 0.15)",
+            color: "oklch(0.65 0.2 250)",
+            border: "1px solid oklch(0.55 0.2 250 / 0.3)",
+            opacity: (sendTemplateMutation.isPending || isSending) ? 0.7 : 1,
+          }}
+        >
+          {sendTemplateMutation.isPending || isSending ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <MessageSquare className="w-3 h-3" />
+          )}
+          إرسال Template
+        </button>
+      </div>
 
       {/* سجل الإرسال */}
       {!historyLoading && history && history.length > 0 && (

@@ -172,6 +172,27 @@ export default function Leads() {
     },
     onError: (e) => toast.error("فشل توليد PDF: " + e.message),
   });
+  // تحليل عميل واحد من القائمة
+  const [analyzingLeadId, setAnalyzingLeadId] = useState<number | null>(null);
+  const singleAnalyze = trpc.analysis.bulkAnalyze.useMutation({
+    onSuccess: (data) => {
+      toast.success(`تم إرسال العميل للتحليل في الخلفية`);
+      setAnalyzingLeadId(null);
+      setTimeout(() => utils.leads.list.invalidate(), 2000);
+    },
+    onError: (e) => { toast.error("فشل التحليل: " + e.message); setAnalyzingLeadId(null); },
+  });
+  // توليد PDF لعميل واحد من القائمة
+  const [generatingPdfLeadId, setGeneratingPdfLeadId] = useState<number | null>(null);
+  const singleGeneratePDF = trpc.pdfReport.generateAndSave.useMutation({
+    onSuccess: (data) => {
+      toast.success("تم توليد التقرير بنجاح");
+      if (data.reportUrl) window.open(data.reportUrl, "_blank");
+      setGeneratingPdfLeadId(null);
+      setTimeout(() => utils.leads.list.invalidate(), 1000);
+    },
+    onError: (e) => { toast.error("فشل توليد PDF: " + e.message); setGeneratingPdfLeadId(null); },
+  });
   const bulkAnalyze = trpc.analysis.bulkAnalyze.useMutation({
     onSuccess: (data) => {
       toast.success(`تم إرسال ${data.queued} عميل للتحليل في الخلفية`);
@@ -881,19 +902,46 @@ export default function Leads() {
                         <Eye className="w-4 h-4" />
                       </button>
                     </Link>
-                    {(lead as any).pdfReportUrl && (
-                      <a
-                        href={(lead as any).pdfReportUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
-                        style={{ color: "oklch(0.75 0.18 280)" }}
-                        title="عرض التقرير"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </a>
-                    )}
+                    {/* زر تحليل شامل */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAnalyzingLeadId(lead.id);
+                        singleAnalyze.mutate({ leadIds: [lead.id] });
+                      }}
+                      disabled={analyzingLeadId === lead.id || lead.analysisStatus === "analyzing"}
+                      className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
+                      style={{ color: analyzingLeadId === lead.id ? "oklch(0.75 0.18 75)" : "oklch(0.65 0.15 280)" }}
+                      title="تحليل شامل"
+                    >
+                      {analyzingLeadId === lead.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <BrainCircuit className="w-4 h-4" />
+                      )}
+                    </button>
+                    {/* زر تحميل PDF */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if ((lead as any).pdfReportUrl) {
+                          window.open((lead as any).pdfReportUrl, "_blank");
+                        } else {
+                          setGeneratingPdfLeadId(lead.id);
+                          singleGeneratePDF.mutate({ leadId: lead.id, reportType: "client_facing" });
+                        }
+                      }}
+                      disabled={generatingPdfLeadId === lead.id}
+                      className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
+                      style={{ color: (lead as any).pdfReportUrl ? "oklch(0.75 0.18 280)" : "oklch(0.55 0.1 240)" }}
+                      title={(lead as any).pdfReportUrl ? "تحميل التقرير" : "توليد تقرير PDF"}
+                    >
+                      {generatingPdfLeadId === lead.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FileDown className="w-4 h-4" />
+                      )}
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setQuickEditLead(lead); setShowQuickEdit(true); }}
                       className="p-1.5 rounded-lg hover:bg-white/5 transition-all opacity-0 group-hover:opacity-100"
