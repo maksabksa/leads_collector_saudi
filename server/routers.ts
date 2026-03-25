@@ -879,6 +879,79 @@ ${contextParts.join('\n')}
       return [];
     }),
 
+  // حفظ مراجعات Google Maps لعميل محدد
+  saveGoogleReviews: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      placeId: z.string().optional(),
+      googleMapsUrl: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { makeRequest } = await import("./_core/map");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      // استخراج place_id
+      let resolvedPlaceId = input.placeId;
+      if (!resolvedPlaceId && input.googleMapsUrl) {
+        const m = input.googleMapsUrl.match(/place_id[=:]([A-Za-z0-9_-]+)/) ||
+                  input.googleMapsUrl.match(/\/place\/[^/]+\/([A-Za-z0-9_-]{20,})/);
+        if (m) resolvedPlaceId = m[1];
+      }
+      if (!resolvedPlaceId) {
+        // جرب استخراج place_id من قاعدة البيانات
+        const lead = await getLeadById(input.leadId);
+        if (lead?.googleMapsUrl) {
+          const m2 = lead.googleMapsUrl.match(/place_id[=:]([A-Za-z0-9_-]+)/) ||
+                     lead.googleMapsUrl.match(/\/place\/[^/]+\/([A-Za-z0-9_-]{20,})/);
+          if (m2) resolvedPlaceId = m2[1];
+        }
+      }
+      if (!resolvedPlaceId) {
+        return { success: false, message: "لم يتم العثور على place_id", reviews: [] };
+      }
+
+      try {
+        const data = await makeRequest<{
+          result: {
+            rating?: number;
+            user_ratings_total?: number;
+            reviews?: Array<{ author_name: string; rating: number; text: string; time?: number }>;
+          };
+          status: string;
+        }>("/maps/api/place/details/json", {
+          place_id: resolvedPlaceId,
+          fields: "rating,user_ratings_total,reviews",
+          language: "ar",
+        });
+
+        if (data.status !== "OK") {
+          return { success: false, message: `Place API error: ${data.status}`, reviews: [] };
+        }
+
+        const rawReviews = data.result.reviews || [];
+        const reviews = rawReviews.slice(0, 10).map((r) => ({
+          author: r.author_name || "",
+          rating: r.rating || 0,
+          text: r.text || "",
+          time: r.time ? new Date(r.time * 1000).toISOString().split("T")[0] : "",
+        }));
+
+        const { leads: leadsTable } = await import("../drizzle/schema");
+        await db.update(leadsTable)
+          .set({
+            googleReviewsData: reviews as any,
+            googleRating: data.result.rating || null,
+            reviewCount: data.result.user_ratings_total || 0,
+          } as any)
+          .where(eq(leadsTable.id, input.leadId));
+
+        return { success: true, reviews, count: reviews.length, rating: data.result.rating };
+      } catch (err: any) {
+        return { success: false, message: err.message, reviews: [] };
+      }
+    }),
+
 });
 
 // ===== ANALYSIS ROUTER =====
@@ -1733,7 +1806,7 @@ const searchRouter = router({
         error_message?: string;
       }>("/maps/api/place/details/json", {
         place_id: input.placeId,
-        fields: "place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types,opening_hours,url,photos",
+        fields: "place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types,opening_hours,url,photos,reviews",
         language: "ar",
       });
       if (data.status !== "OK") {
@@ -1746,7 +1819,14 @@ const searchRouter = router({
       const photoUrls = (data.result.photos || []).slice(0, 10).map(
         (p) => `/maps/api/place/photo?maxwidth=800&photo_reference=${p.photo_reference}`
       );
-      return { ...data.result, photoUrls };
+      // تنظيف المراجعات وإرجاعها
+      const reviews = (data.result.reviews || []).slice(0, 10).map((r) => ({
+        author: r.author_name || "",
+        rating: r.rating || 0,
+        text: r.text || "",
+        time: new Date(((r as any).time || 0) * 1000).toISOString().split("T")[0],
+      }));
+      return { ...data.result, photoUrls, reviews };
     }),
 
   // استخراج بيانات الأنشطة التجارية من رابط مخصص

@@ -90,6 +90,24 @@ export interface TikTokScrapedData {
   error?: string;
 }
 
+export interface FacebookScrapedData {
+  username: string;
+  displayName: string;
+  bio: string;
+  followersCount: number;
+  postsCount: number;
+  avgLikes: number;
+  avgComments: number;
+  recentPosts: Array<{
+    content: string;
+    likesCount: number;
+    commentsCount: number;
+    date?: string;
+  }>;
+  loadedSuccessfully: boolean;
+  error?: string;
+}
+
 // ===== Proxy Configuration =====
 function getBrightDataProxyAgent() {
   const proxyUrl = `http://${ENV.brightDataSerpUsername}:${ENV.brightDataSerpPassword}@${ENV.brightDataSerpHost}:${ENV.brightDataSerpPort}`;
@@ -541,6 +559,51 @@ export async function scrapeTikTok(tiktokUrl: string): Promise<TikTokScrapedData
   return result;
 }
 
+// ===== Facebook Scraper =====
+export async function scrapeFacebook(facebookUrl: string): Promise<FacebookScrapedData> {
+  const { fetchFacebookPagePosts, extractSocialStats } = await import("./brightDataSocialDatasets");
+
+  const result: FacebookScrapedData = {
+    username: "",
+    displayName: "",
+    bio: "",
+    followersCount: 0,
+    postsCount: 0,
+    avgLikes: 0,
+    avgComments: 0,
+    recentPosts: [],
+    loadedSuccessfully: false,
+  };
+
+  try {
+    const fbResult = await fetchFacebookPagePosts(facebookUrl, 10);
+    if (!fbResult.success || !fbResult.data?.length) {
+      result.error = fbResult.error || "No data returned";
+      return result;
+    }
+
+    const stats = extractSocialStats("facebook", fbResult.data);
+    result.username = facebookUrl.replace(/.*facebook\.com\//, "").replace(/\/$/, "");
+    result.displayName = stats.profileName || result.username;
+    result.followersCount = stats.followersCount || 0;
+    result.postsCount = stats.postsCount || fbResult.data.length;
+    result.avgLikes = stats.avgLikes || 0;
+    result.avgComments = stats.avgComments || 0;
+    result.recentPosts = (stats.recentPosts || []).map(p => ({
+      content: p.content || "",
+      likesCount: p.likes || 0,
+      commentsCount: 0,
+      date: p.date,
+    }));
+    result.loadedSuccessfully = true;
+  } catch (err) {
+    result.error = err instanceof Error ? err.message : "Unknown error";
+    result.loadedSuccessfully = false;
+  }
+
+  return result;
+}
+
 // ===== Batch Scraper (يجلب كل المنصات دفعة واحدة) =====
 export interface AllPlatformsData {
   website?: WebsiteScrapedData;
@@ -548,6 +611,7 @@ export interface AllPlatformsData {
   linkedin?: LinkedInScrapedData;
   twitter?: TwitterScrapedData;
   tiktok?: TikTokScrapedData;
+  facebook?: FacebookScrapedData;
   scrapedAt: number;
 }
 
@@ -557,6 +621,7 @@ export async function scrapeAllPlatforms(params: {
   linkedinUrl?: string | null;
   twitterUrl?: string | null;
   tiktokUrl?: string | null;
+  facebookUrl?: string | null;
 }): Promise<AllPlatformsData> {
   const results: AllPlatformsData = { scrapedAt: Date.now() };
 
@@ -608,6 +673,16 @@ export async function scrapeAllPlatforms(params: {
         .then(d => { results.tiktok = d; })
         .catch(err => {
           results.tiktok = { username: "", displayName: "", bio: "", followersCount: 0, followingCount: 0, likesCount: 0, videosCount: 0, isVerified: false, recentVideos: [], avgViews: 0, loadedSuccessfully: false, error: String(err) };
+        })
+    );
+  }
+
+  if (params.facebookUrl) {
+    tasks.push(
+      scrapeFacebook(params.facebookUrl)
+        .then(d => { results.facebook = d; })
+        .catch(err => {
+          results.facebook = { username: "", displayName: "", bio: "", followersCount: 0, postsCount: 0, avgLikes: 0, avgComments: 0, recentPosts: [], loadedSuccessfully: false, error: String(err) };
         })
     );
   }
@@ -675,6 +750,17 @@ export function formatScrapedDataForLLM(data: AllPlatformsData): string {
 موثّق: ${data.tiktok.isVerified ? "نعم ✓" : "لا"}`);
   } else if (data.tiktok) {
     parts.push(`=== تيك توك ===\nفشل جلب البيانات: ${data.tiktok.error || "خطأ"}`);
+  }
+
+  if (data.facebook?.loadedSuccessfully) {
+    parts.push(`=== فيسبوك ===
+الاسم: ${data.facebook.displayName}
+المتابعون: ${data.facebook.followersCount.toLocaleString()}
+عدد المنشورات: ${data.facebook.postsCount}
+متوسط الإعجابات: ${data.facebook.avgLikes}
+آخر المنشورات: ${data.facebook.recentPosts.slice(0, 3).map(p => p.content.slice(0, 100)).join(" | ")}`);
+  } else if (data.facebook) {
+    parts.push(`=== فيسبوك ===\nفشل جلب البيانات: ${data.facebook.error || "خطأ"}`);
   }
 
   return parts.join("\n\n");

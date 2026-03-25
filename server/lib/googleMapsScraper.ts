@@ -32,6 +32,8 @@ export interface GoogleMapsBusinessData {
   instagramHandle?: string;
   facebookUrl?: string;
   whatsappNumber?: string;
+  // مراجعات Google Maps
+  reviews?: Array<{ author: string; rating: number; text: string; time: string }>;
   // مصدر البيانات
   dataSource: "maps_scraping" | "places_api" | "serp";
 }
@@ -196,11 +198,12 @@ async function fetchFromPlacesAPI(
             opening_hours?: { open_now: boolean; weekday_text: string[] };
             url?: string;
             price_level?: number;
+            reviews?: Array<{ author_name: string; rating: number; text: string; time?: number }>;
           };
           status: string;
         }>("/maps/api/place/details/json", {
           place_id: place.place_id,
-          fields: "place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types,opening_hours,url,price_level",
+          fields: "place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types,opening_hours,url,price_level,reviews",
           language: "ar",
         });
 
@@ -225,6 +228,12 @@ async function fetchFromPlacesAPI(
             latitude: r.geometry?.location?.lat,
             longitude: r.geometry?.location?.lng,
             priceLevel: r.price_level ? priceLabels[r.price_level] : undefined,
+            reviews: (r.reviews || []).slice(0, 5).map((rv) => ({
+              author: rv.author_name || "",
+              rating: rv.rating || 0,
+              text: rv.text || "",
+              time: rv.time ? new Date(rv.time * 1000).toISOString().split("T")[0] : "",
+            })),
             dataSource: "places_api",
           });
         }

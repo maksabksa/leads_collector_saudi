@@ -856,6 +856,7 @@ const analyzeAllPlatforms = protectedProcedure
         linkedinUrl: (lead as any).linkedinUrl ?? null,
         twitterUrl: lead.twitterUrl,
         tiktokUrl: lead.tiktokUrl,
+        facebookUrl: lead.facebookUrl ?? null,
       });
 
       const realDataSummary = formatScrapedDataForLLM(allData);
@@ -886,7 +887,8 @@ ${realDataSummary}
     "instagram": "ملخص إنستغرام",
     "twitter": "ملخص تويتر",
     "tiktok": "ملخص تيك توك",
-    "linkedin": "ملخص لينكد إن"
+    "linkedin": "ملخص لينكد إن",
+    "facebook": "ملخص فيسبوك"
   }
 }`;
 
@@ -935,10 +937,11 @@ ${realDataSummary}
       }
 
       // حفظ تحليل السوشيال ميديا في جدول socialAnalyses
-      const socialPlatforms: Array<{ key: "instagram" | "twitter" | "tiktok"; url: string | null | undefined; data: any }> = [
+      const socialPlatforms: Array<{ key: "instagram" | "twitter" | "tiktok" | "facebook"; url: string | null | undefined; data: any }> = [
         { key: "instagram", url: lead.instagramUrl, data: allData.instagram },
         { key: "twitter", url: lead.twitterUrl, data: allData.twitter },
         { key: "tiktok", url: lead.tiktokUrl, data: allData.tiktok },
+        { key: "facebook", url: lead.facebookUrl, data: allData.facebook },
       ];
       for (const sp of socialPlatforms) {
         if (sp.url || sp.data) {
@@ -968,11 +971,13 @@ ${realDataSummary}
           linkedinLoaded: allData.linkedin?.loadedSuccessfully ?? false,
           twitterLoaded: allData.twitter?.loadedSuccessfully ?? false,
           tiktokLoaded: allData.tiktok?.loadedSuccessfully ?? false,
+          facebookLoaded: allData.facebook?.loadedSuccessfully ?? false,
           discoveredPhones: allData.website?.phones ?? [],
           instagramFollowers: allData.instagram?.followersCount ?? 0,
           twitterFollowers: allData.twitter?.followersCount ?? 0,
           tiktokFollowers: allData.tiktok?.followersCount ?? 0,
           linkedinFollowers: allData.linkedin?.followersCount ?? 0,
+          facebookFollowers: allData.facebook?.followersCount ?? 0,
         },
       };
     } catch (error) {

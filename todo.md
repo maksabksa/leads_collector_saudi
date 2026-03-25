@@ -2201,3 +2201,12 @@
 
 - [x] توليد التقرير PDF تلقائياً بعد انتهاء التحليل الجماعي
 - [x] تمرير ملاحظات العميل (notes) للذكاء الاصطناعي في prompt التحليل الجماعي
+
+## الدفعة - 25 مارس 2026 - تحسينات جمع البيانات
+
+- [x] تفعيل نص مراجعات Google Maps في Places Details API (إضافة reviews في fields)
+- [x] تخزين نص المراجعات في قاعدة البيانات (حقل googleReviewsData JSON)
+- [x] إضافة Facebook لـ analyzeAllPlatforms وscrapeAllPlatforms في brightDataAnalysis
+- [x] إضافة Facebook في prompt التحليل الشامل
+- [x] تحسين Snapchat عبر Scraping Browser (جمع متابعون ومشاهدات)
+- [x] اختبارات Vitest للميزات الثلاثة (568 اختبار تمر بنجاح)

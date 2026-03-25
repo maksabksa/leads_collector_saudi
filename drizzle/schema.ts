@@ -83,6 +83,8 @@ export const leads = mysqlTable("leads", {
   crNumber: varchar("crNumber", { length: 30 }),  // رقم السجل التجاري
   clientLogoUrl: varchar("clientLogoUrl", { length: 1000 }),  // لوجو العميل (favicon أو إنستغرام)
   placePhotos: json("placePhotos").$type<string[]>(),  // صور المكان من Google Maps (روابط مباشرة)
+  googleReviewsData: json("googleReviewsData").$type<Array<{ author: string; rating: number; text: string; time: string }>>(),  // نص مراجعات Google Maps
+  googleRating: float("googleRating"),  // تقييم Google Maps الحقيقي
   hasWhatsapp: mysqlEnum("hasWhatsapp", ["unknown", "yes", "no"]).default("unknown").notNull(),
   whatsappCheckedAt: timestamp("whatsappCheckedAt"),
   lastWhatsappSentAt: timestamp("lastWhatsappSentAt"),

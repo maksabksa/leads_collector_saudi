@@ -333,7 +333,7 @@ export async function fetchTikTokPosts(
 
 // ===== Public API: Snapchat Posts =====
 // ملاحظة: Bright Data لا يدعم Snapchat كـ dataset رسمياً
-// نستخدم SERP API لجمع بيانات سناب شات بشكل غير مباشر
+// نستخدم Scraping Browser لجلب بيانات حقيقية من صفحة الملف الشخصي
 export async function fetchSnapchatPosts(
   profileUrl: string,
   limit = 10
@@ -342,50 +342,69 @@ export async function fetchSnapchatPosts(
   try {
     const cleanUrl = normalizeSnapchatUrl(profileUrl);
     const handle = cleanUrl.replace(/.*snapchat\.com\/add\//, "").replace(/\/$/, "");
-    console.log(`[BD Snapchat] Fetching via SERP for handle: ${handle}`);
+    console.log(`[BD Snapchat] Fetching via Scraping Browser for handle: ${handle}`);
 
-    // نستخدم Bright Data SERP API للبحث عن بيانات سناب شات
-    const apiToken = ENV.brightDataApiToken;
-    const serpZone = ENV.brightDataSerpZone || "serp_api1";
-    if (!apiToken) throw new Error("BRIGHT_DATA_API_TOKEN not configured");
-
-    const query = `site:snapchat.com/add/${handle} OR snapchat.com/@${handle}`;
-    const targetUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=10&hl=ar&gl=sa`;
-
-    const res = await fetch("https://api.brightdata.com/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiToken}` },
-      body: JSON.stringify({ zone: serpZone, url: targetUrl, format: "raw" }),
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!res.ok) throw new Error(`SERP request failed: ${res.status}`);
-    const html = await res.text();
-
-    // استخراج بيانات من HTML - نستخدم split بدلاً من regex /s flag
-    const posts: SnapchatPost[] = [];
-    const snippetMarker = 'VwiC3b';
-    const parts = html.split(snippetMarker);
-    for (let i = 1; i < parts.length && posts.length < limit; i++) {
-      const endIdx = parts[i].indexOf('</span>');
-      if (endIdx === -1) continue;
-      const rawContent = parts[i].substring(0, endIdx);
-      const content = rawContent.replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, " ").trim();
-      if (content && content.length > 20) {
-        posts.push({
-          profile_handle: handle,
-          profile_link: cleanUrl,
-          content,
-          url: cleanUrl,
+    // محاولة 1: Scraping Browser لجلب صفحة الملف الشخصي مباشرة
+    const { fetchWithScrapingBrowser } = await import("./brightDataScraper");
+    const profilePageUrl = `https://www.snapchat.com/add/${handle}`;
+    let html = "";
+    try {
+      html = await fetchWithScrapingBrowser(profilePageUrl);
+    } catch (sbErr) {
+      console.warn(`[BD Snapchat] Scraping Browser failed, trying proxy:`, sbErr);
+      // محاولة 2: SERP API كـ fallback
+      const apiToken = ENV.brightDataApiToken;
+      const serpZone = ENV.brightDataSerpZone || "serp_api1";
+      if (apiToken) {
+        const query = `site:snapchat.com/add/${handle} snapchat`;
+        const targetUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=5&hl=ar&gl=sa`;
+        const res = await fetch("https://api.brightdata.com/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiToken}` },
+          body: JSON.stringify({ zone: serpZone, url: targetUrl, format: "raw" }),
+          signal: AbortSignal.timeout(30000),
         });
+        if (res.ok) html = await res.text();
       }
     }
 
-    if (posts.length === 0) {
-      // إذا لم نجد بيانات، نرجع بيانات أساسية تدل على وجود الحساب
-      const hasAccount = html.includes(handle) || html.includes('snapchat.com');
-      if (hasAccount) {
-        posts.push({ profile_handle: handle, profile_link: cleanUrl, url: cleanUrl });
+    const posts: SnapchatPost[] = [];
+
+    if (html) {
+      // استخراج بيانات الملف الشخصي من HTML
+      const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+                      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)?.[1] || "";
+      const ogDescription = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+                            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i)?.[1] || "";
+      const subscribersMatch = html.match(/(\d[\d,\.]+)\s*(?:مشترك|subscriber|follower)/i);
+      const subscribersCount = subscribersMatch ? parseInt(subscribersMatch[1].replace(/[,\.]/g, "")) : 0;
+
+      // استخراج القصص من HTML
+      const storyMatches = html.match(/"story"[^}]+"title":"([^"]+)"/g) || [];
+      for (const m of storyMatches.slice(0, limit)) {
+        const titleMatch = m.match(/"title":"([^"]+)"/);
+        if (titleMatch) {
+          posts.push({
+            profile_handle: handle,
+            profile_link: cleanUrl,
+            content: titleMatch[1],
+            url: cleanUrl,
+            profile_name: ogTitle.replace(" on Snapchat", "").trim(),
+            num_views: subscribersCount,
+          });
+        }
+      }
+
+      // إذا لم نجد قصص، أضف بيانات أساسية
+      if (posts.length === 0 && (ogTitle || ogDescription || html.includes(handle))) {
+        posts.push({
+          profile_handle: handle,
+          profile_link: cleanUrl,
+          content: ogDescription || `حساب Snapchat: @${handle}`,
+          url: cleanUrl,
+          profile_name: ogTitle.replace(" on Snapchat", "").trim() || handle,
+          num_views: subscribersCount,
+        });
       }
     }
 
