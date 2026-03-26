@@ -164,6 +164,13 @@ export default function LeadDetail() {
     }
   }, [savedScoreData]);
 
+  // تحميل رابط PDF المحفوظ مسبقاً عند فتح صفحة العميل
+  useEffect(() => {
+    if (data?.lead?.pdfFileUrl && !pdfUrl) {
+      setPdfUrl(data.lead.pdfFileUrl);
+    }
+  }, [data?.lead?.pdfFileUrl]);
+
   const handleRunScore = () => {
     setIsScoring(true);
     scoreLeadMutation.mutate({ leadId: id });
