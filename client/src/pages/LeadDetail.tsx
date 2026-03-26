@@ -176,6 +176,10 @@ export default function LeadDetail() {
   const generatePDF = trpc.report.generatePDF.useMutation();
   const generateBeautifulReport = trpc.pdfReport.generateAndSave.useMutation();
   const sendPDFViaWhatsApp = trpc.report.generateAndSendViaWhatsApp.useMutation();
+  const sendPdfViaBotMutation = trpc.whatchimp.sendPdfViaBot.useMutation();
+  const { data: whatchimpConfigData } = trpc.whatchimp.isConfigured.useQuery();
+  const isWhatchimpConfigured = whatchimpConfigData?.configured ?? false;
+  const [botFlowSending, setBotFlowSending] = useState(false);
   const computeGapPercentages = trpc.report.computeGapPercentages.useMutation();
   const { data: companySettingsData } = trpc.companySettings.get.useQuery();
   const { data: reportStyleData } = trpc.reportStyle.get.useQuery();
@@ -318,6 +322,31 @@ export default function LeadDetail() {
       toast.error("فشل إرسال التقرير", { description: e.message });
     } finally {
       setPdfSending(false);
+    }
+  };
+
+  // ── إرسال PDF عبر WhatChimp Bot Flow (2 خطوات: Custom Field + trigger-bot) ──
+  const handleSendPdfViaBot = async () => {
+    if (!pdfUrl) {
+      toast.error("يجب توليد التقرير أولاً قبل الإرسال");
+      return;
+    }
+    if (!data?.lead?.verifiedPhone) {
+      toast.error("لا يوجد رقم هاتف للعميل");
+      return;
+    }
+    setBotFlowSending(true);
+    try {
+      await sendPdfViaBotMutation.mutateAsync({
+        leadId: id,
+        pdfUrl,
+      });
+      toast.success("تم إرسال التقرير عبر WhatChimp بنجاح ✅");
+      setShowPdfModal(false);
+    } catch (e: any) {
+      toast.error("فشل الإرسال عبر WhatChimp", { description: e.message });
+    } finally {
+      setBotFlowSending(false);
     }
   };
 
@@ -2207,7 +2236,7 @@ export default function LeadDetail() {
             )}
           </div>
 
-          {isWaConnected && lead.verifiedPhone && (
+           {isWaConnected && lead.verifiedPhone && (
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground">إرسال عبر واتساب</p>
               <textarea
@@ -2225,10 +2254,29 @@ export default function LeadDetail() {
               </button>
             </div>
           )}
-
-          {!isWaConnected && (
+          {/* ── زر WhatChimp Bot Flow ── */}
+          {isWhatchimpConfigured && lead.verifiedPhone && pdfUrl && (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1" style={{ background: "oklch(0.25 0.02 240)" }} />
+                <span className="text-xs text-muted-foreground">أو</span>
+                <div className="h-px flex-1" style={{ background: "oklch(0.25 0.02 240)" }} />
+              </div>
+              <button
+                onClick={handleSendPdfViaBot}
+                disabled={botFlowSending}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "oklch(0.45 0.22 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.4)", opacity: botFlowSending ? 0.7 : 1 }}
+              >
+                {botFlowSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                إرسال عبر WhatChimp Bot Flow
+              </button>
+              <p className="text-xs text-center text-muted-foreground">يحقن رابط PDF في Custom Fields ثم يطلق القالب المعتمد</p>
+            </div>
+          )}
+          {!isWaConnected && !isWhatchimpConfigured && (
             <div className="rounded-xl p-3 text-xs" style={{ background: "oklch(0.65 0.18 60 / 0.08)", border: "1px solid oklch(0.65 0.18 60 / 0.2)", color: "oklch(0.75 0.18 60)" }}>
-              لإرسال التقرير عبر واتساب، يرجى توصيل حساب واتساب أولاً من صفحة الإعدادات
+              لإرسال التقرير، يرجى توصيل حساب واتساب أو إعداد WhatChimp من صفحة الإعدادات
             </div>
           )}
         </div>

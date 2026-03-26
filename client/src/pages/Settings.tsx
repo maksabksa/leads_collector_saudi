@@ -1577,6 +1577,7 @@ function WhatchimpSettingsTab() {
 
   const [apiToken, setApiToken] = useState("");
   const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [botFlowUniqueId, setBotFlowUniqueId] = useState("");
   const [selectedLabelId, setSelectedLabelId] = useState<number | undefined>(undefined);
   const [selectedLabelName, setSelectedLabelName] = useState("");
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -1637,6 +1638,24 @@ function WhatchimpSettingsTab() {
             />
           </div>
 
+          {/* Bot Flow ID لإرسال تقرير PDF */}
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              Bot Flow Unique ID
+              <span className="text-xs text-muted-foreground mr-2">(لإرسال تقرير PDF عبر القالب المعتمد)</span>
+            </label>
+            <Input
+              placeholder={settings?.botFlowUniqueId ?? "أدخل Bot Flow Unique ID من WhatChimp"}
+              value={botFlowUniqueId}
+              onChange={(e) => setBotFlowUniqueId(e.target.value)}
+              dir="ltr"
+            />
+            {settings?.botFlowUniqueId && !botFlowUniqueId && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">✅ محفوظ: {settings.botFlowUniqueId}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">معرّف الـ Flow الذي يحتوي على قالب digital_anal_report</p>
+          </div>
+
           {/* اختيار Label */}
           {labelsData && labelsData.length > 0 && (
             <div>
@@ -1682,6 +1701,7 @@ function WhatchimpSettingsTab() {
                     phoneNumberId: phoneNumberId || settings.phoneNumberId || "",
                     defaultLabelId: selectedLabelId ?? settings?.defaultLabelId ?? undefined,
                     defaultLabelName: selectedLabelName || settings?.defaultLabelName || undefined,
+                    botFlowUniqueId: botFlowUniqueId || settings?.botFlowUniqueId || undefined,
                   });
                 } else {
                   saveMutation.mutate({
@@ -1689,6 +1709,7 @@ function WhatchimpSettingsTab() {
                     phoneNumberId: phoneNumberId || settings?.phoneNumberId || "",
                     defaultLabelId: selectedLabelId ?? settings?.defaultLabelId ?? undefined,
                     defaultLabelName: selectedLabelName || settings?.defaultLabelName || undefined,
+                    botFlowUniqueId: botFlowUniqueId || settings?.botFlowUniqueId || undefined,
                   });
                 }
               }}

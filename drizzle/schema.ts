@@ -1446,6 +1446,8 @@ export const whatchimpSettings = mysqlTable("whatchimp_settings", {
   phoneNumberId: varchar("phone_number_id", { length: 50 }).notNull(),
   defaultLabelId: int("default_label_id"),
   defaultLabelName: varchar("default_label_name", { length: 100 }),
+  // Bot Flow لإرسال تقرير PDF عبر واتساب
+  botFlowUniqueId: varchar("bot_flow_unique_id", { length: 200 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

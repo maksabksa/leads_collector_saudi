@@ -2210,3 +2210,13 @@
 - [x] إضافة Facebook في prompt التحليل الشامل
 - [x] تحسين Snapchat عبر Scraping Browser (جمع متابعون ومشاهدات)
 - [x] اختبارات Vitest للميزات الثلاثة (568 اختبار تمر بنجاح)
+
+## الدفعة - 26 مارس 2026 - إرسال PDF عبر Bot Flow (WhatChimp)
+
+- [x] إضافة حقل botFlowUniqueId في جدول whatchimpSettings
+- [x] تطبيق migration SQL لإضافة الحقل
+- [x] إضافة procedure sendPdfViaBot: حقن pdf_report_link في Custom Fields ثم trigger-bot
+- [x] تحديث saveSettings لقبول botFlowUniqueId
+- [x] إضافة زر "إرسال تقرير PDF" في صفحة العميل
+- [x] حقل Bot Flow Unique ID في صفحة إعدادات WhatChimp
+- [x] اختبارات Vitest لـ sendPdfViaBot (585 اختبار تمر بنجاح)

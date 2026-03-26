@@ -423,6 +423,7 @@ export const whatchimpRouter = router({
       phoneNumberId: z.string().min(5),
       defaultLabelId: z.number().optional(),
       defaultLabelName: z.string().optional(),
+      botFlowUniqueId: z.string().optional(),  // Bot Flow ID لإرسال PDF
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -438,6 +439,7 @@ export const whatchimpRouter = router({
               phoneNumberId: input.phoneNumberId,
               defaultLabelId: input.defaultLabelId ?? null,
               defaultLabelName: input.defaultLabelName ?? null,
+              botFlowUniqueId: input.botFlowUniqueId ?? null,
               isActive: true,
             })
             .where(eq(whatchimpSettings.id, existing[0].id));
@@ -448,6 +450,7 @@ export const whatchimpRouter = router({
               phoneNumberId: input.phoneNumberId,
               defaultLabelId: input.defaultLabelId ?? null,
               defaultLabelName: input.defaultLabelName ?? null,
+              botFlowUniqueId: input.botFlowUniqueId ?? null,
               isActive: true,
             })
             .where(eq(whatchimpSettings.id, existing[0].id));
@@ -461,6 +464,7 @@ export const whatchimpRouter = router({
           phoneNumberId: input.phoneNumberId,
           defaultLabelId: input.defaultLabelId ?? null,
           defaultLabelName: input.defaultLabelName ?? null,
+          botFlowUniqueId: input.botFlowUniqueId ?? null,
           isActive: true,
         });
       }
@@ -1011,6 +1015,163 @@ export const whatchimpRouter = router({
       });
 
       return { success: true, phone, waMessageId };
+    }),
+
+  // ─── إرسال تقرير PDF عبر Bot Flow (خطوتان: حقن Custom Field + trigger-bot) ───────────────
+  sendPdfViaBot: protectedProcedure
+    .input(z.object({
+      leadId: z.number().int().positive(),
+      pdfUrl: z.string().url(),           // رابط PDF المباشر
+      botFlowUniqueId: z.string().optional(), // يُستخدم إذا لم يكن محفوظاً في الإعدادات
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // جلب الإعدادات
+      const settingsRows = await db.select().from(whatchimpSettings)
+        .where(eq(whatchimpSettings.isActive, true)).limit(1);
+      if (!settingsRows[0]) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Whatchimp غير مربوط" });
+      const { apiToken, phoneNumberId, botFlowUniqueId: savedFlowId } = settingsRows[0];
+
+      const flowId = input.botFlowUniqueId ?? savedFlowId;
+      if (!flowId) throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "لم يتم تحديد Bot Flow ID. أضفه في إعدادات Whatchimp أو مرره مباشرة."
+      });
+
+      // جلب بيانات العميل
+      const leadRows = await db.select({
+        id: leads.id,
+        companyName: leads.companyName,
+        verifiedPhone: leads.verifiedPhone,
+      }).from(leads).where(eq(leads.id, input.leadId)).limit(1);
+      if (!leadRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "العميل غير موجود" });
+      const lead = leadRows[0];
+      if (!lead.verifiedPhone) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يوجد رقم هاتف للعميل" });
+
+      const phone = normalizePhone(lead.verifiedPhone);
+
+      // ── الخطوة 1: حقن رابط PDF في Custom Fields ──────────────────────────────
+      try {
+        await whatchimpPost("/whatsapp/subscriber/chat/assign-custom-fields", {
+          apiToken,
+          phone_number_id: phoneNumberId,
+          phone_number: phone,
+          custom_fields: JSON.stringify({ pdf_report_link: input.pdfUrl }),
+        });
+      } catch (err) {
+        // non-fatal: نكمل حتى لو فشل حقن الـ Custom Field
+        console.warn("[sendPdfViaBot] assign-custom-fields failed:", err);
+      }
+
+      // ── الخطوة 2: إطلاق Bot Flow ──────────────────────────────────────────────
+      const triggerRes = await whatchimpPost("/whatsapp/trigger-bot", {
+        apiToken,
+        phone_number_id: phoneNumberId,
+        phone_number: phone,
+        bot_flow_unique_id: flowId,
+      });
+
+      const success = String(triggerRes.status) === "1";
+
+      // تسجيل العملية
+      await db.insert(whatchimpSendLog).values({
+        leadId: input.leadId,
+        leadName: lead.companyName,
+        phone,
+        status: success ? "success" : "failed",
+        errorMessage: success ? null : String(triggerRes.message ?? "فشل trigger-bot"),
+        batchId: `pdf_bot_${Date.now()}`,
+        sentByUserId: ctx.user.id,
+      });
+
+      if (!success) throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: String(triggerRes.message ?? "فشل إطلاق Bot Flow")
+      });
+
+      return { success: true, phone, pdfUrl: input.pdfUrl, flowId };
+    }),
+
+  // ─── إرسال تقرير PDF جماعي عبر Bot Flow ─────────────────────────────────────
+  bulkSendPdfViaBot: protectedProcedure
+    .input(z.object({
+      leadIds: z.array(z.number()).min(1).max(1000),
+      botFlowUniqueId: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const settingsRows = await db.select().from(whatchimpSettings)
+        .where(eq(whatchimpSettings.isActive, true)).limit(1);
+      if (!settingsRows[0]) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Whatchimp غير مربوط" });
+      const { apiToken, phoneNumberId, botFlowUniqueId: savedFlowId } = settingsRows[0];
+
+      const flowId = input.botFlowUniqueId ?? savedFlowId;
+      if (!flowId) throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "لم يتم تحديد Bot Flow ID"
+      });
+
+      const leadsData = await db.select({
+        id: leads.id,
+        companyName: leads.companyName,
+        verifiedPhone: leads.verifiedPhone,
+        pdfFileUrl: leads.pdfFileUrl,
+      }).from(leads).where(inArray(leads.id, input.leadIds));
+
+      let sent = 0, skipped = 0, failed = 0;
+      const errors: Array<{ leadId: number; name: string; error: string }> = [];
+
+      for (const lead of leadsData) {
+        if (!lead.verifiedPhone) { skipped++; continue; }
+        if (!lead.pdfFileUrl) { skipped++; continue; }  // لا يوجد تقرير PDF
+
+        const phone = normalizePhone(lead.verifiedPhone);
+
+        try {
+          // الخطوة 1: حقن رابط PDF
+          try {
+            await whatchimpPost("/whatsapp/subscriber/chat/assign-custom-fields", {
+              apiToken,
+              phone_number_id: phoneNumberId,
+              phone_number: phone,
+              custom_fields: JSON.stringify({ pdf_report_link: lead.pdfFileUrl }),
+            });
+          } catch { /* non-fatal */ }
+
+          // الخطوة 2: إطلاق Bot Flow
+          const triggerRes = await whatchimpPost("/whatsapp/trigger-bot", {
+            apiToken,
+            phone_number_id: phoneNumberId,
+            phone_number: phone,
+            bot_flow_unique_id: flowId,
+          });
+
+          const success = String(triggerRes.status) === "1";
+          await db.insert(whatchimpSendLog).values({
+            leadId: lead.id,
+            leadName: lead.companyName,
+            phone,
+            status: success ? "success" : "failed",
+            errorMessage: success ? null : String(triggerRes.message ?? "فشل"),
+            batchId: `bulk_pdf_${Date.now()}`,
+            sentByUserId: ctx.user.id,
+          });
+
+          if (success) sent++;
+          else { failed++; errors.push({ leadId: lead.id, name: lead.companyName, error: String(triggerRes.message ?? "فشل") }); }
+        } catch (err) {
+          failed++;
+          errors.push({ leadId: lead.id, name: lead.companyName, error: err instanceof Error ? err.message : "خطأ" });
+        }
+
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      return { sent, skipped, failed, total: leadsData.length, errors };
     }),
 
   // ─── التحقق من صحة أرقام الواتساب لقائمة من العملاء ───────────────────────────────────────
