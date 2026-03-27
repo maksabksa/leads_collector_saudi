@@ -223,31 +223,30 @@ export async function fetchSEOIntelligence(url: string): Promise<SEOIntelligence
   };
 
   try {
-    // جلب HTML الكامل — ثلاث طبقات fallback
+    // جلب HTML الكامل — Headless Browser يعمل دائماً بالتوازي لاكتشاف الميزات بدقة
     let html = "";
-    let usedHeadless = false;
+    let headlessFeatures: ReturnType<typeof detectFeaturesFromFullHtml> | null = null;
+
+    // تشغيل Headless Browser بالتوازي مع Bright Data (بدون انتظار)
+    const headlessPromise = scrapeWithHeadless(url, 20000).then(r => {
+      if (r.success && r.html.length > 100) {
+        return detectFeaturesFromFullHtml(r.html, r.text);
+      }
+      return null;
+    }).catch(() => null);
+
+    // جلب HTML للـ meta/SEO عبر Bright Data أو Proxy
     try {
       html = await fetchWithScrapingBrowser(url);
     } catch {
       try {
         html = await fetchViaProxy(url);
       } catch {
-        // Fallback الثالث: Headless Browser (يدعم JS-heavy sites)
-        console.log(`[WebsiteIntelligence] Falling back to Headless Browser for: ${url}`);
+        // إذا فشل كلاهما، انتظر Headless للحصول على HTML
+        console.log(`[WebsiteIntelligence] Both Bright Data & Proxy failed, waiting for Headless: ${url}`);
         const headlessResult = await scrapeWithHeadless(url);
         if (headlessResult.success && headlessResult.html.length > 100) {
           html = headlessResult.html;
-          usedHeadless = true;
-          // تطبيق اكتشاف الميزات من HTML الكامل (بعد تشغيل JS)
-          const features = detectFeaturesFromFullHtml(headlessResult.html, headlessResult.text);
-          result.hasPaymentGateway = features.hasPaymentGateway;
-          result.hasEcommerce = features.hasEcommerce;
-          result.hasBooking = features.hasBooking;
-          result.hasWhatsapp = features.hasWhatsapp;
-          result.hasChatWidget = features.hasLiveChat;
-          result.hasAnalytics = features.hasAnalytics;
-          result.hasSSL = url.startsWith("https://");
-          if (features.phoneNumbers.length > 0) result.phones = features.phoneNumbers;
           if (headlessResult.title) result.title = headlessResult.title;
           if (headlessResult.metaDescription) result.metaDescription = headlessResult.metaDescription;
         } else {
@@ -262,8 +261,11 @@ export async function fetchSEOIntelligence(url: string): Promise<SEOIntelligence
       return result;
     }
 
-    // إذا استُخدم Headless Browser، الميزات محددة بالفعل أعلاه
-    const skipFeatureDetection = usedHeadless;
+    // انتظار نتائج Headless Browser (اكتشاف الميزات الدقيق)
+    headlessFeatures = await headlessPromise;
+
+    // Headless Browser يُستخدم دائماً لاكتشاف الميزات إذا نجح
+    const skipFeatureDetection = headlessFeatures !== null;
 
     const domain = new URL(url).hostname;
 
