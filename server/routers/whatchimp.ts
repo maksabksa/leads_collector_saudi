@@ -250,14 +250,58 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
   // عدد التقييمات
   if (lead.reviewCount != null && lead.reviewCount > 0) fields["عدد التقييمات"] = String(lead.reviewCount);
 
-  // درجة الأولوية
-  if (lead.leadPriorityScore != null) fields["درجة الأولوية"] = String(lead.leadPriorityScore) + " / 100";
+  // درجة الأولوية — صياغة احترافية جاهزة للعميل
+  if (lead.leadPriorityScore != null) {
+    const score = lead.leadPriorityScore;
+    let priorityLabel: string;
+    let priorityEmoji: string;
+    if (score >= 80) {
+      priorityLabel = "أولوية قصوى — فرصة استثنائية لا تُفوَّت";
+      priorityEmoji = "🔴";
+    } else if (score >= 60) {
+      priorityLabel = "أولوية عالية — فرصة واعدة تستحق التحرك السريع";
+      priorityEmoji = "🟠";
+    } else if (score >= 40) {
+      priorityLabel = "أولوية متوسطة — إمكانات جيدة مع تطوير مدروس";
+      priorityEmoji = "🟡";
+    } else {
+      priorityLabel = "أولوية منخفضة — تحتاج إلى تأهيل قبل التحرك";
+      priorityEmoji = "🟢";
+    }
+    fields["درجة الأولوية"] = `${priorityEmoji} ${score}/100 — ${priorityLabel}`;
+  }
 
-  // أكبر ثغرة تسويقية
-  if (lead.biggestMarketingGap) fields["أكبر ثغرة تسويقية"] = lead.biggestMarketingGap;
+  // أكبر ثغرة تسويقية — صياغة احترافية جاهزة للعميل
+  if (lead.biggestMarketingGap) {
+    const gap = lead.biggestMarketingGap.trim();
+    // إذا كان النص قصيراً (جملة واحدة) نُضيف إطاراً احترافياً
+    const isShort = gap.length < 120;
+    if (isShort) {
+      fields["أكبر ثغرة تسويقية"] =
+        `⚡ تشخيص تسويقي حصري لـ ${lead.companyName}:\n\n` +
+        `رصدنا ثغرة محورية في مسيرتكم الرقمية:\n` +
+        `${gap}\n\n` +
+        `هذه الثغرة تُكلّفكم عملاء محتملين يومياً — وإغلاقها يعني نمواً ملموساً في وقت قصير.`;
+    } else {
+      fields["أكبر ثغرة تسويقية"] =
+        `⚡ تشخيص تسويقي حصري لـ ${lead.companyName}:\n\n${gap}`;
+    }
+  }
 
-  // زاوية الدخول البيعية
-  if (lead.suggestedSalesEntryAngle) fields["زاوية الدخول البيعية"] = lead.suggestedSalesEntryAngle;
+  // زاوية الدخول البيعية — صياغة احترافية جاهزة للعميل
+  if (lead.suggestedSalesEntryAngle) {
+    const angle = lead.suggestedSalesEntryAngle.trim();
+    const isShort = angle.length < 120;
+    if (isShort) {
+      fields["زاوية الدخول البيعية"] =
+        `🎯 توصية استراتيجية مخصصة لـ ${lead.companyName}:\n\n` +
+        `${angle}\n\n` +
+        `هذا المسار هو الأقصر والأكثر فاعلية لتحويل حضوركم الرقمي إلى مبيعات حقيقية.`;
+    } else {
+      fields["زاوية الدخول البيعية"] =
+        `🎯 توصية استراتيجية مخصصة لـ ${lead.companyName}:\n\n${angle}`;
+    }
+  }
 
   // مرحلة العميل
   const stageMap: Record<string, string> = {
@@ -282,8 +326,20 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
   // ملاحظات
   if (lead.notes) fields["ملاحظات"] = lead.notes;
 
-  // فرصة الإيراد
-  if ((lead as any).revenueOpportunity) fields["فرصة الإيراد"] = (lead as any).revenueOpportunity;
+  // فرصة الإيراد — صياغة احترافية جاهزة للعميل
+  if ((lead as any).revenueOpportunity) {
+    const rev = ((lead as any).revenueOpportunity as string).trim();
+    const isShort = rev.length < 120;
+    if (isShort) {
+      fields["فرصة الإيراد"] =
+        `💰 تقدير فرصة الإيراد لـ ${lead.companyName}:\n\n` +
+        `${rev}\n\n` +
+        `هذا التقدير مبني على تحليل دقيق لواقعكم الرقمي والسوق المحيط.`;
+    } else {
+      fields["فرصة الإيراد"] =
+        `💰 تقدير فرصة الإيراد لـ ${lead.companyName}:\n\n${rev}`;
+    }
+  }
 
   // مصدر البيانات
   fields["مصدر البيانات"] = "نظام مكسب - مجمع البيانات";
