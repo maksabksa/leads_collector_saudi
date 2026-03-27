@@ -1187,6 +1187,16 @@ function buildPDFHtml(lead: any, websiteAnalysis: any, socialAnalyses: any[], co
     <div class="section">
       <div class="section-title">🌐 تحليل الموقع الإلكتروني</div>
       ${websiteAnalysis ? `
+        <!-- Screenshot الموقع -->
+        ${ (websiteAnalysis as any).screenshotUrl ? `
+        <div style="margin-bottom:14px;border-radius:12px;overflow:hidden;border:2px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+          <div style="background:#f8fafc;padding:6px 12px;font-size:10px;font-weight:700;color:#64748b;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:6px;">
+            <span>🖥️</span>
+            <span>لقطة شاشة حقيقية للموقع</span>
+            <span style="margin-right:auto;font-weight:400;color:#94a3b8;">${lead.website || ''}</span>
+          </div>
+          <img src="${ (websiteAnalysis as any).screenshotUrl }" style="width:100%;height:auto;display:block;max-height:280px;object-fit:cover;object-position:top;" alt="لقطة شاشة الموقع" onerror="this.parentElement.style.display='none'" />
+        </div>` : '' }
         <!-- Gauge Cards بصرية -->
         ${(() => {
           const gaugeItems = [

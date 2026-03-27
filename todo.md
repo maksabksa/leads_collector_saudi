@@ -2282,3 +2282,12 @@
 - [x] إنشاء server/lib/headlessScraper.ts بدالة scrapeWithHeadless(url) وdetectFeaturesFromFullHtml()
 - [x] دمج scrapeWithHeadless في websiteIntelligence.ts كـ fallback ثالث بعد Bright Data
 - [x] ضمان عدم الكتابة فوق نتائج Headless Browser بالكشف العادي (skipFeatureDetection)
+
+## الدفعة - 27 مارس 2026 - إصلاح التحليل + Screenshot
+
+- [x] تشخيص سبب عدم تحديث نتائج التحليل: Headless كان fallback فقط والـ prompt يتجاهل البيانات
+- [x] إصلاح الـ prompt: تعزيز القواعد وتحديث أمثلة JSON لتعكس البيانات الحقيقية
+- [x] إضافة حقل screenshotUrl في جدول website_analyses وتطبيق migration
+- [x] إضافة دالة takeWebsiteScreenshot في headlessScraper.ts
+- [x] أخذ Screenshot بالتوازي مع التحليل وحفظه في S3 في brightDataAnalysis.ts
+- [x] إدراج Screenshot في قسم تحليل الموقع في التقرير PDF

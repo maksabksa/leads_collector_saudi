@@ -261,6 +261,7 @@ export const websiteAnalyses = mysqlTable("website_analyses", {
   summary: text("summary"),
   recommendations: json("recommendations").$type<string[]>(),
   rawAnalysis: text("rawAnalysis"),
+  screenshotUrl: varchar("screenshotUrl", { length: 1000 }),  // صورة الموقع من Headless Browser
   analyzedAt: timestamp("analyzedAt").defaultNow().notNull(),
 });
 

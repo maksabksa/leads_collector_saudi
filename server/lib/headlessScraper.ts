@@ -109,6 +109,66 @@ export async function scrapeWithHeadless(url: string, timeoutMs = 25000): Promis
 }
 
 /**
+ * أخذ Screenshot للموقع بمتصفح حقيقي
+ * يُرجع Buffer للصورة بصيغة PNG
+ */
+export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Promise<Buffer | null> {
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: CHROMIUM_PATH,
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu",
+        "--window-size=1440,900",
+        "--disable-blink-features=AutomationControlled",
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+      ],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1440, height: 900 });
+    await page.setExtraHTTPHeaders({
+      "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+    });
+
+    await page.goto(url, { waitUntil: "networkidle2", timeout: timeoutMs });
+    // انتظار إضافي لتحميل الصور والخطوط
+    await new Promise(r => setTimeout(r, 3000));
+
+    // إخفاء النوافذ المنبثقة الشائعة
+    await page.evaluate(() => {
+      const selectors = [
+        '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
+        '[id*="cookie"]', '[id*="popup"]', '[id*="overlay"]',
+        '[class*="gdpr"]', '[class*="consent"]',
+      ];
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach((el: any) => { el.style.display = 'none'; });
+      });
+    });
+
+    const screenshotBuffer = await page.screenshot({
+      type: "png",
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+
+    return Buffer.from(screenshotBuffer);
+  } catch (err: any) {
+    console.warn("[HeadlessScraper] Screenshot failed:", err?.message);
+    return null;
+  } finally {
+    if (browser) {
+      try { await browser.close(); } catch { /* تجاهل */ }
+    }
+  }
+}
+
+/**
  * اكتشاف الميزات التقنية من HTML الكامل (بعد تشغيل JS)
  */
 export function detectFeaturesFromFullHtml(html: string, text: string) {
