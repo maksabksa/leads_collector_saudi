@@ -215,6 +215,14 @@ export default function Leads() {
     undefined,
     { enabled: showBulkTemplateDialog }
   );
+  const bulkSendPdfViaBot = trpc.whatchimp.bulkSendPdfViaBot.useMutation({
+    onSuccess: (res) => {
+      toast.success(`✅ تم إرسال PDF لـ ${res.sent} عميل (تم تخطي ${res.skipped})`);
+      setSelectedIds(new Set());
+      utils.leads.list.invalidate();
+    },
+    onError: (e: any) => toast.error("فشل إرسال PDF: " + e.message),
+  });
   const bulkSendWhatchimp = trpc.whatchimp.sendBulk.useMutation({
     onSuccess: (res) => {
       const sentIds = Array.from(selectedIds);
@@ -396,6 +404,15 @@ export default function Leads() {
                   >
                     {bulkSendTemplate.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
                     {bulkSendTemplate.isPending ? "جاري الإرسال..." : `إرسال Template لـ ${selectedIds.size}`}
+                  </button>
+                  <button
+                    onClick={() => bulkSendPdfViaBot.mutate({ leadIds: Array.from(selectedIds) })}
+                    disabled={bulkSendPdfViaBot.isPending}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={{ background: "oklch(0.45 0.2 145 / 0.15)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.45 0.2 145 / 0.3)" }}
+                  >
+                    {bulkSendPdfViaBot.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                    {bulkSendPdfViaBot.isPending ? "جاري إرسال PDF..." : `إرسال PDF Bot لـ ${selectedIds.size}`}
                   </button>
                 </>
               )}
