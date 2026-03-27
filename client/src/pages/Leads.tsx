@@ -979,6 +979,11 @@ export default function Leads() {
         leadIds={Array.from(selectedIds)}
         actionLabel={pendingAction === "template" ? "متابعة إرسال Template" : "متابعة إرسال Contact"}
         onConfirm={(validIds) => {
+          if (validIds.length === 0) {
+            toast.error("لا يوجد أرقام صالحة - تأكد من إدخال أرقام الهاتف للعملاء المحددين");
+            setPendingAction(null);
+            return;
+          }
           if (pendingAction === "contact") {
             bulkSendWhatchimp.mutate({ leadIds: validIds });
           } else if (pendingAction === "template") {
