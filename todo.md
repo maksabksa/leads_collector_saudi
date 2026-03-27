@@ -2291,3 +2291,18 @@
 - [x] إضافة دالة takeWebsiteScreenshot في headlessScraper.ts
 - [x] أخذ Screenshot بالتوازي مع التحليل وحفظه في S3 في brightDataAnalysis.ts
 - [x] إدراج Screenshot في قسم تحليل الموقع في التقرير PDF
+
+## إصلاح - 27 مارس 2026 - Screenshot لا يظهر في التقرير
+
+- [ ] تشخيص سبب عدم ظهور screenshotUrl في التقرير
+- [ ] إصلاح تدفق البيانات من brightDataAnalysis → report.ts
+
+## إصلاح - 28 مارس 2026 - "غير قابل للتحليل" + Screenshot
+
+- [x] تشخيص سبب "غير قابل للتحليل": analysis_ready_flag = 0 رغم اكتمال التحليل
+- [x] إصلاح: إضافة تحديث analysis_ready_flag = true في analyzeWebsiteWithBrightData عند اكتمال التحليل
+- [x] إصلاح: إضافة تحديث analysis_ready_flag = true في analyzeAllPlatforms عند اكتمال التحليل
+- [x] إصلاح فوري لمختبرات دلتا في قاعدة البيانات (analysis_ready_flag = 1)
+- [x] تشخيص سبب Screenshot = NULL: Puppeteer المحلي لا يصل للإنترنت (ERR_NAME_NOT_RESOLVED)
+- [x] إصلاح: تعديل takeWebsiteScreenshot لاستخدام Bright Data WS Endpoint أولاً (يعمل عبر الإنترنت)
+- [x] إضافة عرض Screenshot في صفحة تفاصيل العميل (LeadDetail) في قسم تحليل الموقع

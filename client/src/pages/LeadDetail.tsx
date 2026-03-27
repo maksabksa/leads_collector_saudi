@@ -6,7 +6,7 @@ import {
   ArrowRight, Globe, Instagram, Twitter, Phone, MapPin, Zap, BarChart3, Mail,
   AlertTriangle, TrendingUp, Target, Star, CheckCircle, XCircle, Loader2,
   Edit2, Save, X, ExternalLink, RefreshCw, MessageCircle, Send, Copy, ChevronDown, MessagesSquare,
-  Activity, Users, Clock, Brain, ChevronUp, Sparkles, FileText, Download, Eye
+  Activity, Users, Clock, Brain, ChevronUp, Sparkles, FileText, Download, Eye, Monitor
 } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -1701,6 +1701,22 @@ export default function LeadDetail() {
                   {websiteAnalysis.overallScore?.toFixed(1)}/10
                 </span>
               </div>
+              {/* Screenshot الموقع */}
+              {(websiteAnalysis as any).screenshotUrl && (
+                <div className="rounded-xl overflow-hidden border" style={{ borderColor: "oklch(0.65 0.18 200 / 0.3)" }}>
+                  <div className="flex items-center gap-2 px-3 py-2" style={{ background: "oklch(0.65 0.18 200 / 0.08)" }}>
+                    <Monitor className="w-3.5 h-3.5" style={{ color: "oklch(0.65 0.18 200)" }} />
+                    <span className="text-xs font-medium" style={{ color: "oklch(0.65 0.18 200)" }}>لقطة شاشة الموقع</span>
+                  </div>
+                  <img
+                    src={(websiteAnalysis as any).screenshotUrl}
+                    alt="لقطة شاشة الموقع"
+                    className="w-full object-cover object-top"
+                    style={{ maxHeight: "200px" }}
+                    onError={(e) => { (e.target as HTMLElement).parentElement!.style.display = 'none'; }}
+                  />
+                </div>
+              )}
               {websiteAnalysis.summary && <p className="text-sm text-muted-foreground leading-relaxed">{websiteAnalysis.summary}</p>}
               <div className="space-y-2">
                 <ScoreBar label="سرعة التحميل" value={websiteAnalysis.loadSpeedScore} color="oklch(0.65 0.18 200)" />

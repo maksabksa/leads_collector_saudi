@@ -109,10 +109,61 @@ export async function scrapeWithHeadless(url: string, timeoutMs = 25000): Promis
 }
 
 /**
- * أخذ Screenshot للموقع بمتصفح حقيقي
+ * أخذ Screenshot للموقع
+ * يستخدم Bright Data Scraping Browser (WebSocket) للوصول للإنترنت
  * يُرجع Buffer للصورة بصيغة PNG
  */
 export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Promise<Buffer | null> {
+  // محاولة أولى: Bright Data Scraping Browser (يعمل عبر الإنترنت)
+  const wsEndpoint = process.env.BRIGHT_DATA_WS_ENDPOINT;
+  if (wsEndpoint) {
+    let browser = null;
+    try {
+      browser = await puppeteer.connect({
+        browserWSEndpoint: wsEndpoint,
+      });
+
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1440, height: 900 });
+      await page.setExtraHTTPHeaders({
+        "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+      });
+
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      // انتظار إضافي لتحميل المحتوى
+      await new Promise(r => setTimeout(r, 3000));
+
+      // إخفاء النوافذ المنبثقة الشائعة
+      try {
+        await page.evaluate(() => {
+          const selectors = [
+            '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
+            '[id*="cookie"]', '[id*="popup"]', '[id*="overlay"]',
+            '[class*="gdpr"]', '[class*="consent"]',
+          ];
+          selectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach((el: any) => { el.style.display = 'none'; });
+          });
+        });
+      } catch { /* تجاهل أخطاء إخفاء النوافذ */ }
+
+      const screenshotBuffer = await page.screenshot({
+        type: "png",
+        clip: { x: 0, y: 0, width: 1440, height: 900 },
+      });
+
+      await browser.disconnect();
+      console.log(`[Screenshot] Captured via Bright Data: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+      return Buffer.from(screenshotBuffer);
+    } catch (err: any) {
+      console.warn("[Screenshot] Bright Data failed:", err?.message);
+      if (browser) {
+        try { await browser.disconnect(); } catch { /* تجاهل */ }
+      }
+    }
+  }
+
+  // محاولة ثانية: Chromium المحلي (قد لا يعمل في بيئة الإنتاج)
   let browser = null;
   try {
     browser = await puppeteer.launch({
@@ -125,41 +176,23 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
         "--disable-accelerated-2d-canvas",
         "--disable-gpu",
         "--window-size=1440,900",
-        "--disable-blink-features=AutomationControlled",
-        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       ],
     });
 
     const page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 900 });
-    await page.setExtraHTTPHeaders({
-      "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
-    });
-
     await page.goto(url, { waitUntil: "networkidle2", timeout: timeoutMs });
-    // انتظار إضافي لتحميل الصور والخطوط
-    await new Promise(r => setTimeout(r, 3000));
-
-    // إخفاء النوافذ المنبثقة الشائعة
-    await page.evaluate(() => {
-      const selectors = [
-        '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
-        '[id*="cookie"]', '[id*="popup"]', '[id*="overlay"]',
-        '[class*="gdpr"]', '[class*="consent"]',
-      ];
-      selectors.forEach(sel => {
-        document.querySelectorAll(sel).forEach((el: any) => { el.style.display = 'none'; });
-      });
-    });
+    await new Promise(r => setTimeout(r, 2000));
 
     const screenshotBuffer = await page.screenshot({
       type: "png",
       clip: { x: 0, y: 0, width: 1440, height: 900 },
     });
 
+    console.log(`[Screenshot] Captured via local Chromium: ${url}`);
     return Buffer.from(screenshotBuffer);
   } catch (err: any) {
-    console.warn("[HeadlessScraper] Screenshot failed:", err?.message);
+    console.warn("[Screenshot] Local Chromium also failed:", err?.message);
     return null;
   } finally {
     if (browser) {
