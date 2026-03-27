@@ -2267,3 +2267,18 @@
 - [ ] فحص ملف التحليل الشامل لمعرفة كيف يجمع بيانات الموقع
 - [ ] تحسين prompt الذكاء الاصطناعي ليتحقق من المحتوى الفعلي للموقع قبل التشخيص
 - [ ] إضافة تعليمات للـ AI: "لا تقترح ميزة إذا كانت موجودة فعلاً في الموقع"
+
+## الدفعة - 27 مارس 2026 - توحيد اسم الحساب + Headless Browser
+
+- [ ] فحص كيفية جمع بيانات السوشيال حالياً (socialSearch.ts, realSocialData.ts)
+- [ ] توحيد اسم الحساب: استخدام نفس الـ handle المُدخل في جميع المنصات (إنستجرام، تيك توك، سناب، تويتر، فيسبوك)
+- [ ] تثبيت Puppeteer للـ Headless Browser
+- [ ] إضافة دالة scrapeWithHeadless() تستخدم Puppeteer لتحليل المواقع الديناميكية
+- [ ] دمج نتائج Headless Browser في websiteIntelligence.ts كـ fallback عند فشل الـ HTTP Fetch
+
+## الدفعة - 27 مارس 2026 - Headless Browser
+
+- [x] تثبيت puppeteer-core وchromium
+- [x] إنشاء server/lib/headlessScraper.ts بدالة scrapeWithHeadless(url) وdetectFeaturesFromFullHtml()
+- [x] دمج scrapeWithHeadless في websiteIntelligence.ts كـ fallback ثالث بعد Bright Data
+- [x] ضمان عدم الكتابة فوق نتائج Headless Browser بالكشف العادي (skipFeatureDetection)

@@ -5,9 +5,9 @@
  * 2. Bright Data Scraper المحسّن → SEO كامل + بنية الموقع
  * 3. Google Custom Search → عدد الصفحات المفهرسة
  */
-
 import { ENV } from "../_core/env";
 import { fetchWithScrapingBrowser, fetchViaProxy } from "./brightDataScraper";
+import { scrapeWithHeadless, detectFeaturesFromFullHtml } from "./headlessScraper";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -223,16 +223,37 @@ export async function fetchSEOIntelligence(url: string): Promise<SEOIntelligence
   };
 
   try {
-    // جلب HTML الكامل
+    // جلب HTML الكامل — ثلاث طبقات fallback
     let html = "";
+    let usedHeadless = false;
     try {
       html = await fetchWithScrapingBrowser(url);
     } catch {
       try {
         html = await fetchViaProxy(url);
-      } catch (e: any) {
-        result.error = e.message;
-        return result;
+      } catch {
+        // Fallback الثالث: Headless Browser (يدعم JS-heavy sites)
+        console.log(`[WebsiteIntelligence] Falling back to Headless Browser for: ${url}`);
+        const headlessResult = await scrapeWithHeadless(url);
+        if (headlessResult.success && headlessResult.html.length > 100) {
+          html = headlessResult.html;
+          usedHeadless = true;
+          // تطبيق اكتشاف الميزات من HTML الكامل (بعد تشغيل JS)
+          const features = detectFeaturesFromFullHtml(headlessResult.html, headlessResult.text);
+          result.hasPaymentGateway = features.hasPaymentGateway;
+          result.hasEcommerce = features.hasEcommerce;
+          result.hasBooking = features.hasBooking;
+          result.hasWhatsapp = features.hasWhatsapp;
+          result.hasChatWidget = features.hasLiveChat;
+          result.hasAnalytics = features.hasAnalytics;
+          result.hasSSL = url.startsWith("https://");
+          if (features.phoneNumbers.length > 0) result.phones = features.phoneNumbers;
+          if (headlessResult.title) result.title = headlessResult.title;
+          if (headlessResult.metaDescription) result.metaDescription = headlessResult.metaDescription;
+        } else {
+          result.error = headlessResult.error || "All fetch methods failed";
+          return result;
+        }
       }
     }
 
@@ -240,6 +261,9 @@ export async function fetchSEOIntelligence(url: string): Promise<SEOIntelligence
       result.error = "Empty response";
       return result;
     }
+
+    // إذا استُخدم Headless Browser، الميزات محددة بالفعل أعلاه
+    const skipFeatureDetection = usedHeadless;
 
     const domain = new URL(url).hostname;
 
@@ -308,17 +332,23 @@ export async function fetchSEOIntelligence(url: string): Promise<SEOIntelligence
     result.bodyText = bodyText.slice(0, 3000);
     result.wordCount = bodyText.split(/\s+/).filter(w => w.length > 2).length;
 
-    // ─── Contact & Features ───
-    const saudiPhonePattern = /(?:05\d{8}|009665\d{8}|\+9665\d{8}|011\d{7}|012\d{7}|013\d{7})/g;
-    result.phones = Array.from(new Set(html.match(saudiPhonePattern) || [])).slice(0, 5);
-    result.hasWhatsapp = /whatsapp|wa\.me|واتساب/i.test(html);
-    result.hasBooking = /booking|reservation|حجز|موعد|book now|تحديد موعد/i.test(html);
-    result.hasEcommerce = /cart|checkout|add to cart|سلة|شراء|buy now|order now|إضافة للسلة/i.test(html);
-    result.hasPaymentGateway = /mada|visa|mastercard|paypal|stripe|moyasar|hyperpay|tap payment|مدى|بطاقة/i.test(html);
-    result.hasChatWidget = /tawk\.to|intercom|zendesk|crisp|livechat|tidio|freshchat/i.test(html);
-    result.hasAnalytics = /google-analytics|gtag|ga\(|analytics\.js|UA-\d+/i.test(html);
-    result.hasGoogleTagManager = /googletagmanager|GTM-/i.test(html);
-    result.hasFacebookPixel = /fbq\(|facebook\.net\/en_US\/fbevents|connect\.facebook\.net/i.test(html);
+    // ─── Contact & Features (متجاوز إذا استُخدم Headless Browser لأن النتائج محددة بدقة أعلى) ───
+    if (!skipFeatureDetection) {
+      const saudiPhonePattern = /(?:05\d{8}|009665\d{8}|\+9665\d{8}|011\d{7}|012\d{7}|013\d{7})/g;
+      result.phones = Array.from(new Set(html.match(saudiPhonePattern) || [])).slice(0, 5);
+      result.hasWhatsapp = /whatsapp|wa\.me|واتساب/i.test(html);
+      result.hasBooking = /booking|reservation|حجز|موعد|book now|تحديد موعد/i.test(html);
+      result.hasEcommerce = /cart|checkout|add to cart|سلة|شراء|buy now|order now|إضافة للسلة/i.test(html);
+      result.hasPaymentGateway = /mada|visa|mastercard|paypal|stripe|moyasar|hyperpay|tap payment|مدى|بطاقة/i.test(html);
+      result.hasChatWidget = /tawk\.to|intercom|zendesk|crisp|livechat|tidio|freshchat/i.test(html);
+      result.hasAnalytics = /google-analytics|gtag|ga\(|analytics\.js|UA-\d+/i.test(html);
+      result.hasGoogleTagManager = /googletagmanager|GTM-/i.test(html);
+      result.hasFacebookPixel = /fbq\(|facebook\.net\/en_US\/fbevents|connect\.facebook\.net/i.test(html);
+    } else {
+      // Headless: فقط GTM و Facebook Pixel لأنهما لم يُغطيا أعلاه
+      result.hasGoogleTagManager = /googletagmanager|GTM-/i.test(html);
+      result.hasFacebookPixel = /fbq\(|facebook\.net\/en_US\/fbevents|connect\.facebook\.net/i.test(html);
+    }
 
     // ─── robots.txt & sitemap ───
     try {
