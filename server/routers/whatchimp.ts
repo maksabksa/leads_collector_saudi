@@ -1,4 +1,5 @@
 import { router, protectedProcedure } from "../_core/trpc";
+import { invokeLLM } from "../_core/llm";
 import { getDb } from "../db";
 import { whatchimpSettings, whatchimpSendLog, leads } from "../../drizzle/schema";
 import { eq, inArray, and, desc, gte, lt, sql } from "drizzle-orm";
@@ -370,6 +371,39 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
   return fields;
 }
 
+// ─── Summarize notes using LLM ────────────────────────────────────────────
+async function summarizeNotes(notes: string, businessName: string, businessType?: string | null): Promise<string> {
+  if (!notes || notes.trim().length < 50) return notes; // لا تلخيص للنصوص القصيرة
+  try {
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `أنت مستشار تسويقي خبير. مهمتك تلخيص ملاحظات العميل في 4 أسطر بالضبط باللهجة السعودية الخليجية الاحترافية. الملخص يجب أن:
+- يكون مدعوماً بالتحليل ويعكس أهم ما جاء في الملاحظات
+- يخاطب العميل مباشرة (بصيغة المخاطب)
+- يكون احترافياً ومقنعاً دون مبالغة
+- لا يتجاوز 4 أسطر نهائياً
+- لا يذكر اسم العميل في الملخص`,
+        },
+        {
+          role: "user",
+          content: `النشاط: ${businessName}${businessType ? ` (${businessType})` : ""}
+الملاحظات:
+${notes}
+
+لخص هذه الملاحظات في 4 أسطر باللهجة السعودية الخليجية الاحترافية.`,
+        },
+      ],
+    });
+    const rawContent = response?.choices?.[0]?.message?.content;
+    const summary = typeof rawContent === "string" ? rawContent : null;
+    return summary ? `📝 ملخص الملاحظات:\n${summary.trim()}` : notes;
+  } catch {
+    return notes; // في حالة فشل الذكاء الاصطناعي نرجع النص الأصلي
+  }
+}
+
 // ─── Send one lead to Whatchimp ───────────────────────────────────────────────
 async function sendLeadToWhatchimp(
   settings: typeof whatchimpSettings.$inferSelect,
@@ -409,7 +443,12 @@ async function sendLeadToWhatchimp(
 
     // 2. Assign custom fields with lead data (non-fatal)
     try {
-      const customFields = buildCustomFields(lead);
+      // تلخيص الملاحظات بالذكاء الاصطناعي إن وجدت
+      const leadWithSummarizedNotes = { ...lead };
+      if (lead.notes && lead.notes.trim().length >= 50) {
+        leadWithSummarizedNotes.notes = await summarizeNotes(lead.notes, lead.companyName, lead.businessType);
+      }
+      const customFields = buildCustomFields(leadWithSummarizedNotes);
       if (Object.keys(customFields).length > 0) {
         await whatchimpPost("/whatsapp/subscriber/chat/assign-custom-fields", {
           apiToken: settings.apiToken,
