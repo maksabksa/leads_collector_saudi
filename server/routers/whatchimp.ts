@@ -234,8 +234,14 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
   // الدولة
   if (lead.country) fields["الدولة"] = lead.country === "SA" ? "المملكة العربية السعودية" : lead.country;
 
-  // الموقع الإلكتروني
-  if (lead.website) fields["الموقع الإلكتروني"] = lead.website;
+  // الموقع الإلكتروني — رسالة احترافية للعميل
+  if (lead.website) {
+    fields["الموقع الإلكتروني"] =
+      `🌐 لديكم موقع إلكتروني على الإنترنت — وهذا أساس جيد للبدء.\n` +
+      `رابط موقعكم: ${lead.website}\n\n` +
+      `لكن وجود الموقع وحده لا يكفي — السؤال هو: هل يجلب عملاء جدد فعلاً؟\n` +
+      `نحن نحلّل هذا بالتفصيل في تقريرنا المرفق.`;
+  }
 
   // روابط السوشيال ميديا
   if (lead.instagramUrl) fields["إنستجرام"] = lead.instagramUrl;
@@ -244,63 +250,85 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
   if (lead.tiktokUrl) fields["تيك توك"] = lead.tiktokUrl;
   if (lead.facebookUrl) fields["فيسبوك"] = lead.facebookUrl;
 
-  // رابط خرائط جوجل
-  if (lead.googleMapsUrl) fields["خرائط جوجل"] = lead.googleMapsUrl;
-
-  // عدد التقييمات
-  if (lead.reviewCount != null && lead.reviewCount > 0) fields["عدد التقييمات"] = String(lead.reviewCount);
-
-  // درجة الأولوية — صياغة احترافية جاهزة للعميل
-  if (lead.leadPriorityScore != null) {
-    const score = lead.leadPriorityScore;
-    let priorityLabel: string;
-    let priorityEmoji: string;
-    if (score >= 80) {
-      priorityLabel = "أولوية قصوى — فرصة استثنائية لا تُفوَّت";
-      priorityEmoji = "🔴";
-    } else if (score >= 60) {
-      priorityLabel = "أولوية عالية — فرصة واعدة تستحق التحرك السريع";
-      priorityEmoji = "🟠";
-    } else if (score >= 40) {
-      priorityLabel = "أولوية متوسطة — إمكانات جيدة مع تطوير مدروس";
-      priorityEmoji = "🟡";
-    } else {
-      priorityLabel = "أولوية منخفضة — تحتاج إلى تأهيل قبل التحرك";
-      priorityEmoji = "🟢";
-    }
-    fields["درجة الأولوية"] = `${priorityEmoji} ${score}/100 — ${priorityLabel}`;
+  // خرائط جوجل — رسالة احترافية للعميل
+  if (lead.googleMapsUrl) {
+    const reviewNote = (lead.reviewCount && lead.reviewCount > 0)
+      ? `لديكم ${lead.reviewCount} تقييم على خرائط جوجل — `
+      : `حضوركم على خرائط جوجل مسجّل — `;
+    fields["خرائط جوجل"] =
+      `📍 نشاطكم موجود على خرائط جوجل.\n` +
+      `${reviewNote}وهذا يعني أن عملاءكم يبحثون عنكم ويجدونكم.\n\n` +
+      `السؤال المهم: هل صفحتكم محسّنة بالصور والوصف والردود على التقييمات؟\n` +
+      `هذه التفاصيل تحدد من يختاركم قبل المنافس.\n` +
+      `رابط صفحتكم: ${lead.googleMapsUrl}`;
+  } else {
+    fields["خرائط جوجل"] =
+      `📍 نشاطكم غير مسجّل على خرائط جوجل حتى الآن.\n\n` +
+      `هذا يعني أن عملاءكم المحتملين لا يجدونكم حين يبحثون عن ${lead.businessType ?? "نشاطكم"} في المنطقة.\n` +
+      `تسجيل نشاطكم على خرائط جوجل هو أسرع طريقة لكسب عملاء جدد من المنطقة المحيطة.`;
   }
 
-  // أكبر ثغرة تسويقية — صياغة احترافية جاهزة للعميل
+  // عدد التقييمات — يُعرض فقط إذا لم يكن هناك رابط خرائط (لتجنب التكرار)
+  if (!lead.googleMapsUrl && lead.reviewCount != null && lead.reviewCount > 0) {
+    fields["عدد التقييمات"] = String(lead.reviewCount);
+  }
+
+  // درجة الأولوية — رسالة استشارية مخصصة للعميل
+  if (lead.leadPriorityScore != null) {
+    const score = lead.leadPriorityScore;
+    let priorityMsg: string;
+    if (score >= 80) {
+      priorityMsg =
+        `🔴 بناءً على تحليلنا الشامل لواقع ${lead.companyName} الرقمي والتسويقي:\n\n` +
+        `نشاطكم يمتلك مقومات نمو استثنائية — البيئة مهيّأة والسوق جاهز والفرصة قائمة.\n` +
+        `ما ينقصكم فقط هو التنفيذ الصحيح لتحويل هذه الإمكانات إلى نتائج ملموسة.`;
+    } else if (score >= 60) {
+      priorityMsg =
+        `🟠 بناءً على تحليلنا الشامل لواقع ${lead.companyName} الرقمي والتسويقي:\n\n` +
+        `نشاطكم في مرحلة جيدة ولديه فرص حقيقية للتوسع.\n` +
+        `التحرك السريع الآن يضمن لكم السبق قبل أن يستغلّها المنافسون.`;
+    } else if (score >= 40) {
+      priorityMsg =
+        `🟡 بناءً على تحليلنا الشامل لواقع ${lead.companyName} الرقمي والتسويقي:\n\n` +
+        `نشاطكم يمتلك إمكانات جيدة لكنها تحتاج إلى تطوير مدروس.\n` +
+        `بخطة محكمة يمكن تحويل هذه الإمكانات إلى نتائج ملموسة خلال فترة قصيرة.`;
+    } else {
+      priorityMsg =
+        `🟢 بناءً على تحليلنا الشامل لواقع ${lead.companyName} الرقمي والتسويقي:\n\n` +
+        `نشاطكم في مرحلة تأسيس ويحتاج إلى بناء قاعدة رقمية متينة قبل أي خطوة أخرى.\n` +
+        `البداية الصحيحة تضمن لكم نتائج حقيقية من أي استثمار تسويقي.`;
+    }
+    fields["درجة الأولوية"] = priorityMsg;
+  }
+
+  // أكبر ثغرة تسويقية — شرح تفصيلي للعميل السعودي
   if (lead.biggestMarketingGap) {
     const gap = lead.biggestMarketingGap.trim();
-    // إذا كان النص قصيراً (جملة واحدة) نُضيف إطاراً احترافياً
-    const isShort = gap.length < 120;
-    if (isShort) {
-      fields["أكبر ثغرة تسويقية"] =
-        `⚡ تشخيص تسويقي حصري لـ ${lead.companyName}:\n\n` +
-        `رصدنا ثغرة محورية في مسيرتكم الرقمية:\n` +
-        `${gap}\n\n` +
-        `هذه الثغرة تُكلّفكم عملاء محتملين يومياً — وإغلاقها يعني نمواً ملموساً في وقت قصير.`;
-    } else {
-      fields["أكبر ثغرة تسويقية"] =
-        `⚡ تشخيص تسويقي حصري لـ ${lead.companyName}:\n\n${gap}`;
-    }
+    // كشف نوع الثغرة من النص
+    const isSEO = /سيو|seo|محركات بحث|جوجل|ظهور/i.test(gap);
+    const isSocial = /سوشيال|إنستغرام|تيك توك|سناب|تويتر|فيسبوك|منصة|محتوى/i.test(gap);
+    const isMaps = /خرائط|جوجل مابس|تقييمات|موقع جغرافي/i.test(gap);
+    let gapType = "";
+    if (isSEO) gapType = "ظهوركم في محركات البحث (SEO)";
+    else if (isSocial) gapType = "حضوركم على منصات التواصل الاجتماعي";
+    else if (isMaps) gapType = "تواجدكم على خرائط جوجل";
+    else gapType = "الحضور الرقمي الشامل";
+
+    fields["أكبر ثغرة تسويقية"] =
+      `⚡ تشخيص تسويقي حصري لـ ${lead.companyName}:\n\n` +
+      `رصدنا ثغرة محورية في ${gapType}:\n` +
+      `${gap}\n\n` +
+      `هذه الثغرة تعني بشكل مباشر أن عملاءكم المحتملين لا يجدونكم حين يبحثون عن ${lead.businessType ?? "خدماتكم"}.\n` +
+      `إغلاق هذه الثغرة يعني نمواً ملموساً في عدد العملاء القادمين إليكم بشكل عضوي.`;
   }
 
   // زاوية الدخول البيعية — صياغة احترافية جاهزة للعميل
   if (lead.suggestedSalesEntryAngle) {
     const angle = lead.suggestedSalesEntryAngle.trim();
-    const isShort = angle.length < 120;
-    if (isShort) {
-      fields["زاوية الدخول البيعية"] =
-        `🎯 توصية استراتيجية مخصصة لـ ${lead.companyName}:\n\n` +
-        `${angle}\n\n` +
-        `هذا المسار هو الأقصر والأكثر فاعلية لتحويل حضوركم الرقمي إلى مبيعات حقيقية.`;
-    } else {
-      fields["زاوية الدخول البيعية"] =
-        `🎯 توصية استراتيجية مخصصة لـ ${lead.companyName}:\n\n${angle}`;
-    }
+    fields["زاوية الدخول البيعية"] =
+      `🎯 توصية استراتيجية مخصصة لـ ${lead.companyName}:\n\n` +
+      `${angle}\n\n` +
+      `هذا المسار هو الأقصر والأكثر فاعلية لتحويل حضوركم الرقمي إلى مبيعات حقيقية.`;
   }
 
   // مرحلة العميل
@@ -326,19 +354,14 @@ function buildCustomFields(lead: LeadForWhatchimp): Record<string, string> {
   // ملاحظات
   if (lead.notes) fields["ملاحظات"] = lead.notes;
 
-  // فرصة الإيراد — صياغة احترافية جاهزة للعميل
+  // فرصة الإيراد — شرح كيفية زيادة الأرباح بدون أرقام
   if ((lead as any).revenueOpportunity) {
     const rev = ((lead as any).revenueOpportunity as string).trim();
-    const isShort = rev.length < 120;
-    if (isShort) {
-      fields["فرصة الإيراد"] =
-        `💰 تقدير فرصة الإيراد لـ ${lead.companyName}:\n\n` +
-        `${rev}\n\n` +
-        `هذا التقدير مبني على تحليل دقيق لواقعكم الرقمي والسوق المحيط.`;
-    } else {
-      fields["فرصة الإيراد"] =
-        `💰 تقدير فرصة الإيراد لـ ${lead.companyName}:\n\n${rev}`;
-    }
+    fields["فرصة الإيراد"] =
+      `💰 فرصة النمو لـ ${lead.companyName} — بناءً على تحليلنا الميداني:\n\n` +
+      `${rev}\n\n` +
+      `هذه الفرصة لا تحتاج إلى ميزانية إضافية كبيرة — بل تحتاج إلى توجيه صحيح لما هو موجود لديكم فعلاً.\n` +
+      `العملاء الموجودون حولكم يبحثون عن ${lead.businessType ?? "ما تقدمونه"} — السؤال هو: هل يجدونكم أم يجدون منافسيكم؟`;
   }
 
   // مصدر البيانات
