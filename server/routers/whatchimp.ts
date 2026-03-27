@@ -419,7 +419,7 @@ export const whatchimpRouter = router({
   // ── Save / update settings (admin only) ───────────────────────────────────
   saveSettings: protectedProcedure
     .input(z.object({
-      apiToken: z.string().min(10),
+      apiToken: z.string().min(1), // __KEEP__ = keep existing token
       phoneNumberId: z.string().min(5),
       defaultLabelId: z.number().optional(),
       defaultLabelName: z.string().optional(),

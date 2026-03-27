@@ -754,6 +754,18 @@ export default function LeadDetail() {
           {pdfGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
           تحميل PDF
         </button>
+        {/* زر إرسال PDF عبر WhatChimp Bot Flow مباشرة */}
+        {isWhatchimpConfigured && data?.lead?.verifiedPhone && pdfUrl && (
+          <button
+            onClick={handleSendPdfViaBot}
+            disabled={botFlowSending}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex-shrink-0"
+            style={{ background: botFlowSending ? "oklch(0.45 0.22 145 / 0.08)" : "oklch(0.45 0.22 145 / 0.2)", color: "oklch(0.65 0.2 145)", border: "1px solid oklch(0.55 0.2 145 / 0.4)" }}
+          >
+            {botFlowSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            {botFlowSending ? 'جاري الإرسال...' : 'إرسال PDF واتساب'}
+          </button>
+        )}
       </div>
       {/* ===== END Quick Action Bar ===== */}
 
