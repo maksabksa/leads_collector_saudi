@@ -162,6 +162,34 @@ export const pdfReportRouter = router({
           backlinkGaps: (seoRow.backlinkGaps as any[])?.length ? seoRow.backlinkGaps as any : undefined,
         };
       }
+      // جلب تحليل الموقع الإلكتروني
+      const [websiteRowP] = await db.select().from(websiteAnalyses)
+        .where(eq(websiteAnalyses.leadId, input.leadId))
+        .orderBy(websiteAnalyses.analyzedAt)
+        .limit(1);
+      if (websiteRowP) {
+        reportData.websiteData = {
+          url: websiteRowP.url,
+          hasWebsite: websiteRowP.hasWebsite ?? false,
+          loadSpeedScore: websiteRowP.loadSpeedScore,
+          mobileExperienceScore: websiteRowP.mobileExperienceScore,
+          seoScore: websiteRowP.seoScore,
+          contentQualityScore: websiteRowP.contentQualityScore,
+          designScore: websiteRowP.designScore,
+          offerClarityScore: websiteRowP.offerClarityScore,
+          overallScore: websiteRowP.overallScore,
+          hasOnlineBooking: websiteRowP.hasOnlineBooking,
+          hasPaymentOptions: websiteRowP.hasPaymentOptions,
+          hasDeliveryInfo: websiteRowP.hasDeliveryInfo,
+          hasSeasonalPage: websiteRowP.hasSeasonalPage,
+          technicalGaps: websiteRowP.technicalGaps as string[] | null,
+          contentGaps: websiteRowP.contentGaps as string[] | null,
+          recommendations: websiteRowP.recommendations as string[] | null,
+          summary: websiteRowP.summary,
+          analyzedAt: websiteRowP.analyzedAt,
+          screenshotUrl: websiteRowP.screenshotUrl,
+        };
+      }
       const html = generateReportHTML(reportData);
 
       return { html, leadName: lead.companyName };
@@ -266,6 +294,7 @@ export const pdfReportRouter = router({
             recommendations: websiteRow.recommendations as string[] | null,
             summary: websiteRow.summary,
             analyzedAt: websiteRow.analyzedAt,
+            screenshotUrl: websiteRow.screenshotUrl,
           };
         }
 
@@ -480,6 +509,7 @@ export const pdfReportRouter = router({
                 recommendations: websiteRow.recommendations as string[] | null,
                 summary: websiteRow.summary,
                 analyzedAt: websiteRow.analyzedAt,
+                screenshotUrl: websiteRow.screenshotUrl,
               };
             }
             const [socialSnap] = await db.select().from(realSocialSnapshots)

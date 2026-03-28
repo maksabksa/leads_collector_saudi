@@ -94,6 +94,7 @@ export interface PDFReportData {
     recommendations?: string[] | null;
     summary?: string | null;
     analyzedAt?: Date;
+    screenshotUrl?: string | null;
   } | null;
   // بيانات السوشيال الحقيقية (Bright Data)
   socialSnapshot?: {
@@ -582,6 +583,13 @@ export function generateReportHTML(data: PDFReportData): string {
     ${WATERMARK_HTML}
     ${HEADER_HTML(webPageNum, totalPages, "تحليل الموقع الإلكتروني", "السرعة · SEO · المحتوى · تجربة الجوال · الثغرات", "#0ea5e9")}
     <div style="padding:14px 28px;position:relative;z-index:1;">
+      ${web!.screenshotUrl ? `<div style="margin-bottom:14px;border-radius:14px;overflow:hidden;border:2px solid rgba(14,165,233,0.3);box-shadow:0 4px 20px rgba(14,165,233,0.15);">
+        <div style="background:rgba(14,165,233,0.08);padding:6px 14px;font-size:9px;font-weight:700;color:#7dd3fc;border-bottom:1px solid rgba(14,165,233,0.2);display:flex;align-items:center;gap:6px;">
+          <span>🖥️</span><span>لقطة شاشة حقيقية للموقع</span>
+          <span style="margin-right:auto;font-weight:400;color:#475569;font-size:8px;">${web!.url || ''}</span>
+        </div>
+        <img src="${web!.screenshotUrl}" style="width:100%;height:auto;display:block;max-height:260px;object-fit:cover;object-position:top;" alt="لقطة شاشة الموقع" onerror="this.parentElement.style.display='none'" />
+      </div>` : ""}
       <div style="display:flex;gap:10px;margin-bottom:14px;">
         <div style="flex:1;background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.2);border-radius:12px;padding:12px;text-align:center;">
           <div style="font-size:9px;color:#64748b;margin-bottom:3px;">الدرجة الكلية</div>

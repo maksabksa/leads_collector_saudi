@@ -2306,3 +2306,7 @@
 - [x] تشخيص سبب Screenshot = NULL: Puppeteer المحلي لا يصل للإنترنت (ERR_NAME_NOT_RESOLVED)
 - [x] إصلاح: تعديل takeWebsiteScreenshot لاستخدام Bright Data WS Endpoint أولاً (يعمل عبر الإنترنت)
 - [x] إضافة عرض Screenshot في صفحة تفاصيل العميل (LeadDetail) في قسم تحليل الموقع
+
+## إصلاح - عرض Screenshot في صفحة العميل
+- [ ] فحص مكان عرض Screenshot الحالي في LeadDetail
+- [ ] إضافة عرض Screenshot بشكل بارز وواضح في قسم تحليل الموقع
