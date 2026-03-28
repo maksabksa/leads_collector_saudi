@@ -125,9 +125,7 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
 
       const page = await browser.newPage();
       await page.setViewport({ width: 1440, height: 900 });
-      await page.setExtraHTTPHeaders({
-        "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
-      });
+      // ملاحظة: لا نستخدم setExtraHTTPHeaders مع Bright Data لأنه يمنع التنقل
 
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
       // انتظار إضافي لتحميل المحتوى
