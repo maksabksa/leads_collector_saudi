@@ -157,17 +157,16 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
       });
     } catch { /* تجاهل أخطاء إخفاء النوافذ */ }
 
-    // Full-Page Screenshot — يلتقط الصفحة الكاملة بطولها الكامل
+    // Screenshot للجزء المرئي فقط (أكثر موثوقية من fullPage)
     const screenshotBuffer = await page.screenshot({
       type: "png",
-      fullPage: true,
+      fullPage: false,
     });
-
     await browser.close();
-    console.log(`[Screenshot] Captured via local Chromium (full-page): ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+    console.log(`[Screenshot] Captured via local Chromium: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
     return Buffer.from(screenshotBuffer);
   } catch (err: any) {
-    console.warn("[Screenshot] Local Chromium failed:", err?.message);
+    console.error("[Screenshot] Local Chromium failed:", err?.message);
     if (browser) {
       try { await browser.close(); } catch { /* تجاهل */ }
     }
@@ -189,11 +188,11 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
 
       const screenshotBuffer = await page.screenshot({
         type: "png",
-        fullPage: true,
+        fullPage: false,
       });
 
       await bdBrowser.disconnect();
-      console.log(`[Screenshot] Captured via Bright Data (full-page): ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+      console.log(`[Screenshot] Captured via Bright Data: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
       return Buffer.from(screenshotBuffer);
     } catch (err: any) {
       console.warn("[Screenshot] Bright Data also failed:", err?.message);
