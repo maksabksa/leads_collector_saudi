@@ -244,18 +244,22 @@ export async function takeSocialMediaScreenshot(
   const isTwitter = platform === "twitter";
   const isInstagram = platform === "instagram";
   const isTiktok = platform === "tiktok";
+  const isFacebook = platform === "facebook";
+  const isSnapchat = platform === "snapchat";
   const isMobile = isInstagram || isTiktok;
+  // جميع المنصات تحتاج Proxy لأن معظمها يحجب Chromium العادي
+  const needsProxy = isInstagram || isTiktok || isFacebook || isSnapchat || isTwitter;
 
   // User-Agent مناسب لكل منصة
-  const userAgent = isTwitter
+  const userAgent = (isTwitter || isFacebook)
     ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     : "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-  // وقت الانتظار حسب المنصة (تويتر يحتاج وقتاً أطول لتحميل JS)
-  const waitAfterLoad = isTwitter ? 6000 : 4000;
+  // وقت الانتظار حسب المنصة
+  const waitAfterLoad = (isTwitter || isFacebook) ? 6000 : 4000;
 
-  // للمنصات المحجوبة (إنستغرام وتيك توك): استخدام Bright Data Residential Proxy أولاً
-  if (isInstagram || isTiktok) {
+  // جميع المنصات: استخدام Bright Data Residential Proxy أولاً
+  if (needsProxy) {
     const proxyHost = process.env.BRIGHT_DATA_RESIDENTIAL_HOST;
     const proxyPort = process.env.BRIGHT_DATA_RESIDENTIAL_PORT;
     const proxyUser = process.env.BRIGHT_DATA_RESIDENTIAL_USERNAME;
@@ -281,32 +285,33 @@ export async function takeSocialMediaScreenshot(
         });
 
         const page = await bdBrowser.newPage();
-        await page.setViewport({ width: 430, height: 932 }); // iPhone 14 Pro Max
+        // viewport حسب المنصة: فيسبوك وتويتر desktop، باقي المنصات mobile
+        if (isFacebook || isTwitter) {
+          await page.setViewport({ width: 1280, height: 800 });
+        } else {
+          await page.setViewport({ width: 430, height: 932 }); // iPhone 14 Pro Max
+        }
         await page.authenticate({ username: proxyUser, password: proxyPass });
         // تجاهل أخطاء SSL من الـ proxy
         page.on('response', () => {}); // dummy listener
-
         // إخفاء علامات الأتمتة
         await page.evaluateOnNewDocument(() => {
           Object.defineProperty(navigator, "webdriver", { get: () => undefined });
           Object.defineProperty(navigator, "platform", { get: () => "iPhone" });
         });
-
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, waitAfterLoad));
         await hidePopups(page, platform);
         await new Promise(r => setTimeout(r, 1500));
-
         const screenshotBuffer = await page.screenshot({
           type: "png",
           fullPage: false,
         });
-
         await bdBrowser.close();
         console.log(`[SocialScreenshot] Captured ${platform} via Bright Data Residential Proxy: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
         return Buffer.from(screenshotBuffer);
       } catch (err: any) {
-        console.warn(`[SocialScreenshot] Bright Data Residential Proxy failed for ${platform}:`, err?.message);
+        console.error(`[SocialScreenshot] Bright Data Residential Proxy failed for ${platform}:`, err?.message);
         if (bdBrowser) {
           try { await bdBrowser.close(); } catch { /* تجاهل */ }
         }
