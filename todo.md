@@ -2349,3 +2349,14 @@
 - [x] إعادة تصميم كارد كل منصة: تخطيط أفقي (Screenshot يسار + نقاط التقييم يمين)
 - [x] إضافة تأثيرات بصرية: إطار ملون حسب المنصة، ظل، شارة التقييم فوق الصورة
 - [x] التعامل مع حالة عدم وجود Screenshot (عرض النقاط بشكل كامل بدون تقسيم)
+
+## ميزات جديدة - تعليقات المحلل + مقارنة المنافسين + توصيات المنصات
+- [x] فحص شاشة إدخال بيانات العميل (AddLead/EditLead) وبنية schema
+- [x] حقل additionalNotes موجود في جدول leads بقاعدة البيانات
+- [x] إضافة حقل تعليقات المحلل (additionalNotes) في شاشة AddLead بتصميم مميز
+- [x] دمج analyzerNotes (additionalNotes + notes) في برومبت AI في socialEnrichment.ts
+- [x] إضافة حقل competitorScreenshots في جدول social_analyses + migration
+- [x] إضافة مقارنة بصرية بالمنافسين في صفحة السوشيال بالتقرير (Screenshot العميل بجانب المنافسين)
+- [x] إضافة platformRecommendation في برومبت AI وحفظها في rawAnalysis
+- [x] تحديث pdfReportEngine لعرض التوصية المخصصة في كارد كل منصة (platformRecommendation)
+- [x] تمرير competitorScreenshots و platformRecommendation في الثلاث أماكن في pdfReport.ts

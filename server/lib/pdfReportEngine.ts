@@ -178,6 +178,8 @@ export interface PDFReportData {
     dataSource?: string | null;
     profileUrl?: string | null;
     screenshotUrl?: string | null;
+    platformRecommendation?: string | null;
+    competitorScreenshots?: {name: string; url: string; screenshotUrl?: string; followersCount?: number; score?: number}[] | null;
   }> | null;
 }
 
@@ -703,9 +705,35 @@ export function generateReportHTML(data: PDFReportData): string {
                 <!-- ملخص التحليل -->
                 ${sa.summary ? `<div style="font-size:8.5px;color:#94a3b8;line-height:1.65;padding:6px 9px;background:rgba(0,0,0,0.2);border-radius:8px;border-right:2px solid rgba(${pcRgb},0.4);margin-bottom:5px;">${sa.summary}</div>` : ""}
                 <!-- الثغرات -->
-                ${(sa.gaps?.length || 0) > 0 ? `<div style="font-size:8px;color:#fca5a5;">${(sa.gaps!).slice(0,2).map((g:string)=>`⚠️ ${g}`).join(" · ")}</div>` : ""}
+                ${(sa.gaps?.length || 0) > 0 ? `<div style="font-size:8px;color:#fca5a5;margin-bottom:5px;">${(sa.gaps!).slice(0,2).map((g:string)=>`⚠️ ${g}`).join(" · ")}</div>` : ""}
+                <!-- التوصية المخصصة للمنصة -->
+                ${sa.platformRecommendation ? `<div style="padding:6px 10px;background:linear-gradient(135deg,rgba(${pcRgb},0.12),rgba(${pcRgb},0.05));border:1px solid rgba(${pcRgb},0.3);border-radius:8px;margin-top:4px;"><div style="font-size:7.5px;color:rgba(${pcRgb},0.9);font-weight:800;margin-bottom:2px;">🎯 التوصية الأولى</div><div style="font-size:8.5px;color:#e2e8f0;line-height:1.6;">${sa.platformRecommendation}</div></div>` : ""}
               </div>
             </div>
+            <!-- قسم مقارنة المنافسين -->
+            ${(sa.competitorScreenshots?.length || 0) > 0 ? `
+            <div style="border-top:1px solid rgba(${pcRgb},0.12);padding:8px 14px;background:rgba(${pcRgb},0.03);">
+              <div style="font-size:8px;color:rgba(${pcRgb},0.8);font-weight:800;margin-bottom:6px;">🔍 مقارنة بالمنافسين — ${pl}</div>
+              <div style="display:flex;gap:6px;overflow:hidden;">
+                <!-- بطاقة العميل (مميزة) -->
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:7px;color:#22c55e;font-weight:700;text-align:center;padding:2px 4px;background:rgba(34,197,94,0.08);border-radius:4px 4px 0 0;border:1px solid rgba(34,197,94,0.2);border-bottom:none;">★ العميل</div>
+                  ${sa.screenshotUrl ? `<img src="${sa.screenshotUrl}" style="width:100%;height:70px;object-fit:cover;object-position:top;display:block;border:1px solid rgba(34,197,94,0.2);border-top:none;border-radius:0 0 4px 4px;" alt="العميل" onerror="this.style.display='none'" />` : `<div style="width:100%;height:70px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.15);border-top:none;border-radius:0 0 4px 4px;display:flex;align-items:center;justify-content:center;"><span style="font-size:18px;">${pi}</span></div>`}
+                  ${sc != null ? `<div style="text-align:center;font-size:8px;font-weight:900;color:${scColor};margin-top:2px;">${Math.round(sc)}/10</div>` : ""}
+                </div>
+                <!-- بطاقات المنافسين -->
+                ${(sa.competitorScreenshots!).slice(0,3).map((comp) => {
+                  const compScore = comp.score;
+                  const compColor = compScore != null ? (compScore >= 7 ? "#22c55e" : compScore >= 5 ? "#f59e0b" : "#ef4444") : "#64748b";
+                  const compName = comp.name.slice(0, 12);
+                  return `<div style="flex:1;min-width:0;">
+                    <div style="font-size:7px;color:#94a3b8;font-weight:600;text-align:center;padding:2px 4px;background:rgba(255,255,255,0.03);border-radius:4px 4px 0 0;border:1px solid rgba(255,255,255,0.08);border-bottom:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${compName}</div>
+                    ${comp.screenshotUrl ? `<img src="${comp.screenshotUrl}" style="width:100%;height:70px;object-fit:cover;object-position:top;display:block;border:1px solid rgba(255,255,255,0.08);border-top:none;border-radius:0 0 4px 4px;filter:grayscale(20%);" alt="${compName}" onerror="this.style.display='none'" />` : `<div style="width:100%;height:70px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-top:none;border-radius:0 0 4px 4px;display:flex;align-items:center;justify-content:center;"><span style="font-size:9px;color:#475569;">لا صورة</span></div>`}
+                    ${compScore != null ? `<div style="text-align:center;font-size:8px;font-weight:900;color:${compColor};margin-top:2px;">${Math.round(compScore)}/10</div>` : ""}
+                  </div>`;
+                }).join("")}
+              </div>
+            </div>` : ""}
           </div>`;
         }).join("")}
       </div>` : ""}

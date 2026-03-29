@@ -33,6 +33,7 @@ function buildReportData(lead: typeof leads.$inferSelect, reportType: "internal"
       stage: lead.stage,
       priority: lead.priority,
       notes: lead.notes,
+      additionalNotes: lead.additionalNotes,
     },
     analysis: {
       sectorMain: lead.sectorMain,
@@ -219,6 +220,8 @@ export const pdfReportRouter = router({
           dataSource: r.dataSource,
           profileUrl: r.profileUrl,
           screenshotUrl: r.screenshotUrl,
+          platformRecommendation: (() => { try { const raw = r.rawAnalysis ? JSON.parse(r.rawAnalysis as string) : null; return (raw as any)?.platformRecommendation || null; } catch { return null; } })(),
+          competitorScreenshots: r.competitorScreenshots as {name: string; url: string; screenshotUrl?: string; followersCount?: number; score?: number}[] | null,
         }));
       }
       // جلب بيانات السوشيال الحقيقية (Bright Data snapshot)
@@ -423,6 +426,8 @@ export const pdfReportRouter = router({
             dataSource: r.dataSource,
             profileUrl: r.profileUrl,
             screenshotUrl: r.screenshotUrl,
+            platformRecommendation: (() => { try { const raw = r.rawAnalysis ? JSON.parse(r.rawAnalysis as string) : null; return (raw as any)?.platformRecommendation || null; } catch { return null; } })(),
+            competitorScreenshots: r.competitorScreenshots as {name: string; url: string; screenshotUrl?: string; followersCount?: number; score?: number}[] | null,
           }));
         }
 
@@ -636,6 +641,8 @@ export const pdfReportRouter = router({
                 dataSource: r.dataSource,
                 profileUrl: r.profileUrl,
                 screenshotUrl: r.screenshotUrl,
+                platformRecommendation: (() => { try { const raw = r.rawAnalysis ? JSON.parse(r.rawAnalysis as string) : null; return (raw as any)?.platformRecommendation || null; } catch { return null; } })(),
+                competitorScreenshots: r.competitorScreenshots as {name: string; url: string; screenshotUrl?: string; followersCount?: number; score?: number}[] | null,
               }));
             }
             const html = generateReportHTML(reportData);

@@ -5,6 +5,7 @@
  * - ملخص تحليلي مبني على البيانات الحقيقية
  * - توصيات محددة وقابلة للتنفيذ
  * - ثغرات واضحة مع تأثيرها التجاري
+ * - توصية مخصصة لكل منصة (platformRecommendation)
  */
 import { getDb } from "../db";
 import { socialAnalyses } from "../../drizzle/schema";
@@ -21,7 +22,8 @@ async function analyzePlatformWithAI(
   platform: string,
   data: Record<string, any>,
   businessType: string,
-  city: string
+  city: string,
+  analyzerNotes?: string
 ): Promise<{
   engagementScore: number;
   contentQualityScore: number;
@@ -31,6 +33,7 @@ async function analyzePlatformWithAI(
   summary: string;
   recommendations: string[];
   gaps: string[];
+  platformRecommendation: string;
 }> {
   const defaultResult = {
     engagementScore: 0,
@@ -41,6 +44,7 @@ async function analyzePlatformWithAI(
     summary: "",
     recommendations: [],
     gaps: [],
+    platformRecommendation: "",
   };
 
   try {
@@ -53,6 +57,11 @@ async function analyzePlatformWithAI(
     const bio = data.bio ?? data.description ?? "";
     const topPosts = data.topPosts ?? data.topVideos ?? [];
 
+    // قسم ملاحظات المحلل — يُضاف فقط إذا وُجدت
+    const analyzerNotesSection = analyzerNotes?.trim()
+      ? `\n\n⚠️ **ملاحظات المحلل (أعلى أولوية — يجب دمجها في التحليل والتوصيات):**\n${analyzerNotes.trim()}`
+      : "";
+
     const prompt = `أنت محلل سوشيال ميديا متخصص في السوق السعودي. حلّل البيانات الحقيقية التالية وقدم تقييماً منطقياً مبنياً على الأرقام.
 
 البيانات الحقيقية لحساب ${platform} لنشاط "${businessType}" في "${city}":
@@ -63,7 +72,7 @@ async function analyzePlatformWithAI(
 - متوسط التعليقات: ${avgComments.toLocaleString()}
 - حساب موثق: ${verified ? "نعم" : "لا"}
 - البايو: ${bio || "غير متوفر"}
-${topPosts.length > 0 ? `- أفضل ${topPosts.length} منشورات متوفرة` : "- لا توجد بيانات منشورات"}
+${topPosts.length > 0 ? `- أفضل ${topPosts.length} منشورات متوفرة` : "- لا توجد بيانات منشورات"}${analyzerNotesSection}
 
 معايير التقييم للسوق السعودي:
 - معدل تفاعل ممتاز: >5% | جيد: 2-5% | متوسط: 1-2% | ضعيف: <1%
@@ -78,14 +87,16 @@ ${topPosts.length > 0 ? `- أفضل ${topPosts.length} منشورات متوفر
   "overallScore": 0-10,
   "summary": "ملخص تحليلي دقيق في جملتين يذكر أقوى نقطة وأضعف نقطة بالأرقام الحقيقية",
   "recommendations": ["توصية محددة وقابلة للتنفيذ مع تأثيرها التجاري"],
-  "gaps": ["ثغرة محددة مع تأثيرها على الأعمال"]
+  "gaps": ["ثغرة محددة مع تأثيرها على الأعمال"],
+  "platformRecommendation": "جملة واحدة عملية تذكر الدرجة الحالية (مثل 6/10) وما يجب فعله تحديداً لرفعها إلى X"
 }
 
 ملاحظات:
 - استخدم الأرقام الحقيقية في الملخص (مثل: "معدل تفاعل 3.2% أعلى من المتوسط")
 - لا تخترع بيانات غير موجودة
 - إذا كانت البيانات ضعيفة، قل ذلك بوضوح
-- الدرجات يجب أن تعكس الأرقام الحقيقية`;
+- الدرجات يجب أن تعكس الأرقام الحقيقية
+- platformRecommendation: جملة واحدة عملية ومباشرة تذكر الدرجة الحالية والهدف والخطوة الأولى`;
 
     const response = await invokeLLM({
       messages: [
@@ -108,6 +119,7 @@ ${topPosts.length > 0 ? `- أفضل ${topPosts.length} منشورات متوفر
       summary: result.summary || "",
       recommendations: Array.isArray(result.recommendations) ? result.recommendations.slice(0, 5) : [],
       gaps: Array.isArray(result.gaps) ? result.gaps.slice(0, 5) : [],
+      platformRecommendation: typeof result.platformRecommendation === "string" ? result.platformRecommendation : "",
     };
   } catch (err) {
     console.error(`[SocialAI ${platform}] Error:`, err);
@@ -153,12 +165,14 @@ export async function runSocialEnrichment(
 
   const businessType = (lead as any).businessType || "";
   const city = (lead as any).city || "";
+  // ملاحظات المحلل — تُمرر لكل منصة لتوجيه الـ AI
+  const analyzerNotes = (lead as any).notes || (lead as any).additionalNotes || "";
   const platformsEnriched: string[] = [];
 
   // ─── تحليل وحفظ Instagram ────────────────────────────────────────────────
   if (allData.instagram) {
     const ig = allData.instagram;
-    const aiAnalysis = await analyzePlatformWithAI("Instagram", ig as any, businessType, city);
+    const aiAnalysis = await analyzePlatformWithAI("Instagram", ig as any, businessType, city, analyzerNotes);
 
     await db.insert(socialAnalyses).values({
       leadId: lead.id,
@@ -177,9 +191,9 @@ export async function runSocialEnrichment(
       summary: aiAnalysis.summary,
       recommendations: aiAnalysis.recommendations,
       gaps: aiAnalysis.gaps,
+      rawAnalysis: JSON.stringify({ ...ig, platformRecommendation: aiAnalysis.platformRecommendation }),
       dataSource: "bright_data",
-      rawAnalysis: JSON.stringify(ig),
-      analysisText: aiAnalysis.summary || `Instagram: ${ig.followers ?? 0} متابع | تفاعل: ${ig.avgEngagementRate ?? 0}%`,
+      analysisText: aiAnalysis.platformRecommendation || aiAnalysis.summary || `Instagram: ${ig.followers ?? 0} متابع | تفاعل: ${ig.avgEngagementRate ?? 0}%`,
     });
     platformsEnriched.push("instagram");
   }
@@ -187,7 +201,7 @@ export async function runSocialEnrichment(
   // ─── تحليل وحفظ Twitter/X ────────────────────────────────────────────────
   if (allData.twitter) {
     const tw = allData.twitter;
-    const aiAnalysis = await analyzePlatformWithAI("Twitter/X", tw as any, businessType, city);
+    const aiAnalysis = await analyzePlatformWithAI("Twitter/X", tw as any, businessType, city, analyzerNotes);
 
     await db.insert(socialAnalyses).values({
       leadId: lead.id,
@@ -204,9 +218,9 @@ export async function runSocialEnrichment(
       summary: aiAnalysis.summary,
       recommendations: aiAnalysis.recommendations,
       gaps: aiAnalysis.gaps,
+      rawAnalysis: JSON.stringify({ ...tw, platformRecommendation: aiAnalysis.platformRecommendation }),
       dataSource: "bright_data",
-      rawAnalysis: JSON.stringify(tw),
-      analysisText: aiAnalysis.summary || `Twitter/X: ${tw.followers ?? 0} متابع`,
+      analysisText: aiAnalysis.platformRecommendation || aiAnalysis.summary || `Twitter/X: ${tw.followers ?? 0} متابع`,
     });
     platformsEnriched.push("twitter");
   }
@@ -214,7 +228,7 @@ export async function runSocialEnrichment(
   // ─── تحليل وحفظ TikTok ───────────────────────────────────────────────────
   if (allData.tiktok) {
     const tt = allData.tiktok;
-    const aiAnalysis = await analyzePlatformWithAI("TikTok", tt as any, businessType, city);
+    const aiAnalysis = await analyzePlatformWithAI("TikTok", tt as any, businessType, city, analyzerNotes);
 
     await db.insert(socialAnalyses).values({
       leadId: lead.id,
@@ -232,9 +246,9 @@ export async function runSocialEnrichment(
       summary: aiAnalysis.summary,
       recommendations: aiAnalysis.recommendations,
       gaps: aiAnalysis.gaps,
+      rawAnalysis: JSON.stringify({ ...tt, platformRecommendation: aiAnalysis.platformRecommendation }),
       dataSource: "bright_data",
-      rawAnalysis: JSON.stringify(tt),
-      analysisText: aiAnalysis.summary || `TikTok: ${tt.followers ?? 0} متابع | تفاعل: ${tt.avgEngagementRate ?? 0}%`,
+      analysisText: aiAnalysis.platformRecommendation || aiAnalysis.summary || `TikTok: ${tt.followers ?? 0} متابع | تفاعل: ${tt.avgEngagementRate ?? 0}%`,
     });
     platformsEnriched.push("tiktok");
   }

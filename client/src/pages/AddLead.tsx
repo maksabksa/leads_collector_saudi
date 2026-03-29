@@ -55,6 +55,7 @@ export default function AddLead() {
     reviewCount: 0,
     socialSince: "",
     notes: "",
+    additionalNotes: "",
     stage: "new" as "new" | "contacted" | "interested" | "price_offer" | "meeting" | "won" | "lost",
     priority: "medium" as "high" | "medium" | "low",
     nextStep: "",
@@ -568,6 +569,18 @@ export default function AddLead() {
           <textarea value={form.notes} onChange={e => set("notes", e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary resize-none"
             rows={3} placeholder="مثال: العميل يريد التوسع في تيك توك، لديه ميزانية محدودة، منافسه الرئيسي هو..." />
+        </div>
+
+        {/* تعليقات المحلل - تُدمج في التقرير */}
+        <div className="rounded-2xl p-5 border-2 overflow-hidden" style={{ borderColor: "oklch(0.65 0.18 280 / 0.4)", background: "oklch(0.10 0.015 280 / 0.3)" }}>
+          <label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: "oklch(0.75 0.18 280)" }}>
+            <MessageCircle className="w-3.5 h-3.5" />
+            تعليقات المحلل (تُدمج في التقرير)
+          </label>
+          <p className="text-xs text-muted-foreground mb-2">تعليقاتك الشخصية كمحلل — يقرأها الـ AI ويدمجها فكرياً في التقرير النهائي (مثل: "العميل لديه إمكانات عالية لكن تصميمه ضعيف" أو "ركز على فرصة رمضان")</p>
+          <textarea value={form.additionalNotes} onChange={e => set("additionalNotes", e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground focus:outline-none focus:border-primary resize-none"
+            rows={3} placeholder="مثال: رأيت حساب الإنستغرام شخصياً — المحتوى جيد لكن لا يوجد CTA واضح. أنصح بالتركيز على الريلز والتسعير..." />
         </div>
 
         {/* Submit */}

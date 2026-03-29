@@ -297,6 +297,7 @@ export const socialAnalyses = mysqlTable("social_analyses", {
   analysisText: text("analysisText"),
   dataSource: varchar("dataSource", { length: 50 }),
   screenshotUrl: varchar("screenshotUrl", { length: 1000 }),  // لقطة شاشة صفحة السوشيال ميديا
+  competitorScreenshots: json("competitorScreenshots").$type<{name: string; url: string; screenshotUrl?: string; followersCount?: number; score?: number}[]>(),  // Screenshots المنافسين في نفس المنصة
   analyzedAt: timestamp("analyzedAt").defaultNow().notNull(),
 });
 
