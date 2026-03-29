@@ -640,22 +640,72 @@ export function generateReportHTML(data: PDFReportData): string {
           const pl = getPlatformLabel(sa.platform);
           const sc = sa.overallScore;
           const scColor = sc != null ? (sc >= 7 ? "#22c55e" : sc >= 5 ? "#f59e0b" : "#ef4444") : "#64748b";
-          return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">${pi}</span><div><div style="font-size:11px;font-weight:800;color:#f1f5f9;">${pl}</div>${sa.profileUrl ? `<div style="font-size:8px;color:#475569;">${sa.profileUrl.replace(/https?:\/\/(www\.)?/,"").slice(0,40)}</div>` : ""}</div></div>
-              ${sc != null ? `<div style="text-align:center;"><div style="font-size:20px;font-weight:900;color:${scColor};">${Math.round(sc)}</div><div style="font-size:8px;color:#64748b;">/10</div></div>` : ""}
+          // تحويل hex لون المنصة إلى RGB
+          const hexToRgb = (hex: string) => { const r = parseInt(hex.slice(1,3),16); const g = parseInt(hex.slice(3,5),16); const b = parseInt(hex.slice(5,7),16); return `${r},${g},${b}`; };
+          const pcRgb = hexToRgb(pc);
+          return `<div style="background:linear-gradient(135deg,rgba(${pcRgb},0.04) 0%,rgba(255,255,255,0.01) 100%);border:1px solid rgba(${pcRgb},0.2);border-radius:14px;overflow:hidden;margin-bottom:2px;">
+            <!-- هيدر الكارد -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;border-bottom:1px solid rgba(${pcRgb},0.12);background:rgba(${pcRgb},0.06);">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:20px;">${pi}</span>
+                <div>
+                  <div style="font-size:12px;font-weight:900;color:#f1f5f9;letter-spacing:0.3px;">${pl}</div>
+                  ${sa.profileUrl ? `<div style="font-size:8px;color:rgba(${pcRgb},0.8);margin-top:1px;">${sa.profileUrl.replace(/https?:\/\/(www\.)?/,"").slice(0,45)}</div>` : ""}
+                </div>
+              </div>
+              ${sc != null ? `<div style="display:flex;align-items:center;gap:6px;">
+                <div style="text-align:center;background:rgba(${pcRgb},0.1);border:2px solid ${pc};border-radius:50%;width:42px;height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                  <div style="font-size:16px;font-weight:900;color:${scColor};line-height:1;">${Math.round(sc)}</div>
+                  <div style="font-size:7px;color:#64748b;">/10</div>
+                </div>
+                <div style="font-size:8px;color:${scColor};font-weight:700;">${sc>=7?"تقييم جيد":sc>=5?"تقييم متوسط":"يحتاج تحسين"}</div>
+              </div>` : ""}
             </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">
-              ${[["📊 التفاعل",sa.engagementScore],["📝 المحتوى",sa.contentQualityScore],["🗓️ التكرار",sa.postingFrequencyScore],["🎯 الاستراتيجية",sa.contentStrategyScore]].map(([lbl,val]) => { const v = val as number|null|undefined; const c2 = v != null ? (v>=7?"#22c55e":v>=5?"#f59e0b":"#ef4444") : "#64748b"; return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:5px;text-align:center;"><div style="font-size:8px;color:#64748b;margin-bottom:2px;">${lbl}</div><div style="font-size:14px;font-weight:900;color:${c2};">${v != null ? Math.round(v) : "—"}</div></div>`; }).join("")}
+            <!-- الجسم الرئيسي: Screenshot يسار + نقاط التقييم يمين -->
+            <div style="display:flex;gap:0;">
+              ${sa.screenshotUrl ? `
+              <!-- عمود Screenshot -->
+              <div style="width:38%;min-width:120px;position:relative;border-left:1px solid rgba(${pcRgb},0.15);">
+                <div style="font-size:7.5px;color:rgba(${pcRgb},0.9);padding:4px 8px;background:rgba(${pcRgb},0.08);font-weight:700;text-align:center;">📸 واجهة الحساب</div>
+                <img src="${sa.screenshotUrl}" style="width:100%;height:200px;object-fit:cover;object-position:top;display:block;" alt="لقطة ${pl}" onerror="this.parentElement.style.display='none'" />
+                <!-- شارة التقييم فوق الصورة -->
+                ${sc != null ? `<div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.75);border:1.5px solid ${scColor};border-radius:8px;padding:3px 7px;text-align:center;backdrop-filter:blur(4px);">
+                  <div style="font-size:14px;font-weight:900;color:${scColor};line-height:1;">${Math.round(sc)}</div>
+                  <div style="font-size:6.5px;color:#94a3b8;">تقييم عام</div>
+                </div>` : ""}
+              </div>
+              ` : ""}
+              <!-- عمود نقاط التقييم -->
+              <div style="flex:1;padding:10px 12px;">
+                <!-- مؤشرات التقييم الأربعة -->
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:8px;">
+                  ${[["📊 التفاعل",sa.engagementScore],["📝 المحتوى",sa.contentQualityScore],["🗓️ الانتظام",sa.postingFrequencyScore],["🎯 الاستراتيجية",sa.contentStrategyScore]].map(([lbl,val]) => {
+                    const v = val as number|null|undefined;
+                    const c2 = v != null ? (v>=7?"#22c55e":v>=5?"#f59e0b":"#ef4444") : "#64748b";
+                    const barW = v != null ? Math.round(v*10) : 0;
+                    return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:6px 8px;">
+                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                        <div style="font-size:7.5px;color:#94a3b8;">${lbl}</div>
+                        <div style="font-size:13px;font-weight:900;color:${c2};">${v != null ? Math.round(v) : "—"}</div>
+                      </div>
+                      <div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+                        <div style="height:100%;width:${barW}%;background:${c2};border-radius:2px;"></div>
+                      </div>
+                    </div>`;
+                  }).join("")}
+                </div>
+                <!-- شارات المحتوى -->
+                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">
+                  <span style="font-size:7.5px;padding:2px 7px;background:${sa.hasSeasonalContent?"rgba(34,197,94,0.1)":"rgba(239,68,68,0.07)"};color:${sa.hasSeasonalContent?"#22c55e":"#ef4444"};border-radius:8px;border:1px solid ${sa.hasSeasonalContent?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.2)"}">${sa.hasSeasonalContent?"✅":"❌"} موسمي</span>
+                  <span style="font-size:7.5px;padding:2px 7px;background:${sa.hasPricingContent?"rgba(34,197,94,0.1)":"rgba(239,68,68,0.07)"};color:${sa.hasPricingContent?"#22c55e":"#ef4444"};border-radius:8px;border:1px solid ${sa.hasPricingContent?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.2)"}">${sa.hasPricingContent?"✅":"❌"} أسعار</span>
+                  <span style="font-size:7.5px;padding:2px 7px;background:${sa.hasCallToAction?"rgba(34,197,94,0.1)":"rgba(239,68,68,0.07)"};color:${sa.hasCallToAction?"#22c55e":"#ef4444"};border-radius:8px;border:1px solid ${sa.hasCallToAction?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.2)"}">${sa.hasCallToAction?"✅":"❌"} CTA</span>
+                </div>
+                <!-- ملخص التحليل -->
+                ${sa.summary ? `<div style="font-size:8.5px;color:#94a3b8;line-height:1.65;padding:6px 9px;background:rgba(0,0,0,0.2);border-radius:8px;border-right:2px solid rgba(${pcRgb},0.4);margin-bottom:5px;">${sa.summary}</div>` : ""}
+                <!-- الثغرات -->
+                ${(sa.gaps?.length || 0) > 0 ? `<div style="font-size:8px;color:#fca5a5;">${(sa.gaps!).slice(0,2).map((g:string)=>`⚠️ ${g}`).join(" · ")}</div>` : ""}
+              </div>
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
-              ${sa.hasSeasonalContent ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ محتوى موسمي</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا محتوى موسمي</span>`}
-              ${sa.hasPricingContent ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ أسعار معروضة</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا أسعار</span>`}
-              ${sa.hasCallToAction ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ CTA واضح</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا CTA</span>`}
-            </div>
-            ${sa.screenshotUrl ? `<div style="margin-bottom:8px;border-radius:10px;overflow:hidden;border:1px solid rgba(${getPlatformColor(sa.platform).replace('#','').match(/../g)?.map(h=>parseInt(h,16)).join(',') || '255,255,255'},0.25);box-shadow:0 3px 12px rgba(0,0,0,0.3);"><div style="font-size:8px;color:#64748b;padding:4px 8px;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.05);">📸 لقطة شاشة ${pl}</div><img src="${sa.screenshotUrl}" style="width:100%;height:auto;display:block;max-height:200px;object-fit:cover;object-position:top;" alt="لقطة شاشة ${pl}" onerror="this.parentElement.style.display='none'" /></div>` : ""}
-            ${sa.summary ? `<div style="font-size:9px;color:#94a3b8;line-height:1.6;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:8px;">${sa.summary}</div>` : ""}
-            ${(sa.gaps?.length || 0) > 0 ? `<div style="margin-top:6px;font-size:8.5px;color:#fca5a5;">${(sa.gaps!).slice(0,3).map((g:string)=>`⚠️ ${g}`).join(" · ")}</div>` : ""}
           </div>`;
         }).join("")}
       </div>` : ""}
