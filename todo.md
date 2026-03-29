@@ -2360,3 +2360,9 @@
 - [x] إضافة platformRecommendation في برومبت AI وحفظها في rawAnalysis
 - [x] تحديث pdfReportEngine لعرض التوصية المخصصة في كارد كل منصة (platformRecommendation)
 - [x] تمرير competitorScreenshots و platformRecommendation في الثلاث أماكن في pdfReport.ts
+
+## إصلاح Screenshots الموقع والسوشيال ميديا للعملاء الجدد
+- [x] تشخيص سبب عدم ظهور Screenshots: Bright Data WS يفشل بخطأ 407 + لا يوجد fallback للسوشيال
+- [x] إصلاح takeWebsiteScreenshot: تقديم Chromium المحلي أولاً (Bright Data كـ fallback)
+- [x] إصلاح takeSocialMediaScreenshot: إضافة Chromium المحلي كخيار أول (Bright Data كـ fallback)
+- [x] اختبار ناجح: Chromium يلتقط Screenshots المواقع والسوشيال ميديا بنجاح

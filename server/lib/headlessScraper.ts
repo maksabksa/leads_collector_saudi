@@ -114,55 +114,7 @@ export async function scrapeWithHeadless(url: string, timeoutMs = 25000): Promis
  * يُرجع Buffer للصورة بصيغة PNG
  */
 export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Promise<Buffer | null> {
-  // محاولة أولى: Bright Data Scraping Browser (يعمل عبر الإنترنت)
-  const wsEndpoint = process.env.BRIGHT_DATA_WS_ENDPOINT;
-  if (wsEndpoint) {
-    let browser = null;
-    try {
-      browser = await puppeteer.connect({
-        browserWSEndpoint: wsEndpoint,
-      });
-
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1440, height: 900 });
-      // ملاحظة: لا نستخدم setExtraHTTPHeaders مع Bright Data لأنه يمنع التنقل
-
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-      // انتظار إضافي لتحميل المحتوى
-      await new Promise(r => setTimeout(r, 3000));
-
-      // إخفاء النوافذ المنبثقة الشائعة
-      try {
-        await page.evaluate(() => {
-          const selectors = [
-            '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
-            '[id*="cookie"]', '[id*="popup"]', '[id*="overlay"]',
-            '[class*="gdpr"]', '[class*="consent"]',
-          ];
-          selectors.forEach(sel => {
-            document.querySelectorAll(sel).forEach((el: any) => { el.style.display = 'none'; });
-          });
-        });
-      } catch { /* تجاهل أخطاء إخفاء النوافذ */ }
-
-      // Full-Page Screenshot — يلتقط الصفحة الكاملة بطولها الكامل
-      const screenshotBuffer = await page.screenshot({
-        type: "png",
-        fullPage: true,
-      });
-
-      await browser.disconnect();
-      console.log(`[Screenshot] Captured via Bright Data (full-page): ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
-      return Buffer.from(screenshotBuffer);
-    } catch (err: any) {
-      console.warn("[Screenshot] Bright Data failed:", err?.message);
-      if (browser) {
-        try { await browser.disconnect(); } catch { /* تجاهل */ }
-      }
-    }
-  }
-
-  // محاولة ثانية: Chromium المحلي (قد لا يعمل في بيئة الإنتاج)
+  // محاولة أولى: Chromium المحلي (أسرع وأكثر موثوقية في بيئة الإنتاج)
   let browser = null;
   try {
     browser = await puppeteer.launch({
@@ -175,30 +127,84 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
         "--disable-accelerated-2d-canvas",
         "--disable-gpu",
         "--window-size=1440,900",
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       ],
     });
 
     const page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 900 });
-    await page.goto(url, { waitUntil: "networkidle2", timeout: timeoutMs });
-    await new Promise(r => setTimeout(r, 2000));
 
-    // Full-Page Screenshot
+    // إخفاء علامات الأتمتة
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    });
+
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    // انتظار إضافي لتحميل المحتوى الديناميكي
+    await new Promise(r => setTimeout(r, 3000));
+
+    // إخفاء النوافذ المنبثقة الشائعة
+    try {
+      await page.evaluate(() => {
+        const selectors = [
+          '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
+          '[id*="cookie"]', '[id*="popup"]', '[id*="overlay"]',
+          '[class*="gdpr"]', '[class*="consent"]',
+        ];
+        selectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach((el: any) => { el.style.display = 'none'; });
+        });
+      });
+    } catch { /* تجاهل أخطاء إخفاء النوافذ */ }
+
+    // Full-Page Screenshot — يلتقط الصفحة الكاملة بطولها الكامل
     const screenshotBuffer = await page.screenshot({
       type: "png",
       fullPage: true,
     });
 
-    console.log(`[Screenshot] Captured via local Chromium (full-page): ${url}`);
+    await browser.close();
+    console.log(`[Screenshot] Captured via local Chromium (full-page): ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
     return Buffer.from(screenshotBuffer);
   } catch (err: any) {
-    console.warn("[Screenshot] Local Chromium also failed:", err?.message);
-    return null;
-  } finally {
+    console.warn("[Screenshot] Local Chromium failed:", err?.message);
     if (browser) {
       try { await browser.close(); } catch { /* تجاهل */ }
     }
   }
+
+  // محاولة ثانية: Bright Data Scraping Browser (fallback)
+  const wsEndpoint = process.env.BRIGHT_DATA_WS_ENDPOINT;
+  if (wsEndpoint) {
+    let bdBrowser = null;
+    try {
+      bdBrowser = await puppeteer.connect({
+        browserWSEndpoint: wsEndpoint,
+      });
+
+      const page = await bdBrowser.newPage();
+      await page.setViewport({ width: 1440, height: 900 });
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      await new Promise(r => setTimeout(r, 3000));
+
+      const screenshotBuffer = await page.screenshot({
+        type: "png",
+        fullPage: true,
+      });
+
+      await bdBrowser.disconnect();
+      console.log(`[Screenshot] Captured via Bright Data (full-page): ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+      return Buffer.from(screenshotBuffer);
+    } catch (err: any) {
+      console.warn("[Screenshot] Bright Data also failed:", err?.message);
+      if (bdBrowser) {
+        try { await bdBrowser.disconnect(); } catch { /* تجاهل */ }
+      }
+    }
+  }
+
+  console.warn("[Screenshot] All methods failed for:", url);
+  return null;
 }
 
 /**
@@ -211,34 +217,10 @@ export async function takeSocialMediaScreenshot(
   platform: "instagram" | "tiktok" | "twitter" | "snapchat" | "facebook",
   timeoutMs = 35000
 ): Promise<Buffer | null> {
-  const wsEndpoint = process.env.BRIGHT_DATA_WS_ENDPOINT;
-  if (!wsEndpoint) {
-    console.warn("[SocialScreenshot] No Bright Data WS endpoint configured");
-    return null;
-  }
-
-  let browser = null;
-  try {
-    browser = await puppeteer.connect({
-      browserWSEndpoint: wsEndpoint,
-    });
-
-    const page = await browser.newPage();
-    // viewport مناسب للسوشيال ميديا (موبايل-like لإنستغرام، desktop للباقي)
-    if (platform === "instagram" || platform === "tiktok") {
-      await page.setViewport({ width: 430, height: 932 }); // iPhone 14 Pro Max
-    } else {
-      await page.setViewport({ width: 1280, height: 800 });
-    }
-
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    // انتظار تحميل المحتوى الديناميكي
-    await new Promise(r => setTimeout(r, 4000));
-
-    // إخفاء النوافذ المنبثقة حسب المنصة
+  // دالة مساعدة لإخفاء النوافذ المنبثقة حسب المنصة
+  const hidePopups = async (page: any, plt: string) => {
     try {
-      await page.evaluate((plt: string) => {
-        // إخفاء نوافذ تسجيل الدخول والكوكيز
+      await page.evaluate((platform: string) => {
         const hideSelectors = [
           '[role="dialog"]',
           '[class*="cookie"]', '[class*="consent"]',
@@ -246,43 +228,108 @@ export async function takeSocialMediaScreenshot(
           '[class*="modal"]', '[class*="overlay"]',
           '[class*="banner"]',
         ];
-        // إنستغرام: إخفاء نافذة "تسجيل الدخول للمتابعة"
-        if (plt === "instagram") {
-          hideSelectors.push('._a9-z', '._acas', '.RnEpo');
-        }
-        // تيك توك: إخفاء نافذة التطبيق
-        if (plt === "tiktok") {
-          hideSelectors.push('[class*="AppDownload"]', '[class*="LoginModal"]');
-        }
+        if (platform === "instagram") hideSelectors.push('._a9-z', '._acas', '.RnEpo');
+        if (platform === "tiktok") hideSelectors.push('[class*="AppDownload"]', '[class*="LoginModal"]');
         hideSelectors.forEach(sel => {
           document.querySelectorAll(sel).forEach((el: any) => {
             el.style.display = 'none';
             el.style.visibility = 'hidden';
           });
         });
-        // إزالة overflow:hidden من body
         document.body.style.overflow = 'auto';
-      }, platform);
+      }, plt);
     } catch { /* تجاهل */ }
+  };
 
-    // انتظار إضافي بعد إخفاء النوافذ
+  // محاولة أولى: Chromium المحلي مع User-Agent حقيقي
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: CHROMIUM_PATH,
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu",
+        "--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      ],
+    });
+
+    const page = await browser.newPage();
+    // viewport مناسب للسوشيال ميديا
+    if (platform === "instagram" || platform === "tiktok") {
+      await page.setViewport({ width: 430, height: 932 }); // iPhone 14 Pro Max
+    } else {
+      await page.setViewport({ width: 1280, height: 800 });
+    }
+
+    // إخفاء علامات الأتمتة
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+      Object.defineProperty(navigator, "platform", { get: () => "iPhone" });
+    });
+
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    await new Promise(r => setTimeout(r, 4000));
+    await hidePopups(page, platform);
     await new Promise(r => setTimeout(r, 1500));
 
     const screenshotBuffer = await page.screenshot({
       type: "png",
-      fullPage: false, // viewport فقط للسوشيال ميديا (أكثر وضوحاً)
+      fullPage: false,
     });
 
-    await browser.disconnect();
-    console.log(`[SocialScreenshot] Captured ${platform}: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+    await browser.close();
+    console.log(`[SocialScreenshot] Captured ${platform} via local Chromium: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
     return Buffer.from(screenshotBuffer);
   } catch (err: any) {
-    console.warn(`[SocialScreenshot] Failed for ${platform}:`, err?.message);
+    console.warn(`[SocialScreenshot] Local Chromium failed for ${platform}:`, err?.message);
     if (browser) {
-      try { await browser.disconnect(); } catch { /* تجاهل */ }
+      try { await browser.close(); } catch { /* تجاهل */ }
     }
-    return null;
   }
+
+  // محاولة ثانية: Bright Data Scraping Browser (fallback للمنصات المحجوبة)
+  const wsEndpoint = process.env.BRIGHT_DATA_WS_ENDPOINT;
+  if (wsEndpoint) {
+    let bdBrowser = null;
+    try {
+      bdBrowser = await puppeteer.connect({
+        browserWSEndpoint: wsEndpoint,
+      });
+
+      const page = await bdBrowser.newPage();
+      if (platform === "instagram" || platform === "tiktok") {
+        await page.setViewport({ width: 430, height: 932 });
+      } else {
+        await page.setViewport({ width: 1280, height: 800 });
+      }
+
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      await new Promise(r => setTimeout(r, 4000));
+      await hidePopups(page, platform);
+      await new Promise(r => setTimeout(r, 1500));
+
+      const screenshotBuffer = await page.screenshot({
+        type: "png",
+        fullPage: false,
+      });
+
+      await bdBrowser.disconnect();
+      console.log(`[SocialScreenshot] Captured ${platform} via Bright Data: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+      return Buffer.from(screenshotBuffer);
+    } catch (err: any) {
+      console.warn(`[SocialScreenshot] Bright Data also failed for ${platform}:`, err?.message);
+      if (bdBrowser) {
+        try { await bdBrowser.disconnect(); } catch { /* تجاهل */ }
+      }
+    }
+  }
+
+  console.warn(`[SocialScreenshot] All methods failed for ${platform}:`, url);
+  return null;
 }
 
 /**
