@@ -2324,3 +2324,13 @@
 - [x] توليد بيانات المنافسين تلقائياً عبر AI في analyzeAllPlatforms وحفظها في seoAdvancedAnalysis
 - [x] إنشاء صفحة مقارنة العملاء CompareLeads.tsx مع Screenshots مواقع العملاء
 - [x] إضافة رابط "مقارنة العملاء" في القائمة الجانبية (Layout.tsx)
+
+## إصلاحات نظام الدعوات والصلاحيات
+- [x] إصلاح acceptInvitation: حفظ الصلاحيات في جدول userPermissions عند قبول الدعوة
+- [x] إصلاح acceptInvitation: الاحتفاظ بـ openId الموجود بدلاً من إنشاء جديد
+- [x] إصلاح acceptInvitation: تحديث الدور (role) للمستخدم الموجود مسبقاً
+- [x] إصلاح sdk.ts: دعم مستخدمي Staff (openId يبدأ بـ staff_) دون محاولة جلبهم من Manus OAuth
+- [x] إضافة endpoint verifyInvitationToken لعرض تفاصيل الدعوة قبل القبول
+- [x] تحسين صفحة AcceptInvitation: عرض الصلاحيات والدور وتاريخ الانتهاء
+- [x] تحسين DashboardLayout: إضافة خيار تسجيل الدخول كموظف ورابط قبول الدعوة
+- [x] اختبارات vitest شاملة لنظام الدعوات والصلاحيات

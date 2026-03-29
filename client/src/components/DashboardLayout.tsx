@@ -143,16 +143,30 @@ export default function DashboardLayout({
           <div className="flex flex-col items-center gap-3 text-center">
             <h1 className="text-2xl font-bold tracking-tight">نظام CRM المتكامل</h1>
             <p className="text-sm text-muted-foreground max-w-sm">
-              منصة إدارة علاقات العملاء مع واتساب والذكاء الاصطناعي
+              منصة إدارة علاقات العملاء والذكاء الاصطناعي
             </p>
           </div>
-          <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            size="lg"
-            className="w-full"
-          >
-            تسجيل الدخول للمتابعة
-          </Button>
+          <div className="flex flex-col gap-3 w-full">
+            <Button
+              onClick={() => { window.location.href = "/staff-login"; }}
+              size="lg"
+              className="w-full"
+            >
+              تسجيل الدخول كموظف
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              onClick={() => { window.location.href = getLoginUrl(); }}
+            >
+              تسجيل الدخول بحساب Manus
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            هل لديك رابط دعوة؟{" "}
+            <a href="/accept-invitation" className="text-primary hover:underline">اضغط هنا لقبول الدعوة</a>
+          </p>
         </div>
       </div>
     );

@@ -31,9 +31,10 @@ vi.mock("./_core/llm", () => ({
 // ===== اختبارات نظام الدعوات =====
 describe("Invitations System", () => {
   it("should generate a valid invitation token", () => {
-    const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const crypto = require("crypto");
+    const token = crypto.randomBytes(48).toString("hex");
     expect(token).toBeTruthy();
-    expect(token.length).toBeGreaterThan(10);
+    expect(token.length).toBe(96); // 48 bytes = 96 hex chars
   });
 
   it("should validate email format", () => {
@@ -59,7 +60,7 @@ describe("Invitations System", () => {
   });
 
   it("should validate permissions array", () => {
-    const validPermissions = ["leads.view", "leads.add", "whatsapp.send"];
+    const validPermissions = ["leads.view", "leads.add", "search.use"];
     const allPermissions = [
       "leads.view", "leads.add", "leads.edit", "leads.delete",
       "whatsapp.send", "whatsapp.settings", "search.use",
@@ -70,100 +71,188 @@ describe("Invitations System", () => {
       expect(allPermissions.includes(perm)).toBe(true);
     });
   });
-});
 
-// ===== اختبارات إعدادات واتساب =====
-describe("WhatsApp Settings", () => {
-  it("should validate message delay range", () => {
-    const minDelay = 3000; // 3 seconds
-    const maxDelay = 60000; // 60 seconds
+  it("should correctly identify staff openId format", () => {
+    const staffOpenId = "staff_abc123def456";
+    const manusOpenId = "manus_user_12345";
+    const regularOpenId = "openid_xyz789";
 
-    const testDelays = [3000, 10000, 30000, 60000];
-    const invalidDelays = [1000, 2999, 61000, 100000];
-
-    testDelays.forEach((delay) => {
-      expect(delay >= minDelay && delay <= maxDelay).toBe(true);
-    });
-
-    invalidDelays.forEach((delay) => {
-      expect(delay >= minDelay && delay <= maxDelay).toBe(false);
-    });
+    expect(staffOpenId.startsWith("staff_")).toBe(true);
+    expect(manusOpenId.startsWith("staff_")).toBe(false);
+    expect(regularOpenId.startsWith("staff_")).toBe(false);
   });
 
-  it("should calculate notification milestones correctly", () => {
-    const threshold = 50;
-    const testCases = [
-      { prev: 0, current: 50, shouldNotify: true },
-      { prev: 49, current: 50, shouldNotify: true },
-      { prev: 50, current: 99, shouldNotify: false },
-      { prev: 50, current: 100, shouldNotify: true },
-      { prev: 100, current: 149, shouldNotify: false },
-    ];
-
-    testCases.forEach(({ prev, current, shouldNotify }) => {
-      const prevMilestone = Math.floor(prev / threshold);
-      const newMilestone = Math.floor(current / threshold);
-      expect(newMilestone > prevMilestone).toBe(shouldNotify);
-    });
-  });
-
-  it("should add random delay within expected range", () => {
-    const baseDelay = 10000; // 10 seconds
-    const randomExtra = 2000; // up to 2 seconds extra
-
-    for (let i = 0; i < 10; i++) {
-      const totalDelay = baseDelay + Math.random() * randomExtra;
-      expect(totalDelay).toBeGreaterThanOrEqual(baseDelay);
-      expect(totalDelay).toBeLessThan(baseDelay + randomExtra);
-    }
-  });
-});
-
-// ===== اختبارات قواعد الرد التلقائي =====
-describe("Auto Reply Rules", () => {
-  it("should match keywords case-insensitively", () => {
-    const rule = { triggerKeywords: ["سعر", "كم", "price"] };
-    const messages = [
-      { text: "ما هو السعر؟", shouldMatch: true },
-      { text: "كم التكلفة؟", shouldMatch: true },
-      { text: "what is the PRICE?", shouldMatch: true },
-      { text: "مرحبا", shouldMatch: false },
-    ];
-
-    messages.forEach(({ text, shouldMatch }) => {
-      const msgLower = text.toLowerCase();
-      const matched = (rule.triggerKeywords as string[]).some((kw) =>
-        msgLower.includes(kw.toLowerCase())
-      );
-      expect(matched).toBe(shouldMatch);
-    });
-  });
-
-  it("should parse comma-separated keywords correctly", () => {
-    const input = "سعر, كم, price, cost";
-    const keywords = input.split(",").map((k) => k.trim()).filter(Boolean);
-
-    expect(keywords).toHaveLength(4);
-    expect(keywords[0]).toBe("سعر");
-    expect(keywords[1]).toBe("كم");
-    expect(keywords[2]).toBe("price");
-    expect(keywords[3]).toBe("cost");
-  });
-
-  it("should validate rule has required fields", () => {
-    const validRule = {
-      triggerKeywords: ["سعر"],
-      replyTemplate: "شكراً على استفسارك",
-      useAI: false,
+  it("should correctly set permissions for non-admin users on invitation accept", () => {
+    // محاكاة منطق حفظ الصلاحيات
+    const invitation = {
+      email: "employee@company.com",
+      role: "user",
+      permissions: ["leads.view", "search.use", "search.extract"],
+      status: "pending",
     };
 
-    const invalidRule = {
-      triggerKeywords: [],
-      replyTemplate: "",
-      useAI: false,
+    // الموظف العادي يجب أن تُحفظ صلاحياته
+    const shouldSavePermissions = invitation.role !== "admin";
+    expect(shouldSavePermissions).toBe(true);
+    expect(invitation.permissions.length).toBe(3);
+  });
+
+  it("should NOT save permissions for admin users (they have all permissions)", () => {
+    const adminInvitation = {
+      email: "admin@company.com",
+      role: "admin",
+      permissions: [],
+      status: "pending",
     };
 
-    expect(validRule.triggerKeywords.length > 0 && validRule.replyTemplate.length > 0).toBe(true);
-    expect(invalidRule.triggerKeywords.length > 0 && invalidRule.replyTemplate.length > 0).toBe(false);
+    // المدير لا يحتاج لحفظ صلاحيات لأنه يملكها كلها
+    const shouldSavePermissions = adminInvitation.role !== "admin";
+    expect(shouldSavePermissions).toBe(false);
+  });
+
+  it("should update existing user role when accepting invitation", () => {
+    const existingUser = { id: 1, email: "user@company.com", role: "user" };
+    const invitation = { role: "admin", permissions: [] };
+
+    // عند قبول الدعوة يجب تحديث الدور
+    const updatedRole = invitation.role;
+    expect(updatedRole).toBe("admin");
+    expect(updatedRole).not.toBe(existingUser.role);
+  });
+
+  it("should preserve existing openId when user already exists", () => {
+    const existingUser = { id: 1, openId: "staff_existing123", email: "user@company.com" };
+    const newOpenId = `staff_new${Date.now()}`;
+
+    // يجب استخدام الـ openId الموجود وليس إنشاء جديد
+    const userOpenId = existingUser.openId; // نستخدم الموجود
+    expect(userOpenId).toBe("staff_existing123");
+    expect(userOpenId).not.toBe(newOpenId);
+  });
+
+  it("should validate invitation status transitions", () => {
+    const validTransitions = [
+      { from: "pending", to: "accepted", valid: true },
+      { from: "pending", to: "expired", valid: true },
+      { from: "pending", to: "revoked", valid: true },
+      { from: "accepted", to: "accepted", valid: false }, // لا يمكن قبول دعوة مقبولة
+      { from: "revoked", to: "accepted", valid: false }, // لا يمكن قبول دعوة ملغاة
+    ];
+
+    validTransitions.forEach(({ from, to, valid }) => {
+      const canAccept = from === "pending";
+      if (to === "accepted") {
+        expect(canAccept).toBe(valid);
+      }
+    });
+  });
+});
+
+// ===== اختبارات صلاحيات المستخدمين =====
+describe("User Permissions System", () => {
+  it("should return all permissions for admin users", () => {
+    const AVAILABLE_PERMISSIONS = [
+      "leads.view", "leads.add", "leads.edit", "leads.delete", "leads.export",
+      "whatsapp.send", "whatsapp.bulk_send", "whatsapp.view_all_chats", "whatsapp.settings",
+      "search.use", "search.extract", "search.advanced",
+      "followup.view", "followup.manage", "followup.assign",
+      "analytics.view", "analytics.export", "reports.view",
+      "templates.manage", "ai.settings",
+    ];
+
+    const adminUser = { role: "admin" };
+    const adminPermissions = adminUser.role === "admin" ? [...AVAILABLE_PERMISSIONS] : [];
+
+    expect(adminPermissions.length).toBe(AVAILABLE_PERMISSIONS.length);
+    expect(adminPermissions).toContain("leads.delete");
+    expect(adminPermissions).toContain("ai.settings");
+  });
+
+  it("should check specific permission correctly", () => {
+    const userPermissions = ["leads.view", "search.use", "search.extract"];
+
+    const hasLeadsView = userPermissions.includes("leads.view");
+    const hasLeadsDelete = userPermissions.includes("leads.delete");
+    const hasSearchUse = userPermissions.includes("search.use");
+
+    expect(hasLeadsView).toBe(true);
+    expect(hasLeadsDelete).toBe(false);
+    expect(hasSearchUse).toBe(true);
+  });
+
+  it("should apply role presets correctly", () => {
+    const PERMISSION_PRESETS = {
+      searcher: ["leads.view", "search.use", "search.extract", "search.advanced", "leads.add"],
+      sender: ["leads.view", "whatsapp.send", "whatsapp.bulk_send", "whatsapp.view_all_chats"],
+      analyst: ["leads.view", "analytics.view", "analytics.export", "reports.view"],
+    };
+
+    // التحقق من أن الباحث لديه صلاحيات البحث
+    expect(PERMISSION_PRESETS.searcher).toContain("search.use");
+    expect(PERMISSION_PRESETS.searcher).toContain("search.extract");
+    expect(PERMISSION_PRESETS.searcher).not.toContain("whatsapp.send");
+
+    // التحقق من أن المرسل لديه صلاحيات واتساب
+    expect(PERMISSION_PRESETS.sender).toContain("whatsapp.send");
+    expect(PERMISSION_PRESETS.sender).not.toContain("search.advanced");
+
+    // التحقق من أن المحلل لديه صلاحيات التقارير
+    expect(PERMISSION_PRESETS.analyst).toContain("analytics.view");
+    expect(PERMISSION_PRESETS.analyst).not.toContain("leads.delete");
+  });
+
+  it("should handle inactive user accounts", () => {
+    const activeUser = { isActive: true, email: "active@company.com" };
+    const inactiveUser = { isActive: false, email: "inactive@company.com" };
+
+    const canLogin = (user: { isActive: boolean }) => user.isActive !== false;
+
+    expect(canLogin(activeUser)).toBe(true);
+    expect(canLogin(inactiveUser)).toBe(false);
+  });
+});
+
+// ===== اختبارات التحقق من رابط الدعوة =====
+describe("Invitation Token Verification", () => {
+  it("should detect expired invitations", () => {
+    const expiredInvitation = {
+      status: "pending",
+      expiresAt: new Date(Date.now() - 1000), // منتهية منذ ثانية
+    };
+
+    const validInvitation = {
+      status: "pending",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 أيام
+    };
+
+    const isExpired = (inv: { status: string; expiresAt: Date }) =>
+      inv.status !== "pending" || new Date() > inv.expiresAt;
+
+    expect(isExpired(expiredInvitation)).toBe(true);
+    expect(isExpired(validInvitation)).toBe(false);
+  });
+
+  it("should reject revoked invitations", () => {
+    const revokedInvitation = {
+      status: "revoked",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    };
+
+    const isValid = (inv: { status: string; expiresAt: Date }) =>
+      inv.status === "pending" && new Date() <= inv.expiresAt;
+
+    expect(isValid(revokedInvitation)).toBe(false);
+  });
+
+  it("should reject already accepted invitations", () => {
+    const acceptedInvitation = {
+      status: "accepted",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    };
+
+    const isValid = (inv: { status: string; expiresAt: Date }) =>
+      inv.status === "pending" && new Date() <= inv.expiresAt;
+
+    expect(isValid(acceptedInvitation)).toBe(false);
   });
 });

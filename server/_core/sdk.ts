@@ -270,8 +270,16 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
+    // If user not in DB:
     if (!user) {
+      // Staff users (openId starts with 'staff_') are local accounts, not Manus OAuth users
+      // They must already exist in the DB after accepting an invitation
+      if (sessionUserId.startsWith("staff_")) {
+        console.error("[Auth] Staff user not found in DB:", sessionUserId);
+        throw ForbiddenError("Staff user not found. Please accept the invitation first.");
+      }
+
+      // For Manus OAuth users: sync from OAuth server automatically
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({
@@ -292,10 +300,21 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    // Only update lastSignedIn for non-staff users to avoid overwriting role/permissions
+    if (!user.openId.startsWith("staff_")) {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: signedInAt,
+      });
+    } else {
+      // For staff users, just update lastSignedIn without touching other fields
+      const dbConn = await db.getDb();
+      if (dbConn) {
+        const { users } = await import("../../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        await dbConn.update(users).set({ lastSignedIn: signedInAt }).where(eq(users.openId, user.openId));
+      }
+    }
 
     return user;
   }
