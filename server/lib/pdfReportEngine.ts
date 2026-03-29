@@ -177,6 +177,7 @@ export interface PDFReportData {
     analysisText?: string | null;
     dataSource?: string | null;
     profileUrl?: string | null;
+    screenshotUrl?: string | null;
   }> | null;
 }
 
@@ -652,6 +653,7 @@ export function generateReportHTML(data: PDFReportData): string {
               ${sa.hasPricingContent ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ أسعار معروضة</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا أسعار</span>`}
               ${sa.hasCallToAction ? `<span style="font-size:8px;padding:2px 8px;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:10px;border:1px solid rgba(34,197,94,0.2);">✅ CTA واضح</span>` : `<span style="font-size:8px;padding:2px 8px;background:rgba(239,68,68,0.08);color:#ef4444;border-radius:10px;border:1px solid rgba(239,68,68,0.2);">❌ لا CTA</span>`}
             </div>
+            ${sa.screenshotUrl ? `<div style="margin-bottom:8px;border-radius:10px;overflow:hidden;border:1px solid rgba(${getPlatformColor(sa.platform).replace('#','').match(/../g)?.map(h=>parseInt(h,16)).join(',') || '255,255,255'},0.25);box-shadow:0 3px 12px rgba(0,0,0,0.3);"><div style="font-size:8px;color:#64748b;padding:4px 8px;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.05);">📸 لقطة شاشة ${pl}</div><img src="${sa.screenshotUrl}" style="width:100%;height:auto;display:block;max-height:200px;object-fit:cover;object-position:top;" alt="لقطة شاشة ${pl}" onerror="this.parentElement.style.display='none'" /></div>` : ""}
             ${sa.summary ? `<div style="font-size:9px;color:#94a3b8;line-height:1.6;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:8px;">${sa.summary}</div>` : ""}
             ${(sa.gaps?.length || 0) > 0 ? `<div style="margin-top:6px;font-size:8.5px;color:#fca5a5;">${(sa.gaps!).slice(0,3).map((g:string)=>`⚠️ ${g}`).join(" · ")}</div>` : ""}
           </div>`;

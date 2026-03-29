@@ -2334,3 +2334,12 @@
 - [x] تحسين صفحة AcceptInvitation: عرض الصلاحيات والدور وتاريخ الانتهاء
 - [x] تحسين DashboardLayout: إضافة خيار تسجيل الدخول كموظف ورابط قبول الدعوة
 - [x] اختبارات vitest شاملة لنظام الدعوات والصلاحيات
+
+## إضافة Screenshots السوشيال ميديا في تقرير PDF
+- [x] فحص كيفية حفظ Screenshots وأين تُخزَّن (S3 أو DB)
+- [x] تحديد موقع كود توليد PDF لتحليل السوشيال ميديا
+- [x] إضافة screenshotUrl في نوع PDFReportData.socialAnalyses
+- [x] إضافة عرض Screenshot في كارد كل منصة في pageSocial
+- [x] إضافة جلب screenshotUrl في generatePreview (كان مفقوداً)
+- [x] إضافة جلب screenshotUrl في generateAndSave
+- [x] إضافة جلب screenshotUrl في generateBulk

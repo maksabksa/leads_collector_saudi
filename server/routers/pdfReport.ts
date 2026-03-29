@@ -190,6 +190,69 @@ export const pdfReportRouter = router({
           screenshotUrl: websiteRowP.screenshotUrl,
         };
       }
+      // جلب تحليل السوشيال (AI analysis per platform) مع Screenshots
+      const socialRowsP = await db.select().from(socialAnalysesTable)
+        .where(eq(socialAnalysesTable.leadId, input.leadId))
+        .orderBy(socialAnalysesTable.analyzedAt);
+      if (socialRowsP.length > 0) {
+        reportData.socialAnalyses = socialRowsP.map(r => ({
+          platform: r.platform,
+          hasAccount: r.hasAccount ?? false,
+          followersCount: r.followersCount,
+          engagementRate: r.engagementRate,
+          postsCount: r.postsCount,
+          avgLikes: r.avgLikes,
+          avgViews: r.avgViews,
+          overallScore: r.overallScore,
+          engagementScore: r.engagementScore,
+          contentQualityScore: r.contentQualityScore,
+          postingFrequencyScore: r.postingFrequencyScore,
+          contentStrategyScore: r.contentStrategyScore,
+          digitalPresenceScore: r.digitalPresenceScore,
+          hasSeasonalContent: r.hasSeasonalContent,
+          hasPricingContent: r.hasPricingContent,
+          hasCallToAction: r.hasCallToAction,
+          gaps: r.gaps as string[] | null,
+          recommendations: r.recommendations as string[] | null,
+          summary: r.summary,
+          analysisText: r.analysisText,
+          dataSource: r.dataSource,
+          profileUrl: r.profileUrl,
+          screenshotUrl: r.screenshotUrl,
+        }));
+      }
+      // جلب بيانات السوشيال الحقيقية (Bright Data snapshot)
+      const [socialSnapP] = await db.select().from(realSocialSnapshots)
+        .where(eq(realSocialSnapshots.leadId, input.leadId))
+        .orderBy(realSocialSnapshots.fetchedAt)
+        .limit(1);
+      if (socialSnapP) {
+        reportData.socialSnapshot = {
+          instagramFollowers: socialSnapP.instagramFollowers,
+          instagramFollowing: socialSnapP.instagramFollowing,
+          instagramPostsCount: socialSnapP.instagramPostsCount,
+          instagramVerified: socialSnapP.instagramVerified,
+          instagramEngagementRate: socialSnapP.instagramEngagementRate,
+          instagramBio: socialSnapP.instagramBio,
+          instagramUsername: socialSnapP.instagramUsername,
+          tiktokFollowers: socialSnapP.tiktokFollowers,
+          tiktokVideoCount: socialSnapP.tiktokVideoCount,
+          tiktokHearts: socialSnapP.tiktokHearts,
+          tiktokEngagementRate: socialSnapP.tiktokEngagementRate,
+          tiktokVerified: socialSnapP.tiktokVerified,
+          tiktokDescription: socialSnapP.tiktokDescription,
+          tiktokUsername: socialSnapP.tiktokUsername,
+          twitterFollowers: socialSnapP.twitterFollowers,
+          twitterTweetsCount: socialSnapP.twitterTweetsCount,
+          twitterVerified: socialSnapP.twitterVerified,
+          twitterBlueVerified: socialSnapP.twitterBlueVerified,
+          twitterDescription: socialSnapP.twitterDescription,
+          twitterUsername: socialSnapP.twitterUsername,
+          backlinkTotal: socialSnapP.backlinkTotal,
+          backlinkHasGMB: socialSnapP.backlinkHasGMB,
+          fetchedAt: socialSnapP.fetchedAt,
+        };
+      }
       const html = generateReportHTML(reportData);
 
       return { html, leadName: lead.companyName };
@@ -359,6 +422,7 @@ export const pdfReportRouter = router({
             analysisText: r.analysisText,
             dataSource: r.dataSource,
             profileUrl: r.profileUrl,
+            screenshotUrl: r.screenshotUrl,
           }));
         }
 
@@ -542,6 +606,37 @@ export const pdfReportRouter = router({
                 backlinkHasGMB: socialSnap.backlinkHasGMB,
                 fetchedAt: socialSnap.fetchedAt,
               };
+            }
+            // جلب تحليل السوشيال (AI analysis per platform) مع Screenshots
+            const socialRowsB = await db.select().from(socialAnalysesTable)
+              .where(eq(socialAnalysesTable.leadId, leadId))
+              .orderBy(socialAnalysesTable.analyzedAt);
+            if (socialRowsB.length > 0) {
+              reportData.socialAnalyses = socialRowsB.map(r => ({
+                platform: r.platform,
+                hasAccount: r.hasAccount ?? false,
+                followersCount: r.followersCount,
+                engagementRate: r.engagementRate,
+                postsCount: r.postsCount,
+                avgLikes: r.avgLikes,
+                avgViews: r.avgViews,
+                overallScore: r.overallScore,
+                engagementScore: r.engagementScore,
+                contentQualityScore: r.contentQualityScore,
+                postingFrequencyScore: r.postingFrequencyScore,
+                contentStrategyScore: r.contentStrategyScore,
+                digitalPresenceScore: r.digitalPresenceScore,
+                hasSeasonalContent: r.hasSeasonalContent,
+                hasPricingContent: r.hasPricingContent,
+                hasCallToAction: r.hasCallToAction,
+                gaps: r.gaps as string[] | null,
+                recommendations: r.recommendations as string[] | null,
+                summary: r.summary,
+                analysisText: r.analysisText,
+                dataSource: r.dataSource,
+                profileUrl: r.profileUrl,
+                screenshotUrl: r.screenshotUrl,
+              }));
             }
             const html = generateReportHTML(reportData);
             const fileKey = `reports/lead-${leadId}-${input.reportType}-${Date.now()}.html`;
