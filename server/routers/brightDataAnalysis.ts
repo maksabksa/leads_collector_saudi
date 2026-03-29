@@ -119,19 +119,21 @@ const analyzeWebsiteWithBrightData = protectedProcedure
         console.warn("[BD analyzeWebsite] Intelligence gathering failed, using AI estimation:", scrapeErr);
       }
 
-      // الخطوة 1.5: أخذ Screenshot للموقع بالتوازي (لا يوقف التحليل)
-      let screenshotUrl: string | undefined;
-      try {
-        const screenshotBuffer = await takeWebsiteScreenshot(input.url, 25000);
-        if (screenshotBuffer) {
-          const key = `website-screenshots/${input.leadId}-${Date.now()}.png`;
-          const { url: s3Url } = await storagePut(key, screenshotBuffer, "image/png");
-          screenshotUrl = s3Url;
-          console.log(`[Screenshot] Saved: ${s3Url}`);
+      // الخطوة 1.5 + 2: أخذ Screenshot وتحليل LLM بالتوازي تماماً لتوفير 25+ ثانية
+      const screenshotPromise = (async (): Promise<string | undefined> => {
+        try {
+          const screenshotBuffer = await takeWebsiteScreenshot(input.url, 25000);
+          if (screenshotBuffer) {
+            const key = `website-screenshots/${input.leadId}-${Date.now()}.png`;
+            const { url: s3Url } = await storagePut(key, screenshotBuffer, "image/png");
+            console.log(`[Screenshot] Saved: ${s3Url}`);
+            return s3Url;
+          }
+        } catch (ssErr: any) {
+          console.warn("[Screenshot] Failed (non-blocking):", ssErr?.message);
         }
-      } catch (ssErr: any) {
-        console.warn("[Screenshot] Failed (non-blocking):", ssErr?.message);
-      }
+        return undefined;
+      })();
 
       // الخطوة 2: تحليل بـ LLM مع البيانات الحقيقية
       const hasRealPagespeed = pagespeedScores.performance !== null;
@@ -209,6 +211,9 @@ ${realWebsiteContext ? "تذكير: لديك بيانات حقيقية شامل�
       // دمج البيانات الحقيقية مع تحليل AI
       analysis.hasOnlineBooking = analysis.hasOnlineBooking || scrapedFlags.hasBooking;
       analysis.hasPaymentOptions = analysis.hasPaymentOptions || scrapedFlags.hasEcommerce;
+
+      // انتظار Screenshot (كان يعمل بالتوازي مع LLM)
+      const screenshotUrl = await screenshotPromise;
 
       const analysisId = await createWebsiteAnalysis({
         leadId: input.leadId,
@@ -984,25 +989,30 @@ ${realDataSummary}
         { key: "tiktok", url: lead.tiktokUrl, data: allData.tiktok },
         { key: "facebook", url: lead.facebookUrl, data: allData.facebook },
       ];
+      // أخذ جميع Screenshots بالتوازي أولاً لتوفير الوقت (بدلاً من 90+ ثانية تسلسلي)
+      const screenshotMap = new Map<string, string | undefined>();
+      await Promise.all(
+        socialPlatforms
+          .filter(sp => sp.url)
+          .map(async (sp) => {
+            try {
+              const socialBuf = await takeSocialMediaScreenshot(sp.url!, sp.key, 30000);
+              if (socialBuf) {
+                const suffix = Math.random().toString(36).slice(2, 8);
+                const ssKey = `screenshots/social-${input.leadId}-${sp.key}-${suffix}.png`;
+                const { url: s3Url } = await storagePut(ssKey, socialBuf, "image/png");
+                screenshotMap.set(sp.key, s3Url);
+                console.log(`[SocialScreenshot] Saved ${sp.key}: ${s3Url}`);
+              }
+            } catch (ssErr: any) {
+              console.warn(`[SocialScreenshot] Failed for ${sp.key}:`, ssErr?.message);
+            }
+          })
+      );
+      // حفظ تحليل كل منصة مع الـ Screenshot المقابل
       for (const sp of socialPlatforms) {
         if (sp.url || sp.data) {
           try {
-            // أخذ Screenshot لصفحة السوشيال ميديا
-            let socialScreenshotUrl: string | undefined;
-            if (sp.url) {
-              try {
-                const socialBuf = await takeSocialMediaScreenshot(sp.url, sp.key, 30000);
-                if (socialBuf) {
-                  const suffix = Math.random().toString(36).slice(2, 8);
-                  const key = `screenshots/social-${input.leadId}-${sp.key}-${suffix}.png`;
-                  const { url: s3Url } = await storagePut(key, socialBuf, "image/png");
-                  socialScreenshotUrl = s3Url;
-                  console.log(`[SocialScreenshot] Saved ${sp.key}: ${s3Url}`);
-                }
-              } catch (ssErr: any) {
-                console.warn(`[SocialScreenshot] Failed for ${sp.key}:`, ssErr?.message);
-              }
-            }
             await createSocialAnalysis({
               leadId: input.leadId,
               platform: sp.key,
@@ -1014,7 +1024,7 @@ ${realDataSummary}
               gaps: report.criticalGaps ?? [],
               rawAnalysis: JSON.stringify(sp.data ?? {}),
               dataSource: "bright_data",
-              screenshotUrl: socialScreenshotUrl,
+              screenshotUrl: screenshotMap.get(sp.key),
             });
           } catch (e) { /* تجاهل خطأ الحفظ */ }
         }
