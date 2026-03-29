@@ -21,7 +21,7 @@ import {
   gatherWebsiteIntelligence,
   buildWebsiteIntelligenceContext,
 } from "../lib/websiteIntelligence";
-import { takeWebsiteScreenshot } from "../lib/headlessScraper";
+import { takeWebsiteScreenshot, takeSocialMediaScreenshot } from "../lib/headlessScraper";
 import { storagePut } from "../storage";
 import {
   fetchInstagramViaDatasetAPI,
@@ -38,6 +38,7 @@ import {
   updateLead,
   createWebsiteAnalysis,
   createSocialAnalysis,
+  createSeoAdvancedAnalysis,
   getWebsiteAnalysisByLeadId,
   getSocialAnalysesByLeadId,
   getDb,
@@ -986,6 +987,22 @@ ${realDataSummary}
       for (const sp of socialPlatforms) {
         if (sp.url || sp.data) {
           try {
+            // أخذ Screenshot لصفحة السوشيال ميديا
+            let socialScreenshotUrl: string | undefined;
+            if (sp.url) {
+              try {
+                const socialBuf = await takeSocialMediaScreenshot(sp.url, sp.key, 30000);
+                if (socialBuf) {
+                  const suffix = Math.random().toString(36).slice(2, 8);
+                  const key = `screenshots/social-${input.leadId}-${sp.key}-${suffix}.png`;
+                  const { url: s3Url } = await storagePut(key, socialBuf, "image/png");
+                  socialScreenshotUrl = s3Url;
+                  console.log(`[SocialScreenshot] Saved ${sp.key}: ${s3Url}`);
+                }
+              } catch (ssErr: any) {
+                console.warn(`[SocialScreenshot] Failed for ${sp.key}:`, ssErr?.message);
+              }
+            }
             await createSocialAnalysis({
               leadId: input.leadId,
               platform: sp.key,
@@ -997,9 +1014,63 @@ ${realDataSummary}
               gaps: report.criticalGaps ?? [],
               rawAnalysis: JSON.stringify(sp.data ?? {}),
               dataSource: "bright_data",
+              screenshotUrl: socialScreenshotUrl,
             });
           } catch (e) { /* تجاهل خطأ الحفظ */ }
         }
+      }
+
+      // توليد بيانات المنافسين عبر AI وحفظها في seoAdvancedAnalysis
+      try {
+        const competitorPrompt = `أنت خبير تسويق رقمي في السوق السعودي.
+بناءً على النشاط التجاري التالي، حدد أبرز 3-5 منافسين محتملين في السوق السعودي:
+
+النشاط: ${lead.companyName}
+النوع: ${lead.businessType}
+المدينة: ${lead.city}
+الموقع: ${lead.website || 'غير متوفر'}
+
+أنشئ تقريراً بصيغة JSON:
+{
+  "competitors": [
+    {
+      "name": "اسم المنافس",
+      "website": "رابط الموقع أو null",
+      "strengths": ["نقطة قوة 1", "نقطة قوة 2"],
+      "weaknesses": ["نقطة ضعف 1"],
+      "estimatedDigitalScore": 7,
+      "marketPosition": "وصف موقعه في السوق",
+      "instagramUrl": "رابط إنستغرام أو null"
+    }
+  ],
+  "competitorGaps": ["ثغرة تنافسية 1", "ثغرة تنافسية 2"],
+  "marketOpportunities": ["فرصة 1", "فرصة 2"],
+  "competitiveAdvantage": "الميزة التنافسية المقترحة للعميل"
+}`;
+        const compResponse = await invokeLLM({
+          messages: [
+            { role: "system", content: "أنت خبير تسويق رقمي. أجب بـ JSON فقط." },
+            { role: "user", content: competitorPrompt },
+          ],
+          response_format: { type: "json_object" } as any,
+        });
+        const compRaw = compResponse.choices[0]?.message?.content;
+        const compContent = typeof compRaw === "string" ? compRaw : "{}";
+        let compData: any = {};
+        try { compData = JSON.parse(compContent); } catch { compData = {}; }
+        if (compData.competitors?.length > 0) {
+          await createSeoAdvancedAnalysis({
+            leadId: input.leadId,
+            url: lead.website || "",
+            competitors: compData.competitors,
+            competitorGaps: compData.competitorGaps ?? [],
+            priorityActions: compData.marketOpportunities ?? [],
+            seoSummary: compData.competitiveAdvantage ?? null,
+          });
+          console.log(`[Competitors] Saved ${compData.competitors.length} competitors for lead ${input.leadId}`);
+        }
+      } catch (compErr: any) {
+        console.warn("[Competitors] Failed to generate:", compErr?.message);
       }
 
       return {

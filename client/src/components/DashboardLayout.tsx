@@ -52,6 +52,7 @@ const menuGroups = [
     items: [
       { icon: Users, label: "قائمة العملاء", path: "/leads", badge: null },
       { icon: UserPlus, label: "إضافة عميل", path: "/leads/add", badge: null },
+      { icon: BarChart2, label: "مقارنة العملاء", path: "/compare", badge: "جديد" },
       { icon: Upload, label: "رفع جماعي", path: "/bulk-import", badge: null },
       { icon: MapPin, label: "المناطق", path: "/zones", badge: null },
 

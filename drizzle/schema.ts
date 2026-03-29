@@ -296,6 +296,7 @@ export const socialAnalyses = mysqlTable("social_analyses", {
   avgViews: int("avgViews").default(0),
   analysisText: text("analysisText"),
   dataSource: varchar("dataSource", { length: 50 }),
+  screenshotUrl: varchar("screenshotUrl", { length: 1000 }),  // لقطة شاشة صفحة السوشيال ميديا
   analyzedAt: timestamp("analyzedAt").defaultNow().notNull(),
 });
 

@@ -13,6 +13,7 @@ import {
   weeklyReports, InsertWeeklyReport, WeeklyReport,
   reportSchedules, InsertReportSchedule, ReportSchedule,
   whatchimpSendLog,
+  seoAdvancedAnalysis, InsertSeoAdvancedAnalysis,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -325,6 +326,24 @@ export async function createSocialAnalysis(data: InsertSocialAnalysis): Promise<
   if (!db) throw new Error("DB not available");
   const result = await db.insert(socialAnalyses).values(data);
   return (result[0] as any).insertId;
+}
+
+// ===== SEO ADVANCED ANALYSIS HELPERS =====
+export async function createSeoAdvancedAnalysis(data: InsertSeoAdvancedAnalysis): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(seoAdvancedAnalysis).values(data);
+  return (result[0] as any).insertId;
+}
+
+export async function getLatestSeoAdvancedAnalysis(leadId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(seoAdvancedAnalysis)
+    .where(eq(seoAdvancedAnalysis.leadId, leadId))
+    .orderBy(desc(seoAdvancedAnalysis.analyzedAt))
+    .limit(1);
+  return rows[0] || null;
 }
 
 export async function getTopGaps() {

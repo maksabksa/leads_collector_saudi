@@ -31,6 +31,7 @@ import WeeklyReports from "./pages/WeeklyReports";
 import Activation from "./pages/Activation";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
+import CompareLeads from "./pages/CompareLeads";
 import DataQuality from "./pages/DataQuality";
 import MessagesHub from "./pages/MessagesHub";
 import SocialAccounts from "./pages/SocialAccounts";
@@ -97,6 +98,7 @@ function Router() {
         <Route path="/ai-agent" component={AIAgent} />
         <Route path="/serp-queue" component={SerpQueue} />
         <Route path="/seasons" component={Seasons} />
+        <Route path="/compare" component={CompareLeads} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

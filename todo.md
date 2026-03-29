@@ -2315,3 +2315,12 @@
 - [x] فحص pdfFileUrl الأخير لمختبرات دلتا ومعرفة هل يحتوي على screenshotUrl
 - [x] إصلاح orderBy في pdfReport.ts من ASC إلى DESC لجلب أحدث تحليل
 - [x] إعادة توليد التقرير بعد الإصلاح والتحقق من ظهور Screenshot
+
+## ميزات جديدة - 29 مارس 2026
+- [x] Full-Page Screenshot كامل بعرض الصفحة الكاملة للموقع (fullPage: true في headlessScraper.ts)
+- [x] Screenshot لصفحة السوشيال ميديا (إنستغرام/تيك توك/تويتر) - دالة takeSocialMediaScreenshot في headlessScraper.ts
+- [x] إضافة screenshotUrl في جدول social_analyses + migration
+- [x] استدعاء takeSocialMediaScreenshot في analyzeAllPlatforms بعد حفظ كل تحليل منصة
+- [x] توليد بيانات المنافسين تلقائياً عبر AI في analyzeAllPlatforms وحفظها في seoAdvancedAnalysis
+- [x] إنشاء صفحة مقارنة العملاء CompareLeads.tsx مع Screenshots مواقع العملاء
+- [x] إضافة رابط "مقارنة العملاء" في القائمة الجانبية (Layout.tsx)

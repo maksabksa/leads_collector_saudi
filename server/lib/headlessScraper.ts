@@ -109,7 +109,7 @@ export async function scrapeWithHeadless(url: string, timeoutMs = 25000): Promis
 }
 
 /**
- * أخذ Screenshot للموقع
+ * أخذ Screenshot كامل للموقع (Full-Page)
  * يستخدم Bright Data Scraping Browser (WebSocket) للوصول للإنترنت
  * يُرجع Buffer للصورة بصيغة PNG
  */
@@ -145,13 +145,14 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
         });
       } catch { /* تجاهل أخطاء إخفاء النوافذ */ }
 
+      // Full-Page Screenshot — يلتقط الصفحة الكاملة بطولها الكامل
       const screenshotBuffer = await page.screenshot({
         type: "png",
-        clip: { x: 0, y: 0, width: 1440, height: 900 },
+        fullPage: true,
       });
 
       await browser.disconnect();
-      console.log(`[Screenshot] Captured via Bright Data: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+      console.log(`[Screenshot] Captured via Bright Data (full-page): ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
       return Buffer.from(screenshotBuffer);
     } catch (err: any) {
       console.warn("[Screenshot] Bright Data failed:", err?.message);
@@ -182,12 +183,13 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
     await page.goto(url, { waitUntil: "networkidle2", timeout: timeoutMs });
     await new Promise(r => setTimeout(r, 2000));
 
+    // Full-Page Screenshot
     const screenshotBuffer = await page.screenshot({
       type: "png",
-      clip: { x: 0, y: 0, width: 1440, height: 900 },
+      fullPage: true,
     });
 
-    console.log(`[Screenshot] Captured via local Chromium: ${url}`);
+    console.log(`[Screenshot] Captured via local Chromium (full-page): ${url}`);
     return Buffer.from(screenshotBuffer);
   } catch (err: any) {
     console.warn("[Screenshot] Local Chromium also failed:", err?.message);
@@ -196,6 +198,90 @@ export async function takeWebsiteScreenshot(url: string, timeoutMs = 30000): Pro
     if (browser) {
       try { await browser.close(); } catch { /* تجاهل */ }
     }
+  }
+}
+
+/**
+ * أخذ Screenshot لصفحة سوشيال ميديا (إنستغرام / تيك توك / تويتر / سناب شات)
+ * يستخدم Bright Data Scraping Browser للوصول للمنصات المحجوبة
+ * يُرجع Buffer للصورة بصيغة PNG
+ */
+export async function takeSocialMediaScreenshot(
+  url: string,
+  platform: "instagram" | "tiktok" | "twitter" | "snapchat" | "facebook",
+  timeoutMs = 35000
+): Promise<Buffer | null> {
+  const wsEndpoint = process.env.BRIGHT_DATA_WS_ENDPOINT;
+  if (!wsEndpoint) {
+    console.warn("[SocialScreenshot] No Bright Data WS endpoint configured");
+    return null;
+  }
+
+  let browser = null;
+  try {
+    browser = await puppeteer.connect({
+      browserWSEndpoint: wsEndpoint,
+    });
+
+    const page = await browser.newPage();
+    // viewport مناسب للسوشيال ميديا (موبايل-like لإنستغرام، desktop للباقي)
+    if (platform === "instagram" || platform === "tiktok") {
+      await page.setViewport({ width: 430, height: 932 }); // iPhone 14 Pro Max
+    } else {
+      await page.setViewport({ width: 1280, height: 800 });
+    }
+
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    // انتظار تحميل المحتوى الديناميكي
+    await new Promise(r => setTimeout(r, 4000));
+
+    // إخفاء النوافذ المنبثقة حسب المنصة
+    try {
+      await page.evaluate((plt: string) => {
+        // إخفاء نوافذ تسجيل الدخول والكوكيز
+        const hideSelectors = [
+          '[role="dialog"]',
+          '[class*="cookie"]', '[class*="consent"]',
+          '[class*="login"]', '[class*="signup"]',
+          '[class*="modal"]', '[class*="overlay"]',
+          '[class*="banner"]',
+        ];
+        // إنستغرام: إخفاء نافذة "تسجيل الدخول للمتابعة"
+        if (plt === "instagram") {
+          hideSelectors.push('._a9-z', '._acas', '.RnEpo');
+        }
+        // تيك توك: إخفاء نافذة التطبيق
+        if (plt === "tiktok") {
+          hideSelectors.push('[class*="AppDownload"]', '[class*="LoginModal"]');
+        }
+        hideSelectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach((el: any) => {
+            el.style.display = 'none';
+            el.style.visibility = 'hidden';
+          });
+        });
+        // إزالة overflow:hidden من body
+        document.body.style.overflow = 'auto';
+      }, platform);
+    } catch { /* تجاهل */ }
+
+    // انتظار إضافي بعد إخفاء النوافذ
+    await new Promise(r => setTimeout(r, 1500));
+
+    const screenshotBuffer = await page.screenshot({
+      type: "png",
+      fullPage: false, // viewport فقط للسوشيال ميديا (أكثر وضوحاً)
+    });
+
+    await browser.disconnect();
+    console.log(`[SocialScreenshot] Captured ${platform}: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+    return Buffer.from(screenshotBuffer);
+  } catch (err: any) {
+    console.warn(`[SocialScreenshot] Failed for ${platform}:`, err?.message);
+    if (browser) {
+      try { await browser.disconnect(); } catch { /* تجاهل */ }
+    }
+    return null;
   }
 }
 
