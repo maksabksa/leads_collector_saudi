@@ -241,6 +241,20 @@ export async function takeSocialMediaScreenshot(
     } catch { /* تجاهل */ }
   };
 
+  // تحديد User-Agent وإعدادات حسب المنصة
+  const isTwitter = platform === "twitter";
+  const isInstagram = platform === "instagram";
+  const isTiktok = platform === "tiktok";
+  const isMobile = isInstagram || isTiktok;
+
+  // User-Agent مناسب لكل منصة
+  const userAgent = isTwitter
+    ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    : "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+  // وقت الانتظار حسب المنصة (تويتر يحتاج وقتاً أطول لتحميل JS)
+  const waitAfterLoad = isTwitter ? 6000 : 4000;
+
   // محاولة أولى: Chromium المحلي مع User-Agent حقيقي
   let browser = null;
   try {
@@ -253,13 +267,13 @@ export async function takeSocialMediaScreenshot(
         "--disable-dev-shm-usage",
         "--disable-accelerated-2d-canvas",
         "--disable-gpu",
-        "--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        `--user-agent=${userAgent}`,
       ],
     });
 
     const page = await browser.newPage();
     // viewport مناسب للسوشيال ميديا
-    if (platform === "instagram" || platform === "tiktok") {
+    if (isMobile) {
       await page.setViewport({ width: 430, height: 932 }); // iPhone 14 Pro Max
     } else {
       await page.setViewport({ width: 1280, height: 800 });
@@ -272,9 +286,9 @@ export async function takeSocialMediaScreenshot(
     });
 
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    await new Promise(r => setTimeout(r, 4000));
+    await new Promise(r => setTimeout(r, waitAfterLoad));
     await hidePopups(page, platform);
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1000));
 
     const screenshotBuffer = await page.screenshot({
       type: "png",
