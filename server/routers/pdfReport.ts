@@ -6,7 +6,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { leads, seoAdvancedAnalysis, websiteAnalyses, socialAnalyses as socialAnalysesTable, realSocialSnapshots } from "../../drizzle/schema";
-import { eq, isNotNull, ne, or } from "drizzle-orm";
+import { eq, isNotNull, ne, or, desc } from "drizzle-orm";
 import { generateReportHTML, type PDFReportData } from "../lib/pdfReportEngine";
 import { storagePut } from "../storage";
 import { getActiveSeasonForBusiness } from "./seasons";
@@ -165,7 +165,7 @@ export const pdfReportRouter = router({
       // جلب تحليل الموقع الإلكتروني
       const [websiteRowP] = await db.select().from(websiteAnalyses)
         .where(eq(websiteAnalyses.leadId, input.leadId))
-        .orderBy(websiteAnalyses.analyzedAt)
+        .orderBy(desc(websiteAnalyses.analyzedAt))
         .limit(1);
       if (websiteRowP) {
         reportData.websiteData = {
@@ -272,7 +272,7 @@ export const pdfReportRouter = router({
         // جلب تحليل الموقع الإلكتروني
         const [websiteRow] = await db.select().from(websiteAnalyses)
           .where(eq(websiteAnalyses.leadId, input.leadId))
-          .orderBy(websiteAnalyses.analyzedAt)
+          .orderBy(desc(websiteAnalyses.analyzedAt))
           .limit(1);
         if (websiteRow) {
           reportData.websiteData = {
@@ -488,7 +488,9 @@ export const pdfReportRouter = router({
               };
             }
             const [websiteRow] = await db.select().from(websiteAnalyses)
-              .where(eq(websiteAnalyses.leadId, leadId)).limit(1);
+              .where(eq(websiteAnalyses.leadId, leadId))
+              .orderBy(desc(websiteAnalyses.analyzedAt))
+              .limit(1);
             if (websiteRow) {
               reportData.websiteData = {
                 url: websiteRow.url,

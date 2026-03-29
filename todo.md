@@ -2310,3 +2310,8 @@
 ## إصلاح - عرض Screenshot في صفحة العميل
 - [ ] فحص مكان عرض Screenshot الحالي في LeadDetail
 - [ ] إضافة عرض Screenshot بشكل بارز وواضح في قسم تحليل الموقع
+
+## إصلاح - عدم ظهور Screenshot في تقرير PDF الأخير
+- [x] فحص pdfFileUrl الأخير لمختبرات دلتا ومعرفة هل يحتوي على screenshotUrl
+- [x] إصلاح orderBy في pdfReport.ts من ASC إلى DESC لجلب أحدث تحليل
+- [x] إعادة توليد التقرير بعد الإصلاح والتحقق من ظهور Screenshot
