@@ -1134,7 +1134,7 @@ export function generateReportHTML(data: PDFReportData): string {
                   <div style="width:22px;height:22px;border-radius:50%;background:${rankColors[idx]}22;border:1.5px solid ${rankColors[idx]};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:${rankColors[idx]};flex-shrink:0;">${rank}</div>
                   <div style="flex:1;">
                     <div style="font-size:10px;font-weight:800;color:#f1f5f9;">${comp.name}</div>
-                    <div style="font-size:8px;color:#475569;">${comp.url.replace(/https?:\/\/(www\.)?/,"").slice(0,40)}</div>
+                    <div style="font-size:8px;color:#475569;">${(comp.url || '').replace(/https?:\/\/(www\.)?/,"").slice(0,40)}</div>
                   </div>
                   <div style="text-align:center;">
                     <div style="font-size:18px;font-weight:900;color:${scoreColor};">${comp.seoScore}</div>

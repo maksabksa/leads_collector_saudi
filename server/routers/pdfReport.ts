@@ -465,7 +465,8 @@ export const pdfReportRouter = router({
           .where(eq(leads.id, input.leadId));
 
         return { success: true, reportUrl: url, leadName: lead.companyName };
-      } catch {
+      } catch (err) {
+        console.error('[PDF generateAndSave] Error for lead', input.leadId, ':', err);
         await db.update(leads)
           .set({ pdfGenerationStatus: "failed" as const })
           .where(eq(leads.id, input.leadId));
