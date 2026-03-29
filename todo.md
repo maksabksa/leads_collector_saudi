@@ -2371,3 +2371,7 @@
 - [ ] تشخيص سبب خطأ 407 في Bright Data WS Endpoint
 - [ ] تفعيل Bright Data Scraping Browser لإنستغرام وتيك توك فقط
 - [ ] اختبار Screenshots إنستغرام وتيك توك عبر Bright Data
+
+## إصلاح ربط Screenshots بالمنصات الصحيحة
+- [ ] فحص كيف يتم حفظ screenshotUrl لكل منصة في social_analyses
+- [ ] إصلاح منطق الربط بين Screenshot والمنصة الصحيحة في pdfReportEngine
