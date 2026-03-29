@@ -228,7 +228,7 @@ export async function takeSocialMediaScreenshot(
           '[class*="modal"]', '[class*="overlay"]',
           '[class*="banner"]',
         ];
-        if (platform === "instagram") hideSelectors.push('._a9-z', '._acas', '.RnEpo');
+        if (platform === "instagram") hideSelectors.push('._a9-z', '._acas', '.RnEpo', '[class*="AppBanner"]', '[class*="app-banner"]', '[id*="app-banner"]', 'div[style*="position: fixed"]');
         if (platform === "tiktok") hideSelectors.push('[class*="AppDownload"]', '[class*="LoginModal"]');
         hideSelectors.forEach(sel => {
           document.querySelectorAll(sel).forEach((el: any) => {
@@ -255,7 +255,67 @@ export async function takeSocialMediaScreenshot(
   // وقت الانتظار حسب المنصة (تويتر يحتاج وقتاً أطول لتحميل JS)
   const waitAfterLoad = isTwitter ? 6000 : 4000;
 
-  // محاولة أولى: Chromium المحلي مع User-Agent حقيقي
+  // للمنصات المحجوبة (إنستغرام وتيك توك): استخدام Bright Data Residential Proxy أولاً
+  if (isInstagram || isTiktok) {
+    const proxyHost = process.env.BRIGHT_DATA_RESIDENTIAL_HOST;
+    const proxyPort = process.env.BRIGHT_DATA_RESIDENTIAL_PORT;
+    const proxyUser = process.env.BRIGHT_DATA_RESIDENTIAL_USERNAME;
+    const proxyPass = process.env.BRIGHT_DATA_RESIDENTIAL_PASSWORD;
+
+    if (proxyHost && proxyPort && proxyUser && proxyPass) {
+      let bdBrowser = null;
+      try {
+        bdBrowser = await puppeteer.launch({
+          executablePath: CHROMIUM_PATH,
+          headless: true,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
+            "--disable-gpu",
+            "--ignore-certificate-errors",
+            "--ignore-certificate-errors-spki-list",
+            `--proxy-server=http://${proxyHost}:${proxyPort}`,
+            `--user-agent=${userAgent}`,
+          ],
+        });
+
+        const page = await bdBrowser.newPage();
+        await page.setViewport({ width: 430, height: 932 }); // iPhone 14 Pro Max
+        await page.authenticate({ username: proxyUser, password: proxyPass });
+        // تجاهل أخطاء SSL من الـ proxy
+        page.on('response', () => {}); // dummy listener
+
+        // إخفاء علامات الأتمتة
+        await page.evaluateOnNewDocument(() => {
+          Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+          Object.defineProperty(navigator, "platform", { get: () => "iPhone" });
+        });
+
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+        await new Promise(r => setTimeout(r, 5000));
+        await hidePopups(page, platform);
+        await new Promise(r => setTimeout(r, 1500));
+
+        const screenshotBuffer = await page.screenshot({
+          type: "png",
+          fullPage: false,
+        });
+
+        await bdBrowser.close();
+        console.log(`[SocialScreenshot] Captured ${platform} via Bright Data Residential Proxy: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
+        return Buffer.from(screenshotBuffer);
+      } catch (err: any) {
+        console.warn(`[SocialScreenshot] Bright Data Residential Proxy failed for ${platform}:`, err?.message);
+        if (bdBrowser) {
+          try { await bdBrowser.close(); } catch { /* تجاهل */ }
+        }
+      }
+    }
+  }
+
+  // محاولة: Chromium المحلي مع User-Agent حقيقي (للمنصات الأخرى أو كـ fallback)
   let browser = null;
   try {
     browser = await puppeteer.launch({
@@ -302,43 +362,6 @@ export async function takeSocialMediaScreenshot(
     console.warn(`[SocialScreenshot] Local Chromium failed for ${platform}:`, err?.message);
     if (browser) {
       try { await browser.close(); } catch { /* تجاهل */ }
-    }
-  }
-
-  // محاولة ثانية: Bright Data Scraping Browser (fallback للمنصات المحجوبة)
-  const wsEndpoint = process.env.BRIGHT_DATA_WS_ENDPOINT;
-  if (wsEndpoint) {
-    let bdBrowser = null;
-    try {
-      bdBrowser = await puppeteer.connect({
-        browserWSEndpoint: wsEndpoint,
-      });
-
-      const page = await bdBrowser.newPage();
-      if (platform === "instagram" || platform === "tiktok") {
-        await page.setViewport({ width: 430, height: 932 });
-      } else {
-        await page.setViewport({ width: 1280, height: 800 });
-      }
-
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-      await new Promise(r => setTimeout(r, 4000));
-      await hidePopups(page, platform);
-      await new Promise(r => setTimeout(r, 1500));
-
-      const screenshotBuffer = await page.screenshot({
-        type: "png",
-        fullPage: false,
-      });
-
-      await bdBrowser.disconnect();
-      console.log(`[SocialScreenshot] Captured ${platform} via Bright Data: ${url} (${Buffer.from(screenshotBuffer).length} bytes)`);
-      return Buffer.from(screenshotBuffer);
-    } catch (err: any) {
-      console.warn(`[SocialScreenshot] Bright Data also failed for ${platform}:`, err?.message);
-      if (bdBrowser) {
-        try { await bdBrowser.disconnect(); } catch { /* تجاهل */ }
-      }
     }
   }
 

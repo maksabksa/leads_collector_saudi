@@ -2366,3 +2366,8 @@
 - [x] إصلاح takeWebsiteScreenshot: تقديم Chromium المحلي أولاً (Bright Data كـ fallback)
 - [x] إصلاح takeSocialMediaScreenshot: إضافة Chromium المحلي كخيار أول (Bright Data كـ fallback)
 - [x] اختبار ناجح: Chromium يلتقط Screenshots المواقع والسوشيال ميديا بنجاح
+
+## تفعيل Bright Data لإنستغرام وتيك توك
+- [ ] تشخيص سبب خطأ 407 في Bright Data WS Endpoint
+- [ ] تفعيل Bright Data Scraping Browser لإنستغرام وتيك توك فقط
+- [ ] اختبار Screenshots إنستغرام وتيك توك عبر Bright Data
