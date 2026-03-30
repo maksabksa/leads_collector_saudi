@@ -1192,6 +1192,182 @@ const scrapeProfile = protectedProcedure
     }
   });
 
+// ===== دالة مستقلة للتحليل الشامل (قابلة للاستيراد من routers.ts) =====
+export async function runFullAnalysisForLead(leadId: number): Promise<void> {
+  const lead = await getLeadById(leadId);
+  if (!lead) return;
+  await updateLead(leadId, { analysisStatus: "analyzing" });
+  try {
+    const allData = await scrapeAllPlatforms({
+      websiteUrl: lead.website,
+      instagramUrl: lead.instagramUrl,
+      linkedinUrl: (lead as any).linkedinUrl ?? null,
+      twitterUrl: lead.twitterUrl,
+      tiktokUrl: lead.tiktokUrl,
+      facebookUrl: lead.facebookUrl ?? null,
+    });
+    const realDataSummary = formatScrapedDataForLLM(allData);
+    const prompt = `أنت خبير تسويق رقمي واستراتيجي مبيعات في السوق السعودي.
+بناءً على البيانات الحقيقية التالية المجلوبة بـ Bright Data، أنشئ تقريراً تسويقياً شاملاً:
+النشاط: ${lead.companyName}
+النوع: ${lead.businessType}
+المدينة: ${lead.city}
+${realDataSummary}
+أنشئ تقريراً بصيغة JSON:
+{
+  "executiveSummary": "ملخص تنفيذي شامل في 3 جمل بناءً على البيانات الحقيقية",
+  "digitalPresenceScore": 6,
+  "keyStrengths": ["نقطة قوة حقيقية 1"],
+  "criticalGaps": ["ثغرة حرجة حقيقية 1", "ثغرة حرجة حقيقية 2"],
+  "immediateOpportunities": ["فرصة فورية 1"],
+  "seasonalOpportunity": "تقييم فرصة الموسم",
+  "recommendedActions": ["إجراء 1", "إجراء 2"],
+  "salesScript": "نص مقترح لأول تواصل مع العميل بناءً على البيانات الحقيقية",
+  "priorityLevel": "high",
+  "platformsSummary": {
+    "website": "ملخص الموقع",
+    "instagram": "ملخص إنستغرام",
+    "twitter": "ملخص تويتر",
+    "tiktok": "ملخص تيك توك",
+    "linkedin": "ملخص لينكد إن",
+    "facebook": "ملخص فيسبوك"
+  }
+}`;
+    const response = await invokeLLM({
+      messages: [
+        { role: "system", content: "أنت خبير تسويق رقمي. أجب بـ JSON فقط." },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" } as any,
+    });
+    const rawContent = response.choices[0]?.message?.content;
+    const content = typeof rawContent === "string" ? rawContent : "{}";
+    let report: any = {};
+    try { report = JSON.parse(content); } catch { report = {}; }
+    await updateLead(leadId, {
+      analysisStatus: "completed",
+      leadPriorityScore: report.digitalPresenceScore,
+      biggestMarketingGap: report.criticalGaps?.[0] ?? null,
+      revenueOpportunity: report.immediateOpportunities?.[0] ?? null,
+      suggestedSalesEntryAngle: report.salesScript ?? null,
+      analysisReadyFlag: true,
+      analysisConfidenceScore: Math.min(1, (report.digitalPresenceScore ?? 5) / 10),
+      partialAnalysisFlag: false,
+    });
+    if (allData.website?.phones?.length && !lead.verifiedPhone) {
+      await updateLead(leadId, { verifiedPhone: allData.website.phones[0] });
+    }
+    // Screenshots بالتوازي
+    const socialPlatforms = [
+      { key: "instagram" as const, url: lead.instagramUrl, data: allData.instagram },
+      { key: "twitter" as const, url: lead.twitterUrl, data: allData.twitter },
+      { key: "tiktok" as const, url: lead.tiktokUrl, data: allData.tiktok },
+      { key: "facebook" as const, url: lead.facebookUrl, data: allData.facebook },
+      { key: "snapchat" as const, url: (lead as any).snapchatUrl, data: null },
+    ];
+    const screenshotMap = new Map<string, string>();
+    let websiteScreenshotUrl: string | undefined;
+    const websiteScreenshotPromise = (async () => {
+      if (lead.website) {
+        try {
+          const buf = await takeWebsiteScreenshot(lead.website);
+          if (buf) {
+            const key = `website-${leadId}-${Date.now()}.png`;
+            const { url: s3Url } = await storagePut(key, buf, "image/png");
+            websiteScreenshotUrl = s3Url;
+          }
+        } catch (e) { console.warn("[WebsiteScreenshot] Failed:", e); }
+      }
+    })();
+    await Promise.all(
+      socialPlatforms
+        .filter(sp => sp.url)
+        .map(async (sp) => {
+          try {
+            const buf = await takeSocialMediaScreenshot(sp.url!, sp.key);
+            if (buf) {
+              const randomSuffix = Math.random().toString(36).slice(2, 8);
+              const key = `social-${leadId}-${sp.key}-${randomSuffix}.png`;
+              const { url: s3Url } = await storagePut(key, buf, "image/png");
+              screenshotMap.set(sp.key, s3Url);
+            }
+          } catch (ssErr: any) {
+            console.warn(`[SocialScreenshot] Failed for ${sp.key}:`, ssErr?.message);
+          }
+        })
+    );
+    for (const sp of socialPlatforms) {
+      if (sp.url || sp.data) {
+        try {
+          await createSocialAnalysis({
+            leadId,
+            platform: sp.key,
+            profileUrl: sp.url ?? undefined,
+            hasAccount: !!(sp.url),
+            followersCount: sp.data?.followersCount ?? null,
+            summary: report.platformsSummary?.[sp.key] ?? null,
+            recommendations: report.recommendedActions ?? [],
+            gaps: report.criticalGaps ?? [],
+            rawAnalysis: JSON.stringify(sp.data ?? {}),
+            dataSource: "bright_data",
+            screenshotUrl: screenshotMap.get(sp.key),
+          });
+        } catch (e) { /* تجاهل */ }
+      }
+    }
+    await websiteScreenshotPromise;
+    if (lead.website || allData.website) {
+      try {
+        await createWebsiteAnalysis({
+          leadId,
+          url: lead.website || "unknown",
+          hasWebsite: !!(lead.website),
+          overallScore: report.digitalPresenceScore ?? null,
+          summary: report.executiveSummary ?? null,
+          recommendations: report.recommendedActions ?? [],
+          technicalGaps: report.criticalGaps ?? [],
+          contentGaps: [],
+          rawAnalysis: JSON.stringify(report),
+          screenshotUrl: websiteScreenshotUrl,
+        });
+      } catch (e) { console.error("[WebsiteAnalysis] Failed:", e); }
+    }
+    // توليد بيانات المنافسين
+    try {
+      const competitorPrompt = `أنت خبير تسويق رقمي في السوق السعودي. حدد أبرز 3-5 منافسين محتملين:
+النشاط: ${lead.companyName} (${lead.businessType}) في ${lead.city}
+أجب بـ JSON فقط:
+{"competitors":[{"name":"اسم","website":null,"strengths":["قوة"],"weaknesses":["ضعف"],"estimatedDigitalScore":7,"marketPosition":"وصف","instagramUrl":null}],"competitorGaps":["ثغرة"],"marketOpportunities":["فرصة"],"competitiveAdvantage":"الميزة"}`;
+      const compResponse = await invokeLLM({
+        messages: [
+          { role: "system", content: "أجب بـ JSON فقط." },
+          { role: "user", content: competitorPrompt },
+        ],
+        response_format: { type: "json_object" } as any,
+      });
+      const compRaw = compResponse.choices[0]?.message?.content;
+      let compData: any = {};
+      try { compData = JSON.parse(typeof compRaw === "string" ? compRaw : "{}"); } catch { compData = {}; }
+      if (compData.competitors?.length > 0) {
+        await createSeoAdvancedAnalysis({
+          leadId,
+          url: lead.website || "",
+          competitors: compData.competitors,
+          competitorGaps: compData.competitorGaps ?? [],
+          priorityActions: compData.marketOpportunities ?? [],
+          seoSummary: compData.competitiveAdvantage ?? null,
+        });
+      }
+    } catch (compErr: any) {
+      console.warn("[Competitors] Failed:", compErr?.message);
+    }
+    console.log(`[AutoAnalysis] ✅ Completed full analysis for lead ${leadId}`);
+  } catch (error) {
+    console.error(`[AutoAnalysis] ❌ Failed for lead ${leadId}:`, error);
+    await updateLead(leadId, { analysisStatus: "failed" });
+  }
+}
+
 // ===== Export Router =====
 export const brightDataAnalysisRouter = router({
   analyzeWebsite: analyzeWebsiteWithBrightData,
