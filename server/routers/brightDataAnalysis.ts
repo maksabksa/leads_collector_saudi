@@ -1001,21 +1001,24 @@ ${realDataSummary}
       }
 
       // حفظ تحليل الموقع في جدول websiteAnalyses إذا كان هناك موقع
-      if (lead.website || allData.website) {
-        try {
-          await createWebsiteAnalysis({
-            leadId: input.leadId,
-            url: lead.website || "unknown",
-            hasWebsite: !!(lead.website),
-            overallScore: report.digitalPresenceScore ?? null,
-            summary: report.executiveSummary ?? null,
-            recommendations: report.recommendedActions ?? [],
-            technicalGaps: report.criticalGaps ?? [],
-            contentGaps: [],
-            rawAnalysis: JSON.stringify(report),
-          });
-        } catch (e) { /* تجاهل خطأ الحفظ */ }
-      }
+      // أخذ screenshot الموقع بالتوازي مع screenshots السوشيال ميديا
+      let websiteScreenshotUrl: string | undefined;
+      const websiteScreenshotPromise = (async () => {
+        if (lead.website) {
+          try {
+            const wsBuf = await takeWebsiteScreenshot(lead.website, 30000);
+            if (wsBuf) {
+              const wsSuffix = Math.random().toString(36).slice(2, 8);
+              const wsKey = `screenshots/website-${input.leadId}-${wsSuffix}.png`;
+              const { url: wsS3Url } = await storagePut(wsKey, wsBuf, "image/png");
+              websiteScreenshotUrl = wsS3Url;
+              console.log(`[WebsiteScreenshot] Saved: ${wsS3Url}`);
+            }
+          } catch (wsErr: any) {
+            console.error(`[WebsiteScreenshot] Failed for ${lead.website}:`, wsErr?.message);
+          }
+        }
+      })();
 
       // حفظ تحليل السوشيال ميديا في جدول socialAnalyses
       const socialPlatforms: Array<{ key: "instagram" | "twitter" | "tiktok" | "facebook"; url: string | null | undefined; data: any }> = [
@@ -1063,6 +1066,25 @@ ${realDataSummary}
             });
           } catch (e) { /* تجاهل خطأ الحفظ */ }
         }
+      }
+
+      // انتظار screenshot الموقع وحفظ websiteAnalysis
+      await websiteScreenshotPromise;
+      if (lead.website || allData.website) {
+        try {
+          await createWebsiteAnalysis({
+            leadId: input.leadId,
+            url: lead.website || "unknown",
+            hasWebsite: !!(lead.website),
+            overallScore: report.digitalPresenceScore ?? null,
+            summary: report.executiveSummary ?? null,
+            recommendations: report.recommendedActions ?? [],
+            technicalGaps: report.criticalGaps ?? [],
+            contentGaps: [],
+            rawAnalysis: JSON.stringify(report),
+            screenshotUrl: websiteScreenshotUrl,
+          });
+        } catch (e) { console.error("[WebsiteAnalysis] Failed to save:", e); }
       }
 
       // توليد بيانات المنافسين عبر AI وحفظها في seoAdvancedAnalysis

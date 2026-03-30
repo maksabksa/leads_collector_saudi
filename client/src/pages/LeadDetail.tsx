@@ -1813,6 +1813,22 @@ export default function LeadDetail() {
                 ) : null}
               </div>
 
+              {/* Screenshot واجهة الحساب */}
+              {(sa as any).screenshotUrl && (
+                <div className="rounded-xl overflow-hidden border" style={{ borderColor: pc.color.replace(')', ' / 0.25)') }}>
+                  <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: pc.color.replace(')', ' / 0.08)') }}>
+                    <span className="text-xs font-medium" style={{ color: pc.color }}>📸 واجهة الحساب</span>
+                  </div>
+                  <img
+                    src={(sa as any).screenshotUrl}
+                    alt={`واجهة ${pc.label}`}
+                    className="w-full object-cover"
+                    style={{ maxHeight: '320px', objectPosition: 'top' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              )}
+
               {/* بيانات حقيقية من Bright Data Dataset API */}
               {hasRealData && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-xl" style={{ background: pc.color.replace(')', ' / 0.06)') }}>
