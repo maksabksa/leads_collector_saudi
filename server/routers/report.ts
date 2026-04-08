@@ -220,19 +220,20 @@ async function generatePDFBuffer(lead: any, websiteAnalysis: any, socialAnalyses
 
   try {
     const page = await browser.newPage();
-    // تعطيل تحميل الصور والخطوط الخارجية لتسريع التوليد
+    // السماح بتحميل الصور لضمان ظهور السكرينشوت في التقرير
+    // نحجب فقط media (فيديو/صوت) لتوفير الموارد
     await page.setRequestInterception(true);
     page.on('request', (req) => {
       const rt = req.resourceType();
-      if (rt === 'image' || rt === 'font' || rt === 'media') {
+      if (rt === 'media') {
         req.abort();
       } else {
         req.continue();
       }
     });
-    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 45000 });
-    // انتظار قصير لضمان اكتمال الرسم
-    await new Promise(r => setTimeout(r, 500));
+    await page.setContent(html, { waitUntil: "networkidle0", timeout: 60000 });
+    // انتظار إضافي لضمان اكتمال تحميل الصور
+    await new Promise(r => setTimeout(r, 2000));
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,

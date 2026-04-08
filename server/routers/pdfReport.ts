@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { leads, seoAdvancedAnalysis, websiteAnalyses, socialAnalyses as socialAnalysesTable, realSocialSnapshots } from "../../drizzle/schema";
 import { eq, isNotNull, ne, or, desc } from "drizzle-orm";
-import { generateReportHTML, type PDFReportData } from "../lib/pdfReportEngine";
+import { generateReportHTML, fetchImageAsBase64, type PDFReportData } from "../lib/pdfReportEngine";
 import { storagePut } from "../storage";
 import { getActiveSeasonForBusiness } from "./seasons";
 import { getReportStyleSettings } from "./reportStyle";
@@ -447,6 +447,20 @@ export const pdfReportRouter = router({
             aiSummary: null,
             recommendations: null,
           };
+        }
+
+        // تحويل السكرينشوت إلى base64 لضمان ظهوره في التقرير بدون اعتماد على تحميل خارجي
+        if (reportData.websiteData?.screenshotUrl) {
+          const b64 = await fetchImageAsBase64(reportData.websiteData.screenshotUrl).catch(() => null);
+          if (b64) reportData.websiteData.screenshotUrl = b64;
+        }
+        if (reportData.socialAnalyses) {
+          for (const sa of reportData.socialAnalyses) {
+            if (sa.screenshotUrl) {
+              const b64 = await fetchImageAsBase64(sa.screenshotUrl).catch(() => null);
+              if (b64) sa.screenshotUrl = b64;
+            }
+          }
         }
 
         const html = generateReportHTML(reportData);

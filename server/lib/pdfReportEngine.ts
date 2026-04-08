@@ -2,6 +2,35 @@
  * PDF Report Engine v2 — محرك توليد تقارير PDF احترافي
  * هيكل 5 صفحات A4 مع تصميم داكن راقٍ
  */
+import https from "https";
+import http from "http";
+
+/**
+ * تحويل صورة URL إلى base64 data URI لضمان ظهورها في التقرير بدون اعتماد على تحميل خارجي
+ */
+export async function fetchImageAsBase64(url: string): Promise<string | null> {
+  if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) return null;
+  try {
+    return await new Promise((resolve) => {
+      const protocol = url.startsWith("https") ? https : http;
+      const req = protocol.get(url, { timeout: 8000 }, (res) => {
+        if (res.statusCode && res.statusCode >= 400) { resolve(null); return; }
+        const contentType = res.headers["content-type"] || "image/jpeg";
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const buffer = Buffer.concat(chunks);
+          resolve(`data:${contentType};base64,${buffer.toString("base64")}`);
+        });
+        res.on("error", () => resolve(null));
+      });
+      req.on("error", () => resolve(null));
+      req.on("timeout", () => { req.destroy(); resolve(null); });
+    });
+  } catch {
+    return null;
+  }
+}
 
 const MAKSAB_LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310419663029364550/rMEPivVewTdIKIbw.png";
 
